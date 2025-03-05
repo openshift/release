@@ -14,11 +14,11 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.18"
+    tag: "4.19"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.17"
+    tag: "4.18"
   tools:
     name: "4.14"
     namespace: ocp
@@ -38,13 +38,13 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
   custom:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
   intermediate415:
     candidate:
       architecture: arm64
@@ -63,6 +63,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.17"
+  intermediate418:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
   latest:
     release:
       architecture: amd64
@@ -73,7 +79,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -82,7 +88,7 @@ resources:
 tests:
 - as: baremetal-upi-ovn-ipv4-f28
   cluster: build05
-  cron: 21 15 6 * *
+  cron: 3 15 23 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -95,9 +101,11 @@ tests:
       workers: "2"
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE418
+        name: release:intermediate418
       - env: RELEASE_IMAGE_INTERMEDIATE417
         name: release:intermediate417
       - env: RELEASE_IMAGE_INTERMEDIATE416
@@ -114,7 +122,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: baremetal-lab-upi
 zz_generated_metadata:
-  branch: release-4.18
+  branch: release-4.19
   org: openshift
   repo: openshift-tests-private
-  variant: arm64-nightly-4.18-upgrade-from-stable-4.14
+  variant: arm64-nightly-4.19-upgrade-from-stable-4.14
