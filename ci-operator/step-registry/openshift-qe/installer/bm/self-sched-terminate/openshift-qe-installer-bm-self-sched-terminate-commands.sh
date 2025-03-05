@@ -8,6 +8,14 @@ set -o pipefail
 
 quads_pwd=$(cat "/secret/quads_pwd")
 
+if [[ $LAB == "performancelab" ]]; then
+  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com"
+elif [[ $LAB == "scalelab" ]]; then
+  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
+elif [[ $LAB == "scalelab-stage" ]]; then
+  export QUADS_INSTANCE="https://quads2-stage.rdu2.scalelab.redhat.com"
+fi
+
 # Login to get token
 echo
 echo "Login to get token ..."
