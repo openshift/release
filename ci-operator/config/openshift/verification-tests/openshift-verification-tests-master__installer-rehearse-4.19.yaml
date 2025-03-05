@@ -37,6 +37,24 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BOOTSTRAP_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      CONTROL_PLANE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      SLEEP_DURATION: 30m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-upi-private-xpn-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-upi-private-xpn-ingress-glb-provision
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
