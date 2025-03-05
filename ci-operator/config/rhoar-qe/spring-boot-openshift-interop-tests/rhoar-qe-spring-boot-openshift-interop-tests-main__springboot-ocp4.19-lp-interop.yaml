@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: cli
 build_root:
@@ -17,7 +17,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -40,7 +40,34 @@ tests:
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","springboot-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","springboot-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: lfuka@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      USER_TAGS: |
+        scenario springboot
+    test:
+    - ref: springboot-prepare-cluster
+    - ref: springboot-tests-interop
+    workflow: firewatch-ipi-aws
+- as: springboot-interop-aws-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "springboot-prepare-cluster", "failure_type": "all", "classification":  "Infrastructure Provisioning - Cluster Preparation", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "springboot-tests-interop", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "springboot-tests-interop", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTSBT", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","springboot-lp","fips"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: lfuka@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
@@ -54,4 +81,4 @@ zz_generated_metadata:
   branch: main
   org: rhoar-qe
   repo: spring-boot-openshift-interop-tests
-  variant: springboot-ocp4.18-lp-interop
+  variant: springboot-ocp4.19-lp-interop
