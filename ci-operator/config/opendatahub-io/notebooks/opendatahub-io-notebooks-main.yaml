@@ -65,9 +65,9 @@ promotion:
 releases:
   latest:
     release:
+      architecture: multi
       channel: stable
       version: "4.12"
-      architecture: multi # required; see notes below
 resources:
   '*':
     limits:
@@ -437,15 +437,13 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: rocm-runtime-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
-# https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-a-cluster-from-hypershift
 - as: notebooks-ubi9-e2e-tests
   run_if_changed: (jupyter\/minimal\/ubi9-python-3.11\/*)|(jupyter\/datascience\/ubi9-python-3.11\/*)|(jupyter\/pytorch\/ubi9-python-3.11\/*)|(jupyter\/tensorflow\/ubi9-python-3.11\/*)|(jupyter\/trustyai\/ubi9-python-3.11\/*)
   steps:
-    cluster_profile: gcp-opendatahub # required; the cluster profile to create the cloud resources for the hosted cluster by HyperShift
-#    cluster_profile: gcp
+    cluster_profile: gcp-opendatahub
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi # optional; the payload to install
       CONTROL_PLANE_NODE_SELECTOR: kubernetes.io/arch=amd64
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
     test:
     - as: jupyter-ubi9-python-3-11-test-e2e
       cli: latest
