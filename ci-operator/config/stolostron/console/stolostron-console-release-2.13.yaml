@@ -23,6 +23,15 @@ images:
       as:
       - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-20
   to: console
+- dockerfile_path: Dockerfile.mce.prow
+  inputs:
+    stolostron_builder_nodejs20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:nodejs20-linux
+    stolostron_common-nodejs-parent_nodejs-20:
+      as:
+      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-20
+  to: console-mce
 promotion:
   to:
   - name: "2.13"
@@ -71,6 +80,13 @@ tests:
       SOURCE_IMAGE_REF: console
     env:
       IMAGE_REPO: console
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-mce
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console-mce
+    env:
+      IMAGE_REPO: console-mce
     workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true

@@ -1,4 +1,8 @@
 base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.63.4
   ocp_4.19_base-rhel9:
     name: "4.20"
     namespace: ocp
@@ -62,6 +66,17 @@ tests:
   commands: make test-e2e
   container:
     from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    cd v2
+    golangci-lint version
+    golangci-lint run --new-from-rev=HEAD~ --out-format colored-line-number --verbose --print-resources-usage --timeout=5m --build-tags "json1 exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_openpgp"
+  container:
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
