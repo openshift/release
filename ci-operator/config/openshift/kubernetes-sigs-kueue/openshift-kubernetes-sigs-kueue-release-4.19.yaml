@@ -1,17 +1,10 @@
-base_images:
-  base:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 build_root:
   from_repository: true
 images:
 - dockerfile_literal: |
-    FROM base
+    FROM src
     RUN dnf install -y skopeo git && dnf clean all
-    WORKDIR /workdir
-    COPY . .
-  from: base
+  from: src
   to: kueue-base-src
 promotion:
   to:
@@ -44,7 +37,20 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |-
-        REVISION=$(git rev-parse HEAD)
+        echo "Current PWD: $(pwd)"
+        echo "Listing directory contents:"
+        ls -lah
+
+        echo "Current Git branch:"
+        git branch --show-current
+
+        echo "Latest Git commits:"
+        git log --oneline -5
+
+        echo "Git status:"
+        git status
+
+        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
         IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:on-pr-${REVISION}
 
         echo "Waiting for image ${IMAGE_TAG} to be available..."
