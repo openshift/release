@@ -2,6 +2,7 @@
 
 set -o nounset
 set -o errexit
+set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 AWS_ACCOUNT_ID=$(cat /var/run/hcm-job-logs-s3-bucket-storage/account_id)
@@ -23,3 +24,13 @@ export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN
 aws s3 cp --recursive \
 	s3://"${HIVE_LOGS_BUCKET}"/"${CLUSTER_NAME}"-uhc-staging-"${CLUSTER_ID}" \
 	"${ARTIFACT_DIR}"/
+
+# save csv list of operator images
+oc get csv -A -o json | jq -r '
+	.items[] |
+	select(.spec.install.spec.deployments != null) |
+	"\(.metadata.name): " + (
+		.spec.install.spec.deployments[] |
+		.spec.template.spec.containers[] |
+		.name
+	)' | sort | uniq > "${ARTIFACT_DIR}"/operator-shas.txt
