@@ -65,9 +65,9 @@ promotion:
 releases:
   latest:
     release:
-      architecture: amd64
-      channel: fast
-      version: "4.10"
+      channel: stable
+      version: "4.12"
+      architecture: multi # required; see notes below
 resources:
   '*':
     limits:
@@ -437,6 +437,7 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: rocm-runtime-tensorflow-ubi9-python-3.11
     workflow: opendatahub-io-ci-image-mirror
+# https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-a-cluster-from-hypershift
 - as: notebooks-ubi9-e2e-tests
   run_if_changed: (jupyter\/minimal\/ubi9-python-3.11\/*)|(jupyter\/datascience\/ubi9-python-3.11\/*)|(jupyter\/pytorch\/ubi9-python-3.11\/*)|(jupyter\/tensorflow\/ubi9-python-3.11\/*)|(jupyter\/trustyai\/ubi9-python-3.11\/*)
   cluster_claim:
@@ -448,6 +449,10 @@ tests:
     timeout: 1h0m0s
     version: "4.16"
   steps:
+    cluster_profile: aws-2 # required; the cluster profile to create the cloud resources for the hosted cluster by HyperShift
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi # optional; the payload to install
+      CONTROL_PLANE_NODE_SELECTOR: kubernetes.io/arch=amd64
     test:
     - as: jupyter-ubi9-python-3-11-test-e2e
       cli: latest
@@ -551,7 +556,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-gcp
+    workflow: hypershift-hostedcluster-workflow
 - as: codeserver-notebook-e2e-tests
   run_if_changed: (codeserver\/ubi9-python-3.11\/*)
   steps:
