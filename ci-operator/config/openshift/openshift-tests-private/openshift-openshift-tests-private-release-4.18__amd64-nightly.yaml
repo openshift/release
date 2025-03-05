@@ -1158,6 +1158,22 @@ tests:
     - chain: multiarch-tuning-operator
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp-security-group
+- as: aws-rosa-hcp-security-group-stage-full-f30-compliance
+  cron: 25 19 8 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      FILTERS_ADDITIONAL: ""
+      OPENSHIFT_VERSION: "4.18"
+      TEST_FILTERS: ~HyperShiftMGMT&;;~NonHyperShiftHOST&;ROSA&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-aws-sts-hcp-security-group
 - as: aws-rosa-hcp-stage-full-f7
   cron: 21 12 5,14,21,28 * *
   steps:
@@ -1645,6 +1661,20 @@ tests:
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
+- as: azure-aks-hypershift-byo-vnet-fips-guest-f30-compliance
+  cron: 46 8 28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&;~NonHyperShiftHOST&
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
 - as: azure-aks-hypershift-byo-vnet-fips-guest-f14-destructive
   cron: 1 4 11,27 * *
