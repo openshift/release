@@ -1,10 +1,19 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/kubernetes-sigs-kueue
 images:
-- dockerfile_path: Dockerfile.ci
-  from: root
-  to: kueue-controller
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y skopeo git && dnf clean all
+    WORKDIR /workdir
+    COPY . .
+  from: base
+  to: kueue-base-src
 promotion:
   to:
   - name: 4.19-priv
@@ -22,6 +31,39 @@ tests:
   commands: make vet
   container:
     from: src
+- as: e2e-aws-ocp
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: e2e-kueue
+      cli: latest
+      commands: |-
+        REVISION=$(git rev-parse HEAD)
+        IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:on-pr-${REVISION}
+
+        echo "Waiting for image ${IMAGE_TAG} to be available..."
+        function wait_for_image() {
+            until skopeo inspect docker://${IMAGE_TAG} >/dev/null 2>&1; do
+                echo "Image not found yet. Retrying in 30s..."
+                sleep 30
+            done
+        }
+        timeout 25m bash -c "wait_for_image"
+
+        echo "Image is available. Proceeding with tests..."
+
+        IMAGE_TAG=${IMAGE_TAG} make -f Makefile-test-ocp.mk test-e2e-ocp
+      from: kueue-base-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
 zz_generated_metadata:
   branch: main
   org: openshift-priv
