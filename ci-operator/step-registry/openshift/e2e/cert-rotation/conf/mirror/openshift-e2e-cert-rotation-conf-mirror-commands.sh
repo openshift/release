@@ -291,5 +291,6 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
 	/usr/local/bin/local-mirror.sh

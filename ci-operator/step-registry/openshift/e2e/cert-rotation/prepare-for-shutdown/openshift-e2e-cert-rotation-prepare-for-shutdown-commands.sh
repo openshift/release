@@ -16,7 +16,7 @@ cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
 #!/bin/bash
 set -euo pipefail
 
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
@@ -178,6 +178,54 @@ function wait-for-operators-to-stabilize {
 
 EOF
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cert-rotation-functions.sh "root@${IP}:/usr/local/share"
+
+cat >"${SHARED_DIR}"/set-client-ssh-settings.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+source /usr/local/share/cert-rotation-functions.sh
+
+# Install tqdm
+python -m ensurepip && python -m pip install tqdm
+run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
+
+# Stop chrony service on all nodes
+sudo systemctl stop chronyd
+run-on-all-nodes "systemctl disable chronyd --now"
+
+# Set ClientAliveInterval
+set +e
+run-on-all-nodes "sed -i -e 's/.*ClientAliveInterval.*/ClientAliveInterval 120/g' /etc/ssh/sshd_config && sed -i -e 's/.*ClientAliveCountMax.*/ClientAliveCountMax 100/g' /etc/ssh/sshd_config"
+run-on-all-nodes "systemctl restart sshd"
+for n in ${control_nodes[@]} ${compute_nodes[@]}; do
+  until timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" true >/dev/null 2>&1; do
+    echo "."
+  done
+done
+sed -i -e 's/.*ClientAliveInterval.*/ClientAliveInterval 120/g' /etc/ssh/sshd_config && sed -i -e 's/.*ClientAliveCountMax.*/ClientAliveCountMax 100/g' /etc/ssh/sshd_config
+systemctl restart sshd
+EOF
+
+chmod +x "${SHARED_DIR}"/set-client-ssh-settings.sh
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/set-client-ssh-settings.sh "root@${IP}:/usr/local/bin"
+
+timeout \
+	--kill-after 10m \
+	30m \
+	ssh \
+	"${SSHOPTS[@]}" \
+  -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
+	"root@${IP}" \
+	/usr/local/bin/set-client-ssh-settings.sh
+
+timeout \
+	--kill-after 10m \
+	30m \
+	ssh \
+	"${SSHOPTS[@]}" \
+  -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
+	"root@${IP}" \
+  "systemctl restart sshd"
 
 # This file is scp'd to the machine where the nested libvirt cluster is running
 # It rotates node kubeconfigs so that it could be shut down earlier than 24 hours
@@ -379,6 +427,7 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
 	/usr/local/bin/prepare-nodes-for-shutdown.sh \
 	${SKEW}
