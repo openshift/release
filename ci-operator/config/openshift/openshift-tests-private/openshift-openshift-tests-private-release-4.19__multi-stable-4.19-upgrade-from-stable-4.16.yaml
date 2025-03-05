@@ -1,0 +1,77 @@
+base_images:
+  ansible:
+    name: "4.16"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  intermediate1:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.17"
+  intermediate2:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
+  latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.16"
+  target:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gcp-ipi-ovn-ipsec-arm-mixarch-f28
+  cron: 42 2 24 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: cucushift-upgrade-setedge-3hops
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-stable-4.19-upgrade-from-stable-4.16

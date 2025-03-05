@@ -17,6 +17,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -46,6 +47,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 function check_disk_type() {
     local node_list=$1 rg_name=$2 expected_disk_type=$3 ret=0 node_name
