@@ -402,7 +402,7 @@ elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
     export HYPERSHIFT_ENVIRONMENT=true
     export FEATURES_ENVIRONMENT=hypershift-ci
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni knmstate}"
 fi
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
@@ -435,7 +435,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.18" ]] || [[ "$T5CI_VERSION" == "4.19" ]]; then
+if [[ "$T5CI_VERSION" == "4.19" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.17"
 else

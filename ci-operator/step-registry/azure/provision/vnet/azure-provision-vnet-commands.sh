@@ -76,6 +76,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -105,6 +106,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 rg_file="${SHARED_DIR}/resourcegroup"
 if [ -f "${rg_file}" ]; then
@@ -118,17 +120,6 @@ run_command "az group show --name $RESOURCE_GROUP"; ret=$?
 if [ X"$ret" != X"0" ]; then
     echo "The $RESOURCE_GROUP resrouce group does not exit"
     exit 1
-fi
-
-# Assigne proper permissions to resource group where vnet will be created
-if [[ -n "${AZURE_PERMISSION_FOR_VNET_RG}" ]]; then
-    cluster_sp_id=${AZURE_AUTH_CLIENT_ID}
-    if [[ -f "${SHARED_DIR}/azure_sp_id" ]]; then
-        cluster_sp_id=$(< "${SHARED_DIR}/azure_sp_id")
-    fi
-    resource_group_id=$(az group show -g "${RESOURCE_GROUP}" --query id -otsv)
-    echo "Assigin role '${AZURE_PERMISSION_FOR_VNET_RG}' to resource group ${RESOURCE_GROUP}"
-    run_command "az role assignment create --assignee ${cluster_sp_id} --role '${AZURE_PERMISSION_FOR_VNET_RG}' --scope ${resource_group_id} -o jsonc"
 fi
 
 VNET_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"

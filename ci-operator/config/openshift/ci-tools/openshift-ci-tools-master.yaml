@@ -751,7 +751,9 @@ images:
       - destination_dir: .
         source_path: /usr/local/bin/oc
   to: multi-arch-builder-controller
-- dockerfile_literal: |-
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD ci-scheduling-webhook /usr/bin/ci-scheduling-webhook
     ENTRYPOINT ["/usr/bin/ci-scheduling-webhook"]
@@ -782,6 +784,12 @@ promotion:
   to:
   - namespace: ci
     tag: latest
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -790,31 +798,28 @@ resources:
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  cluster: build10
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
   node_architecture: arm64
 - as: codegen
-  cluster: build10
   commands: make verify-gen
   container:
     from: src
   node_architecture: arm64
 - as: format
-  cluster: build10
   commands: make format
   container:
     from: src
   node_architecture: arm64
 - as: integration
-  cluster: build10
   commands: make integration
   container:
     from: test-bin
   node_architecture: arm64
 - always_run: false
   as: e2e
+  cluster: build11
   steps:
     test:
     - as: e2e
@@ -848,6 +853,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo
+  cluster: build11
   optional: true
   pipeline_run_if_changed: pkg/steps/(index|bundle).*.go
   steps:
@@ -880,6 +886,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo-post
+  cluster: build11
   postsubmit: true
   steps:
     test:
@@ -911,7 +918,6 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  cluster: build10
   node_architecture: arm64
   optional: true
   steps:
@@ -931,19 +937,16 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: checkconfig
-  cluster: build10
   commands: make validate-checkconfig
   container:
     from: test-bin
   node_architecture: arm64
 - as: validate-vendor
-  cluster: build10
   commands: make validate-vendor
   container:
     from: src
   node_architecture: arm64
 - as: frontend-checks
-  cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
@@ -964,6 +967,51 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: konflux-test-cluster-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 0 1 1 0
+  steps:
+    test:
+    - as: konflux-test
+      commands: make-placeholder
+      from: konflux-image-placeholder
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: konflux-test-aws
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: aws
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      from: konflux-image-placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: konflux-test-gcp
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      from: konflux-image-placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: security
   optional: true
   steps:

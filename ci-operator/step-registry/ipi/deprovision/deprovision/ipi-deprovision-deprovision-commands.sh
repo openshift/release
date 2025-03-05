@@ -13,7 +13,6 @@ fi
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
-    cp /tmp/installer/metadata.json "${ARTIFACT_DIR}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -114,6 +113,12 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     echo "Private cluster setting proxy"
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+  fi
+fi
+
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]]; then
+  if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
   fi
 fi
 

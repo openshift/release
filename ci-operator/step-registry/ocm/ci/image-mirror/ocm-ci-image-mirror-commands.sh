@@ -129,9 +129,29 @@ DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
 log "INFO Mirroring Image"
 log "     From: $SOURCE_IMAGE_REF"
 log "     To  : $DESTINATION_IMAGE_REF"
-oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" || {
-    log "ERROR Unable to mirror image"
-    exit 1
-}
+
+mirror_log="${ARTIFACT_DIR}/oc-mirror-output.log"
+
+for i in {1..6}; do
+    if ! oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" 1>${mirror_log}; then
+        log "ERROR Unable to mirror image"
+        exit 1
+    fi
+
+    # The stdout output of `oc image mirror` is:
+    # <sha> <image-repo>:<tag>
+    # If it's empty, it's probable nothing was mirrored
+    if [[ -n "$(cat ${mirror_log})" ]]; then
+        break
+    fi
+
+    if [[ "${i}" == "6" ]]; then
+        log "ERROR failed to complete mirroring"
+        exit 1
+    fi
+
+    log "INFO Retrying (${i} of 5) ..."
+    sleep 60
+done
 
 log "INFO Mirroring complete."

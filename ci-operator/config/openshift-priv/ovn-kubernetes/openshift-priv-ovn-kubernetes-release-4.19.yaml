@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
   tests-private:
     name: tests-private
     namespace: ci
@@ -52,6 +56,9 @@ images:
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -270,20 +277,22 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-ipv4-bgp-techpreview
+- as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
+        IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local
     pre:
     - chain: baremetalds-ofcir-pre
     - ref: baremetalds-e2e-ovn-bgp-pre
-    workflow: baremetalds-e2e-ovn-ipv4
+    workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-ovn-hypershift
   steps:
     cluster_profile: hypershift
@@ -367,6 +376,25 @@ tests:
     workflow: openshift-qe-cluster-density-v2
   timeout: 5h0m0s
 - always_run: false
+  as: qe-perfscale-payload-control-plane-6nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      ITERATION_MULTIPLIER_ENV: "15"
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "false"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
+- always_run: false
   as: qe-perfscale-aws-ovn-medium-node-density-cni
   optional: true
   steps:
@@ -418,7 +446,7 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: openshift-qe-installer-featuregate
-    workflow: openshift-qe-udn-density-l3-pods
+    workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-udn-density-l2
@@ -429,6 +457,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_LAYER_3: "false"
       FEATURE: NetworkSegmentation
       ITERATION_MULTIPLIER_ENV: "3"
       KUBE_BURNER_VERSION: 1.5.0
@@ -438,7 +467,7 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: openshift-qe-installer-featuregate
-    workflow: openshift-qe-udn-density-l2-pods
+    workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
 - as: e2e-aws-ovn-techpreview
   optional: true

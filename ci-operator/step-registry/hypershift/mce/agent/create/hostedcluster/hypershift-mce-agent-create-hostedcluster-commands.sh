@@ -39,7 +39,7 @@ BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"
-RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}
 
 if [[ "${CLUSTER_TYPE}" == "equinix-ocp-metal-qe" ]]; then
   # This is a RDU2 lab cluster. RDU2 lab clusters deployed via step-registry/baremetal steps do not

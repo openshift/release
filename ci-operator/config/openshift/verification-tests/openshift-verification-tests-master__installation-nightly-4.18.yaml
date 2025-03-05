@@ -121,6 +121,20 @@ tests:
       ENABLE_BYO_IAM_ROLE_DEFAULT_MACHINE: "false"
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+- as: aws-ipi-byo-subnets-only-public-mini-perm-arm-f14
+  cron: 34 18 1,17 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-subnets
 - as: aws-ipi-default-mini-perm-arm-f7
   cron: 56 23 6,15,22,29 * *
   steps:
@@ -374,7 +388,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.15.2024072409
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.17.2024100419
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -387,7 +401,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_DC4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.15.2024072409
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.17.2024100419
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -536,7 +550,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       OCP_ARCH: arm64
     test:
@@ -719,7 +733,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe-zone
     env:
-      CLUSTER_OS_IMAGE: https://rhcos.mirror.openshift.com/art/storage/prod/streams/4.18-9.4/builds/417.94.202405291927-0/x86_64/rhcos-417.94.202405291927-0-nutanix.x86_64.qcow2
+      CLUSTER_OS_IMAGE: https://rhcos.mirror.openshift.com/art/storage/prod/streams/4.18-9.4/builds/418.94.202501221327-0/x86_64/rhcos-418.94.202501221327-0-nutanix.x86_64.qcow2
       COMPUTE_REPLICAS: "2"
       ENABLE_REBOOT_CHECK: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"

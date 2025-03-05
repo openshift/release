@@ -31,9 +31,32 @@ fi
 api_vip=$(jq -r --argjson N 2 --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
 ingress_vip=$(jq -r --argjson N 3 --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
 
+# Set the VIPs to be the load balancer IP in case of user-managed LB.
+load_balancer_type=$(echo "$ASSISTED_CONFIG" | awk -F'=' '/^LOAD_BALANCER_TYPE=/{print $2}')
+if [ -n "$load_balancer_type" ]; then
+    echo "LOAD_BALANCER_TYPE: $load_balancer_type"
+else
+    echo "LOAD_BALANCER_TYPE not found"
+fi
+
+if [ "${load_balancer_type:=cluster-managed}" = "user-managed" ]; then
+  mapfile -t vips <"${SHARED_DIR}"/vips.txt
+  api_vip=${vips[0]}
+  ingress_vip=${vips[1]}
+  load_balancer_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
+fi
+
+echo "API VIP is ${api_vip}"
+echo "INGRESS VIP is ${ingress_vip}"
+
+if [ "${load_balancer_cidr:-}" != "" ]; then
+  echo "Load balancer CIDR is ${load_balancer_cidr}"
+fi
+
   cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
 export API_VIPS="[{\"ip\": \"${api_vip}\"}]"
 export INGRESS_VIPS="[{\"ip\": \"${ingress_vip}\"}]"
+export LOAD_BALANCER_CIDR="${load_balancer_cidr:-}"
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file..."
