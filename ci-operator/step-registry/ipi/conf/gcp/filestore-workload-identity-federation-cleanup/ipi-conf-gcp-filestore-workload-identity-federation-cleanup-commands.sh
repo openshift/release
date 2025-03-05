@@ -18,7 +18,7 @@ logger() {
 
 function run_command() {
     local CMD="$1"
-    echo "Running Command: ${CMD}"
+    echo "Running Command: ${CMD}" || true
     eval "${CMD}"
 }
 
