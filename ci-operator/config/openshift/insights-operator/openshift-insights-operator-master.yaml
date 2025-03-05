@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
@@ -15,10 +19,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
 build_root:
   from_repository: true
 images:
@@ -338,40 +338,40 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     test:
-      - as: test
-        cli: latest
-        commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=${ARTIFACT_DIR}/test-report.xml
-        credentials:
-          - mount_path: /secrets
-            name: insights-qa
-            namespace: test-credentials
-          - mount_path: /secret/aws/aws-bucket
-            name: aws-bucket
-            namespace: test-credentials
-          - mount_path: /secret/aws/aws-access-key-id
-            name: aws-access-key-id
-            namespace: test-credentials
-          - mount_path: /secret/aws/aws-region
-            name: aws-region
-            namespace: test-credentials
-          - mount_path: /secret/aws/aws-secret-access-key
-            name: aws-secret-access-key
-            namespace: test-credentials
-        env:
-          - default: /secret/aws/aws-access-key-id/aws-access-key-id
-            name: AWS_ACCESS_KEY_ID_PATH
-          - default: /secret/aws/aws-bucket/aws-bucket
-            name: AWS_BUCKET_PATH
-          - default: /secret/aws/aws-region/aws-region
-            name: AWS_REGION_PATH
-          - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
-            name: AWS_SECRET_ACCESS_KEY_PATH
-        from: insights-operator-tests
-        grace_period: 30s
-        resources:
-          requests:
-            cpu: 100m
-        timeout: 3h0m0s
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=${ARTIFACT_DIR}/test-report.xml
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
