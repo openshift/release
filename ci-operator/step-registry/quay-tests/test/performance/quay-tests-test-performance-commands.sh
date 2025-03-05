@@ -12,6 +12,12 @@ echo "current directory is: $(pwd)"
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
 QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
 
+TEST_USERNAME=$(cat /var/run/seansecret/myusername)
+TEST_PASSWORD=$(cat /var/run/seansecret/mypassword)
+echo "TEST_USERNAME: $TEST_USERNAME"
+echo "TEST_PASSWORD: $TEST_PASSWORD"
+sleep 10m
+
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
