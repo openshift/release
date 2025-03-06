@@ -398,6 +398,36 @@ function extract_rhcos_images {
   fi
 }
 
+function wait_until_assisted_service_is_ready {
+
+  echo "Wait until Multicluster Engine PODs are avaliable..."
+
+  set -x
+  attempts=0 ;
+  while sleep 10s ; do
+    [ $(( attempts=${attempts} + 1 )) -lt 60 ] || {
+      oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+      exit 1 ;
+    }
+    assisted_service_pod_name=$( \
+      oc -n multicluster-engine get pods -l app=assisted-service | \
+      grep "^assisted-service.*Running" | \
+      awk '{print $1}' || echo)
+    [ -n "${assisted_service_pod_name}" ] && \
+      oc -n multicluster-engine get pod assisted-image-service-0 ${assisted_service_pod_name} --ignore-not-found && \
+      break
+  done ;
+  {
+    oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 --timeout=30m &&
+    oc -n multicluster-engine wait --for=condition=Available deployment/assisted-service --timeout=30m ;
+  } || {
+    oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
+    exit 1 ;
+  }
+  set +x
+}
+
 function generate_agent_service_config {
 
   echo "************ telcov10n Generate and Deploy AgentServiceConfig CR ************"
@@ -488,22 +518,9 @@ EOF
   oc get AgentServiceConfig agent -oyaml
   set +x
 
-  echo "Wait until Multicluster Engine PODs are avaliable..."
+  wait_until_assisted_service_is_ready
+
   set -x
-  attempts=0 ;
-  while sleep 10s ; do
-    [ $(( attempts=${attempts} + 1 )) -lt 60 ] || exit 1;
-    assisted_service_pod_name=$( \
-      oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
-      grep "^assisted-service" || echo)
-    [ -n "${assisted_service_pod_name}" ] && \
-    oc -n multicluster-engine get pod assisted-image-service-0 ${assisted_service_pod_name} && break ;
-  done ;
-  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m || {
-    oc -n multicluster-engine get sc,pv,pod,pvc ;
-    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
-    exit 1 ;
-  }
   oc -n multicluster-engine get sc,pv,pod,pvc
   set +x
 }
