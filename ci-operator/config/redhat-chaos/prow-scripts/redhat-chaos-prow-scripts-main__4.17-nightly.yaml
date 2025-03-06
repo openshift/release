@@ -137,12 +137,19 @@ tests:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure
 - always_run: false
-  as: krkn-hub-ibm-cloud-api-tests
+  as: krkn-hub-ibm-cloud-node-tests
   steps:
     cluster_profile: ibmcloud-qe
+    env:
+      SET_ENV_BY_PLATFORM: custom
+      WORKERS: "3"
     test:
-    - ref: redhat-chaos-node-disruptions-master-outage
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+  timeout: 6h0m0s
 - as: krkn-hub-tests-aro
   cron: 0 8 16 * *
   steps:
