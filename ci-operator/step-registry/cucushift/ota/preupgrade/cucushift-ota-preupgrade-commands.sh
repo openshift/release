@@ -842,7 +842,11 @@ function run_ota_single_case(){
     fi
 }
 
-export TARGET="${RELEASE_IMAGE_INITIAL:-${RELEASE_IMAGE_LATEST:-$OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}}"
+if [ -n "$RELEASE_IMAGE_INITIAL" ]; then
+    export TARGET="$RELEASE_IMAGE_LATEST"
+else
+    export TARGET="$OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
+fi
 
 if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
   exit 0
