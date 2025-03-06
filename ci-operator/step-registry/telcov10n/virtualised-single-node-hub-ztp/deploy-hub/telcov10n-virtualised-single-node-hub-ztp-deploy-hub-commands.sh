@@ -236,8 +236,6 @@ function generate_inventory_file {
 
   echo "************ telcov10n Generate Ansible inventory file to connect to Bastion host ************"
 
-  load_env
-
   inventory_file="${PWD}/bastion-vhub-node-inventory.yml"
   cat <<EOF >| $inventory_file
 all:
@@ -455,6 +453,25 @@ function install_ansible_collections {
     ansible-galaxy collection install -r requirements.yml
 }
 
+function generate_pull_secret {
+
+  if [ -f $CLUSTER_PROFILE_DIR/pull-secret ]; then
+
+    echo "************ telcov10n Generate Pull Secret from all available sources ************"
+
+    ps_base=$(mktemp)
+    echo ${CLUSTER_B64_PULL_SECRET} | base64 -d > ${ps_base}
+
+    CLUSTER_B64_PULL_SECRET=$(jq -s '.[0] * .[1]' \
+      ${ps_base} \
+      $CLUSTER_PROFILE_DIR/pull-secret \
+      | base64 -w 0)
+
+    # echo ${CLUSTER_B64_PULL_SECRET} | base64 -d > ${ps_base}.merged
+    rm -f ${ps_base}
+  fi
+}
+
 function install_virtualised_hub_cluster {
 
     ansible-playbook -i ${inventory_file} playbooks/deploy-virtualised-hub.yml -vvv
@@ -479,13 +496,16 @@ function verify_virtualised_hub_cluster_installed {
 
 function main {
 
-    echo "Runing Prow script..."
+  echo "Runing Prow script..."
 
-    install_ansible_collections
-    generate_inventory_file
-    install_virtualised_hub_cluster
-    set -x
-    verify_virtualised_hub_cluster_installed
+  load_env
+
+  install_ansible_collections
+  generate_pull_secret
+  generate_inventory_file
+  install_virtualised_hub_cluster
+  set -x
+  verify_virtualised_hub_cluster_installed
 }
 
 function pr_debug_mode_waiting {
