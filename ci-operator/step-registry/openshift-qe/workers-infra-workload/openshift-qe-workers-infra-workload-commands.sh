@@ -559,7 +559,7 @@ items:
       machineconfiguration.openshift.io/role: worker
     name: os-layer-custom-worker
   spec:
-    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:f29553f34b300ecab5282338d79f9685a8d75e5b0ceb75e514569759c8d6d560
+    osImageURL: quay.io/sdodsonrht/rhcos-95-kernel:kernel-612
 - apiVersion: machineconfiguration.openshift.io/v1
   kind: MachineConfig
   metadata:
@@ -567,7 +567,7 @@ items:
       machineconfiguration.openshift.io/role: master
     name: os-layer-custom-master
   spec:
-    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:f29553f34b300ecab5282338d79f9685a8d75e5b0ceb75e514569759c8d6d560
+    osImageURL: quay.io/sdodsonrht/rhcos-95-kernel:kernel-612
 kind: List
 metadata:
   resourceVersion: ""
