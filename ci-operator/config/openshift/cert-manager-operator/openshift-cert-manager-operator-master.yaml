@@ -117,10 +117,16 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-operator-tech-preview
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h
+    version: "4.17"
   optional: true
   run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
   steps:
-    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -128,6 +134,7 @@ tests:
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
     test:
+    - ref: optional-operators-operator-sdk
     - as: test
       cli: latest
       commands: |
@@ -136,7 +143,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-hypershift
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift
