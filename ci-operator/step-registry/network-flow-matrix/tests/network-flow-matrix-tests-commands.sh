@@ -1,12 +1,22 @@
 #!/bin/bash
 
+if [ -f "${SHARED_DIR}/kubeconfig" ]; then
+cat "${SHARED_DIR}/kubeconfig" > $KUBECONFIG
+fi
+
+oc projects
+
 # Extract and format the cluster version to branch
 cluster_version_to_branch() {
-  version=$(oc version | grep "Server Version:" | awk '{print $3}')
-  major=$(echo "$version" | cut -d '.' -f 1)
-  minor=$(echo "$version" | cut -d '.' -f 2)
-  branch="release-$major.$minor"
-  echo "$branch"
+  if ! command -v jq 2>&1 >/dev/null; then
+    version=$(oc version | grep "Server Version:" | awk '{print $3}')
+    major=$(echo "$version" | cut -d '.' -f 1)
+    minor=$(echo "$version" | cut -d '.' -f 2)
+    branch="release-$major.$minor"
+    echo "$branch"
+  else
+    echo "$(oc version -ojson | jq '"release-\(.serverVersion.major).\(.serverVersion.minor)"' -r)"
+  fi
 }
 BRANCH=$(cluster_version_to_branch)
 MAIN_BRANCH="release-4.19"
