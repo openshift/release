@@ -449,12 +449,24 @@ tests:
     - as: jupyter-ubi9-python-3-11-test-e2e
       cli: latest
       commands: |
+        export HOME=$( mktemp -d )
+        mkdir -p ${HOME}/.docker
+        cp /tmp/pull-secret/.dockerconfigjson ${HOME}/.docker/config.json
+
         oc new-project jupyter-minimal-ubi9-python-3-11
+
+        oc create secret generic ci-pull-credentials --from-file=.dockerconfigjson=/tmp/pull-secret/.dockerconfigjson --type=kubernetes.io/dockerconfigjson
+        oc secrets link default ci-pull-credentials --for=pull
+
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
         make deploy9-jupyter-minimal-ubi9-python-3.11 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-jupyter-minimal-ubi9-python-3.11
         make undeploy9-jupyter-minimal-ubi9-python-3.11
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
       dependencies:
       - env: JUPYTER_MINIMAL_IMAGE
         name: jupyter-minimal-ubi9-python-3.11
