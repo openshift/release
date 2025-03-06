@@ -87,7 +87,7 @@ function check_tp_operator_notfound(){
 function check_manifest_annotations(){
     tmp_manifest=$(mktemp -d)
     IFS=" " read -r -a tp_operator <<< "$*"
-    if ! oc adm release extract --to "${tmp_manifest}" "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"; then
+    if ! oc adm release extract --to "${tmp_manifest}" "${TARGET}"; then
         echo "Failed to extract manifest!"
         return 1
     fi
@@ -256,7 +256,7 @@ function pre-OCP-66839(){
     fi
 
     # Extract all CRs from tobe upgrade release payload with --included
-    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"; then
+    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
         echo "Failed to extract CRs from tobe upgrade release payload!"
         return 1
     fi
@@ -841,6 +841,8 @@ function run_ota_single_case(){
         fi
     fi
 }
+
+export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-$RELEASE_IMAGE_LATEST}"
 
 if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
   exit 0
