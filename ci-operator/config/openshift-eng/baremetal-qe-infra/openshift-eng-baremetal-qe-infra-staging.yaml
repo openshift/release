@@ -1,0 +1,69 @@
+base_images:
+  centos9:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: "1.21"
+images:
+- context_dir: images/prow-image
+  dockerfile_path: Dockerfile
+  from: centos9
+  to: baremetal-qe-base
+- context_dir: images/fcos-base-image
+  dockerfile_path: Containerfile
+  to: fcos-base
+- context_dir: images/fcos-auxiliary-image
+  dockerfile_path: Containerfile
+  from: fcos-base
+  to: fcos-auxiliary
+- context_dir: images/fcos-bastion-image
+  dockerfile_path: Containerfile
+  from: fcos-base
+  to: fcos-bastion
+- context_dir: images/bind9
+  dockerfile_path: Dockerfile
+  from: centos9
+  to: bmqe-bind9
+- context_dir: images/dhcp
+  dockerfile_path: Containerfile
+  from: centos9
+  to: bmqe-dnsmasq
+- context_dir: images/tang
+  dockerfile_path: Containerfile
+  from: centos9
+  to: bmqe-tang
+promotion:
+  to:
+  - namespace: ci
+    tag: staging
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shellcheck
+  commands: for f in $(git diff --name-only "$PULL_BASE_SHA..$PULL_PULL_SHA" | grep
+    -E ".*.sh$"); do echo -e "\nVerifying $f..."; shellcheck -s bash "$f"; done
+  container:
+    from: shellcheck
+zz_generated_metadata:
+  branch: staging
+  org: openshift-eng
+  repo: baremetal-qe-infra

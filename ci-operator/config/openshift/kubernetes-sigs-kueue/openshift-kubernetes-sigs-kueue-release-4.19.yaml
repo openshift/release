@@ -50,8 +50,8 @@ tests:
         echo "Git status:"
         git status
 
-        REVISION=$(git rev-parse HEAD)
-        IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:on-pr-${REVISION}
+        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
+        export IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:on-pr-${REVISION}
 
         echo "Waiting for image ${IMAGE_TAG} to be available..."
         function wait_for_image() {
@@ -65,7 +65,7 @@ tests:
 
         echo "Image is available. Proceeding with tests..."
 
-        IMAGE_TAG=${IMAGE_TAG} make -f Makefile-test-ocp.mk test-e2e-ocp
+        make -f Makefile-test-ocp.mk test-e2e-ocp
       from: kueue-base-src
       resources:
         requests:

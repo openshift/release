@@ -1,18 +1,11 @@
-base_images:
-  base:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/kubernetes-sigs-kueue
 images:
 - dockerfile_literal: |
-    FROM base
+    FROM src
     RUN dnf install -y skopeo git && dnf clean all
-    WORKDIR /workdir
-    COPY . .
-  from: base
+  from: src
   to: kueue-base-src
 promotion:
   to:
@@ -44,9 +37,21 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |-
-        cd /workdir
-        REVISION=$(git rev-parse HEAD)
-        IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:on-pr-${REVISION}
+        echo "Current PWD: $(pwd)"
+        echo "Listing directory contents:"
+        ls -lah
+
+        echo "Current Git branch:"
+        git branch --show-current
+
+        echo "Latest Git commits:"
+        git log --oneline -5
+
+        echo "Git status:"
+        git status
+
+        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
+        export IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:on-pr-${REVISION}
 
         echo "Waiting for image ${IMAGE_TAG} to be available..."
         function wait_for_image() {
@@ -60,7 +65,7 @@ tests:
 
         echo "Image is available. Proceeding with tests..."
 
-        IMAGE_TAG=${IMAGE_TAG} make -f Makefile-test-ocp.mk test-e2e-ocp
+        make -f Makefile-test-ocp.mk test-e2e-ocp
       from: kueue-base-src
       resources:
         requests:
