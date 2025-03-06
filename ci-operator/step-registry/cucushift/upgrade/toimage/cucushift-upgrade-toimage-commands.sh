@@ -480,7 +480,7 @@ run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
 export TARGET_MINOR_VERSION=""
-export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-$RELEASE_IMAGE_LATEST}"
+export TARGET="${RELEASE_IMAGE_INITIAL:-${RELEASE_IMAGE_LATEST:-$OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
