@@ -25,6 +25,8 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+export TEST_PROVIDER="none"
+
 # The base image for this step is incapable of ssh-ing to MicroShift's VM because
 # of user configuration. Since this image comes from promotion of origin we would
 # like to leave it untouched. The skip list is within MicroShift's code, which is
