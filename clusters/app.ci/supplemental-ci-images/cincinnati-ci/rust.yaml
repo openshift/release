@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: cincinnati-ci-public
+    name: rust
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: cincinnati-ci-public
+    name: rust-ubi9
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: rust:ubi9
+    source:
+      dockerfile: |
+        FROM registry.access.redhat.com/ubi9/ubi:latest
+        RUN dnf update -y \
+          && dnf install -y jq rust cargo \
+          && dnf install -y openssl-devel \
+          && dnf clean all
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: ubi:9
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+      - type: ConfigChange
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: cincinnati-ci-public
+    name: rust-e2e-test-ubi9
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: rust:e2e-test-ubi9
+    source:
+      dockerfile: |
+        FROM registry.access.redhat.com/ubi9/ubi:latest
+        RUN curl -sL https://github.com/tsenart/vegeta/releases/download/v12.8.4/vegeta_12.8.4_linux_amd64.tar.gz | tar xzf - -C /usr/bin/ vegeta && \
+            curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xzf - -C /usr/bin/ oc
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: ubi:9
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+      - type: ConfigChange
