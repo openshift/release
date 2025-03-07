@@ -63,6 +63,16 @@ images:
       - src
   to: tests-private-ui
 - dockerfile_literal: |
+    FROM src AS builder
+    FROM registry.ci.openshift.org/ci/ocp-qe-perfscale-ci:latest
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-burner
+- dockerfile_literal: |
     FROM root
     ARG YQ_VERSION="v4.30.8"
     RUN set -x && \
