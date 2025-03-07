@@ -188,7 +188,7 @@ fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
 echo "OC Version:"
-export PATH=${CLI_DIR}:$PATH
+export PATH=${CLI_DIR:-}:$PATH
 which oc
 oc version --client
 oc adm release extract --help

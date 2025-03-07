@@ -18,6 +18,11 @@ EOF
 configure_vm_args=""
 if "${OPTIONAL_RPMS}"; then
   configure_vm_args="--optional-rpms"
+
+  # install all the optional RPMs except those specified in ${SKIPPED_OPTIONAL_RPMS}
+  if [ -n "${SKIPPED_OPTIONAL_RPMS}" ]; then
+    configure_vm_args="${configure_vm_args} --skip-optional-rpms ${SKIPPED_OPTIONAL_RPMS}"
+  fi
 fi
 
 cat <<EOF > /tmp/install.sh

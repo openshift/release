@@ -383,6 +383,11 @@ function build_upi_cluster() {
     echo "Done with retrieval"
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
 
+    # Create ~/.kube directory on the Bastion if it doesn't exist
+    ssh -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}/ocp4-upi-powervs/data/id_rsa" root@"${BASTION_PUBLIC_IP}" "mkdir -p ~/.kube"
+    scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig root@"${BASTION_PUBLIC_IP}":~/.kube/config
+    echo "Done copying kubeconfig to bastion location ~/.kube/config"
+
     echo "Copying the terraform.tfstate"
     cp "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
     if [ ! -f "${SHARED_DIR}"/kubeconfig ]
