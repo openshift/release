@@ -1,27 +1,27 @@
 presubmits:
-  red-hat-storage/odf-operator:
+  red-hat-storage/ocs-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.18$
-    - ^release-4\.18-
-    cluster: build09
-    context: ci/prow/ci-bundle-odf-dependencies-bundle
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build03
+    context: ci/prow/ci-bundle-ocs-operator-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-release-4.18-ci-bundle-odf-dependencies-bundle
-    rerun_command: /test ci-bundle-odf-dependencies-bundle
+    name: pull-ci-red-hat-storage-ocs-operator-release-4.19-ci-bundle-ocs-operator-bundle
+    rerun_command: /test ci-bundle-ocs-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=odf-dependencies-bundle
+        - --target=ocs-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,68 +54,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-bundle-odf-dependencies-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-bundle-ocs-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.18$
-    - ^release-4\.18-
-    cluster: build09
-    context: ci/prow/ci-bundle-odf-operator-bundle
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-release-4.18-ci-bundle-odf-operator-bundle
-    rerun_command: /test ci-bundle-odf-operator-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=odf-operator-bundle
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-bundle-odf-operator-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.18$
-    - ^release-4\.18-
-    cluster: build09
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -123,7 +68,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-release-4.18-images
+    name: pull-ci-red-hat-storage-ocs-operator-release-4.19-images
     rerun_command: /test images
     spec:
       containers:
@@ -168,10 +113,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.18$
-    - ^release-4\.18-
+    - ^release-4\.19$
+    - ^release-4\.19-
     cluster: build03
-    context: ci/prow/odf-operator-e2e-aws
+    context: ci/prow/ocs-operator-bundle-e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -180,8 +125,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: odf-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-release-4.18-odf-operator-e2e-aws
-    rerun_command: /test odf-operator-e2e-aws
+    name: pull-ci-red-hat-storage-ocs-operator-release-4.19-ocs-operator-bundle-e2e-aws
+    rerun_command: /test ocs-operator-bundle-e2e-aws
     spec:
       containers:
       - args:
@@ -190,7 +135,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=odf-operator-e2e-aws
+        - --target=ocs-operator-bundle-e2e-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -238,4 +183,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )odf-operator-e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocs-operator-bundle-e2e-aws,?($|\s.*)
