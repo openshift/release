@@ -143,6 +143,12 @@ spec:
           - name: TEST_PHASES
             value: "${TEST_PHASES}"
             # value: "LOAD,RUN,DELETE"
+          - name: SKIP_PUSH
+            value: "false"
+          - name: QUAY_USERNAME
+            value: "${STAGE_USERNAME}"   
+          - name: QUAY_PASSWORD
+            value: "${STAGE_PASSWORD}"   
         resources:
           requests:
             cpu: "1"
