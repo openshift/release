@@ -9,14 +9,13 @@ echo "current directory is: $(pwd)"
 
 # 1, Setup Quay performance test environment
 
-QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
-QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
+QUAY_ROUTE="https://stage.quay.io" #https://quayhostname
 
-TEST_USERNAME=$(cat /var/run/seansecret/myusername)
-TEST_PASSWORD=$(cat /var/run/seansecret/mypassword)
-echo "TEST_USERNAME: $TEST_USERNAME"
-echo "TEST_PASSWORD: $TEST_PASSWORD"
-sleep 10m
+STAGE_USERNAME=$(cat /var/run/quaystage/username)
+STAGE_PASSWORD=$(cat /var/run/quaystage/password)
+STAGE_TOKEN=$(cat /var/run/quaystage/oauth)
+echo "TEST_USERNAME: $STAGE_USERNAME"
+echo "TEST_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
 
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
@@ -25,19 +24,19 @@ ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 echo "ELK_SERVER: $ELK_SERVER"
 echo "QUAY_ROUTE: $QUAY_ROUTE"
 
-#create organization "perftest" and namespace "quay-perf" for Quay performance test
-export quay_perf_organization="perftest"
+#create  namespace "quay-perf" for Quay performance test
+export quay_perf_organization="demo2"   #organization demo2 exists
 export quay_perf_namespace="quay-perf"
 export WORKLOAD="quay-load-test"
 export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 
-curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
-  --header "Content-Type: application/json" \
-  --header "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
-  --data-raw '{
-        "name": "'"${quay_perf_organization}"'",
-        "email": "testperf@testperf.com"
-    }' -k
+# curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
+#   --header "Content-Type: application/json" \
+#   --header "Authorization: Bearer ${STAGE_TOKEN}" \
+#   --data-raw '{
+#         "name": "'"${quay_perf_organization}"'",
+#         "email": "testperf@testperf.com"
+#     }' -k
 
 #   refer to https://github.com/quay/quay-performance-scripts
 
@@ -121,9 +120,9 @@ spec:
           privileged: true
         env:
           - name: QUAY_HOST
-            value: "${QUAY_ROUTE}"
+            value: "stage.quay.io"
           - name: QUAY_OAUTH_TOKEN
-            value: "${QUAY_OAUTH_TOKEN}"
+            value: "${STAGE_TOKEN}"
           - name: QUAY_ORG
             value: "${quay_perf_organization}"
           - name: ES_HOST
