@@ -352,5 +352,5 @@ configure_automation
 setup_powervs_image
 run_automation
 wait_for_additional_nodes_readiness "$((2+${ADDITIONAL_WORKERS}))"
-
+ 
 exit 0
