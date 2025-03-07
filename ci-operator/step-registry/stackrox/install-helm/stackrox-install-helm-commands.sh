@@ -165,6 +165,10 @@ function install_central_with_helm() {
       installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
   fi
 
+  if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+      installflags+=('--set' 'scannerV4.disable=false')
+  fi
+
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
   /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
@@ -215,10 +219,18 @@ wait_deploy central
 get_init_bundle
 install_secured_cluster_with_helm
 echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  wait_deploy scanner-v4-indexer
+  wait_deploy scanner-v4-matcher
+  wait_deploy scanner-v4-db
+fi
 wait_deploy scanner
 wait_deploy scanner-db
 wait_deploy sensor
 wait_deploy admission-control
+
+echo "Restart sensor to accelerate scanner start up..."
+oc rollout restart deployment sensor -n stackrox
 
 retry oc get pods --namespace stackrox
 
