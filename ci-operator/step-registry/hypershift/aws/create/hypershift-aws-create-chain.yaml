@@ -60,6 +60,14 @@ chain:
     - name: HYPERSHIFT_SHARED_VPC
       default: "false"
       documentation: "If set to true, it sets the --vpc-owner-aws-creds as ${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+    - name: HYPERSHIFT_DISK_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable OS disk encryption by specifying --root-volume-kms-key="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
+    - name: HYPERSHIFT_ETCD_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -117,6 +125,14 @@ chain:
 
       if [[ -n $EXTRA_ARGS ]]; then
         COMMAND+=(${EXTRA_ARGS})
+      fi
+      
+      if [[ $HYPERSHIFT_DISK_ENCRYPTION == "true" ]]; then
+        COMMAND+=(--root-volume-kms-key="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
+      fi
+      
+      if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
+        COMMAND+=(--kms-key-arn="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
       fi
       
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
