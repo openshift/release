@@ -112,6 +112,50 @@ tests:
           memory: 400Mi
     - chain: openshift-qe-node-density-heavy
     workflow: generic-claim
+- always_run: false
+  as: cluster-density-v2-no-kepler
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-powermon
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.18"
+  steps:
+    env:
+      ADDITIONAL_PARAMS: '{"layeredProduct": "no-kepler"}'
+      ENABLE_LOCAL_INDEX: "true"
+      EXTRA_FLAGS: --churn-duration=20m
+      ITERATION_MULTIPLIER_ENV: "9"
+      USER_METADATA: layeredProduct=no-kepler
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: generic-claim
+- always_run: false
+  as: node-density-heavy-no-kepler
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-powermon
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.18"
+  steps:
+    env:
+      ADDITIONAL_PARAMS: '{"layeredProduct": "no-kepler"}'
+      ENABLE_LOCAL_INDEX: "true"
+      EXTRA_FLAGS: --churn-duration=20m
+      ITERATIONS_PER_NAMESPACE: "1"
+      NAMESPACED_ITERATIONS: "true"
+      PODS_PER_NODE: "200"
+      USER_METADATA: layeredProduct=no-kepler
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift-power-monitoring
