@@ -8,27 +8,7 @@ echo "************ Fix container user ************"
 # Fix user IDs in a container
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-function wait_until_command_is_ok {
-  cmd=$1 ; shift
-  [ $# -gt 0 ] && sleep_for=${1} && shift && \
-  [ $# -gt 0 ] && max_attempts=${1} && shift
-  [ $# -gt 0 ] && exit_non_ok_message=${1} && shift
-  for ((attempts = 0 ; attempts <  ${max_attempts:=10} ; attempts++)); do
-    echo "Attempting[${attempts}/${max_attempts}]..."
-    set -x
-    eval "${cmd}" && { set +x ; return ; }
-    sleep ${sleep_for:='1m'}
-    set +x
-  done
-
-  echo ${exit_non_ok_message:="[Fail] The exit condition was not met"}
-  if [[ "${TENTATIVE_CREATION}" == "yes" ]] ; then
-    echo "However, since it was set as tentative creation, this failure won't cause the job to stop."
-    exit 0
-  else
-    exit 1
-  fi
-}
+source ${SHARED_DIR}/spoke-common-functions.sh
 
 function update_openshift_config_pull_secret {
 
