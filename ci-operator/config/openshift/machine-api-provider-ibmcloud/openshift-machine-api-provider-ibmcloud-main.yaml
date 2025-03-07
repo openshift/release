@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -71,6 +75,25 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
+- as: regression-clusterinfra-ibmcloud-ipi-mapi
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      BASE_DOMAIN: ci-ibmcloud.devcluster.openshift.com
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
