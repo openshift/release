@@ -115,7 +115,7 @@ spec:
     spec:
       containers:
       - name: python
-        image: quay.io/quay-qetest/quay-load:latest
+        image: quay.io/quay-qetest/quay-load:stage
         securityContext:
           privileged: true
         env:
@@ -134,7 +134,7 @@ spec:
           - name: ES_INDEX
             value: "quay-vegeta"
           - name: PUSH_PULL_IMAGE
-            value: "quay.io/quay-qetest/quay-load:latest"
+            value: "quay.io/quay-qetest/quay-load:stage"
           - name: PUSH_PULL_ES_INDEX
             value: "quay-push-pull"
           - name: PUSH_PULL_NUMBERS
