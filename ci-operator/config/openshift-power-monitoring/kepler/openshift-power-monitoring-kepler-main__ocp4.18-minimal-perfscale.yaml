@@ -1,0 +1,119 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.22-openshift-4.17
+images:
+- context_dir: .
+  dockerfile_path: build/Dockerfile
+  to: kepler
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- always_run: false
+  as: cluster-density-v2-kepler-minimal
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-powermon
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.18"
+  steps:
+    env:
+      ADDITIONAL_PARAMS: '{"layeredProduct": "kepler-minimal"}'
+      ENABLE_LOCAL_INDEX: "true"
+      EXTRA_FLAGS: --churn-duration=20m
+      ITERATION_MULTIPLIER_ENV: "9"
+      USER_METADATA: layeredProduct=kepler-minimal
+    test:
+    - as: kepler-minimal
+      cli: latest
+      commands: |
+        GOFLAGS="" make tools
+        GOFLAGS="" make build-manifest OPTS="OPENSHIFT_DEPLOY PROMETHEUS_DEPLOY"
+        sed -i 's/namespace: monitoring/namespace: openshift-monitoring/' _output/generated-manifest/deployment.yaml
+        oc apply -f _output/generated-manifest/deployment.yaml
+        echo "Validating Kepler Install"
+        oc rollout status -n kepler daemonset kepler-exporter --timeout 5m || {
+          oc get pods -n kepler
+          oc describe daemonset kepler-exporter -n kepler
+          echo "Kepler validation failed"
+        }
+        oc logs -n kepler daemonset/kepler-exporter
+      dependencies:
+      - env: EXPORTER_IMG
+        name: kepler
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    - chain: openshift-qe-cluster-density-v2
+    workflow: generic-claim
+- always_run: false
+  as: node-density-heavy-kepler-minimal
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-powermon
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.18"
+  steps:
+    env:
+      ADDITIONAL_PARAMS: '{"layeredProduct": "kepler-minimal"}'
+      ENABLE_LOCAL_INDEX: "true"
+      EXTRA_FLAGS: --churn-duration=20m
+      ITERATIONS_PER_NAMESPACE: "1"
+      NAMESPACED_ITERATIONS: "true"
+      PODS_PER_NODE: "200"
+      USER_METADATA: layeredProduct=kepler-minimal
+    test:
+    - as: kepler-minimal
+      cli: latest
+      commands: |
+        GOFLAGS="" make tools
+        GOFLAGS="" make build-manifest OPTS="OPENSHIFT_DEPLOY PROMETHEUS_DEPLOY"
+        sed -i 's/namespace: monitoring/namespace: openshift-monitoring/' _output/generated-manifest/deployment.yaml
+        oc apply -f _output/generated-manifest/deployment.yaml
+        echo "Validating Kepler Install"
+        oc rollout status -n kepler daemonset kepler-exporter --timeout 5m || {
+          oc get pods -n kepler
+          oc describe daemonset kepler-exporter -n kepler
+          echo "Kepler validation failed"
+        }
+        oc logs -n kepler daemonset/kepler-exporter
+      dependencies:
+      - env: EXPORTER_IMG
+        name: kepler
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    - chain: openshift-qe-node-density-heavy
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift-power-monitoring
+  repo: kepler
+  variant: ocp4.18-minimal-perfscale
