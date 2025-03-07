@@ -67,7 +67,7 @@ elif [ "$platform" = "IBMCloud" ]; then
     export TIMEOUT=320
 elif [ "$platform" = "VSphere" ]; then
     export CLOUD_TYPE="vsphere"
-    MASTER_MACHINE=$(oc get machines -A | awk '/master/ {print $2; exit}')
+    MASTER_MACHINE=$(oc get machines -A | grep master | head -n 1 | awk '{print $2}')
     VSPHERE_IP=$(oc get machine $MASTER_MACHINE -n openshift-machine-api -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}' | awk '{print $1}')
     export VSPHERE_IP
     VSPHERE_VCENTER=$(oc get infrastructures.config.openshift.io cluster -o jsonpath='{.spec.platformSpec.vsphere.vcenters[0].server}')
