@@ -166,7 +166,7 @@ for hub_version in "${!hub_to_mce[@]}"; do
                 aws)
                     post_data=$(jq -n --arg mce_version "$mce_version" \
                         --arg release_image "${payload_list[$hub_version]}" \
-                        '{job_execution_type: "1", pod_spec_options: {envs: {MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION: $mce_version, RELEASE_IMAGE_LATEST: $release_image}}}')
+                        '{job_execution_type: "1", pod_spec_options: {envs: {MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION: $mce_version, RELEASE_IMAGE_LATEST: $release_image, MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT: "true"}}}')
                     result=$(trigger_prow_job "${guest_to_job_aws[$guest_version]}" "$post_data")
                     ;;
                 agent)
