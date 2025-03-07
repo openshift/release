@@ -53,9 +53,23 @@ def init():
 def create_sheet(sheet_title):
     global creds
     try:
-        build("sheets", "v4", credentials=creds).spreadsheets().batchUpdate(
+        copy_response = build("sheets", "v4", credentials=creds).spreadsheets().sheets().copyTo(
             spreadsheetId=SAMPLE_SPREADSHEET_ID,
-            body={"requests": [{"addSheet": {"properties": {"title": sheet_title, "index": 2}}}]}
+            sheetId=772427170,
+            body={"destinationSpreadsheetId": SAMPLE_SPREADSHEET_ID}
+        ).execute()
+        new_sheet_id = copy_response["sheetId"]
+        build("sheets", "v4", credentials=creds).spreadsheets().batchUpdate(
+            spreadsheetId=SAMPLE_SPREADSHEET_ID, body={
+            "requests": [
+                {
+                    "updateSheetProperties": {
+                        "properties": {"sheetId": new_sheet_id, "title": sheet_title, "index": 2 },
+                        "fields": "title,index"
+                    }
+                }
+            ]
+        }
         ).execute()
     except (HttpError, Exception) as e:
         raise Exception(f"Error occurred while creating sheet: {e}")
