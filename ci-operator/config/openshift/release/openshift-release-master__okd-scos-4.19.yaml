@@ -56,6 +56,28 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
+- as: payload-control-plane-6nodes
+  interval: 168h
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      HUNTER_ANALYZE: "true"
+      ITERATION_MULTIPLIER_ENV: "15"
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      VERSION: "4.19"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
 zz_generated_metadata:
   branch: master
   org: openshift
