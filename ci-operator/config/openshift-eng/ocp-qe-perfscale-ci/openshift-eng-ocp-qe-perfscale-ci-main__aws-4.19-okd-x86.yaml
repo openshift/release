@@ -1,0 +1,128 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: okd
+      stream: okd-scos
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: conc-builds-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-conc-builds
+    - chain: openshift-qe-run-api-apf-customized-flowcontrol
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: compact-cp-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-aws-compact
+  timeout: 5h0m0s
+- always_run: false
+  as: router-perf-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-router-perf
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: payload-node-density-heavy-6nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_FLAGS: --pod-ready-threshold=43s
+      ITERATIONS_PER_NAMESPACE: "100"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 2h0m0s
+- always_run: false
+  as: payload-node-density-cni-6nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      POD_READY_THRESHOLD: 4s
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+  timeout: 2h0m0s
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-heavy-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-cni-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.19-okd-x86
