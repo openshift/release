@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ ! -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
+  echo "No 'gcp_min_permissions.json' found, aborted." && exit 0
+fi
+
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -15,5 +19,5 @@ fi
 
 iam_account=$(jq -r .client_email ${SHARED_DIR}/gcp_min_permissions.json)
 key_id=$(jq -r .private_key_id ${SHARED_DIR}/gcp_min_permissions.json)
-gcloud iam service-accounts keys delete -q "${key_id}" --iam-account="${iam_account}" || exit 1
+gcloud --project "${GOOGLE_PROJECT_ID}" iam service-accounts keys delete -q "${key_id}" --iam-account="${iam_account}" || exit 1
 echo "$(date -u --rfc-3339=seconds) - Deleted the temporary key of the IAM service account which is used for the minimum permissions testing on GCP."
