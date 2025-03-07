@@ -60,6 +60,9 @@ chain:
     - name: HYPERSHIFT_SHARED_VPC
       default: "false"
       documentation: "If set to true, it sets the --vpc-owner-aws-creds as ${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+    - name: HYPERSHIFT_AUTONODE
+      default: "false"
+      documentation: "If set to true, it sets the --auto-node flag to true"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -96,7 +99,8 @@ chain:
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}
         --release-image ${RELEASE_IMAGE}
         --annotations=hypershift.openshift.io/skip-release-image-validation=true
-        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" 
+        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)
+        --auto-node=${HYPERSHIFT_AUTONODE}"
       )
       
       if [[ $HYPERSHIFT_SHARED_VPC == "true" ]]; then
