@@ -109,10 +109,12 @@ function cleanup_prior() {
     WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
     VPC_NAME="${WORKSPACE_NAME}-vpc"
     export VPC_NAME
+    POWERVS_REGION=$(< "${SHARED_DIR}/POWERVS_REGION")
+    export POWERVS_REGION
 
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
+    for CRN in $(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-p-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
     do
         echo "Targetting power cloud instance"
         ibmcloud pi workspace target "${CRN}"
@@ -203,7 +205,7 @@ function destroy_upi_cluster() {
     fi
 
     cp "${SHARED_DIR}"/var-multi-arch-upi.tfvars "${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars 
-    echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars
+    echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars
 
     # Loads the tfstate if it exists in the shared directory
     if [ ! -f "${SHARED_DIR}"/terraform.tfstate ]
@@ -212,14 +214,14 @@ function destroy_upi_cluster() {
         exit 0
     fi
 
-    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
 
     # Destroys the current installation for this run
     cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
-            -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+            -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars \
+            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
 }
 
 ############################################################
