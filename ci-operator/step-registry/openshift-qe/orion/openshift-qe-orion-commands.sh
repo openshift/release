@@ -20,11 +20,6 @@ pushd orion
 
 pip install -r requirements.txt
 
-# Download the latest ACK file
-if [ ${JUNIT} == true ]; then
-  curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
-fi
-
 if [[ ${ES_TYPE} == "qe" ]]; then
     ES_PASSWORD=$(cat "/secret/qe/password")
     ES_USERNAME=$(cat "/secret/qe/username")
@@ -37,15 +32,25 @@ fi
 
 pip install .
 export EXTRA_FLAGS=" --lookback ${LOOKBACK}d"
+
 if [[ ! -z "$UUID" ]]; then
     export EXTRA_FLAGS+=" --uuid ${UUID}"
 fi
+
 if [ ${HUNTER_ANALYZE} == "true" ]; then
     export EXTRA_FLAGS+=" --hunter-analyze"
 fi
-if [ ${JUNIT} == true ]; then
+
+if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     export EXTRA_FLAGS+=" --output-format junit"
     export EXTRA_FLAGS+=" --save-output-path=junit.xml"
+elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
+    export EXTRA_FLAGS+=" --output-format json"
+elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
+    export EXTRA_FLAGS+=" --output-format text"
+else
+    echo "Unsupported format: ${OUTPUT_FORMAT}"
+    exit 1
 fi
 
 if [[ ! -z "$ORION_CONFIG" ]]; then
@@ -53,10 +58,16 @@ if [[ ! -z "$ORION_CONFIG" ]]; then
 fi
 
 if [[ ! -z "$ACK_FILE" ]]; then
+    # Download the latest ACK file
+    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
     export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
 fi
 
-if [[ -n "${ORION_ENVS:-}" ]]; then
+if [ ${COLLAPSE} == "true" ]; then
+    export EXTRA_FLAGS+=" --collapse"
+fi
+
+if [[ -n "${ORION_ENVS}" ]]; then
     ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
     IFS=',' read -r -a env_array <<< "$ORION_ENVS"
     for env_pair in "${env_array[@]}"; do
@@ -67,7 +78,7 @@ if [[ -n "${ORION_ENVS:-}" ]]; then
     done
 fi
 
-if [[ -n "${LOOKBACK_SIZE:-}" ]]; then
+if [[ -n "${LOOKBACK_SIZE}" ]]; then
     export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
@@ -76,10 +87,8 @@ es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} 
 orion_exit_status=$?
 set -e
 
-if [ ${JUNIT} == true ]; then
+if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
   cp *.xml ${ARTIFACT_DIR}/
-else
-  cat *.csv
 fi
 
 exit $orion_exit_status
