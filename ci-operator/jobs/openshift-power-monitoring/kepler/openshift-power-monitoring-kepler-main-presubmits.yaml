@@ -246,17 +246,89 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build11
-    context: ci/prow/ocp4.18-minimal-perfscale-cluster-density-v2-kepler-minimal
+    context: ci/prow/ocp4.18-perfscale-cluster-density-v2-kepler-estimator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.18-minimal-perfscale
+      ci-operator.openshift.io/variant: ocp4.18-perfscale
       ci.openshift.io/generator: prowgen
       job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-minimal-perfscale-cluster-density-v2-kepler-minimal
-    rerun_command: /test ocp4.18-minimal-perfscale-cluster-density-v2-kepler-minimal
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-perfscale-cluster-density-v2-kepler-estimator
+    rerun_command: /test ocp4.18-perfscale-cluster-density-v2-kepler-estimator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=cluster-density-v2-kepler-estimator
+        - --variant=ocp4.18-perfscale
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(ocp4.18-perfscale-cluster-density-v2-kepler-estimator|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
+    context: ci/prow/ocp4.18-perfscale-cluster-density-v2-kepler-minimal
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ocp4.18-perfscale
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-perfscale-cluster-density-v2-kepler-minimal
+    rerun_command: /test ocp4.18-perfscale-cluster-density-v2-kepler-minimal
     spec:
       containers:
       - args:
@@ -266,7 +338,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=cluster-density-v2-kepler-minimal
-        - --variant=ocp4.18-minimal-perfscale
+        - --variant=ocp4.18-perfscale
         command:
         - ci-operator
         image: ci-operator:latest
@@ -311,24 +383,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(ocp4.18-minimal-perfscale-cluster-density-v2-kepler-minimal|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(ocp4.18-perfscale-cluster-density-v2-kepler-minimal|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build11
-    context: ci/prow/ocp4.18-minimal-perfscale-cluster-density-v2-no-kepler
+    context: ci/prow/ocp4.18-perfscale-cluster-density-v2-no-kepler
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.18-minimal-perfscale
+      ci-operator.openshift.io/variant: ocp4.18-perfscale
       ci.openshift.io/generator: prowgen
       job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-minimal-perfscale-cluster-density-v2-no-kepler
-    rerun_command: /test ocp4.18-minimal-perfscale-cluster-density-v2-no-kepler
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-perfscale-cluster-density-v2-no-kepler
+    rerun_command: /test ocp4.18-perfscale-cluster-density-v2-no-kepler
     spec:
       containers:
       - args:
@@ -338,7 +410,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=cluster-density-v2-no-kepler
-        - --variant=ocp4.18-minimal-perfscale
+        - --variant=ocp4.18-perfscale
         command:
         - ci-operator
         image: ci-operator:latest
@@ -383,24 +455,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(ocp4.18-minimal-perfscale-cluster-density-v2-no-kepler|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(ocp4.18-perfscale-cluster-density-v2-no-kepler|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
     cluster: build11
-    context: ci/prow/ocp4.18-minimal-perfscale-images
+    context: ci/prow/ocp4.18-perfscale-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.18-minimal-perfscale
+      ci-operator.openshift.io/variant: ocp4.18-perfscale
       ci.openshift.io/generator: prowgen
       job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-minimal-perfscale-images
-    rerun_command: /test ocp4.18-minimal-perfscale-images
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-perfscale-images
+    rerun_command: /test ocp4.18-perfscale-images
     spec:
       containers:
       - args:
@@ -408,7 +480,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=ocp4.18-minimal-perfscale
+        - --variant=ocp4.18-perfscale
         command:
         - ci-operator
         image: ci-operator:latest
@@ -441,24 +513,96 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp4.18-minimal-perfscale-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp4.18-perfscale-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build11
-    context: ci/prow/ocp4.18-minimal-perfscale-node-density-heavy-kepler-minimal
+    context: ci/prow/ocp4.18-perfscale-node-density-heavy-kepler-estimator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.18-minimal-perfscale
+      ci-operator.openshift.io/variant: ocp4.18-perfscale
       ci.openshift.io/generator: prowgen
       job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-minimal-perfscale-node-density-heavy-kepler-minimal
-    rerun_command: /test ocp4.18-minimal-perfscale-node-density-heavy-kepler-minimal
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-perfscale-node-density-heavy-kepler-estimator
+    rerun_command: /test ocp4.18-perfscale-node-density-heavy-kepler-estimator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=node-density-heavy-kepler-estimator
+        - --variant=ocp4.18-perfscale
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(ocp4.18-perfscale-node-density-heavy-kepler-estimator|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
+    context: ci/prow/ocp4.18-perfscale-node-density-heavy-kepler-minimal
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ocp4.18-perfscale
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-perfscale-node-density-heavy-kepler-minimal
+    rerun_command: /test ocp4.18-perfscale-node-density-heavy-kepler-minimal
     spec:
       containers:
       - args:
@@ -468,7 +612,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=node-density-heavy-kepler-minimal
-        - --variant=ocp4.18-minimal-perfscale
+        - --variant=ocp4.18-perfscale
         command:
         - ci-operator
         image: ci-operator:latest
@@ -513,24 +657,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(ocp4.18-minimal-perfscale-node-density-heavy-kepler-minimal|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(ocp4.18-perfscale-node-density-heavy-kepler-minimal|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build11
-    context: ci/prow/ocp4.18-minimal-perfscale-node-density-heavy-no-kepler
+    context: ci/prow/ocp4.18-perfscale-node-density-heavy-no-kepler
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp4.18-minimal-perfscale
+      ci-operator.openshift.io/variant: ocp4.18-perfscale
       ci.openshift.io/generator: prowgen
       job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-minimal-perfscale-node-density-heavy-no-kepler
-    rerun_command: /test ocp4.18-minimal-perfscale-node-density-heavy-no-kepler
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.18-perfscale-node-density-heavy-no-kepler
+    rerun_command: /test ocp4.18-perfscale-node-density-heavy-no-kepler
     spec:
       containers:
       - args:
@@ -540,7 +684,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=node-density-heavy-no-kepler
-        - --variant=ocp4.18-minimal-perfscale
+        - --variant=ocp4.18-perfscale
         command:
         - ci-operator
         image: ci-operator:latest
@@ -585,7 +729,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(ocp4.18-minimal-perfscale-node-density-heavy-no-kepler|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(ocp4.18-perfscale-node-density-heavy-no-kepler|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
