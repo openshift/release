@@ -65,9 +65,9 @@ promotion:
 releases:
   latest:
     release:
-      architecture: amd64
-      channel: fast
-      version: "4.10"
+      architecture: multi
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -440,17 +440,33 @@ tests:
 - as: notebooks-ubi9-e2e-tests
   run_if_changed: (jupyter\/minimal\/ubi9-python-3.11\/*)|(jupyter\/datascience\/ubi9-python-3.11\/*)|(jupyter\/pytorch\/ubi9-python-3.11\/*)|(jupyter\/tensorflow\/ubi9-python-3.11\/*)|(jupyter\/trustyai\/ubi9-python-3.11\/*)
   steps:
-    cluster_profile: gcp-opendatahub
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.2-multi
     test:
     - as: jupyter-ubi9-python-3-11-test-e2e
       cli: latest
       commands: |
+        export HOME=$( mktemp -d )
+        mkdir -p ${HOME}/.docker
+        cp /tmp/pull-secret/.dockerconfigjson ${HOME}/.docker/config.json
+
         oc new-project jupyter-minimal-ubi9-python-3-11
+
+        oc create secret generic ci-pull-credentials --from-file=.dockerconfigjson=/tmp/pull-secret/.dockerconfigjson --type=kubernetes.io/dockerconfigjson
+        oc secrets link default ci-pull-credentials --for=pull
+
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
         make deploy9-jupyter-minimal-ubi9-python-3.11 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-jupyter-minimal-ubi9-python-3.11
         make undeploy9-jupyter-minimal-ubi9-python-3.11
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
       dependencies:
       - env: JUPYTER_MINIMAL_IMAGE
         name: jupyter-minimal-ubi9-python-3.11
@@ -459,274 +475,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: jupyter-ds-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-datascience-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
-        make deploy9-jupyter-datascience-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-datascience-ubi9-python-3.11
-        make undeploy9-jupyter-datascience-ubi9-python-3.11
-      dependencies:
-      - env: JUPYTER_DATA_SCIENCE_IMAGE
-        name: jupyter-datascience-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: cuda-jupyter-pt-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-pytorch-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_PYTORCH_IMAGE}"
-        make deploy9-jupyter-pytorch-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-pytorch-ubi9-python-3.11
-        make undeploy9-jupyter-pytorch-ubi9-python-3.11
-      dependencies:
-      - env: JUPYTER_PYTORCH_IMAGE
-        name: jupyter-pytorch-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: cuda-jupyter-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project cuda-jupyter-minimal-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
-        make deploy9-cuda-jupyter-minimal-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-cuda-jupyter-minimal-ubi9-python-3.11
-        make undeploy9-cuda-jupyter-minimal-ubi9-python-3.11
-      dependencies:
-      - env: JUPYTER_MINIMAL_IMAGE
-        name: cuda-jupyter-minimal-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: cuda-jupyter-tf-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project cuda-jupyter-tensorflow-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TENSORFLOW_IMAGE}"
-        make deploy9-cuda-jupyter-tensorflow-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-cuda-jupyter-tensorflow-ubi9-python-3.11
-        make undeploy9-cuda-jupyter-tensorflow-ubi9-python-3.11
-      dependencies:
-      - env: JUPYTER_TENSORFLOW_IMAGE
-        name: cuda-jupyter-tensorflow-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: jupyter-tai-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-trustyai-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TRUSTYAI_IMAGE}"
-        make deploy9-jupyter-trustyai-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-trustyai-ubi9-python-3.11
-        make undeploy9-jupyter-trustyai-ubi9-python-3.11
-      dependencies:
-      - env: JUPYTER_TRUSTYAI_IMAGE
-        name: jupyter-trustyai-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: codeserver-notebook-e2e-tests
-  run_if_changed: (codeserver\/ubi9-python-3.11\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: codeserver-ubi9-python-3.11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project codeserver-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${CODE_SERVER_IMAGE}"
-        make deploy9-codeserver-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-codeserver-image image=codeserver-ubi9-python-3.11
-        make undeploy9-codeserver-ubi9-python-3.11
-      dependencies:
-      - env: CODE_SERVER_IMAGE
-        name: codeserver-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: rstudio-notebook-e2e-tests
-  run_if_changed: (rstudio\/c9s-python-3.11\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: rstudio-c9s-python-3.11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project rstudio-c9s-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${R_STUDIO_IMAGE}"
-        make deploy-c9s-rstudio-c9s-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-rstudio-image image=rstudio-c9s-python-3.11
-        make undeploy-c9s-rstudio-c9s-python-3.11
-      dependencies:
-      - env: R_STUDIO_IMAGE
-        name: rstudio-c9s-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: runtimes-ubi9-e2e-tests
-  run_if_changed: (runtimes\/datascience\/ubi9-python-3.11\/*)|(runtimes\/pytorch\/ubi9-python-3.11\/*)|(runtimes\/tensorflow\/ubi9-python-3.11\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: runtime-ds-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-datascience-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_DATASCIENCE_IMAGE}"
-        make deploy9-runtimes-datascience-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-datascience-ubi9-python-3.11
-        make undeploy9-runtimes-datascience-ubi9-python-3.11
-      dependencies:
-      - env: RUNTIME_DATASCIENCE_IMAGE
-        name: runtime-datascience-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: runtime-pt-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-pytorch-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_PYTORCH_IMAGE}"
-        make deploy9-runtimes-pytorch-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-pytorch-ubi9-python-3.11
-        make undeploy9-runtimes-pytorch-ubi9-python-3.11
-      dependencies:
-      - env: RUNTIME_PYTORCH_IMAGE
-        name: runtime-pytorch-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: runtime-cuda-tf-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-cuda-tensorflow-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_TENSORFLOW_IMAGE}"
-        make deploy9-runtimes-tensorflow-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-tensorflow-ubi9-python-3.11
-        make undeploy9-runtimes-tensorflow-ubi9-python-3.11
-      dependencies:
-      - env: RUNTIME_TENSORFLOW_IMAGE
-        name: runtime-cuda-tensorflow-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: rocm-notebooks-e2e-tests
-  run_if_changed: (rocm\/ubi9-python-3.11\/*)|(jupyter\/rocm\/pytorch\/ubi9-python-3.11\/*)|(jupyter\/rocm\/tensorflow\/ubi9-python-3.11\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: rocm-jupyter-tf-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project rocm-jupyter-tensorflow-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_rocm__TENSORFLOW_IMAGE}"
-        make deploy9-jupyter-rocm-tensorflow-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-rocm-tensorflow-ubi9-python-3.11
-        make undeploy9-jupyter-rocm-tensorflow-ubi9-python-3.11
-      dependencies:
-      - env: JUPYTER_rocm__TENSORFLOW_IMAGE
-        name: rocm-jupyter-tensorflow-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: rocm-jupyter-pt-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project rocm-jupyter-pytorch-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_rocm__PYTORCH_IMAGE}"
-        make deploy9-jupyter-rocm-pytorch-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-rocm-pytorch-ubi9-python-3.11
-        make undeploy9-jupyter-rocm-pytorch-ubi9-python-3.11
-      dependencies:
-      - env: JUPYTER_rocm__PYTORCH_IMAGE
-        name: rocm-jupyter-pytorch-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: rocm-runtimes-ubi9-e2e-tests
-  run_if_changed: (runtimes\/rocm-pytorch\/ubi9-python-3.11\/*)|(runtimes\/rocm-tensorflow\/ubi9-python-3.11\/*)
-  steps:
-    cluster_profile: gcp-opendatahub
-    test:
-    - as: rocm-runtime-pt-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-rocm-pytorch-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_ROCM_PYTORCH_IMAGE}"
-        make deploy9-runtimes-rocm-pytorch-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-rocm-pytorch-ubi9-python-3.11
-        make undeploy9-runtimes-rocm-pytorch-ubi9-python-3.11
-      dependencies:
-      - env: RUNTIME_ROCM_PYTORCH_IMAGE
-        name: runtime-rocm-pytorch-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: rocm-runtime-tf-ubi9-python-3-11-test-e2e
-      cli: latest
-      commands: |
-        oc new-project runtimes-rocm-tensorflow-ubi9-python-3-11
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_ROCM_TENSORFLOW_IMAGE}"
-        make deploy9-runtimes-rocm-tensorflow-ubi9-python-3.11 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-runtime-image image=runtime-rocm-tensorflow-ubi9-python-3.11
-        make undeploy9-runtimes-rocm-tensorflow-ubi9-python-3.11
-      dependencies:
-      - env: RUNTIME_ROCM_TENSORFLOW_IMAGE
-        name: runtime-rocm-tensorflow-ubi9-python-3.11
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
