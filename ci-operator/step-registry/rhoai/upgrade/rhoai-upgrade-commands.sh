@@ -21,6 +21,7 @@ oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --
 OC_HOST=$(oc whoami --show-server)
 OCP_CONSOLE=$(oc whoami --show-console)
 RHODS_DASHBOARD="https://$(oc get route rhods-dashboard -n redhat-ods-applications -o jsonpath='{.spec.host}{"\n"}')"
+
 export OC_HOST
 export OCP_CONSOLE
 export RHODS_DASHBOARD
@@ -48,6 +49,5 @@ export NAME_5
 
 echo "TEST_SUITE: ${TEST_SUITE}"
 export TEST_SUITE
-
 # running RHOAI tests
 ./run_interop.sh
