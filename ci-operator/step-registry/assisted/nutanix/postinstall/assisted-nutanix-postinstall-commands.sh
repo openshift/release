@@ -51,9 +51,23 @@ stringData:
 EOF
 echo "machine API credentials created"
 
-version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
-resource_timeout_seconds=300
+cat <<EOF | oc create -f -
+apiVersion: v1
+kind: Secret
+metadata:
+   name: nutanix-credentials
+   namespace: openshift-cloud-controller-manager
+type: Opaque
+stringData:
+  credentials: |
+    [{"type":"basic_auth","data":{"prismCentral":{"username":"${NUTANIX_USERNAME}","password":"${NUTANIX_PASSWORD}"},"prismElements":null}}]
+EOF
+echo "Cluster Cloud Controller Manager operator credentials created"
 
+version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+resource_timeout_seconds=3000
+
+echo "${version}"
 # Do the following if OCP version is >=4.13
 # Cloud Provider Config is needed for CCM, which was introduced with 4.13 for Nutanix
 if [[ $(echo -e "4.13
@@ -145,6 +159,10 @@ fi
 starting_csv=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.channels[*].currentCSV\})
 source=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSource\})
 source_namespace=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSourceNamespace\})
+
+echo "starting_csv= ${starting_csv}"
+echo "source= ${source}"
+echo "source_namespace= ${source_namespace}"
 
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
