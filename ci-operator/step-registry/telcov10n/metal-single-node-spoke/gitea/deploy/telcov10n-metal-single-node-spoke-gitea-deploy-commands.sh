@@ -7,6 +7,8 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/spoke-common-functions.sh
+
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
@@ -84,18 +86,6 @@ EOF
 
 }
 
-function wait_until_command_is_ok {
-  cmd=$1 ; shift
-  [ $# -gt 0 ] && sleep_for=${1} && shift && \
-  [ $# -gt 0 ] && max_attempts=${1}  && shift
-  set -x
-  for ((attempts = 0 ; attempts <  ${max_attempts:=10} ; attempts++)); do
-    eval "${cmd}" && { set +x ; return ; }
-    sleep ${sleep_for:='1m'}
-  done
-  exit 1
-}
-
 function setup_openshift_route {
 
   echo "************ telcov10n Setup route to Gitea repo ************"
@@ -126,7 +116,7 @@ EOF
   gitea_url="https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')"
   echo -n "${gitea_url}" > ${SHARED_DIR}/gitea-url.txt
   echo "Wait until Gitea endpoint is reachable via openshift route..."
-  wait_until_command_is_ok "curl -vIk ${gitea_url}"
+  wait_until_command_is_ok "curl -sSIk -w %{http_code} ${gitea_url} | tail -1 | grep -w '200'"
 }
 
 function generate_gitea_ssh_keys {
@@ -143,6 +133,24 @@ function generate_gitea_ssh_keys {
   echo
   cat ${ssh_pri_key_file}
   echo
+}
+
+function use_shared_ssh_keys_from_vault {
+
+  echo "************ telcov10n use shared ssh keys from vault ************"
+
+  ssh_pri_key_file=${SHARED_DIR}/ssh-key-${gitea_project}
+  ssh_pub_key_file="${ssh_pri_key_file}.pub"
+
+  #### SSH Private key
+  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key >| ${ssh_pri_key_file}
+  chmod 0600 ${ssh_pri_key_file}
+
+  #### SSH Public key
+  cat /var/run/telcov10n/ansible-group-all/ssh_public_key >| ${ssh_pub_key_file}
+  chmod 0644 ${ssh_pub_key_file}
+
+  ls -lhtr ${ssh_pri_key_file}*
 }
 
 function upload_gitea_ssh_keys {
@@ -170,8 +178,13 @@ function create_ztp_gitea_repo {
     -u ${GITEA_ADMIN_USERNAME}:${gitea_admin_pass} \
     -H "Content-Type: application/json" \
     -d '{"name":"'${repo_name}'"}' \
+    -o /tmp/repo-request.json \
     "$(cat ${SHARED_DIR}/gitea-url.txt)/api/v1/user/repos"
   set +x
+
+  new_repo_created="no"
+  cat /tmp/repo-request.json | \
+    grep 'The repository with the same name already exists.' || new_repo_created="yes"
 
   echo -n "${gitea_url_k8s_service}/${GITEA_ADMIN_USERNAME}/${repo_name}" > ${SHARED_DIR}/gitea-http-repo-uri.txt
 }
@@ -186,34 +199,6 @@ function generate_gitea_ssh_uri {
 
   set -x
   echo -n "${gitea_ssh_uri}" > ${SHARED_DIR}/gitea-ssh-uri.txt
-  set +x
-}
-
-function run_script_in_the_hub_cluster {
-  local helper_img="${GITEA_HELPER_IMG}"
-  local script_file=$1
-  shift && local ns=$1
-  [ $# -gt 1 ] && shift && local pod_name="${1}"
-
-  set -x
-  if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
-    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
-      oc -n ${ns} run ${pod_name} \
-        --image=${helper_img} --restart=Never -- sleep infinity ; \
-      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
-    }
-    oc -n ${ns} exec -i ${pod_name} -- \
-      bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
-  else
-    oc -n ${ns} run -i ${pod_name} \
-      --image=${helper_img} --restart=Never -- \
-        bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  fi
   set +x
 }
 
@@ -234,30 +219,39 @@ chmod 0400 /tmp/ssh-prikey
 set -x
 nc -vz ${gitea_ssh_host} ${gitea_ssh_port}
 
-ztp_repo_dir=\$(mktemp -d)
-cd \${ztp_repo_dir}
-echo "# Telco Verification" > README.md
-echo "$(cat ${ssh_pri_key_file}.pub)" >> README.md
-echo "$(cat ${ssh_pri_key_file})" >> troubleshooting-info.md
-git config --global user.email "${gitea_project}@telcov10n.com"
-git config --global user.name "ZTP Gitea Telco Verification"
-git config --global init.defaultBranch main
-git init
-git checkout -b main
-git add README.md
-git add troubleshooting-info.md
-git commit -m "First commit"
-git remote add origin ${gitea_ssh_uri}
-GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push -u origin main
+if [[ "${new_repo_created}" == "yes" ]]; then
+
+  ztp_repo_dir=\$(mktemp -d)
+  cd \${ztp_repo_dir}
+  echo "# Telco Verification" > README.md
+  echo "$(cat ${ssh_pri_key_file}.pub)" >> README.md
+  echo "$(cat ${ssh_pri_key_file})" >> troubleshooting-info.md
+  git config --global user.email "${gitea_project}@telcov10n.com"
+  git config --global user.name "ZTP Gitea Telco Verification"
+  git config --global init.defaultBranch main
+  git init
+  git checkout -b main
+  git add README.md
+  git add troubleshooting-info.md
+  git commit -m "First commit by ${NAMESPACE}"
+  git remote add origin ${gitea_ssh_uri}
+  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push -u origin main
+else
+    set +x
+    echo
+    echo "The ZTP GitOps repo '${repo_name}' already exist. Do nothing..."
+    echo
+fi
 EOF
 
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "gitea-pod-helper"
+  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "${NAMESPACE}-helper"
 }
 
 function main {
   set_hub_cluster_kubeconfig
   create_gitea_deployment
-  generate_gitea_ssh_keys
+  # generate_gitea_ssh_keys
+  use_shared_ssh_keys_from_vault
   upload_gitea_ssh_keys
   create_ztp_gitea_repo
   generate_gitea_ssh_uri
