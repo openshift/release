@@ -2419,18 +2419,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
-- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
-  cron: 32 21 26 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_FILTERS: ~HyperShiftMGMT
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
-      TEST_TIMEOUT: "20"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 - as: gcp-ipi-secureboot-confidential-computing-f28
   cron: 33 20 24 * *
   steps:
@@ -2607,15 +2595,61 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-private-fips-f28-compliance-destructive
+  cron: 8 12 27 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest
-      TEST_PARALLEL: "3"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
       TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "40"
+      TEST_TIMEOUT: "45"
     test:
     - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-private-fips-f28-file-integrity
+  cron: 44 9 24 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@fio'
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-private-fips-f28-security-profiles
+  cron: 6 12 24 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@spo'
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator
+    test:
     - ref: openshift-extended-test
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
