@@ -69,6 +69,7 @@ if [[ -n "${USER_METADATA}" ]]; then
     done
     EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
 fi
+EXTRA_FLAGS+="$METRIC_PROFILES"
 export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
 
