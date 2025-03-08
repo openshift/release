@@ -1,0 +1,37 @@
+binary_build_commands: CGO_ENABLED=0 go build -o /go/bin/hypershift-oadp-plugin .
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+canonical_go_repository: github.com/openshift/hypershift-oadp-plugin
+promotion:
+  to:
+  - name: 4.19-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.19-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.19-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: exit 0
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: hypershift-oadp-plugin
