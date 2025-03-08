@@ -460,6 +460,7 @@ EOF
     fi
 }
 
+sleep 7200
 # select the cases per FILTERS
 function handle_filters {
     filter_tmp="$1"
