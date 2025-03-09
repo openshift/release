@@ -83,11 +83,6 @@ fi
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
-# Determine if we should replace the LCA version
-if [[ ! -z "${LCA_PULL_REF_OVERRIDE}" ]]; then
-  LCA_PULL_REF=$LCA_PULL_REF_OVERRIDE
-fi
-
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
@@ -97,7 +92,7 @@ export PULL_SECRET=\$(<${PULL_SECRET_FILE})
 export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
-export LCA_IMAGE="${LCA_PULL_REF}"
+export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
 export RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
@@ -118,6 +113,17 @@ set_openshift_clients() {
   rm -rf ./tools
 }
 
+# Sets the docker config.json file from the PULL_SECRET_FILE, as it is used by
+# operator-sdk to pull the pipeline's operator bundle image. More recent
+# versions of the operator-sdk use the REGISTRY_AUTH_FILE environment variable,
+# until then we can use the docker config file.
+#
+# https://github.com/operator-framework/operator-registry/blob/6c602841934d6e154e38c0574cc140471dc063e6/pkg/image/containerdregistry/resolver.go#L105-L115
+# https://github.com/operator-framework/operator-registry/blob/5e23ef594a41e6c8ce843d48b22715319c684dff/pkg/image/containerdregistry/resolver.go#L45-L47
+set_docker_config_file() {
+  mkdir -p \${HOME}/.docker/ && cp ${PULL_SECRET_FILE} \${HOME}/.docker/config.json
+}
+
 set_openshift_clients \${RELEASE_IMAGE}
 
 cd ${remote_workdir}/ib-orchestrate-vm
@@ -129,6 +135,8 @@ if [[ "${CREATE_CLUSTER_ONLY}" == "true" ]]; then
   echo "CREATE_CLUSTER_ONLY was specified, exiting"
   exit 0
 fi
+
+set_docker_config_file
 
 # Prepare the seed vm for seed image creation
 make seed-cluster-prepare
