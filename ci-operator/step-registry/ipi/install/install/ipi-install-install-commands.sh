@@ -678,6 +678,7 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 set +o errexit
+openshift-install version
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
 ret="$?"
