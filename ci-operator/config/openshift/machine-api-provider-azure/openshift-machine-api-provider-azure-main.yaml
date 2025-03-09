@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -81,6 +85,24 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+- as: regression-clusterinfra-azure-ipi-mapi
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: azure4
+    env:
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+      TEST_TIMEOUT: "35"
+    test:
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi
+  timeout: 7h0m0s
 - as: security
   steps:
     env:
