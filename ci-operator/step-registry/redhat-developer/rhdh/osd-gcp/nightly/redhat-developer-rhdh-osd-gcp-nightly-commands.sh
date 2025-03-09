@@ -18,15 +18,6 @@ oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:defau
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
 oc logout
 
-echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
-
-mkdir -p /tmp/openshift-client
-# Download and Extract the oc binary
-wget -O /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OC_CLIENT_VERSION/openshift-client-linux.tar.gz
-tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz
-export PATH=/tmp/openshift-client:$PATH
-oc version
-
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
