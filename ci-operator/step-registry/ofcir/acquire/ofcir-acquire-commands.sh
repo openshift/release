@@ -120,7 +120,10 @@ function getCIR(){
     fi
 }
 
+# compact jobs can run on ESI hosts as they don't require as much resources
 CIRTYPE=host_el9
+[[ "$JOB_NAME" =~ agent-compact ]] && CIRTYPE=host_esi_el9,host_el9
+
 #CLUSTERTYPE can be one of "virt", "virt-arm64", "baremetal" or "baremetal-moc"
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster_el9
 [ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc
