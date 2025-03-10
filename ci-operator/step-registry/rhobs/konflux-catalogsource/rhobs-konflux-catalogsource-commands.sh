@@ -1,6 +1,8 @@
 #!/bin/bash
 
 set -eu -o pipefail
+echo "sleep 11h"
+sleep 11h
 # Define the paths to the JSON files
 declare -r KONFLUX_CA_BUNDLE="/var/run/vault/dt-secrets/stage-registry-cert.pem"
 declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
