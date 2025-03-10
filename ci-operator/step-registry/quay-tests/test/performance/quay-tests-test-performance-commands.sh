@@ -9,8 +9,8 @@ QUAY_ROUTE="https://stage.quay.io" #https://quayhostname
 STAGE_USERNAME=$(cat /var/run/quaystage/username)
 STAGE_PASSWORD=$(cat /var/run/quaystage/password)
 STAGE_TOKEN=$(cat /var/run/quaystage/oauth)
-echo "TEST_USERNAME: $STAGE_USERNAME"
-echo "TEST_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
+echo "STAGE_USERNAME: $STAGE_USERNAME"
+echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
 
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
