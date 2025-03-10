@@ -87,15 +87,6 @@ tests:
         echo "Listing directory contents:"
         ls -lah
 
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-
         TEMP_DIR=$(mktemp -d)
         git clone --depth 1 https://github.com/openshift/kubernetes-sigs-kueue.git ${TEMP_DIR}
         cd ${TEMP_DIR}
@@ -106,12 +97,20 @@ tests:
         echo "Latest commit ID for Kueue: ${KUEUE_COMMIT_ID}"
 
         REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
+        export KUEUE_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:${KUEUE_COMMIT_ID}
+        echo "Using Kueue Image: ${KUEUE_IMAGE}"
+
+        echo "Current Git branch:"
+        git branch --show-current
+
+        echo "Latest Git commits:"
+        git log --oneline -5
+
+        echo "Git status:"
+        git status
 
         export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator:on-pr-${REVISION}
-        export KUEUE_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:${KUEUE_COMMIT_ID}
-
         echo "Using Operator Image: ${OPERATOR_IMAGE}"
-        echo "Using Kueue Image: ${KUEUE_IMAGE}"
 
         echo "Waiting for operator image ${OPERATOR_IMAGE} to be available..."
         function wait_for_image() {
