@@ -75,9 +75,9 @@ elif [ "$platform" = "VSphere" ]; then
     VSPHERE_VCENTER_WITHOUTDOT=$(echo "$VSPHERE_VCENTER" | sed 's/\./\\./g')
     jsonpath_username="{.data.${VSPHERE_VCENTER_WITHOUTDOT}\.username}"
     jsonpath_password="{.data.${VSPHERE_VCENTER_WITHOUTDOT}\.password}"
-    VSPHERE_USERNAME=$(comamnd oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username" 2>/dev/null)
+    VSPHERE_USERNAME=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username")
     export VSPHERE_USERNAME
-    VSPHERE_PASSWORD=$(command oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" 2>/dev/null)
+    VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password")
     export VSPHERE_PASSWORD
 fi
 
