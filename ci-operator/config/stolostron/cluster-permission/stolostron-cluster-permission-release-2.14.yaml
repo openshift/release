@@ -13,16 +13,17 @@ build_root:
     namespace: stolostron
     tag: go1.20-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
+- dockerfile_path: Dockerfile
   from: base
   inputs:
     stolostron_builder_go1.21-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.21-linux
-  to: multicluster-operators-channel
+  to: cluster-permission
 promotion:
   to:
-  - name: "2.14"
+  - disabled: true
+    name: "2.14"
     namespace: stolostron
 resources:
   '*':
@@ -35,9 +36,8 @@ tests:
     workflow: ocm-ci-rbac
 - as: test-unit
   commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow lint
-    make -f Makefile.prow test
+    export SELF="make -f Makefile"
+    make -f Makefile test
   container:
     from: src
 - as: sonarcloud
@@ -68,25 +68,43 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-channel
+      SOURCE_IMAGE_REF: cluster-permission
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-permission
     env:
-      DESTINATION_BRANCH: release-2.14
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: cluster-permission
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-channel
+      SOURCE_IMAGE_REF: cluster-permission
     env:
-      IMAGE_REPO: multicluster-operators-channel
-      IMAGE_TAG: latest
+      IMAGE_REPO: cluster-permission
+      IMAGE_TAG: 2.14.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.14
   org: stolostron
-  repo: multicloud-operators-channel
+  repo: cluster-permission
