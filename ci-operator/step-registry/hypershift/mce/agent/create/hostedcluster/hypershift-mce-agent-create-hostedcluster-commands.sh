@@ -83,6 +83,19 @@ if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publi
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
+echo "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \  
+  --name=${CLUSTER_NAME} \
+  --pull-secret=/tmp/.dockerconfigjson \
+  --agent-namespace=\"${AGENT_NAMESPACE}\" \
+  --namespace local-cluster \
+  --base-domain=${BASEDOMAIN} \
+  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
+  --image-content-sources \"${SHARED_DIR}/mgmt_icsp.yaml\" \
+  --ssh-key=\"${SHARED_DIR}/id_rsa.pub\" \
+  --release-image ${RELEASE_IMAGE}" > /tmp/agent-create-command.sh
+
+sleep 3h
+
 /tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
