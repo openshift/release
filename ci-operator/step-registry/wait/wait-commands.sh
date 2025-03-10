@@ -3,6 +3,8 @@
 echo "************ Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+TIMEOUT="36 hours"
+
 function pr_debug_mode_waiting {
 
   echo "################################################################################"
