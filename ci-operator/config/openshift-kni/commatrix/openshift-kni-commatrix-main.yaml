@@ -1,3 +1,8 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
 build_root:
   from_repository: true
 releases:
@@ -24,6 +29,51 @@ tests:
   commands: make lint
   container:
     from: src
+- as: commatrix-krew-command
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch krew-test
+        ci-job-fullname openshift-kni-commatrix-e2e-tests-main
+        ci-job-type commatrix-e2e-tests
+        ci-repo-name commatrix
+        ci-org-name openshift-kni
+    test:
+    - as: commatrix-krew-command
+      commands: |
+        # Check if krew is installed, if not install it
+        if ! command -v krew &> /dev/null; then
+          echo "krew not found, installing..."
+          OS="$(uname | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/' -e 's/armv7l/arm/')"
+          KREW="krew-${OS}_${ARCH}"
+
+          mkdir -p /tmp
+
+          curl -fsSL "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" -o /tmp/${KREW}.tar.gz  
+          mkdir -p /tmp/krew
+          tar -xvzf /tmp/${KREW}.tar.gz -C /tmp/krew
+          /tmp/krew/${KREW} install krew
+          export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+        fi
+
+        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+        oc krew install --manifest=cmd/.krew.yaml
+
+        # Run the generate command and check if it worked
+        echo "Running: oc commatrix generate"
+        oc commatrix generate
+
+        echo "SUCCESS: oc commatrix generate ran successfully!"
+      from: test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: commatrix-e2e-tests
   steps:
     cluster_profile: aws-telco
