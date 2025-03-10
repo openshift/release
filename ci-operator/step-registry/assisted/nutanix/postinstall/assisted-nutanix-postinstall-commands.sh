@@ -123,16 +123,16 @@ cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-name: nutanix-csi-operator-beta
-namespace: openshift-marketplace
+  name: nutanix-csi-operator-beta
+  namespace: openshift-marketplace
 spec:
-displayName: ${catalog}
-publisher: Nutanix-dev
-sourceType: grpc
-image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
-updateStrategy:
-  registryPoll:
-    interval: 5m
+  displayName: ${catalog}
+  publisher: Nutanix-dev
+  sourceType: grpc
+  image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
+  updateStrategy:
+    registryPoll:
+      interval: 5m
 EOF
 
 start_time=$(date +%s)
