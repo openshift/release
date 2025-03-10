@@ -31,21 +31,21 @@ fi
 # The IAM service account for UPI: upi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 # Currently we only deal with IPI in Prow CI.
 
-if [ -f "${CLUSTER_PROFILE_DIR}/ipi-min-permissions-sa.json" ]; then
+sa_filename="ipi-min-permissions-sa.json"
+if [[ "${MINIMAL_PERMISSIONS_WITHOUT_ACT_AS}" == "yes" ]]; then
+    sa_filename="ipi-min-perm-without-actAs-sa.json"
+fi
+if [[ -f "${CLUSTER_PROFILE_DIR}/${sa_filename}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Use pre-configured key of the IAM service account for the minimum permissions testing on GCP."
-  cp "${CLUSTER_PROFILE_DIR}/ipi-min-permissions-sa.json" "${SHARED_DIR}/gcp_min_permissions.json"
-  iam_account=$(jq -r .client_email ${SHARED_DIR}/gcp_min_permissions.json)
+  cp "${CLUSTER_PROFILE_DIR}/${sa_filename}" "${SHARED_DIR}/gcp_min_permissions.json"
 else
-  iam_account="ipi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
-  email=$(gcloud --project "${GOOGLE_PROJECT_ID}" iam service-accounts list --filter="email=${iam_account}" --format='value(email)')
-  if [[ -z "${email}" ]]; then
-    echo "$(date -u --rfc-3339=seconds) - Failed to find the IAM service account '${iam_account}' in GCP project '${GOOGLE_PROJECT_ID}', abort."
-    exit 1
-  fi
-  gcloud iam service-accounts keys create "${SHARED_DIR}/gcp_min_permissions.json" --iam-account="${iam_account}" || exit 1
-  echo "$(date -u --rfc-3339=seconds) - Created a temporary key of the IAM service account for the minimum permissions testing on GCP."
-  key_id=$(jq -r .private_key_id "${SHARED_DIR}/gcp_min_permissions.json")
-  echo "${key_id}" > "${SHARED_DIR}/gcp_min_permissions_sa_temporary_key_id"
+  echo "$(date -u --rfc-3339=seconds) - ERROR Failed to find the pre-configured key file of the IAM service account '${iam_account}' in GCP project '${GOOGLE_PROJECT_ID}', abort." && exit 1
+fi
+
+iam_account=$(jq -r .client_email "${CLUSTER_PROFILE_DIR}/${sa_filename}")
+email=$(gcloud --project "${GOOGLE_PROJECT_ID}" iam service-accounts list --filter="email=${iam_account}" --format='value(email)')
+if [[ -z "${email}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR Failed to find the IAM service account '${iam_account}' in GCP project '${GOOGLE_PROJECT_ID}', abort." && exit 1
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Check the IAM service account's roles/permissions..."
