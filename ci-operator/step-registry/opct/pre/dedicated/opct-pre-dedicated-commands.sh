@@ -19,6 +19,7 @@ source "${SHARED_DIR}/env"
 extract_opct
 
 # setup dedicated node
+#${OPCT_CLI} adm e2e-dedicated taint-node --yes
 ${OPCT_CLI} adm setup-node --yes
 
 # setup MachineConfigPool to pause upgrades into
