@@ -131,11 +131,13 @@ spec:
       neighbors:
       - address: 192.168.111.1
         asn: 64512
+        disableMP: true
         toReceive:
           allowed:
             mode: filtered
       - address: fd2e:6f44:5dd8:c956::1
         asn: 64512
+        disableMP: true
         toReceive:
           allowed:
             mode: filtered
