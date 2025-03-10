@@ -65,7 +65,20 @@ elif [ "$platform" = "IBMCloud" ]; then
     NODE_NAME=$(oc get nodes -l $LABEL_SELECTOR --no-headers | head -1 | awk '{printf $1}' )
     export NODE_NAME
     export TIMEOUT=320
-
+elif [ "$platform" = "VSphere" ]; then
+    export CLOUD_TYPE="vsphere"
+    MASTER_MACHINE=$(oc get machines -A | grep master | head -n 1 | awk '{print $2}')
+    VSPHERE_IP=$(oc get machine $MASTER_MACHINE -n openshift-machine-api -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}' | awk '{print $1}')
+    export VSPHERE_IP
+    VSPHERE_VCENTER=$(oc get infrastructures.config.openshift.io cluster -o jsonpath='{.spec.platformSpec.vsphere.vcenters[0].server}')
+    export VSPHERE_VCENTER
+    VSPHERE_VCENTER_WITHOUTDOT=$(echo "$VSPHERE_VCENTER" | sed 's/\./\\./g')
+    jsonpath_username="{.data.${VSPHERE_VCENTER_WITHOUTDOT}\.username}"
+    jsonpath_password="{.data.${VSPHERE_VCENTER_WITHOUTDOT}\.password}"
+    VSPHERE_USERNAME=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username" &>/dev/null)
+    export VSPHERE_USERNAME
+    VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" &>/dev/null)
+    export VSPHERE_PASSWORD
 fi
 
 ./node-disruptions/prow_run.sh
