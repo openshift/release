@@ -11,8 +11,9 @@ build_root:
   from_repository: true
 images:
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    FROM src
     RUN dnf install -y skopeo git && dnf clean all
+  from: src
   inputs:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
@@ -47,6 +48,12 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
+    echo "Current PWD: $(pwd)"
+    echo "Listing directory contents:"
+    ls -lah
+
+    echo "Current Git branch:"
+    git branch --show-current
     make lint
   container:
     clone: true
