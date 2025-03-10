@@ -7,13 +7,15 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.4.5
+    tag: stackrox-ui-test-0.4.8
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.17"
+      version_bounds:
+        lower: 4.17.0-0
+        stream: 4-stable
+        upper: 4.18.0-0
 resources:
   '*':
     requests:
@@ -21,14 +23,12 @@ resources:
       memory: 8000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: acs-tests-aws
+- as: acs-tests-ibmcloud
   cron: 0 23 31 2 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -37,40 +37,12 @@ tests:
               {"step": "stackrox-*", "failure_type": "test_failure", "classification": "ACS Test Failure", "jira_project": "ROX", "jira_assignee": "davidh@redhat.com", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/ibm-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","acs-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      USER_TAGS: |
-        scenario acs
     test:
     - ref: stackrox-qa-e2e
-    workflow: firewatch-ipi-aws
-- as: acs-tests-aws-fips
-  cron: 0 23 31 2 *
-  steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      FIPS_ENABLED: "true"
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-            [
-              {"step": "stackrox-*", "failure_type": "pod_failure", "classification": "ACS Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "stackrox-*", "failure_type": "test_failure", "classification": "ACS Test Failure", "jira_project": "ROX", "jira_assignee": "davidh@redhat.com", "jira_additional_labels": ["!default","interop-tests"]}
-            ]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","self-managed-lp","acs-lp","fips"]'
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      USER_TAGS: |
-        scenario acs
-    test:
-    - ref: stackrox-qa-e2e
-    workflow: firewatch-ipi-aws
-  timeout: 8h0m0s
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: master
   org: stackrox

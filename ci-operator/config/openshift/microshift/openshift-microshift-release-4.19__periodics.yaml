@@ -1,3 +1,8 @@
+base_images:
+  microshift-ci-brew:
+    name: brew
+    namespace: microshift
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -33,14 +38,18 @@ tests:
   steps:
     workflow: openshift-microshift-publish-release-notes
 - as: e2e-aws-tests-cache-nightly
+  cluster: build11
   cron: 0 0 * * *
+  restrict_network_access: false
   steps:
     cluster_profile: aws
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests-cache-nightly-arm
+  cluster: build11
   cron: 0 0 * * *
+  restrict_network_access: false
   steps:
     cluster_profile: aws
     env:
@@ -120,6 +129,7 @@ tests:
     env:
       MICROSHIFT_OS: rhel-9.4
       OPTIONAL_RPMS: "true"
+      SKIPPED_OPTIONAL_RPMS: ai-model-serving,low-latency
       TEST_SUITE: openshift/conformance
     workflow: openshift-microshift-e2e-origin-conformance
 - as: e2e-aws-ovn-ocp-conformance-optional-components-arm
@@ -130,6 +140,7 @@ tests:
       EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
       OPTIONAL_RPMS: "true"
+      SKIPPED_OPTIONAL_RPMS: ai-model-serving,low-latency
       TEST_SUITE: openshift/conformance
     workflow: openshift-microshift-e2e-origin-conformance
 - as: clusterbot-nightly

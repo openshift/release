@@ -168,9 +168,9 @@ function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
+    for CRN in $(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-p-px-${POWERVS_ZONE}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
     do
-        echo "Targetting power cloud instance"
+        echo "Targeting power cloud instance"
         ibmcloud pi workspace target "${CRN}"
 
         echo "Deleting the PVM Instances"
@@ -313,7 +313,7 @@ release_image_override    = "${TARGET_VERSION}"
 use_zone_info_for_names    = true
 use_ibm_cloud_services     = true
 ibm_cloud_vpc_name         = "${VPC_NAME}"
-private_network_mtu        = 9000
+private_network_mtu        = 1450
 ibm_cloud_vpc_subnet_name  = "sn01"
 ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
@@ -382,6 +382,11 @@ function build_upi_cluster() {
     scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
     echo "Done with retrieval"
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
+
+    # Create ~/.kube directory on the Bastion if it doesn't exist
+    ssh -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}/ocp4-upi-powervs/data/id_rsa" root@"${BASTION_PUBLIC_IP}" "mkdir -p ~/.kube"
+    scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig root@"${BASTION_PUBLIC_IP}":~/.kube/config
+    echo "Done copying kubeconfig to bastion location ~/.kube/config"
 
     echo "Copying the terraform.tfstate"
     cp "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate

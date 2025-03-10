@@ -13,6 +13,7 @@ set -euo pipefail
 cat /proc/meminfo
 cd stage_quay_io_tests/new_ui
 skopeo -v
+podman -v
 #oc version
 #terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
@@ -132,10 +133,11 @@ trap copyArtifacts EXIT
 #yarn run cypress run --browser firefox --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags=newui+-nopipeline || true
 #yarn run cypress run --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
 
-yarn run all_test  || true
+export CYPRESS_NO_COMMAND_LOG=true
+NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json
+#yarn run all_test  || true
 #yarn run org_test || true
 
-yarn run jrm  ./stage_quay_io_testing_report.xml ./cypress/results/stage_quay_io_testing_report-* || true
-
+#yarn run jrm  ./stage_quay_io_testing_report.xml ./cypress/results/stage_quay_io_testing_report-* || true
 #reformat_report "stage_quay_io_testing_report.xml" "stage.quay.io Testing" ||true 
 
