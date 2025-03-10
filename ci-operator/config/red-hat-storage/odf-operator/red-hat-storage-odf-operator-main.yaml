@@ -12,19 +12,21 @@ images:
 - dockerfile_path: Dockerfile
   from: golang-image
   to: odf-operator
-- dockerfile_path: catalog.deps.Dockerfile
-  to: odf-operator-catalog-deps
+- dockerfile_path: bundle.deps.Dockerfile
+  to: odf-dependencies-bundle
 operator:
   bundles:
   - as: odf-operator-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
-  - as: odf-dependencies-bundle
-    dockerfile_path: bundle.deps.Dockerfile
+  - as: odf-operator-catalog-deps
+    dockerfile_path: catalog.deps.Dockerfile
     skip_building_index: true
   substitutions:
   - pullspec: quay.io/ocs-dev/odf-operator:latest
     with: pipeline:odf-operator
+  - pullspec: quay.io/ocs-dev/odf-dependencies-bundle:latest
+    with: pipeline:odf-dependencies-bundle
 releases:
   latest:
     integration:
@@ -61,9 +63,9 @@ tests:
       - env: OO_BUNDLE
         name: odf-operator-bundle
       - env: OO_DEPS_BUNDLE
-        name: odf-dependencies-bundle
+        name: pipeline:odf-dependencies-bundle
       - env: OO_CATALOG
-        name: pipeline:odf-operator-catalog-deps
+        name: odf-operator-catalog-deps
       from: src
       resources:
         requests:
