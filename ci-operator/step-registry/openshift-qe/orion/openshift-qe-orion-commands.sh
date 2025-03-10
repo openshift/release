@@ -54,7 +54,13 @@ else
 fi
 
 if [[ ! -z "$ORION_CONFIG" ]]; then
-    export CONFIG="${ORION_CONFIG}"
+    if [[ "$ORION_CONFIG" =~ "https://raw" ]] ; then
+        fileBasename=$(echo "$ORION_CONFIG" | awk -F'/' '{print $NF}')
+        curl -sL "$ORION_CONFIG" > "$ARTIFACT_DIR/$fileBasename"
+        export CONFIG="$ARTIFACT_DIR/$fileBasename"
+    else
+        export CONFIG="${ORION_CONFIG}"
+    fi
 fi
 
 if [[ ! -z "$ACK_FILE" ]]; then
