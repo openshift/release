@@ -24,22 +24,6 @@ tests:
   commands: make lint
   container:
     from: src
-- as: krew-test
-  commands: |
-    # Check if krew is installed, if not install it
-    if ! command -v krew &> /dev/null; then
-      echo "krew not found, installing..."
-      curl -fsSL https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz | tar xz -C /tmp
-      mv /tmp/krew-*/* /usr/local/bin/
-    fi
-
-    oc krew install --manifest=cmd/.krew.yaml
-    oc commatrix generate
-  from: src
-  resources:
-    requests:
-      cpu: 100m
-      memory: 200Mi
 - as: commatrix-e2e-tests
   steps:
     cluster_profile: aws-telco
@@ -54,7 +38,18 @@ tests:
         ci-org-name openshift-kni
     test:
     - as: commatrix-e2e-tests
-      commands: go mod vendor && make e2e-test
+      commands: |
+        # Check if krew is installed, if not install it
+        if ! command -v krew &> /dev/null; then
+          echo "krew not found, installing..."
+          curl -fsSL https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz | tar xz -C /tmp
+          mv /tmp/krew-*/* /usr/local/bin/
+        fi
+
+        oc krew install --manifest=cmd/.krew.yaml
+        oc commatrix generate
+
+        go mod vendor && make e2e-test
       from: src
       resources:
         requests:
