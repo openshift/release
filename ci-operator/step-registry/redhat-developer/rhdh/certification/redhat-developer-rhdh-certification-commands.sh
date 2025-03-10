@@ -11,7 +11,7 @@ export OPENSHIFT_USERNAME
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' "$KUBECONFIG")"
 OPENSHIFT_USERNAME="kubeadmin"
 
-QUAY_REPO="rhdh-community/rhdh"
+QUAY_REPO="rhdh-community/rhdh-plugin-certification"
 export QUAY_REPO
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' "$KUBECONFIG"
@@ -47,14 +47,14 @@ export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="redhat-developer"
-GITHUB_REPOSITORY_NAME="rhdh"
+GITHUB_REPOSITORY_NAME="rhdh-plugin-certification"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
-cd rhdh || exit
+cd rhdh-plugin-certification || exit
 
-git config --global user.name "rhdh-qe"
-git config --global user.email "rhdh-qe@redhat.com"
+git config --global user.name "rhdh-cert"
+git config --global user.email "rhdh-cert@redhat.com"
 
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # If executed as PR check of the repository, switch to PR branch.
