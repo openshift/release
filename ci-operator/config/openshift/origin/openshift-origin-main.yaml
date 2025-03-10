@@ -36,7 +36,7 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: images/tests/Dockerfile.rhel
-  from: tools
+  from: tools-base
   inputs:
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
@@ -58,6 +58,13 @@ promotion:
   to:
   - name: "4.19"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): add openstack repo
+      curl http://base-openstack-4-19.ocp.svc > /etc/yum.repos.d/base-4-19-rhel-9-openstack-17-rpms.repo
+    from: tools
+    to: tools-base
 releases:
   initial:
     integration:
