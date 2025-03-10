@@ -35,18 +35,14 @@ find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
     process_inventory $dir /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename ${dir})"
 done
 
-find /var/group_variables/${CLUSTER_NAME}/ -mindepth 1 -type d | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory $dir /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename ${dir})"
-done
-
 echo "Create host_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
 
 find /var/host_variables/${CLUSTER_NAME}/ -mindepth 1 -type d | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
+    echo "Process host inventory file: ${dir}"
     process_inventory $dir /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename ${dir})"
 done
 
 cd /eco-ci-cd
-ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME}" -vvv
+ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml \
+    --extra-vars 'kubeconfig="/home/telcov10n/project/generated/'${CLUSTER_NAME}'/auth/kubeconfig" version="'${VERSION}'" operators='\'${OPERATORS}\'''
