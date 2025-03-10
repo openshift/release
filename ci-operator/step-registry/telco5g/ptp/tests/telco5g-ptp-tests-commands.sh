@@ -83,7 +83,9 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #[dev-ci] use forked dev repo
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/edcdavid/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
@@ -233,6 +235,11 @@ else
     source $HOME/golang-1.22.4
 fi
 
+#[dev-ci] use dev branch for test code if needed
+#export TEST_BRANCH="dev-branch-for-ci-fix"
+#[dev-ci] use dev branch for product code
+export PTP_UNDER_TEST_BRANCH="add-dual-follower-ci"
+
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
@@ -245,7 +252,9 @@ build_images
 
 # deploy ptp-operator
 
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+#[dev-ci] use dev branch for product code
+#git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+git clone https://github.com/edcdavid/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -279,6 +288,8 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
+#[dev-ci] use dev branch for test code if needed
+#git clone https://github.com/edcdavid/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
@@ -350,45 +361,21 @@ sleep 300
 # get RTC logs
 print_time
 
-# Running Dual NIC BC scenario
-export PTP_TEST_MODE=dualnicbc
-export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
-set_events_output_file
-make functests || temp_status_dnbc=$?
-
-# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
-sleep 60
-
-# get RTC logs
-print_time
-
-# Running BC scenario
-export PTP_TEST_MODE=bc
-export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
-set_events_output_file
-make functests || temp_status_bc=$?
-
-# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
-sleep 60
-
-# get RTC logs
-print_time
-
 # Running OC scenario
-export PTP_TEST_MODE=oc
+export PTP_TEST_MODE=DualFollower
 export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
 set_events_output_file
-make functests || temp_status_oc=$?
+make functests || temp_status_dual_follower=$?
 
 # get RTC logs
 print_time
 
 # saving overall status (all success=0, any failure=1)
 status=0
-if [[ $temp_status_dnbc != 0 || $temp_status_bc != 0 || $temp_status_oc != 0 ]]; then
+if [[ $temp_status_dnbc != 0 || $temp_status_bc != 0 || $temp_status_dual_follower != 0 ]]; then
   echo  "status for Dual NIC BC scenario = $temp_status_dnbc"
   echo  "status for BC scenario = $temp_status_bc"
-  echo  "status for OC scenario = $temp_status_oc"
+  echo  "status for Dual Follower scenario = $temp_status_dual_follower"
   status=1
 fi
 
