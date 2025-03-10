@@ -68,11 +68,14 @@ chain:
       fi
 
       if [[ $MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT == "true" ]]; then
-        RELEASE_IMAGE_LATEST="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
+        export RELEASE_IMAGE_LATEST="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
         oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
         mkdir /tmp/tests-cli
         oc image extract "$(oc adm release info --image-for=tests "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}")" --path /usr/bin/openshift-tests:/tmp/tests-cli --registry-config=/tmp/.dockerconfigjson
         chmod +x /tmp/tests-cli/openshift-tests
+        oc adm release extract --command=oc --to=/tmp/tests-cli "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}" --registry-config=/tmp/.dockerconfigjson
+        chmod +x /tmp/tests-cli/oc
+        ln -s /tmp/tests-cli/oc /tmp/tests-cli/kubectl
         export PATH=/tmp/tests-cli:$PATH
       else
         # In order for openshift-tests to pull external binary images from the
