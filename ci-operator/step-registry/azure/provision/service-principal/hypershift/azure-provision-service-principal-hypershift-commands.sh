@@ -13,7 +13,7 @@ az cloud set --name AzureCloud
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
-set -x
+# set -x
 
 SP_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 KV_NAME=$(<"${SHARED_DIR}/azure_keyvault_name")
@@ -24,9 +24,11 @@ COMPONENTS="azure-disk azure-file ciro cloud-provider cncc cpo ingress capz"
 
 declare -A component_to_client_id
 declare -A component_to_cert_name
+declare -A component_to_credential_secret_name
 
 for component in $COMPONENTS; do
     name="${SP_NAME_PREFIX}-${component}"
+    credential_secret_name="${SP_NAME_PREFIX}-${component}-secret"
     scopes="/subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_HC"
     role="b24988ac-6180-42a0-ab88-20f7382dd24c"
 
@@ -57,8 +59,25 @@ for component in $COMPONENTS; do
     client_id="$(eval "az ad sp create-for-rbac --name $name --role \"$role\" --scopes $scopes --create-cert --cert $name --keyvault $KV_NAME --output json --only-show-errors" | jq -r '.appId')"
     echo "$client_id" >> "${SHARED_DIR}/azure_sp_id"
 
+    client_secret_value="$(az keyvault secret show --vault-name "$KV_NAME" --name "$name" --query value -o tsv)"
+    not_before_timestamp=$(date -u -d "$(az keyvault secret show --vault-name "$KV_NAME" --name "$name" | jq -r .attributes.notBefore)" +"%Y-%m-%dT%H:%M:%SZ")
+    not_after_timestamp=$(date -u -d "$(az keyvault secret show --vault-name "$KV_NAME" --name "$name" | jq -r .attributes.expires)" +"%Y-%m-%dT%H:%M:%SZ")
+    cat <<EOF >"${SHARED_DIR}"/"$credential_secret_name".json
+{
+    "authentication_endpoint": "https://login.microsoftonline.com/",
+    "client_id": "$client_id",
+    "client_secret": "$client_secret_value",
+    "tenant_id": "$AZURE_AUTH_TENANT_ID",
+    "not_after": "$not_after_timestamp",
+    "not_before": "$not_before_timestamp"
+} 
+EOF
+    echo "created secret $credential_secret_name"
+    az keyvault secret set --vault-name "$KV_NAME" --name "$credential_secret_name" --file "${SHARED_DIR}"/"$credential_secret_name".json
+
     component_to_client_id+=(["$component"]="$client_id")
     component_to_cert_name+=(["$component"]="$name")
+    component_to_credential_secret_name+=(["$component"]="$credential_secret_name")
 done
 
 # TODO: Remove this once the we used the automated role assignment by "--assign-service-principal-role"
@@ -77,35 +96,52 @@ cat <<EOF >"${SHARED_DIR}"/hypershift_azure_mi_file.json
     },
     "cloudProvider": {
         "clientID": "${component_to_client_id[cloud-provider]}",
-        "certificateName": "${component_to_cert_name[cloud-provider]}"
+        "certificateName": "${component_to_cert_name[cloud-provider]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[cloud-provider]}",
     },
     "nodePoolManagement": {
         "clientID": "${component_to_client_id[capz]}",
-        "certificateName": "${component_to_cert_name[capz]}"
+        "certificateName": "${component_to_cert_name[capz]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[capz]}",
     },
     "controlPlaneOperator": {
         "clientID": "${component_to_client_id[cpo]}",
-        "certificateName": "${component_to_cert_name[cpo]}"
+        "certificateName": "${component_to_cert_name[cpo]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[cpo]}",
     },
     "imageRegistry": {
         "clientID": "${component_to_client_id[ciro]}",
-        "certificateName": "${component_to_cert_name[ciro]}"
+        "certificateName": "${component_to_cert_name[ciro]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[ciro]}",
     },
     "ingress": {
         "clientID": "${component_to_client_id[ingress]}",
-        "certificateName": "${component_to_cert_name[ingress]}"
+        "certificateName": "${component_to_cert_name[ingress]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[ingress]}",
     },
     "network": {
         "clientID": "${component_to_client_id[cncc]}",
-        "certificateName": "${component_to_cert_name[cncc]}"
+        "certificateName": "${component_to_cert_name[cncc]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[cncc]}",
     },
     "disk": {
         "clientID": "${component_to_client_id[azure-disk]}",
-        "certificateName": "${component_to_cert_name[azure-disk]}"
+        "certificateName": "${component_to_cert_name[azure-disk]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[azure-disk]}",
     },
     "file": {
         "clientID": "${component_to_client_id[azure-file]}",
-        "certificateName": "${component_to_cert_name[azure-file]}"
+        "certificateName": "${component_to_cert_name[azure-file]}",
+        "credentialsSecretName": "${component_to_credential_secret_name[azure-file]}",
     }
+}
+EOF
+
+
+cat <<EOF >"${SHARED_DIR}"/hypershift_azure_data_plane_identities_file.json
+{
+    "imageRegistryMSIClientID": "${component_to_client_id[ciro]}",
+    "diskMSIClientID": "${component_to_client_id[azure-disk]}",
+    "fileMSIClientID": "${component_to_client_id[azure-file]}"
 }
 EOF
