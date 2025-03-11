@@ -193,40 +193,6 @@ function load_env {
   # shellcheck disable=SC2090
   export HUB_CLUSTER_OPERATORS
 
-  #### Spoke cluster
-  SPOKE_CLUSTER_NAME="spoke-${OCP_SPOKE_VERSION//./-}"
-  export SPOKE_CLUSTER_NAME
-
-  BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
-  export BAREMETAL_SPOKE_CLUSTER_NIC_MAC
-
-  # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('24') | ansible.utils.ipv4('address') }}"
-  # shellcheck disable=SC2090
-  export BAREMETAL_SPOKE_IPv4
-  # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 36))') | ansible.utils.ipv6('address') }}"
-  # shellcheck disable=SC2090
-  export BAREMETAL_SPOKE_IPv6
-
-  # shellcheck disable=SC2089
-  SPOKE_CLUSTER_API_IPv4="${BAREMETAL_SPOKE_IPv4}"
-  # shellcheck disable=SC2090
-  export SPOKE_CLUSTER_API_IPv4
-  # shellcheck disable=SC2089
-  SPOKE_CLUSTER_API_IPv6="${BAREMETAL_SPOKE_IPv6}"
-  # shellcheck disable=SC2090
-  export SPOKE_CLUSTER_API_IPv6
-
-  # shellcheck disable=SC2089
-  SPOKE_CLUSTER_INGRESS_IPv4="${BAREMETAL_SPOKE_IPv4}"
-  # shellcheck disable=SC2090
-  export SPOKE_CLUSTER_INGRESS_IPv4
-  # shellcheck disable=SC2089
-  SPOKE_CLUSTER_INGRESS_IPv6="${BAREMETAL_SPOKE_IPv6}"
-  # shellcheck disable=SC2090
-  export SPOKE_CLUSTER_INGRESS_IPv6
-
   #### Proxy access
   SOCKS5_PROXY_PORT="${SOCKS5_PROXY##*:}"
   export SOCKS5_PROXY_PORT
@@ -382,9 +348,6 @@ all:
                   dhcp-host={{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},${VM_CONTROL_PLANE_0_IPv4},{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
                   # dhcp-host=id:00:03:00:01:{{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},[${VM_CONTROL_PLANE_0_IPv6}],{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
                   # dhcp-host={{ lookup('ansible.builtin.env', 'VM_CONTROL_PLANE_0_MAC') }},${VM_CONTROL_PLANE_0_IPv4},[${VM_CONTROL_PLANE_0_IPv6}],{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}-ctlplane-0.${NETWORK_BRIDGE_BASE_DOMAIN},set:{{ lookup('ansible.builtin.env', 'NETWORK_BRIDGE_NAME') }}
-                  # SNO Spoke main NIC
-                  dhcp-host={{ lookup('ansible.builtin.env', 'BAREMETAL_SPOKE_CLUSTER_NIC_MAC') }},${BAREMETAL_SPOKE_IPv4}
-                  # dhcp-host=id:00:03:00:01:{{ lookup('ansible.builtin.env', 'BAREMETAL_SPOKE_CLUSTER_NIC_MAC') }},[${BAREMETAL_SPOKE_IPv6}]
 
                   ########################################
                   # DNS entries
@@ -404,18 +367,6 @@ all:
                   # OCP HUB cluster INGRESS
                   address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv4}
                   # address=/.apps.{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${HUB_CLUSTER_INGRESS_IPv6}
-                  #
-                  # OCP SPOKE cluster API
-                  # TODO: These below lines should be added later during Spoke deployments, so that more than one Spoke can be installed at the same time:
-                  #
-                  # OCP SPOKE cluster
-                  address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv4}
-                  address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv4}
-                  # address=/api.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
-                  # address=/api-int.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_API_IPv6}
-                  # OCP HUB cluster INGRESS
-                  address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_INGRESS_IPv4}
-                  # address=/.apps.{{ lookup('ansible.builtin.env', 'SPOKE_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}/${SPOKE_CLUSTER_INGRESS_IPv6}
           kcli_wrp_firewalld:
             zone_files:
               - path: /etc/firewalld/zones/public.xml
