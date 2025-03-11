@@ -122,7 +122,7 @@ def run(args):
         retries = 5
         while True:
             try:
-                tags, has_more = fetch_tags('openshift/ci', token, page, like='_prune_')
+                tags, has_more = fetch_tags('openshift/ci', token, page)
                 break
             except Exception:  # pylint: disable=broad-except
                 logging.exception("Error retrieving tags")
