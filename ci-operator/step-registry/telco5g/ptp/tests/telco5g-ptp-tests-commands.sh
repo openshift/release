@@ -85,7 +85,7 @@ spec:
 
           #[dev-ci] use forked dev repo
           #git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/edcdavid/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/edcdavid/ptp-operator-upstream.git ptp-operator
           cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
@@ -238,7 +238,7 @@ fi
 #[dev-ci] use dev branch for test code if needed
 #export TEST_BRANCH="dev-branch-for-ci-fix"
 #[dev-ci] use dev branch for product code
-export PTP_UNDER_TEST_BRANCH="add-dual-follower-ci"
+export PTP_UNDER_TEST_BRANCH="dual-follower-extra-tests"
 
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
