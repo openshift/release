@@ -1,32 +1,30 @@
 presubmits:
-  openshift-knative/kn-plugin-func:
+  openshift-knative/eventing-integrations:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^serverless-1\.34$
-    - ^serverless-1\.34-
-    cluster: build09
-    context: ci/prow/416-e2e-oncluster-test
+    - ^release-v1\.16$
+    - ^release-v1\.16-
+    cluster: build03
+    context: ci/prow/414-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "416"
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-kn-plugin-func-serverless-1.34-416-e2e-oncluster-test
-    rerun_command: /test 416-e2e-oncluster-test
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
+    name: pull-ci-openshift-knative-eventing-integrations-release-v1.16-414-images
+    rerun_command: /test 414-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-oncluster-test
-        - --variant=416
+        - --target=[images]
+        - --target=src
+        - --variant=414
         command:
         - ci-operator
         image: ci-operator:latest
@@ -36,14 +34,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -56,12 +48,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -71,23 +57,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-e2e-oncluster-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )414-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^serverless-1\.34$
-    - ^serverless-1\.34-
-    cluster: build09
-    context: ci/prow/416-images
+    - ^release-v1\.16$
+    - ^release-v1\.16-
+    cluster: build03
+    context: ci/prow/417-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "416"
+      ci-operator.openshift.io/variant: "417"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-kn-plugin-func-serverless-1.34-416-images
-    rerun_command: /test 416-images
+    name: pull-ci-openshift-knative-eventing-integrations-release-v1.16-417-images
+    rerun_command: /test 417-images
     skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
     spec:
       containers:
@@ -97,7 +83,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=416
+        - --variant=417
         command:
         - ci-operator
         image: ci-operator:latest
@@ -130,32 +116,32 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )417-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^serverless-1\.34$
-    - ^serverless-1\.34-
-    cluster: build09
-    context: ci/prow/416-unit
+    - ^release-v1\.16$
+    - ^release-v1\.16-
+    cluster: build03
+    context: ci/prow/418-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "416"
+      ci-operator.openshift.io/variant: "418"
       ci.openshift.io/generator: prowgen
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-kn-plugin-func-serverless-1.34-416-unit
-    rerun_command: /test 416-unit
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
+    name: pull-ci-openshift-knative-eventing-integrations-release-v1.16-418-images
+    rerun_command: /test 418-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
-        - --variant=416
+        - --target=[images]
+        - --variant=418
         command:
         - ci-operator
         image: ci-operator:latest
@@ -188,4 +174,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )418-images,?($|\s.*)
