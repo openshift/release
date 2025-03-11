@@ -15,15 +15,6 @@ printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 echo "kubeconfig loc $KUBECONFIG"
 
-ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
-
-ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
-ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
-ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
-if [ -e "${ES_SECRETS_PATH}/host" ]; then
-    ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
-fi
-
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
@@ -37,7 +28,7 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+export ES_SERVER=""
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
