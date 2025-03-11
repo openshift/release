@@ -219,7 +219,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="main"
+export TEST_BRANCH="dual-follower-extra-tests"
 
 export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
 export IMG_VERSION="release-${T5CI_VERSION}"
@@ -254,7 +254,7 @@ build_images
 
 #[dev-ci] use dev branch for product code
 #git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
-git clone https://github.com/edcdavid/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+git clone https://github.com/edcdavid/ptp-operator-upstream.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -289,8 +289,8 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
 #[dev-ci] use dev branch for test code if needed
-#git clone https://github.com/edcdavid/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/edcdavid/ptp-operator-upstream.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
