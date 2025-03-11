@@ -346,10 +346,6 @@ EOF
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 
-temp_status_dnbc=0
-temp_status_bc=0
-temp_status_oc=0
-
 export PTP_LOG_LEVEL=debug
 export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
@@ -372,9 +368,7 @@ print_time
 
 # saving overall status (all success=0, any failure=1)
 status=0
-if [[ $temp_status_dnbc != 0 || $temp_status_bc != 0 || $temp_status_dual_follower != 0 ]]; then
-  echo  "status for Dual NIC BC scenario = $temp_status_dnbc"
-  echo  "status for BC scenario = $temp_status_bc"
+if [[ $temp_status_dual_follower != 0 ]]; then
   echo  "status for Dual Follower scenario = $temp_status_dual_follower"
   status=1
 fi
