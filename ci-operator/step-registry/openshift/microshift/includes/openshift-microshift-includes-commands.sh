@@ -50,8 +50,24 @@ function ci_copy_secrets() {
 
     # Set up the pull secret at the expected location
     if [ -e /tmp/pull-secret ] ; then
+        echo "Setting up a pull secret file"
         export PULL_SECRET="${HOME}/.pull-secret.json"
-        cp /tmp/pull-secret "${PULL_SECRET}"
+
+        if [ -e /tmp/registry.stage.redhat.io ] ; then
+            cat > /tmp/pull-secret-stage <<EOF
+{
+    "auths": {
+        "registry.stage.redhat.io": {
+            "auth": "$(cat /tmp/registry.stage.redhat.io)"
+        }
+    }
+}
+EOF
+            # Merge the files and save the result at the expected location
+            jq -s '.[0] * .[1]' /tmp/pull-secret /tmp/pull-secret-stage > "${PULL_SECRET}"
+        else
+            cp /tmp/pull-secret "${PULL_SECRET}"
+        fi
     fi
 
     # Set up the AWS CLI keys at the expected location for accessing the cached data.
