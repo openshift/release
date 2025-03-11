@@ -77,6 +77,11 @@ if [ -e /var/run/microshift-dev-access-keys/aws_access_key_id ] && \
         "${INSTANCE_PREFIX}:/tmp"
 fi
 
+if [ -e /var/run/microshift-dev-access-keys/registry.stage.redhat.io ] ; then
+    scp /var/run/microshift-dev-access-keys/registry.stage.redhat.io \
+        "${INSTANCE_PREFIX}:/tmp"
+fi
+
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
