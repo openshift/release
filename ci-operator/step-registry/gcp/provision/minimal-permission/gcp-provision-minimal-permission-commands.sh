@@ -12,6 +12,10 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
+if [[ "${GCP_INSTALL_USE_MINIMAL_PERMISSIONS}" == "no" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - GCP_INSTALL_USE_MINIMAL_PERMISSIONS is no, nothing to do." && exit 0
+fi
+
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -26,7 +30,40 @@ fi
 # The IAM service account for IPI: ipi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 # The IAM service account for UPI: upi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 # Currently we only deal with IPI in Prow CI.
-iam_account="ipi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
 
-gcloud iam service-accounts keys create "${SHARED_DIR}/gcp_min_permissions.json" --iam-account="${iam_account}" || exit 1
-echo "$(date -u --rfc-3339=seconds) - Created a temporary key of the IAM service account for the minimum permissions testing on GCP."
+sa_filename="ipi-min-permissions-sa.json"
+if [[ "${MINIMAL_PERMISSIONS_WITHOUT_ACT_AS}" == "yes" ]]; then
+  sa_filename="ipi-min-perm-without-actAs-sa.json"
+fi
+
+if [ -f "${CLUSTER_PROFILE_DIR}/${sa_filename}" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Use pre-configured key of the IAM service account for the minimum permissions testing on GCP."
+  cp "${CLUSTER_PROFILE_DIR}/${sa_filename}" "${SHARED_DIR}/gcp_min_permissions.json"
+else
+  echo "$(date -u --rfc-3339=seconds) - Failed to find the pre-configured key file of the IAM service account for the minimum permissions testing on GCP, abort." && exit 1
+fi
+
+iam_account=$(jq -r .client_email "${CLUSTER_PROFILE_DIR}/${sa_filename}")
+email=$(gcloud iam service-accounts list --filter="email=${iam_account}" --format='value(email)')
+if [[ -z "${email}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Failed to find the IAM service account '${iam_account}' in GCP project '${GOOGLE_PROJECT_ID}', abort." && exit 1
+fi
+
+echo "$(date -u --rfc-3339=seconds) - Check the IAM service account's roles/permissions..."
+
+gcloud projects get-iam-policy "${GOOGLE_PROJECT_ID}" --flatten='bindings[].members' --format='table(bindings.role)' --filter="bindings.members:${iam_account}"
+
+readarray -t binding_roles < <(gcloud projects get-iam-policy "${GOOGLE_PROJECT_ID}" --flatten='bindings[].members' --format='table(bindings.role)' --filter="bindings.members:${iam_account}" | grep roles)
+for role in "${binding_roles[@]}"; do
+  if [[ "${role}" =~ "projects/" ]]; then
+    # Example: projects/openshift-qe/roles/jiwei_compute_admin
+    project=$(echo "${role}" | awk -F/ '{print $2}')
+    role_name=$(echo "${role}" | awk -F/ '{print $4}')
+    CMD="gcloud iam roles describe --project=${project} ${role_name}"
+  else
+    # Example: roles/compute.admin
+    CMD="gcloud iam roles describe ${role}"
+  fi
+  echo "Running Command: ${CMD}"
+  eval "${CMD}"
+done
