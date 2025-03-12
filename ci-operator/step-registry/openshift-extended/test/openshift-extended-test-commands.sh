@@ -110,6 +110,11 @@ then
     QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
     export QE_BASTION_PUBLIC_ADDRESS
 fi
+if test -f "${SHARED_DIR}/server-ip"
+then
+    QE_HYPERVISOR_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/server-ip")
+    export QE_HYPERVISOR_PUBLIC_ADDRESS
+fi
 if test -f "${SHARED_DIR}/bastion_private_address"
 then
     QE_BASTION_PRIVATE_ADDRESS=$(cat "${SHARED_DIR}/bastion_private_address")
@@ -398,7 +403,6 @@ function run {
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
-    sleep 30m
     set +x
     set +e
     rm -fr ./case_selected
