@@ -173,6 +173,7 @@ spec:
       group-du-sno: ""
       common: true
       sites: "${SPOKE_CLUSTER_NAME}"
+      prowId: "${SPOKE_CLUSTER_NAME}"
     clusterNetwork:
       - cidr: "10.128.0.0/14"
         hostPrefix: 23
