@@ -6,12 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-export REGION=${REGION:-}
 export TEST_PROFILE=${TEST_PROFILE}
-export VERSION=${VERSION:-}
-export WAIT_SETUP_CLUSTER_READY=${WAIT_SETUP_CLUSTER_READY:-false}
-
-CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
@@ -57,7 +52,8 @@ if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
   psID=$(echo "$psList" | head -n 1)
   export PROVISION_SHARD_ID=$psID
 fi
-
+echo ${OPENSHIFT_VERSION}
+echo ${VERSION}
 rosatest --ginkgo.v --ginkgo.no-color \
   --ginkgo.timeout "60m" \
   --ginkgo.label-filter "day1" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
