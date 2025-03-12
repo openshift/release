@@ -29,9 +29,16 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: exit 0
+  commands: make tests
   container:
     from: src
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high -d
+      SNYK_ENABLE_DEPS_SCAN: "false"
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv
