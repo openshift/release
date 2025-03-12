@@ -1,0 +1,140 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+  use_build_cache: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-extended-aws
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-extended-aws-proxy
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      TEST_FILTERS: ~NonPreRelease&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn
+- as: e2e-extended-aws-sts
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+- as: e2e-extended-rosa
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      OPENSHIFT_VERSION: "4.18"
+      TEST_FILTERS: ~NonPreRelease&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-aws-sts
+- as: e2e-extended-gcp
+  cron: '@weekly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: e2e-extended-azure
+  cron: '@weekly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: e2e-extended-baremetal
+  cron: '@weekly'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FIPS_MODE=true
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cert-manager-operator
+  variant: ocp-4.18
