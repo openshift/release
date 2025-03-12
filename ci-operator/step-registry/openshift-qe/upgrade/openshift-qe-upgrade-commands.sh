@@ -50,7 +50,6 @@ SCALE=${SCALE:=false}
 MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=1}
 EUS_UPGRADE=${EUS_UPGRADE:=false}
 EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
-ARCH_TYPE=${ARCH_TYPE:=""}
 echo TARGET_RELEASES is $TARGET_RELEASES
 
 UPGRADE_WAIT_NUM=${UPGRADE_WAIT_NUM="450"}
@@ -82,6 +81,6 @@ EOL
 echo "All OCP Cluster Operator is Ready, Upgrade Started"
 START_TIME=$(($(date +%s) - 600))
 echo $START_TIME > ${SHARED_DIR}/workload_start_time.txt
-./upgrade.sh $TARGET_RELEASES -f $ENABLE_FORCE -s $SCALE -u $MAX_UNAVAILABLE -e $EUS_UPGRADE -c $EUS_CHANNEL -a $ARCH_TYPE
+./upgrade.sh $TARGET_RELEASES -f $ENABLE_FORCE -s $SCALE -u $MAX_UNAVAILABLE -e $EUS_UPGRADE -c $EUS_CHANNEL
 END_TIME=$(date +%s)
 echo $END_TIME > ${SHARED_DIR}/workload_end_time.txt
