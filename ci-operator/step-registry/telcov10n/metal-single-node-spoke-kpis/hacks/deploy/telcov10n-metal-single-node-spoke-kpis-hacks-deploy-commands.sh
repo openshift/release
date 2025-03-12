@@ -9,14 +9,16 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 function load_env {
 
+  baremetal_host_path="${1}"
+
   #### Spoke cluster
   SPOKE_CLUSTER_NAME="spoke-${OCP_SPOKE_VERSION//./-}"
   # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
+  BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat ${baremetal_host_path}/network_spoke_mac_address)"
   # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_IPv4="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_ipv4_address)"
+  BAREMETAL_SPOKE_IPv4="$(cat ${baremetal_host_path}/network_spoke_ipv4_address)"
   # shellcheck disable=SC2089
-  BAREMETAL_SPOKE_IPv6="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_ipv6_address)"
+  BAREMETAL_SPOKE_IPv6="$(cat ${baremetal_host_path}/network_spoke_ipv6_address)"
 }
 
 function setup_aux_host_ssh_access {
@@ -48,20 +50,121 @@ function set_spoke_cluster_kubeconfig {
   export KUBECONFIG="${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
 }
 
+function select_baremetal_host_from_pool {
+
+  echo "************ telcov10n select a baremetal host from the pool ************"
+
+  local ts
+  ts=$(date -u +%s%N)
+  # shellcheck disable=SC2044
+  for host in $( \
+    find /var/run/telcov10n/ \
+      -maxdepth 1 \
+      -type d \
+      -exec bash -c 'f="$1" ; test -f "${f}"/pool_name && echo "${f}"/pool_name' shell {} \;); do
+    baremetal_host_path="$(dirname ${host})"
+
+    load_env "${baremetal_host_path}"
+
+    echo
+    echo "Selecting '${baremetal_host_path}/name)' host..."
+    echo
+
+    if [[ "$(cat ${host})" == "baremetal-spokes-kpis" ]];then
+      try_to_lock_host "$(cat ${baremetal_host_path}/network_spoke_mac_address)" "${ts}"
+      [[ "$(check_the_host_was_locked "$(cat ${baremetal_host_path}/network_spoke_mac_address)" "${ts}")" == "locked" ]] &&
+      {
+        update_host_and_master_yaml_files "$(dirname ${host})" ;
+        return 0 ;
+      }
+    fi
+  done
+
+  echo
+  echo "[FATAL] There is not available baremetal host where deploy the current Spoke cluster!!!"
+  echo "For manual clean up, check out /var/run/lock/ztp-baremetal-pool/*.lock folder in your bastion host"
+  echo "and remove the lock files that release those baremental host you consider is saved to unlock."
+  echo
+  exit 1
+}
+
+function try_to_lock_host {
+
+  local network_spoke_mac_address=${1} ; shift
+  local ts=${1}
+  local spoke_lock_filename="/var/run/lock/ztp-baremetal-pool/spoke-baremetal-${network_spoke_mac_address//:/-}.lock"
+
+  set -x
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s --  \
+    "${spoke_lock_filename}" "${ts}" "${LOCK_TIMEOUT}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+lock_fname="${1}"
+ts_now="${2}"
+lock_timeout="${3}"
+
+sudo mkdir -pv $(dirname ${lock_fname})
+
+set -x
+if [ -f ${lock_fname} ]; then
+  ts_stored=$(<${lock_fname})
+  time_diff=$(( ts_now - ts_stored ))
+  time_diff=$(( time_diff < 0 ? 0 : time_diff ))
+
+  # Timeout in nanoseconds (lock_timeut is in seconds)
+  lock_timeout_in_ns=$(( lock_timeout * 1000000000 ))
+
+  # Check if the stored timestamp is at least the timeout older
+  if (( time_diff >= lock_timeout_in_ns )); then
+    echo "The stored timestamp is at least the timeout older."
+    sudo echo "${ts_now}" >| ${lock_fname}
+  else
+    echo "The stored timestamp is less than the timeout old."
+  fi
+else
+  sudo echo "${ts_now}" >| ${lock_fname}
+fi
+EOF
+
+  set +x
+  echo
+}
+
+function check_the_host_was_locked {
+
+  local network_spoke_mac_address=${1} ; shift
+  local ts=${1}
+  local spoke_lock_filename="/var/run/lock/ztp-baremetal-pool/spoke-baremetal-${network_spoke_mac_address//:/-}.lock"
+
+  set -x
+  local ts_stored
+  ts_stored=$(timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" cat ${spoke_lock_filename})
+  if (( ts == ts_stored )); then
+    echo "locked"
+  else
+    echo "fail"
+  fi
+  set +x
+}
+
 function update_host_and_master_yaml_files {
 
   echo "************ telcov10n update host and master Yaml files ************"
 
+  baremetal_host_path="${1}"
+
   # ${SHARED_DIR}/hosts.yaml file expected values to be available:
-  server_hostname="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/name)"
-  redfish_scheme="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/redfish_scheme)"
-  bmc_address="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/bmc_address)"
-  redfish_base_uri="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/redfish_base_uri)"
-  mac="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/network_spoke_mac_address)"
-  root_device="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/root_device)"
-  root_dev_hctl="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/root_dev_hctl)"
-  baremetal_iface="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/baremetal_iface)"
-  ipi_disabled_ifaces="$(cat /var/run/telcov10n/helix72-telcoqe-eng-rdu2-dc-redhat-com/ipi_disabled_ifaces)"
+  server_hostname="$(cat ${baremetal_host_path}/name)"
+  redfish_scheme="$(cat ${baremetal_host_path}/redfish_scheme)"
+  bmc_address="$(cat ${baremetal_host_path}/bmc_address)"
+  redfish_base_uri="$(cat ${baremetal_host_path}/redfish_base_uri)"
+  mac="$(cat ${baremetal_host_path}/network_spoke_mac_address)"
+  root_device="$(cat ${baremetal_host_path}/root_device)"
+  root_dev_hctl="$(cat ${baremetal_host_path}/root_dev_hctl)"
+  baremetal_iface="$(cat ${baremetal_host_path}/baremetal_iface)"
+  ipi_disabled_ifaces="$(cat ${baremetal_host_path}/ipi_disabled_ifaces)"
 
   bmc_user="$(cat /var/run/telcov10n/ansible-group-all/bmc_user)"
   bmc_pass="$(cat /var/run/telcov10n/ansible-group-all/bmc_password)"
@@ -173,39 +276,17 @@ EOF
   echo
 }
 
-function use_shared_ssh_keys_from_vault {
-
-  echo "************ telcov10n use shared ssh keys from vault ************"
-
-  gitea_project="${GITEA_NAMESPACE}"
-  ssh_pri_key_file=${SHARED_DIR}/ssh-key-${gitea_project}
-  ssh_pub_key_file="${ssh_pri_key_file}.pub"
-
-  #### SSH Private key
-  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${ssh_pri_key_file}
-  chmod 0600 ${ssh_pri_key_file}
-
-  #### SSH Public key
-  cat /var/run/telcov10n/ansible-group-all/ssh_public_key >| ${ssh_pub_key_file}
-  chmod 0644 ${ssh_pub_key_file}
-
-  ls -lhtr ${ssh_pri_key_file}*
-}
-
 function hack_spoke_deployment {
 
   echo "************ telcov10n hack spoke deployment values ************"
 
-  update_host_and_master_yaml_files
+  select_baremetal_host_from_pool
   update_spoke_cluster_name
   update_base_domain
   update_dns_domains
-  # use_shared_ssh_keys_from_vault
 }
 
 function main {
-
-  load_env
 
   setup_aux_host_ssh_access
   set_spoke_cluster_kubeconfig
