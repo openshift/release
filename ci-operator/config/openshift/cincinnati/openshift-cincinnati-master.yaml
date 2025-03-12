@@ -1,12 +1,16 @@
 base_images:
+  e2e:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: e2e-test-ubi9
+  rust:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: ubi9
   ubi:
     name: ubi
     namespace: ocp
     tag: "8"
-  ubi9:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 build_root:
   image_stream_tag:
     name: release
@@ -50,9 +54,12 @@ images:
   to: deploy
 - dockerfile_path: dist/Dockerfile.e2e-ubi/Dockerfile
   inputs:
-    ubi9:
+    e2e:
       as:
-      - registry.access.redhat.com/ubi9/ubi:latest
+      - registry.ci.openshift.org/cincinnati-ci-public/rust:e2e-test-ubi9
+    rust:
+      as:
+      - registry.ci.openshift.org/cincinnati-ci-public/rust:ubi9
   to: e2e-test
 resources:
   '*':
