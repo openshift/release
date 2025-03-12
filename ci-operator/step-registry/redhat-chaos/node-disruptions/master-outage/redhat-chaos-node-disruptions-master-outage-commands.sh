@@ -72,17 +72,17 @@ elif [ "$platform" = "VSphere" ]; then
     # export VSPHERE_IP
     VSPHERE_IP=$(oc get infrastructures.config.openshift.io cluster -o jsonpath='{.spec.platformSpec.vsphere.vcenters[0].server}')
     export VSPHERE_IP
-    # VSPHERE_IP_WITHOUTDOT=$(echo "$VSPHERE_IP" | sed 's/\./\\./g')
-    # jsonpath_username="{.data.${VSPHERE_IP_WITHOUTDOT}\.username}"
-    # jsonpath_password="{.data.${VSPHERE_IP_WITHOUTDOT}\.password}"
-    # VSPHERE_USERNAME=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username")
-    # export VSPHERE_USERNAME
-    # VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password")
-    # export VSPHERE_PASSWORD
-    vcenter_username_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_username_minimal_permission")
-    export VSPHERE_USERNAME=$vcenter_username_minimal_permission
-    vcenter_password_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_password_minimal_permission")
-    export VSPHERE_PASSWORD=$vcenter_password_minimal_permission
+    VSPHERE_IP_WITHOUTDOT=$(echo "$VSPHERE_IP" | sed 's/\./\\./g')
+    jsonpath_username="{.data.${VSPHERE_IP_WITHOUTDOT}\.username}"
+    jsonpath_password="{.data.${VSPHERE_IP_WITHOUTDOT}\.password}"
+    VSPHERE_USERNAME=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username")
+    export VSPHERE_USERNAME
+    VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password")
+    export VSPHERE_PASSWORD
+    # vcenter_username_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_username_minimal_permission")
+    # export VSPHERE_USERNAME=$vcenter_username_minimal_permission
+    # vcenter_password_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_password_minimal_permission")
+    # export VSPHERE_PASSWORD=$vcenter_password_minimal_permission
 fi
 
 ./node-disruptions/prow_run.sh
