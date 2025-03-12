@@ -121,6 +121,28 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: openshift-e2e-aws-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: upstream-e2e
+      cli: latest
+      commands: make -C openshift test-e2e
+      dependencies:
+      - env: E2E_REGISTRY_IMAGE
+        name: e2e-test-registry
+      - env: TEST_CATALOG_IMAGE
+        name: test-catalog
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

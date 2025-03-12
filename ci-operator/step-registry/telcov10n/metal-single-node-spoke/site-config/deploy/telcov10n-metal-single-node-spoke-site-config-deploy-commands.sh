@@ -7,6 +7,8 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/spoke-common-functions.sh
+
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
@@ -21,34 +23,6 @@ function check_hub_cluster_is_alive {
   oc get node,clusterversion
   set +x
   echo
-}
-
-function run_script_in_the_hub_cluster {
-  local helper_img="${GITEA_HELPER_IMG}"
-  local script_file=$1
-  shift && local ns=$1
-  [ $# -gt 1 ] && shift && local pod_name="${1}"
-
-  set -x
-  if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
-    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
-      oc -n ${ns} run ${pod_name} \
-        --image=${helper_img} --restart=Never -- sleep infinity ; \
-      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
-    }
-    oc -n ${ns} exec -i ${pod_name} -- \
-      bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
-  else
-    oc -n ${ns} run -i ${pod_name} \
-      --image=${helper_img} --restart=Never -- \
-        bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  fi
-  set +x
 }
 
 function generate_network_config {
@@ -86,10 +60,10 @@ function generate_network_config {
 
 function get_storage_class_name {
 
-  echo "Get the Storage Class name to be used..."
+  echo "************ telcov10n Get the Storage Class name to be used ************"
 
-  if [ -n "$(oc get pod -A | grep "openshift-storage.*lvms-operator" || echo)" ];then
-    cat <<EOF | oc apply -f -
+  if [ -n "$(oc get pod -A | grep 'openshift-storage.*lvms-operator')" ];then
+    cat <<EOF | oc create -f - 2>/dev/null || { set -x ; oc -n openshift-storage get LVMCluster lvmcluster -oyaml ; set +x ; }
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
@@ -106,8 +80,6 @@ spec:
         overprovisionRatio: 10
         sizePercent: 90
 EOF
-    #sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1)
-    sc_name="lvms-vg1"
     set -x
     attempts=0
     while sleep 10s ; do
@@ -116,6 +88,8 @@ EOF
     done
     set +x
     oc -n openshift-storage get lvmcluster/lvmcluster -oyaml
+
+    sc_name=$(oc get sc -ojsonpath='{range .items[]}{.metadata.name}{"\n"}{end}'| grep '^lvms-' | head -1 || echo "lvms-vg1")
   else
     sc_name=$(oc get sc -ojsonpath='{.items[0].metadata.name}')
   fi
@@ -247,23 +221,38 @@ set -x
 ztp_repo_dir=\$(mktemp -d --dry-run)
 git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
-GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
-mkdir -pv \${ztp_repo_dir}/site-configs/sno-extra-manifest
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
+mkdir -pv \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest
 mkdir -pv \${ztp_repo_dir}/site-policies
-cat <<EOS > \${ztp_repo_dir}/site-configs/site-config.yaml
+cat <<EOS > \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/site-config.yaml
 $(cat ${site_config_file})
 EOS
-cat <<EOK > \${ztp_repo_dir}/site-configs/kustomization.yaml
+cat <<EOK > \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/kustomization.yaml
 generators:
   - site-config.yaml
 EOK
-touch \${ztp_repo_dir}/site-configs/sno-extra-manifest/.placeholder
-touch \${ztp_repo_dir}/site-policies/.placeholder
+
+ts="$(date -u +%s%N)"
+echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/.cluster-image-set-used.\${ts}
+echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-policies/.cluster-image-set-used.\${ts}
+
+if [ -f \${ztp_repo_dir}/site-configs/kustomization.yaml ]; then
+  if [ "\$(grep "${SPOKE_CLUSTER_NAME}" \${ztp_repo_dir}/site-configs/kustomization.yaml)" == "" ]; then
+    sed -i '/^resources:$/a\  - ${SPOKE_CLUSTER_NAME}' \${ztp_repo_dir}/site-configs/kustomization.yaml
+  fi
+else
+  cat <<EOK > \${ztp_repo_dir}/site-configs/kustomization.yaml
+resources:
+  - ${SPOKE_CLUSTER_NAME}
+EOK
+fi
 
 cd \${ztp_repo_dir}
 git add .
-git commit -m 'Generated SiteConfig file'
-GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main
+git commit -m 'Generated SiteConfig file by ${SPOKE_CLUSTER_NAME}'
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main || {
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git pull -r origin main &&
+GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main ; }
 EOF
 
   gitea_project="${GITEA_NAMESPACE}"
@@ -287,22 +276,129 @@ function get_openshift_baremetal_install_tool {
   set +x
 }
 
+function upload_iso_url_to_http_hub_pod {
+
+  echo "************ ISO image cache ************"
+
+  src_iso_url="${1}"
+  http_listen_port="8080"
+  run_script=$(mktemp --dry-run)
+
+  cat <<EOF > ${run_script}
+set -o nounset
+set -o errexit
+set -o pipefail
+
+iso_path=/tmp/live-iso/$(basename ${src_iso_url})
+
+set -x
+if [ -d \$(dirname \${iso_path}) ]; then
+  echo "Waiting for the server to start up..."
+  for ((attempts = 0 ; attempts < 10 ; attempts++)); do
+    response=\$(curl -sSkL -w "%{http_code}" -o /dev/null http://localhost:${http_listen_port}/$(basename ${src_iso_url}) || echo)
+    [[ \${response} -eq 200 ]] && exit 0
+    sleep 30s
+  done
+  exit 1
+fi
+
+mkdir -pv \$(dirname \${iso_path})
+curl -sSkL -o \${iso_path} ${src_iso_url}
+
+cat <<EOP > /tmp/server.py
+from http.server import SimpleHTTPRequestHandler, HTTPServer
+import os
+
+FILE_PATH = "\${iso_path}"
+HOST = "0.0.0.0"
+PORT = ${http_listen_port}
+
+class CustomHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/$(basename ${src_iso_url})":
+            if os.path.exists(FILE_PATH):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Disposition", f"attachment; filename={os.path.basename(FILE_PATH)}")
+                self.send_header("Content-Length", str(os.path.getsize(FILE_PATH)))
+                self.end_headers()
+
+                with open(FILE_PATH, "rb") as file:
+                    self.wfile.write(file.read())
+            else:
+                self.send_error(404, "File Not Found")
+        else:
+            self.send_error(404, "Not Found")
+
+if __name__ == "__main__":
+    server = HTTPServer((HOST, PORT), CustomHandler)
+    print(f"Serving {FILE_PATH} on http://{HOST}:{PORT}/$(basename ${src_iso_url})")
+    server.serve_forever()
+EOP
+
+  cat << EOP >| /tmp/run.py
+import subprocess
+
+process = subprocess.Popen(["python3", "/tmp/server.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+print(f"Server started in the background with PID {process.pid}")
+EOP
+
+  exec python3 /tmp/run.py
+EOF
+
+  gitea_project="${GITEA_NAMESPACE}"
+  pod_name="$(basename ${src_iso_url} | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
+  run_script_in_the_hub_cluster ${run_script} ${gitea_project} ${pod_name}
+
+  pod_ip=$(oc -n ${gitea_project} get po ${pod_name} -ojsonpath='{.status.podIP}')
+  iso_url="http://${pod_ip}:${http_listen_port}/$(basename ${src_iso_url})"
+  echo
+  echo "The ISO is served on '${iso_url}' inside the Hub cluster"
+  echo
+}
+
 function extract_rhcos_images {
 
   echo "************ telcov10n Extract RHCOS images ************"
   get_openshift_baremetal_install_tool
 
   openshift_release=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.release')
-  if [ -z "${RHCOS_IMG_ROOTFS_URL}" ]; then
-    rootfs_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location')
-  else
-    rootfs_url="${RHCOS_IMG_ROOTFS_URL}"
-  fi
-  if [ -z "${RHCOS_ISO_URL}" ]; then
+  if [ -z "${RHCOS_ISO_URL:-}" ]; then
     iso_url=$(./openshift-baremetal-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
   else
-    iso_url="${RHCOS_ISO_URL}"
+    iso_url=""
+    upload_iso_url_to_http_hub_pod "${RHCOS_ISO_URL}"
   fi
+}
+
+function wait_until_assisted_service_is_ready {
+
+  echo "Wait until Multicluster Engine PODs are avaliable..."
+
+  set -x
+  attempts=0 ;
+  while sleep 10s ; do
+    [ $(( attempts=${attempts} + 1 )) -lt 60 ] || {
+      oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+      exit 1 ;
+    }
+    assisted_service_pod_name=$( \
+      oc -n multicluster-engine get pods -l app=assisted-service | \
+      grep "^assisted-service.*Running" | \
+      awk '{print $1}' || echo)
+    [ -n "${assisted_service_pod_name}" ] && \
+      oc -n multicluster-engine get pod assisted-image-service-0 ${assisted_service_pod_name} --ignore-not-found && \
+      break
+  done ;
+  {
+    oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 --timeout=30m &&
+    oc -n multicluster-engine wait --for=condition=Available deployment/assisted-service --timeout=30m ;
+  } || {
+    oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
+    exit 1 ;
+  }
+  set +x
 }
 
 function generate_agent_service_config {
@@ -363,40 +459,41 @@ spec:
   osImages:
   - cpuArchitecture: x86_64
     openshiftVersion: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
-    rootFSUrl: ${rootfs_url}
     url: ${iso_url}
     version: ${openshift_release}
 EOF
   else
-    echo "AgentServiceConfig 'agent' already exists. Patching it..." ;
 
-    oc patch AgentServiceConfig/agent --type=merge --patch-file=/dev/stdin <<-EOF
-spec:
-  osImages:
-  - cpuArchitecture: x86_64
-    openshiftVersion: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
-    rootFSUrl: ${rootfs_url}
-    url: ${iso_url}
-    version: ${openshift_release}
+    set -x
+    openshift_version="$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
+    if [ "$(oc get AgentServiceConfig/agent -oyaml|grep "${openshift_version}")" == "" ] ; then
+      echo "AgentServiceConfig 'agent' already exists. Patching it..." ;
+
+      oc get AgentServiceConfig/agent -ojsonpath='{.spec.osImages}' >| /tmp/AgentServiceConfig-agent.spec.osImages.json
+
+      yq -o json >| /tmp/AgentServiceConfig-agent.spec.osImages.patch.json <<-EOF
+- cpuArchitecture: x86_64
+  openshiftVersion: "${openshift_version}"
+  url: ${iso_url}
+  version: ${openshift_release}
 EOF
+      oc patch AgentServiceConfig/agent --type=merge --patch-file=/dev/stdin <<-EOF
+$(jq -s '.[0] + .[1]' /tmp/AgentServiceConfig-agent.spec.osImages.json /tmp/AgentServiceConfig-agent.spec.osImages.patch.json | yq -o=yaml -I=2 -P '. | {"spec": {"osImages": .}}')
+EOF
+    else
+      echo
+      echo "'${openshift_version}' openshiftVersion already exists. Do nothing..."
+      echo
+    fi
   fi
 
   set -x
   oc get AgentServiceConfig agent -oyaml
   set +x
 
-  echo "Wait until Multicluster Engine PODs are avaliable..."
+  wait_until_assisted_service_is_ready
+
   set -x
-  attempts=0 ;
-  while sleep 10s ; do
-    [ $(( attempts=${attempts} + 1 )) -lt 60 ] || exit 1;
-    assisted_service_pod_name=$( \
-      oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
-      grep "^assisted-service" || echo)
-    [ -n "${assisted_service_pod_name}" ] && \
-    oc -n multicluster-engine get pod assisted-image-service-0 ${assisted_service_pod_name} && break ;
-  done ;
-  oc -n multicluster-engine wait --for=condition=Ready pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=30m
   oc -n multicluster-engine get sc,pv,pod,pvc
   set +x
 }

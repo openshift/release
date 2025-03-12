@@ -32,8 +32,8 @@ metadata:
 spec:
   machineConfigSelector:
     matchExpressions:
-    - key: machineconfiguration.openshift.io/role,
-      operator: In,
+    - key: machineconfiguration.openshift.io/role
+      operator: In
       values: [worker,opct]
   nodeSelector:
     matchLabels:

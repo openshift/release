@@ -43,23 +43,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: true
+- always_run: false
   as: cargo-check
   commands: cargo check
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: cargo-test
   commands: cargo test
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: cargo-clippy
   commands: cargo clippy
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: e2e-aws-ovn-single-node-recert-serial
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
     cluster_profile: aws-2
     env:
@@ -71,8 +75,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-recert
-- always_run: true
+- always_run: false
   as: e2e-aws-ovn-single-node-recert-parallel
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
     cluster_profile: aws-2
     env:
@@ -125,8 +130,9 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-sno
-- always_run: true
+- always_run: false
   as: baremetalds-sno-recert-cluster-rename
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
     cluster_profile: packet-sno
     env:
