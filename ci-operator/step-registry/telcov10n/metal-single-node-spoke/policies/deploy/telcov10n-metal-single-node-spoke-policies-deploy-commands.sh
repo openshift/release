@@ -75,8 +75,12 @@ function generate_policy_related_files {
     # Create the file and write the content
     echo "mkdir -pv $(dirname $filename)"
     echo "cat <<EOPGT >| $filename"
-    echo -e "$content"
+    echo -e "$content" | \
+      yq eval '. | select(.kind == "Namespace") .metadata.name += "-'${SPOKE_CLUSTER_NAME}'"' | \
+      yq eval '. | select(.metadata.namespace) .metadata.namespace += "-'${SPOKE_CLUSTER_NAME}'"' | \
+      yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"'
     echo "EOPGT"
+
   done
 }
 
