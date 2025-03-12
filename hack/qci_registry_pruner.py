@@ -76,22 +76,14 @@ def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] =
     for key, value in headers.items():
         request.add_header(key, value)
 
-    retries_for_502 = 60
-    while retries_for_502 > 0:
-        with urllib.request.urlopen(request) as response:
-            response_data = response.read()
-            if response.status == 200:
-                data = json.loads(response_data)
-                tags = data.get("tags", [])
-                has_more = data.get("has_additional", False)
-                return tags, has_more
-            if response.status == 502:
-                logging.info('502 bad gateway from quay. Retrying in 1 minute..')
-                time.sleep(60)
-                retries_for_502 -= 1
-                continue
-
-            raise IOError(f"Failed to fetch tags: {response.status} {response_data}")
+    with urllib.request.urlopen(request) as response:
+        response_data = response.read()
+        if response.status == 200:
+            data = json.loads(response_data)
+            tags = data.get("tags", [])
+            has_more = data.get("has_additional", False)
+            return tags, has_more
+        raise IOError(f"Failed to fetch tags: {response.status} {response_data}")
 
 
 def run(args):
@@ -119,7 +111,7 @@ def run(args):
         retries = 5
         while True:
             try:
-                tags, has_more = fetch_tags('openshift/ci', token, page, like='_prune_')
+                tags, has_more = fetch_tags('openshift/ci', token, page)
                 break
             except Exception:  # pylint: disable=broad-except
                 logging.exception("Error retrieving tags")

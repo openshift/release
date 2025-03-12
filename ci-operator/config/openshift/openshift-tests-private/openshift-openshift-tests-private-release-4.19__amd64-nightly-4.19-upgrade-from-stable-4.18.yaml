@@ -295,11 +295,12 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-cco-manual-security-token-service
-- as: aws-ipi-workers-marketplace-f28
+- as: aws-ipi-workers-marketplace-mini-perm-f28
   cron: 12 6 26 * *
   steps:
     cluster_profile: aws-qe
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - chain: openshift-upgrade-qe-test
@@ -443,6 +444,21 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
+- as: azure-ipi-disc-oidc-oc-mirror-f28-ota
+  cron: 5 19 1 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
+      MIRROR_GRAPH_DATA: "true"
+    test:
+    - ref: cucushift-upgrade-mirror-images-by-oc-mirror
+    - ref: cucushift-upgrade-prehealthcheck
+    - ref: cucushift-upgrade-toimage
+    - ref: cucushift-upgrade-healthcheck
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
 - as: azure-ipi-marketplace-mini-perm-f28
   cron: 26 6 3 * *
@@ -642,22 +658,25 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
-- as: gcp-ipi-confidential-computing-fips-f28
-  cron: 55 1 4 * *
+- as: gcp-ipi-confidential-computing-fips-mini-perm-f28
+  cron: 32 17 14 * *
   steps:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
-- as: gcp-ipi-disc-priv-oidc-fips-f28
-  cron: 9 18 27 * *
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f28
+  cron: 9 22 26 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-upgrade-qe-test-disconnected
@@ -666,13 +685,19 @@ tests:
   cron: 16 20 8 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: custom-4-16384
+      CONTROL_PLANE_NODE_TYPE: custom-4-16384
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission
-- as: gcp-ipi-secureboot-confidential-computing-f28
-  cron: 33 16 15 * *
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-secureboot-confidential-computing-mini-perm-f28
+  cron: 51 23 4 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing

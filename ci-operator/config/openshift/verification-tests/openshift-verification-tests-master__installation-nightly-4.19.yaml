@@ -121,6 +121,20 @@ tests:
       ENABLE_BYO_IAM_ROLE_DEFAULT_MACHINE: "false"
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+- as: aws-ipi-byo-subnets-only-public-mini-perm-arm-f14
+  cron: 32 8 8,24 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-subnets
 - as: aws-ipi-default-mini-perm-arm-f7
   cron: 7 21 4,11,20,27 * *
   steps:
@@ -726,7 +740,7 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrad
+      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
@@ -744,6 +758,8 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
+      FEATURE_GATES: '[ClusterAPIInstall=true]'
+      FEATURE_SET: CustomNoUpgrade
       ZONES_COUNT: "2"
     test:
     - chain: cucushift-installer-check-cluster-health
