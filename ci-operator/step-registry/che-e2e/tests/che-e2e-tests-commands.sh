@@ -4,14 +4,24 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'sleep 2h' EXIT TERM ERR SIGINT SIGTERM
+
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export OCP_API_URL
-IDP_USER="rosa-admin"
+
+# Fetch user creds
+if [[ "${TEST_PLATFORM}" == "rosa" ]]; then
+  IDP_USER="rosa-admin"
+  IDP_LOGIN_PATH=$(cat $SHARED_DIR/api.login)
+  IDP_PASSWD=$(echo "${IDP_LOGIN_PATH}" | grep -oP '(?<=-p\s)[^\s]+')
+else
+  IDP_USER="kubeadmin"
+  IDP_PASSWD=$(cat ${SHARED_DIR}/kubeadmin-password)
+  #  oc login $OCP_API_URL --insecure-skip-tls-verify=true -u $IDP_USER -p $IDP_PASSWD
+fi
 export IDP_USER
-IDP_LOGIN_PATH=$(cat $SHARED_DIR/api.login)
-IDP_PASSWD=$(echo "${IDP_LOGIN_PATH}" | grep -oP '(?<=-p\s)[^\s]+')
 export IDP_PASSWD
 export CHE_NAMESPACE
 export TEST_POD_NAME
@@ -38,6 +48,16 @@ spec:
     - name: interop-wto-test
       image: quay.io/eclipse/e2e-che-interop:latest
       imagePullPolicy: Always
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: "RuntimeDefault"
+        readOnlyRootFilesystem: false
+        runAsGroup: 0
       env:
         - name: USERSTORY
           value: WebTerminalUnderAdmin
@@ -73,6 +93,16 @@ spec:
     - name: download-reports
       image: eeacms/rsync
       imagePullPolicy: IfNotPresent
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: "RuntimeDefault"
+        readOnlyRootFilesystem: false
+        runAsGroup: 0
       volumeMounts:
         - name: test-run-results
           mountPath: /tmp/e2e/report/
@@ -91,3 +121,4 @@ sleep 180
 echo "Extracting logs into artifact dir"
 oc -n $CHE_NAMESPACE cp ${TEST_POD_NAME}:/tmp/e2e/report -c download-reports "${ARTIFACT_DIR}/tests"
 cp $ARTIFACT_DIR/tests/junit/test-results.xml $ARTIFACT_DIR/
+
