@@ -96,7 +96,7 @@ spec:
             make docker-build
           else
             # Dockerfile is updated to upstream in 4.19+
-            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ocp
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ci
             podman build -t ${IMG} -f Dockerfile.ocp
           fi
           podman push ${IMG} --tls-verify=false
