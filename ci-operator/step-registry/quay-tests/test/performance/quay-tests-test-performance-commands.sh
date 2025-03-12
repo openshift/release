@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2153 #Prow false alert error for env variable HITSIZE CONCURRENCY 
 
 set -o nounset
 
@@ -17,6 +18,10 @@ ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 echo "ELK_SERVER: $ELK_SERVER"
 echo "QUAY_ROUTE: $QUAY_ROUTE"
+
+
+# echo "HITSIZE $HITSIZE"
+# echo "CONCURRENCY $CONCURRENCY"
 
 #create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
@@ -134,10 +139,8 @@ spec:
           - name: PUSH_PULL_NUMBERS
             value:  "${PUSH_PULL_NUMBERS}"
           - name: TARGET_HIT_SIZE
-            # shellcheck disable=SC2153
             value: "${HITSIZE}"
           - name: CONCURRENCY
-            # shellcheck disable=SC2153
             value: "${CONCURRENCY}"
           - name: TEST_NAMESPACE
             value: "${quay_perf_namespace}"
