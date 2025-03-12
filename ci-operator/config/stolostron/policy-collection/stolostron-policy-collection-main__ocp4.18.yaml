@@ -27,6 +27,10 @@ base_images:
     name: ocs-ci-container
     namespace: ci
     tag: stable
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -124,6 +128,45 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     - ref: quay-tests-quay-interop-test
     - ref: acm-opp-app
+  timeout: 8h0m0s
+- as: interop-opp-vsphere
+  cron: 0 0 1,15 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "ipi-vsphere-pre", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}},
+              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "opp-tests", "priority": 1}},
+              {"step": "acm-mch", "failure_type": "all", "classification": "MCH install", "group": {"name": "opp-tests", "priority": 2}},
+              {"step": "acm-policies-openshift-plus-setup", "failure_type": "all", "classification": "Policies setup failure", "jira_project": "!default", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 3}, "jira_epic": "!default", "jira_assignee": "!default"},
+              {"step": "acm-policies-openshift-plus", "failure_type": "all", "classification": "Policies testcase failure", "jira_project": "!default", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 3}, "jira_epic": "!default", "jira_assignee": "!default"},
+              {"step": "acm-tests-obs", "failure_type": "all", "classification": "OBS testcase failure", "jira_project": "!default", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default"},
+              {"step": "cucushift-installer-check-cluster-health", "failure_type": "all", "classification": "Cucushift testcase failure", "jira_project": "!default", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default"},
+              {"step": "acm-must-gather", "failure_type": "pod_failure", "classification": "ACM must-gather failure", "group": {"name": "opp-tests", "priority": 2}},
+              {"step": "mce-must-gather", "failure_type": "pod_failure", "classification": "MCE must-gather failure", "group": {"name": "opp-tests", "priority": 2}, "jira_additional_labels": ["!default","OPP"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["mpiit_opp"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8084
+      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.12", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
+    - ref: acm-tests-obs
+    - chain: cucushift-installer-check-cluster-health
+    - ref: acm-opp-app
+    workflow: acm-ipi-vsphere
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
