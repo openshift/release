@@ -134,8 +134,10 @@ spec:
           - name: PUSH_PULL_NUMBERS
             value:  "${PUSH_PULL_NUMBERS}"
           - name: TARGET_HIT_SIZE
+            # shellcheck disable=SC2153
             value: "${HITSIZE}"
           - name: CONCURRENCY
+            # shellcheck disable=SC2153
             value: "${CONCURRENCY}"
           - name: TEST_NAMESPACE
             value: "${quay_perf_namespace}"
