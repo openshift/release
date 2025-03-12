@@ -19,13 +19,13 @@ trap 'dump_opct_namespace' EXIT TERM INT
 # Retrieve after successful execution
 show_msg "Retrieving Results..."
 mkdir -p "${ARTIFACT_DIR}/opct-results"
-${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results"
+${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results" | tee -a "${ARTIFACT_DIR}"/log-retrieve.txt
 RESULT_FILE=$(ls "${ARTIFACT_DIR}"/opct-results/*.tar*)
 
 function show_results() {
   # Run results summary (to log to file)
   show_msg "\t>> running: ${OPCT_CLI} results\n"
-  ${OPCT_CLI} results "${RESULT_FILE}" | tee -a "${ARTIFACT_DIR}"/results.txt
+  ${OPCT_CLI} results "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-results.txt
 
   # Run report (to log to file)
   show_msg "\t>> running: ${OPCT_CLI} report\n"
@@ -33,9 +33,17 @@ function show_results() {
     --skip-server \
     --log-level=debug \
     --save-to "${ARTIFACT_DIR}"/opct-report \
-    "${RESULT_FILE}" || true  | tee -a "${ARTIFACT_DIR}"/report.txt
+    "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt
 }
 show_results || true
+
+function collect_inspect() {
+  inspect_root_dir=/tmp/inspect-ns-opct
+  mkdir -p ${inspect_root_dir}
+  oc adm inspect ns/opct --dest-dir=${inspect_root_dir}
+  tar cfz "${ARTIFACT_DIR}"/inspect-opct.tar.gz ${inspect_root_dir}
+}
+collect_inspect || true
 
 # Check if job is running in OPCT repo to skip upload results to
 # OPCT storage.
@@ -61,7 +69,6 @@ fi
 
 # shellcheck disable=SC2153 # OPCT_VERSION is defined on ${SHARED_DIR}/env
 show_msg "\t> Saving results when passing in pipeline.\n"
-echo "Meta: ${OBJECT_META}"
 
 # Rename result file to format to be uploaded
 artifact_result="${ARTIFACT_DIR}/$(basename "${OBJECT_PATH}")"
@@ -77,8 +84,8 @@ mv -v "${RESULT_FILE}" "${artifact_result}"
 # CI must caught the failure (exit code) and fail the job.
 show_msg "\t> Publish results in baseline artifacts storage. meta=[${OBJECT_PATH}]\n"
 export OPCT_ENABLE_ADM_BASELINE="1"
-${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" || true
+${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" > "${ARTIFACT_DIR}"/log-publish.txt || true
 
 # re-index the result to expose the valid baseline.
 show_msg "\t> Re-indexing the baseline artifacts to be consumed by 'report' and 'opct adm baseline list'\n"
-${OPCT_CLI} adm baseline indexer --log-level=debug || true
+${OPCT_CLI} adm baseline indexer --log-level=debug > "${ARTIFACT_DIR}"/log-publish-indexer.txt || true
