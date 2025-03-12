@@ -92,17 +92,17 @@ function download_binary {
 }
 
 function get_config_files {
-    local repo_url="https://github.com/kuiwang02/burner-config.git" # will change to the official
-    local git_option="--branch main"
-    rm -fr burner-config metrics-profiles templates || true
-    git clone $repo_url $git_option --depth 1 || { ret_code=$?; FAIL_MESSAGE="cant clone burner-config"; exit_burner $ret_code yes; }
-    cp -fr burner-config/config/${OPERATION}/* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner-config"; exit_burner $ret_code yes; }
-    cp -fr burner-config/util/* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner util"; exit_burner $ret_code yes; }
-    # local base_parent_dir="/go/src/github.com/openshift/openshift-tests-private/"
-    # local util_parent_dir="${base_parent_dir}test/extended/operators/stress/util"
-    # local config_parent_dir="${base_parent_dir}test/extended/operators/stress/manifests/config"
-    # cp -fr "${util_parent_dir}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner util"; exit_burner $ret_code yes; }
-    # cp -fr "${config_parent_dir}/${OPERATION}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner-config"; exit_burner $ret_code yes; }
+    # local repo_url="https://github.com/kuiwang02/burner-config.git" # will change to the official
+    # local git_option="--branch main"
+    # rm -fr burner-config metrics-profiles templates || true
+    # git clone $repo_url $git_option --depth 1 || { ret_code=$?; FAIL_MESSAGE="cant clone burner-config"; exit_burner $ret_code yes; }
+    # cp -fr burner-config/config/${OPERATION}/* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner-config"; exit_burner $ret_code yes; }
+    # cp -fr burner-config/util/* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner util"; exit_burner $ret_code yes; }
+    local base_parent_dir="/go/src/github.com/openshift/openshift-tests-private/"
+    local util_parent_dir="${base_parent_dir}test/extended/operators/stress/util"
+    local config_parent_dir="${base_parent_dir}test/extended/operators/stress/manifests/config"
+    cp -fr "${util_parent_dir}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner util"; exit_burner $ret_code yes; }
+    cp -fr "${config_parent_dir}/${OPERATION}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner-config"; exit_burner $ret_code yes; }
 }
 
 function set_prometheus {
@@ -249,10 +249,12 @@ function summarize_test_result {
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' ${ARTIFACT_DIR}/junit/import*.xml > /tmp/result.log || { echo "can not grep test result";exit_burner 1 "no"; }
     while read row ; do
-	for ctype in "${!results[@]}" ; do
+        echo "row: ${row}"
+        for ctype in "${!results[@]}" ; do
             count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
-            if [[ -n $count ]] ; then
-                let results[$ctype]+=count || true
+            echo "ctpye: ${ctype}, count: ${count}"
+            if [[ -n $count ]] && [[ "$count" != "0" ]] ; then
+                results[$ctype]=$(( ${results[$ctype]} + $count )) || true
             fi
         done
     done < /tmp/result.log
@@ -266,14 +268,10 @@ openshift-extended-olm-test-burner-pkg-ins:
   skipped: ${results[skipped]}
 EOF
 
-    # currently we do not have failing scenario, like golang step, so no need it.
-    # if [ ${results[failures]} != 0 ] ; then
-    #     echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
-    #     readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
-    #     for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
-    #         echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
-    #     done
-    # fi
+    if [ ${results[failures]} != 0 ] ; then
+        echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+        echo "    - ${CASETITLE}" >> "${TEST_RESULT_FILE}"
+    fi
     cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
 }
