@@ -7,11 +7,13 @@ pwd
 ls -al
 ls ./utility -al || true
 echo "current directory is: $(pwd)"
-sleep 10m
+sleep 1m
 
 # 1, Setup Quay performance test environment
 
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
+QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
+
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
@@ -20,8 +22,8 @@ echo "ELK_SERVER: $ELK_SERVER"
 echo "QUAY_ROUTE: $QUAY_ROUTE"
 
 
-# echo "HITSIZE $HITSIZE"
-# echo "CONCURRENCY $CONCURRENCY"
+echo "HITSIZE $HITSIZE"
+echo "CONCURRENCY $CONCURRENCY"
 
 #create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
