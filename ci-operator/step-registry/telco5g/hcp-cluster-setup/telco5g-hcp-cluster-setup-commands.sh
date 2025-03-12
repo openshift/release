@@ -6,7 +6,7 @@ set -o pipefail
 
 # enable for debug
 # exec &> >(tee -i -a ${ARTIFACT_DIR}/_job.log )
-# set -x
+set -x
 
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
