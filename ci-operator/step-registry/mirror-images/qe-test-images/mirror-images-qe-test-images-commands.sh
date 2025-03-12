@@ -76,6 +76,7 @@ quay.io/openshifttest/mysql:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/mysq
 quay.io/openshifttest/nfs-provisioner:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/nfs-provisioner:1.2.0
 quay.io/openshifttest/nfs-server:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/nfs-server:1.2.0
 quay.io/openshifttest/nginx-alpine:1.2.1=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/nginx-alpine:1.2.1
+quay.io/openshifttest/nginx-alpine:1.2.4=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/nginx-alpine:1.2.4
 quay.io/openshifttest/ociimage:multiarch=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/ociimage:multiarch
 quay.io/openshifttest/ociimage-singlearch:x86_64=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/ociimage-singlearch:x86_64
 quay.io/openshifttest/ocp-logtest:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/ocp-logtest:1.2.0

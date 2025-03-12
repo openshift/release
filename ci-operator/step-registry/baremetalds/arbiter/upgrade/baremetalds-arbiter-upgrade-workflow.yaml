@@ -1,0 +1,24 @@
+workflow:
+  as: baremetalds-arbiter-upgrade
+  steps:
+    pre:
+      - chain: baremetalds-ofcir-pre
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      CLUSTERTYPE: baremetal
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        ENABLE_ARBITER=true
+        FEATURE_SET="TechPreviewNoUpgrade"
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+  documentation: |-
+    This workflow executes arbiter cluster installation and upgrade

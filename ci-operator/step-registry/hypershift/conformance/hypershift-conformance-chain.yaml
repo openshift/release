@@ -67,15 +67,27 @@ chain:
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
       fi
 
-      # In order for openshift-tests to pull external binary images from the
-      # payload, we need access enabled to the images on the build farm. In
-      # order to do that, we need to unset the KUBECONFIG so we talk to the
-      # build farm, not the cluster under test.
-      echo "Granting access for image pulling from the build farm..."
-      KUBECONFIG_BAK=$KUBECONFIG
-      unset KUBECONFIG
-      oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
-      export KUBECONFIG=$KUBECONFIG_BAK
+      if [[ $MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT == "true" ]]; then
+        export RELEASE_IMAGE_LATEST="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
+        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+        mkdir /tmp/tests-cli
+        oc image extract "$(oc adm release info --image-for=tests "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}")" --path /usr/bin/openshift-tests:/tmp/tests-cli --registry-config=/tmp/.dockerconfigjson
+        chmod +x /tmp/tests-cli/openshift-tests
+        oc adm release extract --command=oc --to=/tmp/tests-cli "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}" --registry-config=/tmp/.dockerconfigjson
+        chmod +x /tmp/tests-cli/oc
+        ln -s /tmp/tests-cli/oc /tmp/tests-cli/kubectl
+        export PATH=/tmp/tests-cli:$PATH
+      else
+        # In order for openshift-tests to pull external binary images from the
+        # payload, we need access enabled to the images on the build farm. In
+        # order to do that, we need to unset the KUBECONFIG so we talk to the
+        # build farm, not the cluster under test.
+        echo "Granting access for image pulling from the build farm..."
+        KUBECONFIG_BAK=$KUBECONFIG
+        unset KUBECONFIG
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+        export KUBECONFIG=$KUBECONFIG_BAK
+      fi
 
       if [[ -n "${USE_HYPERSHIFT_AZURE_CREDS:-}" ]]; then
         export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-azurecreds/credentials.json
@@ -183,7 +195,6 @@ chain:
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
 
-      RELEASE_IMAGE_LATEST="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
@@ -255,6 +266,16 @@ chain:
         Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
         program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
         details. The file must be present in ${SHARED_DIR}.
+    - name: MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT
+      documentation: |-
+        Optional. Used to override openshift-tests CLI, CLI extracts from 'HOSTEDCLUSTER_RELEASE_IMAGE_LATEST'.
+        When using the Gangway API, pass it as:
+        "pod_spec_options": {
+          "envs": {
+            "MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT": "true"
+          }
+        }
+      default: ""
     - name: HOSTED_CP
       default: ""
       documentation: Execute against a ROSA hosted control plane

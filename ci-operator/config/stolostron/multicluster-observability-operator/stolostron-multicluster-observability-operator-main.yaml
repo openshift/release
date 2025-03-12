@@ -173,6 +173,7 @@ tests:
 - as: test-e2e
   skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
+    allow_skip_on_success: true
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
@@ -211,6 +212,18 @@ tests:
         ZDogU2VydmljZUFjY291bnQKICBuYW1lOiBtdWx0aWNsdXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVy
         YXRvcgogIG5hbWVzcGFjZTogb3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQKLS0tCg==
       PIPELINE_STAGE: dev
+    post:
+    - as: obs-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=registry.redhat.io/rhacm2/acm-must-gather-rhel9:v2.12
+        /usr/bin/gather_observability_log
+      from: src
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
     test:
     - as: e2e
       commands: |

@@ -14,7 +14,7 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION="${LEASED_RESOURCE}"
+REGION=${REGION:-$LEASED_RESOURCE}
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 # get user arn
