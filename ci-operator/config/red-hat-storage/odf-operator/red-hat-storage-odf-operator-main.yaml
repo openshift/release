@@ -19,9 +19,6 @@ operator:
   - as: odf-operator-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
-  - as: odf-dependencies-bundle
-    dockerfile_path: bundle.deps.Dockerfile
-    skip_building_index: true
   substitutions:
   - pullspec: quay.io/ocs-dev/odf-operator:latest
     with: pipeline:odf-operator
@@ -55,13 +52,11 @@ tests:
       cli: latest
       commands: |
         unset VERSION
-        BUNDLE_IMG="$OO_BUNDLE" ODF_DEPS_BUNDLE_IMG="$OO_DEPS_BUNDLE" CATALOG_DEPS_IMG="$OO_CATALOG" make install-odf
+        BUNDLE_IMG="$OO_BUNDLE" CATALOG_DEPS_IMG="$OO_CATALOG" make install-odf
         GOFLAGS='' ODF_OPERATOR_INSTALL=false ODF_OPERATOR_UNINSTALL=false make e2e-test
       dependencies:
       - env: OO_BUNDLE
         name: odf-operator-bundle
-      - env: OO_DEPS_BUNDLE
-        name: odf-dependencies-bundle
       - env: OO_CATALOG
         name: pipeline:odf-operator-catalog-deps
       from: src
