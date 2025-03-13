@@ -8,6 +8,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+declare -gx RESULT_FILE
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # shellcheck source=/dev/null
@@ -16,11 +17,20 @@ extract_opct
 
 trap 'dump_opct_namespace' EXIT TERM INT
 
-# Retrieve after successful execution
-show_msg "Retrieving Results..."
-mkdir -p "${ARTIFACT_DIR}/opct-results"
-${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results" | tee -a "${ARTIFACT_DIR}"/log-retrieve.txt
-RESULT_FILE=$(ls "${ARTIFACT_DIR}"/opct-results/*.tar*)
+function collect_inspect() {
+  inspect_root_dir=/tmp/inspect-ns-opct
+  mkdir -p ${inspect_root_dir}
+  oc adm inspect ns/opct --dest-dir=${inspect_root_dir}
+  tar cfz "${ARTIFACT_DIR}"/inspect-opct.tar.gz ${inspect_root_dir}
+}
+
+function retrieve_artifact() {
+  # Retrieve after successful execution
+  show_msg "Retrieving Results..."
+  mkdir -p "${ARTIFACT_DIR}/opct-results"
+  ${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results" | tee -a "${ARTIFACT_DIR}"/log-retrieve.txt
+  RESULT_FILE=$(ls "${ARTIFACT_DIR}"/opct-results/*.tar*)
+}
 
 function show_results() {
   # Run results summary (to log to file)
@@ -35,15 +45,10 @@ function show_results() {
     --save-to "${ARTIFACT_DIR}"/opct-report \
     "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt
 }
-show_results || true
 
-function collect_inspect() {
-  inspect_root_dir=/tmp/inspect-ns-opct
-  mkdir -p ${inspect_root_dir}
-  oc adm inspect ns/opct --dest-dir=${inspect_root_dir}
-  tar cfz "${ARTIFACT_DIR}"/inspect-opct.tar.gz ${inspect_root_dir}
-}
 collect_inspect || true
+retrieve_artifact || true
+show_results || true
 
 # Check if job is running in OPCT repo to skip upload results to
 # OPCT storage.
