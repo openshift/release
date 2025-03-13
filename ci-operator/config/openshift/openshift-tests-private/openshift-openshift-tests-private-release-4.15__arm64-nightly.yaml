@@ -675,6 +675,51 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
+- as: baremetal-upi-ovn-ipv4-f14-compliance
+  cluster: build05
+  cron: 9 13 4,20 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "20"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: baremetal-lab-upi
+- as: baremetal-upi-ovn-ipv4-f14-compliance-destructive
+  cluster: build05
+  cron: 14 16 12,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "45"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: baremetal-lab-upi
 - as: baremetal-upi-ovn-ipv4-compact-f28
   cluster: build05
   cron: 56 16 14 * *

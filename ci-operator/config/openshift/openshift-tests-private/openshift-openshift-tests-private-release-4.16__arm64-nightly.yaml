@@ -702,6 +702,46 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f28-compliance
+  cron: 33 11 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      FILTERS_ADDITIONAL: ""
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f28-compliance-destructive
+  cron: 36 14 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "45"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-f28-sanity-reliability-test
   cron: 37 0 29 * *
   steps:
