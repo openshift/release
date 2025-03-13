@@ -349,7 +349,7 @@ CONFIG = {
         'us-east': 7,
     },
     'ibmcloud-qe-quota-slice': {
-        'jp-tok': 10,
+        'jp-tok': 20,
     },
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
