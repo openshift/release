@@ -14,7 +14,7 @@ source /tmp/ci-functions.sh
 ci_subscription_register
 ci_copy_secrets "${CACHE_REGION}"
 
-sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
+sudo dnf install -y jq pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 
