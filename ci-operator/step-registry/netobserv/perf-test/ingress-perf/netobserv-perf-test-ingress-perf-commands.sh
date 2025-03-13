@@ -54,7 +54,14 @@ export ES_SERVER=""
 
 # Start the Workload
 ./run.sh
+rc=$?
+echo "{'ingress-perf': $rc}" >> "${SHARED_DIR}"/ingress-perf-observer_status.json
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
-cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
-cp ${SHARED_DIR}/index_data.json ${ARTIFACT_DIR}/ingress-perf-index_data.json
+cp "$folder_name"/index_data.json "${SHARED_DIR}"/index_data.json
+cp "${SHARED_DIR}"/index_data.json "$SHARED_DIR"/ingress-perf-index_data.json
+cp "$SHARED_DIR"/ingress-perf-index_data.json "${ARTIFACT_DIR}"/ingress-perf-index_data.json
+
+echo "Return code: $rc"
+exit $rc
+
