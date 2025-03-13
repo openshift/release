@@ -3,12 +3,6 @@
 
 set -o nounset
 
-pwd
-ls -al
-ls ./utility -al || true
-echo "current directory is: $(pwd)"
-sleep 1m
-
 # 1, Setup Quay performance test environment
 
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
@@ -20,10 +14,6 @@ ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 echo "ELK_SERVER: $ELK_SERVER"
 echo "QUAY_ROUTE: $QUAY_ROUTE"
-
-
-echo "HITSIZE $HITSIZE"
-echo "CONCURRENCY $CONCURRENCY"
 
 #create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
@@ -39,7 +29,7 @@ curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
         "email": "testperf@testperf.com"
     }' -k
 
-#   refer to https://github.com/quay/quay-performance-scripts
+#refer to https://github.com/quay/quay-performance-scripts
 
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
@@ -215,11 +205,18 @@ export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
 export WORKLOAD="quay-load-test"
-export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
+# export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 export TEST_PHASES="${TEST_PHASES}"
-export hitsize="${HITSIZE}"
-export concurrency="${CONCURRENCY}"
-export imagePushPulls="${PUSH_PULL_NUMBERS}"
+# export hitsize="${HITSIZE}"
+# export concurrency="${CONCURRENCY}"
+# export imagePushPulls="${PUSH_PULL_NUMBERS}"
+export HITSIZE="$HITSIZE"
+export CONCURRENCY="$CONCURRENCY"
+export PUSH_PULL_NUMBERS="$PUSH_PULL_NUMBERS"
+
+echo "HITSIZE $HITSIZE"
+echo "CONCURRENCY $CONCURRENCY"
+echo "PUSH_PULL_NUMBERS $PUSH_PULL_NUMBERS"
 
 source utility/e2e-benchmarking.sh
 echo "es server is: $ES_SERVER"
