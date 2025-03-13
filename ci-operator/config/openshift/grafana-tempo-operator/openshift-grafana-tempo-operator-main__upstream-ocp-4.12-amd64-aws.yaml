@@ -1,18 +1,18 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.12"
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.14"
+    name: "4.12"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.22-openshift-4.17
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.23-openshift-4.19
 canonical_go_repository: github.com/grafana/tempo-operator
 images:
 - context_dir: .
@@ -34,7 +34,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -42,11 +42,23 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: tempo-e2e-tests
+  as: security-sast-tempo
   steps:
-    cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_TYPE: e2-standard-8
+      PROJECT_NAME: tempo-operator
+    workflow: openshift-ci-security
+- as: tempo-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-tracing
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    env:
       OPERATORS: |
         [
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
@@ -54,6 +66,7 @@ tests:
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
+      SKIP_TESTS: tests/e2e-openshift/monitoring tests/e2e-openshift-ossm/ossm-tempostack
     test:
     - as: install
       cli: latest
@@ -71,9 +84,9 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-upstream
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
+  variant: upstream-ocp-4.12-amd64-aws
