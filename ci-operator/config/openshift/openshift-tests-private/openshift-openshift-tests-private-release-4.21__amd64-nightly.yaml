@@ -297,11 +297,14 @@ tests:
   steps:
     cluster_profile: aws-1-qe
     env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-f56n6bt/release:latest
+      FEATURE_SET: TechPreviewNoUpgrade
+      TIMEOUT: +10 hours
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-efa-pg
+    workflow: openshift-e2e-aws-ccm-techpreview
 - as: aws-ipi-external-oidc-entraid-f14
   cron: 34 3 7,23 * *
   steps:
@@ -1472,11 +1475,13 @@ tests:
     env:
       CHANNEL_GROUP: nightly
       E2E_RUN_TAGS: '@rosa'
+      FEATURE_SET: TechPreviewNoUpgrade
       NAME_PREFIX: ocpe2e
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
       TEST_PROFILE: ocpe2e-rosa-advanced
       VERSION: "4.21"
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe
     workflow: rosa-lifecycle-advanced
 - as: aws-rosa-non-sts-advanced-stage-f7
@@ -2383,6 +2388,7 @@ tests:
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
+    - ref: wait
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: azure-stack-ipi-f28
@@ -3319,6 +3325,7 @@ tests:
       RT_ENABLED: "true"
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
+    - ref: wait
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: ibmcloud-ipi-tp-f28
