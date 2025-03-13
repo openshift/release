@@ -7,8 +7,6 @@ set -o xtrace
 set -x
 ls
 
-oc version 
-
 pushd /tmp
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
@@ -17,6 +15,8 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
+
+oc version
 
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
