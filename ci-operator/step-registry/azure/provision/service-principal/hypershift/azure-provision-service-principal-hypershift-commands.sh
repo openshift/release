@@ -49,7 +49,8 @@ for component in $COMPONENTS; do
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_NSG"
         scopes+=" /subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_VNET"
     elif [[ $component == azure-disk ]]; then
-        role="5b7237c5-45e1-49d6-bc18-a1f62f400748"
+        role="4a3f6b8e-f010-44ce-95cd-66ffbc61547c"
+        # role="5b7237c5-45e1-49d6-bc18-a1f62f400748"
     elif [[ $component == cncc ]]; then
         role="be7a6435-15ae-4171-8f30-4a343eff9e8f"
     elif [[ $component == ciro ]]; then
