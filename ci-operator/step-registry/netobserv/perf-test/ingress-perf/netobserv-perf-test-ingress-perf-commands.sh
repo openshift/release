@@ -11,9 +11,6 @@ done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 
-kubectl config view
-kubectl projects
-
 #check for flowcollector and ebpf-daemonset being ready
 kubectl get flowcollector/cluster | grep Ready
 while [[ $? ]]; do
