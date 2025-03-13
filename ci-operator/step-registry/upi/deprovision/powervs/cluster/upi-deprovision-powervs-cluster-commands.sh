@@ -208,13 +208,13 @@ function destroy_upi_cluster() {
     echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars
 
     # Loads the tfstate if it exists in the shared directory
-    if [ ! -f "${SHARED_DIR}"/terraform.tfstate ]
+    if [ ! -f "${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate ]
     then
         echo "No tfstate file provided"
         exit 0
     fi
 
-    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
+    cp "${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
 
     # Destroys the current installation for this run
     cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
