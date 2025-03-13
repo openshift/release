@@ -20,7 +20,7 @@ extract_opct
 
 # setup dedicated node
 #${OPCT_CLI} adm e2e-dedicated taint-node --yes
-${OPCT_CLI} adm setup-node --yes
+${OPCT_CLI} adm e2e-dedicated taint-node --yes
 
 # setup MachineConfigPool to pause upgrades into
 # dedicated node (prevent disruptions).
@@ -33,8 +33,8 @@ metadata:
 spec:
   machineConfigSelector:
     matchExpressions:
-    - key: machineconfiguration.openshift.io/role,
-      operator: In,
+    - key: machineconfiguration.openshift.io/role
+      operator: In
       values: [worker,opct]
   nodeSelector:
     matchLabels:

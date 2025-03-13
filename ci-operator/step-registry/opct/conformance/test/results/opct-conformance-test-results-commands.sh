@@ -17,7 +17,14 @@ extract_opct
 
 trap 'dump_opct_namespace' EXIT TERM INT
 
+function show_reader() {
+  echo "#>>
+# $*
+#<<"
+}
+
 function collect_inspect() {
+  show_reader "Inspecting Namespace 'opct'"
   inspect_root_dir=/tmp/inspect-ns-opct
   mkdir -p ${inspect_root_dir}
   oc adm inspect ns/opct --dest-dir=${inspect_root_dir}
@@ -26,19 +33,21 @@ function collect_inspect() {
 
 function retrieve_artifact() {
   # Retrieve after successful execution
-  show_msg "Retrieving Results..."
+  show_reader "Retrieving Results"
+  show_msg "\t>> running: ${OPCT_CLI} retrieve\n"
   mkdir -p "${ARTIFACT_DIR}/opct-results"
   ${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results" | tee -a "${ARTIFACT_DIR}"/log-retrieve.txt
   RESULT_FILE=$(ls "${ARTIFACT_DIR}"/opct-results/*.tar*)
 }
 
 function show_results() {
+  show_reader "Exporting Results"
   # Run results summary (to log to file)
   show_msg "\t>> running: ${OPCT_CLI} results\n"
   ${OPCT_CLI} results "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-results.txt
 
   # Run report (to log to file)
-  show_msg "\t>> running: ${OPCT_CLI} report\n"
+  show_msg "\n\t>> running: ${OPCT_CLI} report\n"
   ${OPCT_CLI} report \
     --skip-server \
     --log-level=debug \
@@ -52,6 +61,7 @@ show_results || true
 
 # Check if job is running in OPCT repo to skip upload results to
 # OPCT storage.
+show_reader "Consolidating artifacts as Baseline Results"
 INVALID_OPCT_REPO="true"
 VALID_REPOS=("redhat-openshift-ecosystem-provider-certification-tool")
 VALID_REPOS+=("redhat-openshift-ecosystem-opct")
@@ -64,7 +74,7 @@ done
 
 # Ignore persisting data in non OPCT/repo jobs
 if [[ "${INVALID_OPCT_REPO}" == "true" ]]; then
-  show_msg "# ERROR: Job $JOB_NAME is not allowed to persist baseline results, ignoring it."
+  show_msg "# WARNING: Job $JOB_NAME is not allowed to persist baseline results, ignoring it."
   exit 0
 fi
 
@@ -87,10 +97,12 @@ mv -v "${RESULT_FILE}" "${artifact_result}"
 
 # Publish results to backend. This command must reject invalid results and return failure.
 # CI must caught the failure (exit code) and fail the job.
-show_msg "\t> Publish results in baseline artifacts storage. meta=[${OBJECT_PATH}]\n"
+show_msg "\n\t> Publish results in baseline artifacts storage. meta=[${OBJECT_PATH}]\n"
 export OPCT_ENABLE_ADM_BASELINE="1"
 ${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" > "${ARTIFACT_DIR}"/log-publish.txt || true
+show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish.txt\n"
 
 # re-index the result to expose the valid baseline.
-show_msg "\t> Re-indexing the baseline artifacts to be consumed by 'report' and 'opct adm baseline list'\n"
+show_msg "\n\t> Re-indexing the baseline artifacts to be consumed by 'report' and 'opct adm baseline list'\n"
 ${OPCT_CLI} adm baseline indexer --log-level=debug > "${ARTIFACT_DIR}"/log-publish-indexer.txt || true
+show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish-indexer.txt\n"
