@@ -23,7 +23,8 @@ function load_env {
   export CLUSTER_SSH_PUB_KEY
 
   #### Pull secret encoded in base64
-  CLUSTER_B64_PULL_SECRET="$(cat /var/run/telcov10n/ztp-left-shifting/b64-pull-secret)"
+  # CLUSTER_B64_PULL_SECRET="$(cat /var/run/telcov10n/ztp-left-shifting/b64-pull-secret)"
+  CLUSTER_B64_PULL_SECRET="$(cat ${CLUSTER_PROFILE_DIR}/pull-secret | base64 -w 0)"
   export CLUSTER_B64_PULL_SECRET
 
   #### Bastion user
