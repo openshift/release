@@ -186,6 +186,31 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: baremetal-lab-agent-install-network-dynamic
+- as: aws-obo-cluster-pool-f999-logging
+  cron: 8 8 29 2 *
+  steps:
+    env:
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
+      OPERATORS: "[\n    {\"name\": \"elasticsearch-operator\", \"source\": \"redhat-operators\",
+        \"channel\": \"stable\", \"install_namespace\": \"openshift-operators-redhat\",\"target_namespaces\":
+        \"\", \"operator_group\": \"openshift-operators-redhat\"},\n    {\"name\":
+        \"loki-operator\", \"source\": \"qe-app-registry\", \"channel\": \"stable-5.9\",
+        \"install_namespace\": \"openshift-operators-redhat\",\"target_namespaces\":
+        \"\", \"operator_group\": \"openshift-operators-redhat\"},\n    {\"name\":
+        \"cluster-logging\", \"source\": \"qe-app-registry\", \"channel\": \"stable-5.9\",
+        \"install_namespace\": \"openshift-logging\",\"target_namespaces\": \"\",
+        \"operator_group\": \"openshift-logging\"}, \n    {\"name\": \"amq-streams\",
+        \"source\": \"redhat-operators\", \"channel\": \"stable\", \"install_namespace\":
+        \"openshift-operators\",\"target_namespaces\": \"\", \"operator_group\": \"\"}\n]\n"
+      TEST_FILTERS: Disruptive;Longduration
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe-disruptive
 zz_generated_metadata:
   branch: release-4.18
   org: openshift
