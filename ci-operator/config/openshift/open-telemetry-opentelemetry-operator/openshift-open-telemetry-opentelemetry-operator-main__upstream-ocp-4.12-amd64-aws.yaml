@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.12"
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.15"
+    name: "4.12"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: unset GOFLAGS && make manager && make targetallocator && make
@@ -13,7 +13,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-8-golang-1.23-openshift-4.19
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - context_dir: .
@@ -62,7 +62,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -85,18 +85,17 @@ tests:
     owner: obs-tracing
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.12"
   steps:
     env:
       OPERATORS: |
         [
             {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
+      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-targetallocator/targetallocator-prometheuscr
+        tests/e2e-otel/awscloudwatchlogsexporter tests/e2e-otel/awsxrayexporter tests/e2e-openshift/export-to-cluster-logging-lokistack
     test:
     - as: install
       cli: latest
@@ -120,4 +119,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: upstream-ocp-4.15-amd64-aws
+  variant: upstream-ocp-4.12-amd64-aws
