@@ -210,7 +210,7 @@ fi
 function is_bm_node {
     node=$1
 
-    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
+    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "ztp-cnftests" ]] ; then
         # Define thresholds
         CPU_THRESHOLD=79
         MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
@@ -471,7 +471,7 @@ fi
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "ztp-cnftests" ]]; then
     oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 fi
 
@@ -557,7 +557,7 @@ if [[ ${val_status} -ne 0 ]]; then
     status=${val_status}
 fi
 
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "ztp-cnftests" ]]; then
     echo "Wait until number of nodes matches number of machines"
     # Wait until number of nodes matches number of machines
     # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
