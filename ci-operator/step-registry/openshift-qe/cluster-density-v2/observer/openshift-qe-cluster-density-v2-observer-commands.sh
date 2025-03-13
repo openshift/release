@@ -7,6 +7,8 @@ set -o xtrace
 set -x
 ls
 
+oc version 
+
 pushd /tmp
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
