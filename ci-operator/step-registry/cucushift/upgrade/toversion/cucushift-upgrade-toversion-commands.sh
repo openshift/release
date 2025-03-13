@@ -127,10 +127,14 @@ function update_cloud_credentials_oidc(){
     mkdir "${preCredsDir}" "${tobeCredsDir}"
     # Extract all CRs from live cluster with --included
     if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
-        echo "Failed to extract CRs from live cluster!" && exit 1
+        echo "Failed to extract CRs from live cluster!"
+        export UPGRADE_FAILURE_TYPE="oc_update"
+        return 1
     fi
     if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
-        echo "Failed to extract CRs from tobe upgrade release payload!" && exit 1
+        echo "Failed to extract CRs from tobe upgrade release payload!"
+        export UPGRADE_FAILURE_TYPE="oc_update"
+        return 1
     fi
 
     # TODO: add gcp and azure
@@ -143,14 +147,17 @@ function update_cloud_credentials_oidc(){
         case "${platform}" in
         "AWS")
             if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
-                echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
+		echo "No aws_oidc_provider_arn file in SHARED_DIR"
+		return 1
             else
                 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
                 infra_name=${NAMESPACE}-${UNIQUE_HASH}
                 oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
-                extract_ccoctl
+                extract_ccoctl || { export UPGRADE_FAILURE_TYPE="cloud-credential"; return 1; }
                 if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
-                    echo "Failed to update iam role!" && exit 1
+		    echo "Failed to update iam role!"
+		    export UPGRADE_FAILURE_TYPE="cloud-credential"
+		    return 1
                 fi
                 if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
                     echo "Apply the new credential secrets."
@@ -159,7 +166,7 @@ function update_cloud_credentials_oidc(){
             fi
             ;;
         *)
-           echo "to be supported platform: ${platform}" 
+           echo "to be supported platform: ${platform}"
            ;;
         esac
     fi
@@ -458,9 +465,7 @@ if [[ "${FORCE_UPDATE}" == "false" ]]; then
     cco_annotation
 fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
-    if ! update_cloud_credentials_oidc; then
-        export UPGRADE_FAILURE_TYPE="cloud-credential"
-    fi
+    update_cloud_credentials_oidc
 fi
 run_command "${upgrade_cmd} --force=${FORCE_UPDATE}"
 echo "Upgrading cluster to ${TARGET_VERSION} gets started..."

@@ -202,7 +202,7 @@ function rhel_upgrade(){
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     echo -e "\nRunning RHEL worker upgrade"
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv || { export UPGRADE_FAILURE_TYPE="rhel"; return 1; }
 
     check_upgrade_status
 }
@@ -220,7 +220,9 @@ function rhel_post_upgrade(){
     if [[ ${exp_version} == "${act_version}" ]]; then
         echo "RHEL worker has correct K8s version"
     else
-        echo "RHEL worker has incorrect K8s version" && return 1
+        echo "RHEL worker has incorrect K8s version"
+        export UPGRADE_FAILURE_TYPE="rhel"
+        return 1
     fi
 
     echo "Check the upgrade hook flags created"
@@ -228,7 +230,9 @@ function rhel_post_upgrade(){
         if [[ -f /tmp/${hookname} ]]; then
             echo "The hook ${hookname}.yaml was executed."
         else
-            echo "The hook ${hookname}.yaml was NOT executed." && return 1
+            echo "The hook ${hookname}.yaml was NOT executed."
+            export UPGRADE_FAILURE_TYPE="rhel"
+            return 1
         fi
     done
         
@@ -239,7 +243,9 @@ function rhel_post_upgrade(){
     if [[ "$ret" == "0" ]]; then
         echo "oc logs checking command passed."
     else
-        echo "oc logs checking command failed." && return 1
+        echo "oc logs checking command failed."
+        export UPGRADE_FAILURE_TYPE="rhel"
+        return 1
     fi
 
     if [[ "$TARGET_MINOR_VERSION" -ge 14 ]]; then
@@ -259,7 +265,7 @@ function rhel_post_upgrade(){
       msg: "'/var/lib/kubelet' was NOT found in fixfiles_exclude_dirs. Quitting..."
     when: grep_result.rc != 0
 EOF
-        ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/post_check.yaml -vvv
+        ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/post_check.yaml -vvv || { export UPGRADE_FAILURE_TYPE="rhel"; return 1; }
     fi
 
     echo -e "oc get node -owide\n$(oc get node -owide)"
@@ -375,9 +381,7 @@ if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     rhel_repo
     rhel_pre_upgrade
     rhel_upgrade
-    if ! rhel_post_upgrade; then
-        export UPGRADE_FAILURE_TYPE="rhel"
-    fi
+    rhel_post_upgrade
     check_mcp
     check_history
 fi
