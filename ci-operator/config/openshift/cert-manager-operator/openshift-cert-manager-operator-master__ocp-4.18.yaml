@@ -3,6 +3,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: cli
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -49,17 +53,16 @@ tests:
   steps:
     cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
+      CHANNEL_GROUP: nightly
       INDEX_IMG: brew.registry.redhat.io/rh-osbs/iib@sha256:bfc620d19dc034678e7f5c19190d8dc7b1f55062e05d4c86b9cb193fb7b82e6b
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      OPENSHIFT_VERSION: "4.18"
       TEST_FILTERS: ~NonPreRelease&
       TEST_SCENARIOS: cert-manager
     test:
     - chain: cert-manager-install
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn
+    workflow: rosa-aws-non-sts-byo-vpc-kms-proxy
 - as: e2e-extended-aws-sts
   cron: '@weekly'
   steps:
@@ -79,16 +82,16 @@ tests:
   steps:
     cluster_profile: aws-qe
     env:
-      CHANNEL_GROUP: candidate
+      CHANNEL_GROUP: nightly
       INDEX_IMG: brew.registry.redhat.io/rh-osbs/iib@sha256:bfc620d19dc034678e7f5c19190d8dc7b1f55062e05d4c86b9cb193fb7b82e6b
       OPENSHIFT_VERSION: "4.18"
-      TEST_FILTERS: ~NonPreRelease&
+      TEST_FILTERS: ~NonPreRelease&;ROSA&
       TEST_SCENARIOS: cert-manager
     test:
     - chain: cert-manager-install
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
-    workflow: rosa-aws-sts
+    workflow: rosa-aws-sts-byo-kms-oidc
 - as: e2e-extended-gcp
   cron: '@weekly'
   steps:
@@ -117,22 +120,22 @@ tests:
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: e2e-extended-baremetal
+  cluster: build05
   cron: '@weekly'
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      DEVSCRIPTS_CONFIG: |
-        FIPS_MODE=true
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       INDEX_IMG: brew.registry.redhat.io/rh-osbs/iib@sha256:bfc620d19dc034678e7f5c19190d8dc7b1f55062e05d4c86b9cb193fb7b82e6b
+      RESERVE_BOOTSTRAP: "false"
       TEST_FILTERS: ~NonPreRelease&
       TEST_SCENARIOS: cert-manager
+      architecture: amd64
     test:
     - chain: cert-manager-install
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+    workflow: baremetal-lab-agent-install-network-dynamic-ipv6
 zz_generated_metadata:
   branch: master
   org: openshift
