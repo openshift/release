@@ -7,6 +7,15 @@ set -o xtrace
 set -x
 ls
 
+pushd /tmp
+REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+git clone $REPO_URL $TAG_OPTION --depth 1
+
+python -m virtualenv ./venv_qe
+source ./venv_qe/bin/activate
+
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 10
@@ -15,10 +24,6 @@ printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 echo "kubeconfig loc $KUBECONFIG"
 
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=cluster-density-v2
 
