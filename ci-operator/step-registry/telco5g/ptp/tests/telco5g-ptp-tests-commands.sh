@@ -83,7 +83,9 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #[dev-ci] use forked dev repo
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/edcdavid/ptp-operator-upstream.git ptp-operator
           cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
@@ -94,8 +96,8 @@ spec:
             make docker-build
           else
             # Dockerfile is updated to upstream in 4.19+
-            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ocp
-            podman build -t ${IMG} -f Dockerfile.ocp
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ci
+            podman build -t ${IMG} -f Dockerfile.ci
           fi
           podman push ${IMG} --tls-verify=false
           cd ..
@@ -217,7 +219,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="main"
+export TEST_BRANCH="dual-follower-extra-tests"
 
 export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
 export IMG_VERSION="release-${T5CI_VERSION}"
@@ -233,6 +235,11 @@ else
     source $HOME/golang-1.22.4
 fi
 
+#[dev-ci] use dev branch for test code if needed
+#export TEST_BRANCH="dev-branch-for-ci-fix"
+#[dev-ci] use dev branch for product code
+export PTP_UNDER_TEST_BRANCH="dual-follower-extra-tests"
+
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
@@ -245,7 +252,9 @@ build_images
 
 # deploy ptp-operator
 
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+#[dev-ci] use dev branch for product code
+#git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+git clone https://github.com/edcdavid/ptp-operator-upstream.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -279,7 +288,9 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#[dev-ci] use dev branch for test code if needed
+git clone https://github.com/edcdavid/ptp-operator-upstream.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
@@ -335,10 +346,6 @@ EOF
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 
-temp_status_dnbc=0
-temp_status_bc=0
-temp_status_oc=0
-
 export PTP_LOG_LEVEL=debug
 export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
@@ -350,45 +357,19 @@ sleep 300
 # get RTC logs
 print_time
 
-# Running Dual NIC BC scenario
-export PTP_TEST_MODE=dualnicbc
-export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
-set_events_output_file
-make functests || temp_status_dnbc=$?
-
-# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
-sleep 60
-
-# get RTC logs
-print_time
-
-# Running BC scenario
-export PTP_TEST_MODE=bc
-export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
-set_events_output_file
-make functests || temp_status_bc=$?
-
-# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
-sleep 60
-
-# get RTC logs
-print_time
-
 # Running OC scenario
-export PTP_TEST_MODE=oc
+export PTP_TEST_MODE=DualFollower
 export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
 set_events_output_file
-make functests || temp_status_oc=$?
+make functests || temp_status_dual_follower=$?
 
 # get RTC logs
 print_time
 
 # saving overall status (all success=0, any failure=1)
 status=0
-if [[ $temp_status_dnbc != 0 || $temp_status_bc != 0 || $temp_status_oc != 0 ]]; then
-  echo  "status for Dual NIC BC scenario = $temp_status_dnbc"
-  echo  "status for BC scenario = $temp_status_bc"
-  echo  "status for OC scenario = $temp_status_oc"
+if [[ $temp_status_dual_follower != 0 ]]; then
+  echo  "status for Dual Follower scenario = $temp_status_dual_follower"
   status=1
 fi
 
