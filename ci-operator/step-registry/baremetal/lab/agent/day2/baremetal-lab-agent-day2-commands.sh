@@ -83,6 +83,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+sleep 120
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
