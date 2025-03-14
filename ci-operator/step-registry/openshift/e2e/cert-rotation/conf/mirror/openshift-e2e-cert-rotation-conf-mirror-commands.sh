@@ -226,8 +226,13 @@ do
 done
 set -e
 
+# Copy pull secret for external binary extraction
+mkdir -p /run/secrets/ci.openshift.io/cluster-profile
+cp -rvf ~/pull-secret /run/secrets/ci.openshift.io/cluster-profile
+
 # Mirror test images
 DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
+export KUBECONFIG=/root/.kube/config
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
 oc image mirror -f /tmp/mirror --registry-config ~/pull-secret
 echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
