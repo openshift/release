@@ -11,6 +11,9 @@ KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.st
 
 if [[ $INSTALLATION_SOURCE == "Internal" ]]; then
     NOO_BUNDLE_INFO=$(./scripts/build_info.sh)
+else
+    # Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
+    NOO_BUNDLE_INFO="v0.0.0-main"
 fi
 
 # TODO, Add:
