@@ -314,6 +314,8 @@ function scale_up_intel_workers {
         oc scale --replicas=1 machinesets.machine.openshift.io "${WORKER_MACHINESET}" -n openshift-machine-api
     done
 
+    sleep 2h
+
     echo "Start waiting for Workers to be ready"
     wait_for_worker_machines
 
