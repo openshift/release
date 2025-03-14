@@ -234,6 +234,9 @@ EOK
 
 ts="$(date -u +%s%N)"
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/.cluster-image-set-used.\${ts}
+cat <<EO-ICSP >| \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/imageContentSourcePolicy.yaml
+$(cat ${SHARED_DIR}/imageContentSourcePolicy.yaml || echo "---")
+EO-ICSP
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-policies/.cluster-image-set-used.\${ts}
 
 if [ -f \${ztp_repo_dir}/site-configs/kustomization.yaml ]; then
@@ -401,6 +404,42 @@ function wait_until_assisted_service_is_ready {
   set +x
 }
 
+function setup-pre-ga-catalog-access {
+
+  if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
+
+      echo "************ telcov10n Setup ZTP to use PreGA catalog ************"
+
+      cat <<EO-cm | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assisted-installer-mirror-config
+  namespace: multicluster-engine
+  labels:
+    app: assisted-service
+data:
+  registries.conf: |
+    unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
+
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test"
+EO-cm
+
+    mirror_registry_ref="mirrorRegistryRef:
+      name: assisted-installer-mirror-config"
+
+      set -x
+      oc -n multicluster-engine get cm assisted-installer-mirror-config -oyaml
+      set +x
+    fi
+}
+
 function generate_agent_service_config {
 
   echo "************ telcov10n Generate and Deploy AgentServiceConfig CR ************"
@@ -422,6 +461,7 @@ EOF
   set +x
 
   get_storage_class_name
+  setup-pre-ga-catalog-access
 
   agent_serv_conf=$(oc get AgentServiceConfig agent 2>/dev/null || echo)
 
@@ -456,6 +496,7 @@ spec:
     resources:
       requests:
         storage: 50Gi
+  ${mirror_registry_ref:-}
   osImages:
   - cpuArchitecture: x86_64
     openshiftVersion: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
@@ -484,6 +525,13 @@ EOF
       echo
       echo "'${openshift_version}' openshiftVersion already exists. Do nothing..."
       echo
+    fi
+
+    if [ -n "${mirror_registry_ref:-}" ]; then
+      oc patch AgentServiceConfig/agent --type=merge --patch-file=/dev/stdin <<-EO-mirror-patch
+spec:
+  ${mirror_registry_ref}
+EO-mirror-patch
     fi
   fi
 
