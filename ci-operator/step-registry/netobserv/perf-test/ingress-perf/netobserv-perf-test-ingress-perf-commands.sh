@@ -10,13 +10,15 @@ while [ ! -f "${KUBECONFIG}" ]; do
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
+oc config view
+oc projects
 
 #check for flowcollector and ebpf-daemonset being ready
-kubectl get flowcollector/cluster | grep Ready
+oc get flowcollector/cluster | grep Ready
 while [[ $? ]]; do
     echo "====> Waiting for flowcollector to be ready"
     sleep 30
-    kubectl get flowcollector/cluster | grep Ready
+    oc get flowcollector/cluster | grep Ready
 done
 
 ebpfDesiredNumber="1"
@@ -24,8 +26,8 @@ ebpfDesiredNumber="0"
 
 while [[ "$ebpfNumberAvailable" != "$ebpfDesiredNumber" ]]; do
     echo "====> Waiting for ebpf damonset to be ready"
-    ebpfDesiredNumber=$(kubectl -n netobserv-privileged  get ds/netobserv-ebpf-agent -o jsonpath='{.status.desiredNumberScheduled}' || echo "1")
-    ebpfNumberAvailable=$(kubectl -n netobserv-privileged  get ds/netobserv-ebpf-agent -o jsonpath='{.status.numberAvailable}' || echo "0")
+    ebpfDesiredNumber=$(oc -n netobserv-privileged  get ds/netobserv-ebpf-agent -o jsonpath='{.status.desiredNumberScheduled}' || echo "1")
+    ebpfNumberAvailable=$(oc -n netobserv-privileged  get ds/netobserv-ebpf-agent -o jsonpath='{.status.numberAvailable}' || echo "0")
     sleep 30
 done
 

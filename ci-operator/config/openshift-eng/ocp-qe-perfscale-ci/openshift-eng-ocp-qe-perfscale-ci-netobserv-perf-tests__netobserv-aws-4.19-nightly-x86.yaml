@@ -1,8 +1,24 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+images:
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -21,6 +37,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_PARAMS: ${SHARED_DIR}/netobserv_metadata.json
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "25"
       COMPUTE_NODE_TYPE: m6i.4xlarge
@@ -45,6 +62,7 @@ tests:
       - redhat-chaos-cerberus
     test:
     - ref: netobserv-perf-test-deploy
+    - ref: netobserv-perf-test-envdata
     - chain: openshift-qe-node-density-heavy
     - ref: openshift-qe-orion
     - ref: netobserv-perf-test-cleanup
@@ -80,6 +98,7 @@ tests:
       - redhat-chaos-cerberus
     test:
     - ref: netobserv-perf-test-deploy
+    - ref: netobserv-perf-test-envdata
     - chain: openshift-qe-cluster-density-v2
     - ref: openshift-qe-orion
     - ref: netobserv-perf-test-cleanup

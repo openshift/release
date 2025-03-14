@@ -18,3 +18,5 @@ NETOBSERV_METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$L
 if [ -d "${SHARED_DIR}" ]; then 
     echo "$NETOBSERV_METADATA" > "${SHARED_DIR}"/netobserv_metadata.json
 fi
+
+echo "$NETOBSERV_METADATA" > "${ARTIFACT_DIR}"/netobserv_metadata.json
