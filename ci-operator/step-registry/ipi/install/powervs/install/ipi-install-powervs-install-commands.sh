@@ -891,7 +891,7 @@ stringData:
 type: Opaque
 EOF
 
-if [ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]; then
+if [ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ] || [ "${FEATURE_SET}" == "CustomNoUpgrade" ]; then
   echo "Creating capi ibmcloud manager bootstrap credentials"
   cat > "${dir}/manifests/openshift-cluster-api-capi-ibmcloud-manager-bootstrap-credentials.yaml" << EOF
 apiVersion: v1
