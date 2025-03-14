@@ -9,11 +9,14 @@ NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*
 LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
 KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
 
+if [[ $INSTALLATION_SOURCE == "Internal" ]]; then
+    NOO_BUNDLE_INFO=$(./scripts/build_info.sh)
+fi
+
 # TODO, Add:
-# NOO_BUNDLE_INFO
 # PR info?
 
-NETOBSERV_METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\"}"
+NETOBSERV_METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\"=\"$NOO_BUNDLE_INFO\"}"
 
 if [ -d "${SHARED_DIR}" ]; then 
     echo "$NETOBSERV_METADATA" > "${SHARED_DIR}"/netobserv_metadata.json
