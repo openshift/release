@@ -81,7 +81,6 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      DEDICATEDHOST_ZONE: "2"
       SLEEP_DURATION: 5h
     post:
     - ref: cucushift-installer-wait
@@ -89,18 +88,16 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
-- as: installer-rehearse-ibmcloud-dy
+- as: installer-rehearse-ibmcloud-dh-capi
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      SLEEP_DURATION: 1m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision-check
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
 zz_generated_metadata:
   branch: master
   org: openshift
