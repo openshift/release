@@ -40,50 +40,98 @@ EOF
   jq '.data.".dockerconfigjson" = "'${new_dot_dockerconfig_data}'"' /tmp/dot-dockerconfig.json | oc replace -f -
 }
 
+function apply_catalog_source_and_image_content_source_policy {
+
+  image_index_tag="v${IMAGE_INDEX_OCP_VERSION}.0"
+
+  SSHOPTS=(-o 'ConnectTimeout=5'
+    -o 'StrictHostKeyChecking=no'
+    -o 'UserKnownHostsFile=/dev/null'
+    -o 'ServerAliveInterval=90'
+    -o LogLevel=ERROR
+    -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+  catalog_info_dir=$(mktemp -d)
+
+  timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+    "${PREGA_CATSRC_AND_ICSP_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
+    "${catalog_info_dir}" "${image_index_tag}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+set -x
+catalog_soruces_url="${1}"
+prega_operator_index_tags_url="${2}"
+tag_version="${4}"
+
+version_tag=$(curl -sSL "${prega_operator_index_tags_url}" | jq -r '
+  [.tags[] | select(.name | startswith("'${tag_version}'-"))] |
+  sort_by(.start_ts) |
+  last.name')
+info_dir=${3}/${version_tag}
+
+mkdir -pv ${info_dir}
+pushd .
+cd ${info_dir}
+
+for f in $(curl -sSL ${catalog_soruces_url}/${version_tag}|grep -oP '(?<=href=")[^"]+'|grep 'yaml$'); do
+  set -x
+  curl -sSLO ${catalog_soruces_url}/${version_tag}/${f}
+  set +x
+done
+
+popd
+EOF
+
+  rsync -avP \
+      -e "ssh $(echo "${SSHOPTS[@]}")" \
+      "root@${AUX_HOST}":${catalog_info_dir}/ \
+      ${catalog_info_dir}
+
+  timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+    "${catalog_info_dir}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+set -x
+rm -frv ${1}
+EOF
+
+  echo
+  echo "----------------------------------------------------------------------------------------------"
+  set -x
+  mv -v ${catalog_info_dir} "${ARTIFACT_DIR}/pre-ga-info"
+  catalog_info_basename_dir="$(basename ${catalog_info_dir})"
+  prega_info_dir="$(ls -1d ${ARTIFACT_DIR}/pre-ga-info/${catalog_info_basename_dir}/*)"
+  ls -lhrtR ${prega_info_dir}
+  set +x
+  echo
+  echo "----------------------------------------------------------------------------------------------"
+  echo
+  set -x
+  oc -n openshift-marketplace delete catsrc ${CATALOGSOURCE_NAME} --ignore-not-found
+  sed -i "s/name: .*/name: ${CATALOGSOURCE_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  sed -i "s/displayName: .*/displayName: ${CATALOGSOURCE_DISPLAY_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  set +x
+  echo "--------------------- ${ARTIFACT_DIR}/pre-ga-info/catalogSource.yaml -------------------------"
+  cat ${prega_info_dir}/catalogSource.yaml
+  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageContentSourcePolicy.yaml ----------------------"
+  cat ${prega_info_dir}/imageContentSourcePolicy.yaml
+  echo "----------------------------------------------------------------------------------------------"
+  set -x
+  oc apply -f ${prega_info_dir}/catalogSource.yaml
+  oc apply -f ${prega_info_dir}/imageContentSourcePolicy.yaml
+  set +x
+
+}
+
 function create_pre_ga_calatog {
 
   echo "************ telcov10n Create Pre GA catalog ************"
 
-  set -x
-  image_index_tag="v${IMAGE_INDEX_OCP_VERSION}.0"
-  oc -n openshift-marketplace delete catsrc $CATALOGSOURCE_NAME --ignore-not-found
-  set +x
-
-  oc create -f - <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: $CATALOGSOURCE_NAME
-  namespace: openshift-marketplace
-  annotations:
-    olm.catalogImageTemplate: "${INDEX_IMAGE}:${image_index_tag}"
-spec:
-  displayName: PreGA Telco Operators
-  nodeSelector:
-    kubernetes.io/os: linux
-    node-role.kubernetes.io/master: ""
-  priorityClassName: system-cluster-critical
-  securityContextConfig: restricted
-  tolerations:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
-    operator: Exists
-  - effect: NoExecute
-    key: node.kubernetes.io/unreachable
-    operator: Exists
-    tolerationSeconds: 120
-  - effect: NoExecute
-    key: node.kubernetes.io/not-ready
-    operator: Exists
-    tolerationSeconds: 120
-  image: ${INDEX_IMAGE}:${image_index_tag}
-  priority: -100
-  publisher: OpenShift Telco Verification
-  sourceType: grpc
-  updateStrategy:
-    registryPoll:
-      interval: 10m
-EOF
+  apply_catalog_source_and_image_content_source_policy
 
   wait_until_command_is_ok \
     "oc -n openshift-marketplace get catalogsource ${CATALOGSOURCE_NAME} -o=jsonpath='{.status.connectionState.lastObservedState}' | grep -w READY" \
