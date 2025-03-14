@@ -40,6 +40,46 @@ items:
   apiVersion: build.openshift.io/v1
   metadata:
     namespace: cincinnati-ci-public
+    name: rust-1.70.0
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: rust:1.70.0
+    source:
+      dockerfile: |
+        FROM registry.access.redhat.com/ubi9/ubi:latest
+        WORKDIR /opt/app-root/src/cincinnati
+        ENV HOME="/root"
+        ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
+        RUN chgrp root /opt/app-root/src/cincinnati && \
+            chmod g+w /opt/app-root/src/cincinnati && \
+            dnf install -y jq python38 gcc openssl-devel && \
+            dnf clean all
+        RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.70.0 -y && \
+            rustup install 1.64.0
+        RUN pip3 install --user yamllint
+        RUN mkdir -p $HOME/.cargo/git/ && \
+            find $HOME/. -type d -exec chmod 777 {} \; && \
+            find $HOME/. -type f -exec chmod ugo+rw {} \;
+        RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: ubi:9
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+      - type: ConfigChange
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: cincinnati-ci-public
     name: rust-e2e-test-ubi9
   spec:
     successfulBuildsHistoryLimit: 1
