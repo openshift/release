@@ -220,6 +220,8 @@ platform:
     userTags:
       expirationDate: ${expiration_date}
       clusterName: ${NAMESPACE}-${UNIQUE_HASH}
+      ci-nat-replace: "true"
+      job_name: "${JOB_NAME:-}"
 controlPlane:
   architecture: ${CONTROL_ARCH}
   name: master
