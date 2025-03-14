@@ -33,9 +33,9 @@ scp \
 
 ssh "${INSTANCE_PREFIX}" "/tmp/prepare.sh"
 
-ssh "${INSTANCE_PREFIX}" 'bash -x $HOME/microshift/scripts/ci-footprint-and-performance/1-setup.sh'
+ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"
 boot_id=$(ssh "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id')
-ssh "${INSTANCE_PREFIX}" 'bash -x $HOME/microshift/scripts/ci-footprint-and-performance/2-reboot.sh' || true
+ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/2-reboot.sh" || true
 
 : Waiting for the host to be up
 boot_timeout=$(( 20 * 60  ))
@@ -93,4 +93,4 @@ if [[ "${BRANCH}" == "" ]]; then
     exit 1
 fi
 
-ssh "${INSTANCE_PREFIX}" "JOB_TYPE=${JOB_TYPE} BRANCH=${BRANCH} bash -x \$HOME/microshift//scripts/ci-footprint-and-performance/3-test.sh"
+ssh "${INSTANCE_PREFIX}" "JOB_TYPE=${JOB_TYPE} BRANCH=${BRANCH} bash -x \$HOME/microshift/scripts/ci-${SUITE}/3-test.sh"

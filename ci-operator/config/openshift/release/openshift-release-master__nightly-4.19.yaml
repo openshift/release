@@ -689,6 +689,22 @@ tests:
     - chain: ipi-aws-pre
     - ref: fips-check
     workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-upgrade-fips
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FAIL_ON_CORE_DUMP: "true"
+      FIPS_ENABLED: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: fips-check
+    workflow: openshift-upgrade-aws-ovn
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -1717,7 +1733,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-runc
 - as: e2e-vsphere-ovn-serial-runc
-  cron: '@daily'
+  interval: 4h
   steps:
     cluster_profile: vsphere-elastic
     env:

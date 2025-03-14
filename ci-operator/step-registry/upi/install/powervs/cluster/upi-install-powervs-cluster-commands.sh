@@ -337,7 +337,7 @@ function build_upi_cluster() {
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init -no-color -upgrade && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform apply -auto-approve -no-color \
             -var-file "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+            -state "${SHARED_DIR}"/terraform.tfstate \
             | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
                 while read LINE
                 do
@@ -355,16 +355,10 @@ function build_upi_cluster() {
                     fi
                 done
 
-    if [ ! -f "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate ]
-    then
-        echo "Terraform did not execute, exiting"
-        exit 76
-    fi
-
     echo "Extracting the terraformm output from the state file"
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_public_ip > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
     # public ip not shared for security reasons
@@ -388,8 +382,6 @@ function build_upi_cluster() {
     scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig root@"${BASTION_PUBLIC_IP}":~/.kube/config
     echo "Done copying kubeconfig to bastion location ~/.kube/config"
 
-    echo "Copying the terraform.tfstate"
-    cp "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
     if [ ! -f "${SHARED_DIR}"/kubeconfig ]
     then
         echo "kubeconfig not found install failed"
