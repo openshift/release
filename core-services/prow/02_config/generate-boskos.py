@@ -254,6 +254,9 @@ CONFIG = {
         'libvirt-s390x-0-1': 1
     },
     'libvirt-ppc64le-quota-slice': {},
+    'libvirt-ppc64le-s2s-quota-slice':{
+        'libvirt-ppc64le-s2s-0-0': 1
+    },
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'default': 1000,
