@@ -12,7 +12,7 @@ bastion=$(cat "/secret/address")
 
 cat > /tmp/poweroff.sh << 'EOF'
 echo 'Running poweroff.sh'
-USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")echo 
+USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
 for i in $(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:][].name"); do
   badfish -H mgmt-$i -u $USER -p $PWD --power-off
