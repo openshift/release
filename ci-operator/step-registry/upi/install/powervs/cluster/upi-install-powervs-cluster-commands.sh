@@ -230,7 +230,7 @@ function cleanup_prior() {
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
-    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
+    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[] | select(.name | contains("ci-op-")) .id?')
     do
         ibmcloud is image-delete "${RESOURCE_TGT}" -f
     done
