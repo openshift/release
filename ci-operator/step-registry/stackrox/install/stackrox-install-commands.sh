@@ -301,8 +301,5 @@ wait_deploy scanner-db
 wait_deploy sensor
 wait_deploy admission-control
 
-echo "Restart sensor to accelerate scanner start up..."
-oc rollout restart deployment sensor -n stackrox
-
 retry oc get deployments -n stackrox
 retry oc get pods --namespace stackrox
