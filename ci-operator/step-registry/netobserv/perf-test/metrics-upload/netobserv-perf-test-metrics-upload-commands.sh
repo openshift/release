@@ -21,12 +21,8 @@ if [[ $WORKLOAD == "node-density-heavy" ]]; then
     # TODO: change to ingress-perf-index_data.json
     END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/$WORKLOAD-index_data.json")
 fi
-# Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
-if [[ $INSTALLATION_SOURCE == "Internal" ]]; then
-    NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/netobserv_metadata.json")
-else
-    NOO_BUNDLE_VERSION="v0.0.0-main"
-fi
+
+NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/netobserv_metadata.json")
 export NOO_BUNDLE_VERSION
 
 E2E_BENCHMARKING_REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking"
