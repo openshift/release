@@ -51,12 +51,10 @@ items:
     source:
       dockerfile: |
         FROM registry.access.redhat.com/ubi9/ubi:latest
-        WORKDIR /opt/app-root/src/cincinnati
         ENV HOME="/root"
         ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
-        RUN chgrp root /opt/app-root/src/cincinnati && \
-            chmod g+w /opt/app-root/src/cincinnati && \
-            dnf install -y jq python38 gcc openssl-devel && \
+        RUN mkdir /go && chmod g+xw -R /go && \
+            dnf install -y git jq python38 gcc openssl-devel && \
             dnf clean all
         RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.70.0 -y && \
             rustup install 1.64.0
@@ -65,6 +63,7 @@ items:
             find $HOME/. -type d -exec chmod 777 {} \; && \
             find $HOME/. -type f -exec chmod ugo+rw {} \;
         RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+        WORKDIR /go/src/github.com/openshift/cincinnati
       type: Dockerfile
     strategy:
       dockerStrategy:
