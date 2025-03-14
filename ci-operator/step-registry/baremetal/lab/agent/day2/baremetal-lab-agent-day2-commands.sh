@@ -83,8 +83,6 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-sleep 120
-
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
@@ -93,6 +91,8 @@ cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
 echo "Extract the latest oc client..."
 oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=oc --to=/tmp --insecure=true
+
+sleep 300
 
 if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
