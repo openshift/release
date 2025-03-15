@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-8-golang-1.23-openshift-4.19
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - context_dir: .
@@ -27,10 +27,17 @@ resources:
 tests:
 - always_run: false
   as: opentelemetry-stage-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-tracing
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
   steps:
-    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
@@ -49,7 +56,7 @@ tests:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
