@@ -8,6 +8,10 @@ source "${SHARED_DIR}/packet-conf.sh"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOFTOP'
 FRR_K8S_VERSION=v0.0.14
 FRR_TMP_DIR=$(mktemp -d -u)
+
+AGNHOST_SUBNET_V4=172.20.0.0/16
+AGNHOST_SUBNET_V6=2001:db8:2::/64
+
 clone_frr() {
   [ -d "$FRR_TMP_DIR" ] || {
     mkdir -p "$FRR_TMP_DIR" && trap 'rm -rf $FRR_TMP_DIR' EXIT
@@ -55,6 +59,7 @@ EOF
     echo "" >> "$OUTPUT_FILE"
 
     echo " address-family ipv4 unicast" >> "$OUTPUT_FILE"
+    echo "  network ${AGNHOST_SUBNET_V4}" >> "$OUTPUT_FILE"
     for ip in "${ipv4_list[@]}"; do
         echo "  neighbor $ip activate" >> "$OUTPUT_FILE"
         echo "  neighbor $ip next-hop-self" >> "$OUTPUT_FILE"
@@ -64,6 +69,7 @@ EOF
     echo "" >> "$OUTPUT_FILE"
 
     echo " address-family ipv6 unicast" >> "$OUTPUT_FILE"
+    echo "  network ${AGNHOST_SUBNET_V6}" >> "$OUTPUT_FILE"
     for ip in "${ipv6_list[@]}"; do
         echo "  neighbor $ip activate" >> "$OUTPUT_FILE"
         echo "  neighbor $ip next-hop-self" >> "$OUTPUT_FILE"
@@ -83,14 +89,23 @@ deploy_frr_external_container() {
   cp "${FRR_TMP_DIR}"/frr-k8s/hack/demo/frr/daemons $FRR_CONFIG
   chmod a+rw $FRR_CONFIG/*
 
-  podman rm -f frr
+  podman rm -f frr || true
   podman run -d --privileged --network host --rm --ulimit core=-1 --name frr --volume "$FRR_CONFIG":/etc/frr quay.io/frrouting/frr:9.1.0
 }
 
-sudo dnf install -y golang
+deploy_agnhost_container() {
+  podman rm -f agnhost || true
+  podman network rm agnhost_net || true
+  podman network create --driver bridge --ipv6 --subnet=${AGNHOST_SUBNET_V4} --gateway 172.20.0.1 --subnet=${AGNHOST_SUBNET_V6} --gateway 2001:db8:2::1 agnhost_net
+  podman run -d --privileged --name agnhost --network agnhost_net --ip 172.20.0.100 --ip6 2001:db8:2::100 registry.k8s.io/e2e-test-images/agnhost:2.40 netexec --http-port=8000
+}
+
 
 # deploy a frr instance
 deploy_frr_external_container
+
+# deploy an agnhost container as an external host for BGP test
+deploy_agnhost_container
 
 # enable route advertisement with FRR
 oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
@@ -134,22 +149,32 @@ spec:
         disableMP: true
         toReceive:
           allowed:
-            mode: filtered
+            mode: all
       - address: fd2e:6f44:5dd8:c956::1
         asn: 64512
         disableMP: true
         toReceive:
           allowed:
-            mode: filtered
+            mode: all
 EOF
 
-CLUSTER_NETWORK="10.128.0.0/14"
-EGRESSIP_CIDR="192.169.100.0/24"
+CLUSTER_NETWORK_V4="10.128.0.0/14"
+iptables -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
+iptables -t filter -I FORWARD -d ${CLUSTER_NETWORK_V4} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V4} ! -d 192.168.111.1/24 -j MASQUERADE
 
-iptables -t filter -I FORWARD -s ${CLUSTER_NETWORK} -i ostestbm -j ACCEPT
-iptables -t filter -I FORWARD -d ${CLUSTER_NETWORK} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-iptables -t filter -I FORWARD -s ${EGRESSIP_CIDR} -i ostestbm -j ACCEPT
-iptables -t filter -I FORWARD -d ${EGRESSIP_CIDR} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-iptables -t nat -I POSTROUTING -s ${CLUSTER_NETWORK} ! -d 192.168.111.1/24 -j MASQUERADE
-iptables -t nat -I POSTROUTING -s ${EGRESSIP_CIDR} ! -d 192.168.111.1/24 -j MASQUERADE
+iptables -t filter -I FORWARD -d ${AGNHOST_SUBNET_V4} -j ACCEPT
+iptables -t filter -I FORWARD -s ${AGNHOST_SUBNET_V4} -j ACCEPT
+iptables -t nat -I POSTROUTING -d ${AGNHOST_SUBNET_V4} -j ACCEPT
+iptables -t nat -I POSTROUTING -s ${AGNHOST_SUBNET_V4} -j ACCEPT
+
+CLUSTER_NETWORK_V6="fd01::/48"
+ip6tables -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
+ip6tables -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+ip6tables -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+
+ip6tables -t filter -I FORWARD -d ${AGNHOST_SUBNET_V6} -j ACCEPT
+ip6tables -t filter -I FORWARD -s ${AGNHOST_SUBNET_V6} -j ACCEPT
+ip6tables -t nat -I POSTROUTING -d ${AGNHOST_SUBNET_V6} -j ACCEPT
+ip6tables -t nat -I POSTROUTING -s ${AGNHOST_SUBNET_V6} -j ACCEPT
 EOFTOP
