@@ -6,12 +6,12 @@ base_images:
   ubi:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.21
 images:
 - dockerfile_literal: |
     FROM ubi
@@ -36,13 +36,12 @@ images:
     RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
     USER 1001
   from: ubi
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/cincinnati
   to: src-rust
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+  inputs:
+    ubi:
+      as:
+      - registry.access.redhat.com/ubi9/ubi:latest
   to: deploy
 - dockerfile_path: dist/Dockerfile.e2e/Dockerfile
   to: e2e-test
@@ -153,7 +152,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.17"
   steps:
     test:
     - as: openshift-e2e-test
