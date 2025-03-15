@@ -54,6 +54,32 @@ tests:
       IMAGE_REPO: odh-model-controller
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: kserve-e2e-predictor
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-predictor
+      cli: latest
+      commands: |
+        export HOME=/go
+        git clone https://github.com/opendatahub-io/kserve.git
+        cd kserve
+        ./test/scripts/openshift-ci/run-e2e-tests.sh predictor
+      dependencies:
+      - env: ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: incubating
   org: opendatahub-io
