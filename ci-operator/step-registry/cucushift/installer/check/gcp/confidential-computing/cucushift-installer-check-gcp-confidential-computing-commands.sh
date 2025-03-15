@@ -35,6 +35,7 @@ for line in "${machines[@]}"; do
   confidential_compute="$(jq -r -c .confidentialInstanceConfig.enableConfidentialCompute "/tmp/${CLUSTER_NAME}-machine.json")"
   on_host_maintenance="$(jq -r -c .scheduling.onHostMaintenance "/tmp/${CLUSTER_NAME}-machine.json")"
   cpu_platform="$(jq -r -c .cpuPlatform "/tmp/${CLUSTER_NAME}-machine.json")"
+  guest_os_features="$(jq -r -c .disks[].guestOsFeatures "/tmp/${CLUSTER_NAME}-machine.json")"
 
   if [[ "${confidential_compute}" == true ]]; then
     echo "$(date -u --rfc-3339=seconds) - Matched .enableConfidentialCompute '${confidential_compute}' for '${machine_name}'."
@@ -54,6 +55,14 @@ for line in "${machines[@]}"; do
     echo "$(date -u --rfc-3339=seconds) - Matched .cpuPlatform '${cpu_platform}' for '${machine_name}'."
   else
     echo "$(date -u --rfc-3339=seconds) - Unexpected .cpuPlatform '${cpu_platform}' for '${machine_name}'."
+    ret=1
+  fi
+
+  if [[ "${guest_os_features}" =~ """{"type":"SEV_SNP_CAPABLE"}""" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Matched guestOsFeatures 'SEV_SNP_CAPABLE' for '${machine_name}'."
+  else
+    echo "$(date -u --rfc-3339=seconds) - Failed to find guestOsFeatures 'SEV_SNP_CAPABLE' for '${machine_name}'."
+    echo "${guest_os_features}"
     ret=1
   fi
 done
