@@ -6,6 +6,10 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+
+export RELEASE_IMAGE_LATEST="registry.build05.ci.openshift.org/ci-ln-gvrhti2/release:latest"
+
+
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
