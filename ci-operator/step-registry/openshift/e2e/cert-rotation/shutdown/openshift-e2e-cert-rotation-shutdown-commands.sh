@@ -25,7 +25,7 @@ sudo systemctl stop chronyd
 
 SKEW=${1:-90d}
 OC=${OC:-oc}
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
@@ -60,11 +60,9 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "shut off"; do
-    echo -n "."
     sleep 10
-  done
+  done | /usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null
 done
 
 # Set date for host
@@ -83,11 +81,9 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "running"; do
-    echo -n "."
     sleep 10
-  done
+  done | /usr/local/bin/tqdm --desc "Starting ${vm} VM" --null
 done
 set -x
 
@@ -116,6 +112,7 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+  -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
 	/usr/local/bin/time-skew-test.sh \
 	${SKEW}
