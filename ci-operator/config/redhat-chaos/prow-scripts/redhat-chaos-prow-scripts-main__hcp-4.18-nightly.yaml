@@ -1,0 +1,91 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  assisted-service-scripts:
+    name: ocm-2.12
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  test-bin:
+    name: "4.18"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-hcp-418
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: krkn-tests-bm-hypershift
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=32768
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=2
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MCE_VERSION: "2.5"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
+    - chain: redhat-chaos-hog-scenarios
+    workflow: hypershift-mce-agent-metal3-conformance
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: hcp-4.18-nightly
