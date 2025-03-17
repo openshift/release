@@ -43,6 +43,35 @@ tests:
     make test
   container:
     from: src
+- as: e2e-sno-gpu
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: a2-highgpu-1g
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: single-node-conf-gcp
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        make deploy-cert-manager-ocp
+        make deploy-nfd-ocp
+        make deploy-nvidia-ocp
+        make deploy-instaslice-on-ocp
+        make test-e2e-ocp
+      env:
+      - default: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-bundle@sha256:aa2e401ba5d1dbcd98e81139bb35df537694f6574ef567904c252031fbbaf79b
+        name: BUNDLE_IMG
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: ipi-gcp-single-node
 zz_generated_metadata:
   branch: main
   org: openshift
