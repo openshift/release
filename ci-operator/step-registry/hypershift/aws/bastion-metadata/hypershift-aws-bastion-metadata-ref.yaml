@@ -1,0 +1,25 @@
+ref:
+  as: hypershift-aws-bastion-metadata
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  cli: latest
+  env:
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: |
+      Specifies the AWS region for the cluster.
+  commands: hypershift-aws-bastion-metadata-commands.sh
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-awscreds
+      name: hypershift-ci-jobs-awscreds
+      namespace: test-credentials
+  documentation: |-
+    This step retrieves the VPC ID and a public subnet ID from the first hosted cluster from the management cluster.
+    Files named ${SHARED_DIR}/vpc_id and ${SHARED_DIR}/public_subnet_ids are created to store these IDs, respectively. 
+    It is expected that these files do not exist prior to this step.
