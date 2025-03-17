@@ -2,7 +2,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.54.2
+    tag: v1.63.4
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -134,6 +134,21 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+- as: e2e-agnostic-usc-devpreview
+  optional: true
+  run_if_changed: pkg/updatestatus/
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: hack/test-usc-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-into-change-techpreview
   steps:
@@ -151,6 +166,21 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
+- as: e2e-agnostic-operator-devpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: DevPreviewNoUpgrade
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

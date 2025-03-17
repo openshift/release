@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build10
+    cluster: build07
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -57,6 +57,74 @@ postsubmits:
       - name: push-secret
         secret:
           secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    cluster: build07
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-rh-ecosystem-edge-nvidia-ci-main-mirror-vcsref-image
+    reporter_config:
+      slack:
+        channel: '#wg-edge-nvidia-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    skip_if_only_changed: ^(README|OWNERS|LICENSE)$|\.(md|adoc)$|^docs/|^\.github/|^workflows/versions\.json$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=mirror-vcsref-image
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

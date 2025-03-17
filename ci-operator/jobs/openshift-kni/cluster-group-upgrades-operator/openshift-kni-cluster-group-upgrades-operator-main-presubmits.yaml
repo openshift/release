@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build06
     context: ci/prow/ci-index
     decorate: true
     labels:
@@ -54,11 +54,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build06
     context: ci/prow/ci-job
     decorate: true
     labels:
@@ -66,6 +66,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cluster-group-upgrades-operator-main-ci-job
     rerun_command: /test ci-job
+    skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -111,7 +112,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -160,11 +161,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build06
     context: ci/prow/integration
     decorate: true
     labels:
@@ -174,6 +175,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cluster-group-upgrades-operator-main-integration
     rerun_command: /test integration
+    skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -236,7 +238,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build06
     context: ci/prow/security
     decorate: true
     labels:
@@ -292,3 +294,58 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )security,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
+    context: ci/prow/tekton-linting
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-cluster-group-upgrades-operator-main-tekton-linting
+    optional: true
+    rerun_command: /test tekton-linting
+    run_if_changed: ^(?:.*/)?(?:\.tekton/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=tekton-linting
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )tekton-linting,?($|\s.*)

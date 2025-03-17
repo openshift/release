@@ -6,7 +6,7 @@ build_root:
 images:
 - build_args:
   - name: max_jobs
-    value: "12"
+    value: "24"
   - name: nvcc_threads
     value: "2"
   - name: TORCH_CUDA_ARCH_LIST
@@ -19,8 +19,8 @@ images:
   dockerfile_path: Dockerfile.ubi
   to: vllm-build-release-cuda
 - build_args:
-  - name: max_jobs
-    value: "12"
+  - name: MAX_JOBS
+    value: "30"
   - name: PYTORCH_ROCM_ARCH
     value: gfx908;gfx90a;gfx942;gfx1100
   - name: PYTHON_VERSION
@@ -41,8 +41,8 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 200m
-      memory: 200Mi
+      cpu: "1"
+      memory: 500Mi
   smoke-test:
     limits:
       cpu: "4"
@@ -54,22 +54,23 @@ resources:
       nvidia.com/gpu: "1"
   vllm-build-release-cuda:
     limits:
-      cpu: "16"
-      memory: 50Gi
+      cpu: "24"
+      memory: 84Gi
     requests:
-      cpu: "16"
-      memory: 24Gi
+      cpu: "24"
+      memory: 84Gi
   vllm-build-release-rocm:
     limits:
-      cpu: "16"
-      memory: 35Gi
+      cpu: "30"
+      memory: 50Gi
     requests:
-      cpu: "16"
-      memory: 35Gi
+      cpu: "30"
+      memory: 50Gi
 tests:
 - always_run: true
   as: smoke-test
-  cluster: build05
+  capabilities:
+  - gpu
   commands: |
     export VIRTUAL_ENV=/opt/vllm
     export PATH=$VIRTUAL_ENV/bin/:$PATH
@@ -81,6 +82,8 @@ tests:
     clone: true
     from: vllm-build-release-cuda
 - as: release-image-mirror-cuda
+  capabilities:
+  - highperf
   postsubmit: true
   steps:
     dependencies:
@@ -89,7 +92,10 @@ tests:
       IMAGE_REPO: vllm
       RELEASE_VERSION: stable
     workflow: opendatahub-io-ci-image-mirror
+  timeout: 8h0m0s
 - as: release-image-mirror-cuda-1
+  capabilities:
+  - highperf
   postsubmit: true
   steps:
     dependencies:
@@ -98,7 +104,10 @@ tests:
       IMAGE_REPO: vllm
       RELEASE_VERSION: stable-cuda
     workflow: opendatahub-io-ci-image-mirror
+  timeout: 8h0m0s
 - as: release-image-mirror-rocm
+  capabilities:
+  - highperf
   postsubmit: true
   steps:
     dependencies:
@@ -107,6 +116,7 @@ tests:
       IMAGE_REPO: vllm
       RELEASE_VERSION: stable-rocm
     workflow: opendatahub-io-ci-image-mirror
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release
   org: opendatahub-io

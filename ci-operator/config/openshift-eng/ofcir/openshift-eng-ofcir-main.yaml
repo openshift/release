@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: rhel-9-release-golang-1.23-openshift-4.19
 canonical_go_repository: github.com/openshift/ofcir
 images:
 - dockerfile_path: Dockerfile
@@ -33,12 +33,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -47,8 +47,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  dnf install -y libvirt-devel
 tests:
-- always_run: false
+- always_run: true
   as: e2e-tests
   cluster: build05
   steps:
@@ -100,7 +102,7 @@ tests:
     GOFLAGS="-mod=readonly" \
     make unit-tests
   container:
-    from: src
+    from: test-bin
 zz_generated_metadata:
   branch: main
   org: openshift-eng

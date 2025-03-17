@@ -44,13 +44,6 @@ queue ${ARTIFACT_DIR}/spiaccesstokens.json  oc --insecure-skip-tls-verify --requ
 queue ${ARTIFACT_DIR}/spifilecontentrequests.json  oc --insecure-skip-tls-verify --request-timeout=5s get spifilecontentrequests.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/remotesecrets.json oc --insecure-skip-tls-verify --request-timeout=5s get remotesecrets.appstudio.redhat.com --all-namespaces -o json
 
-# JBS resources (jvm-build-service)
-queue ${ARTIFACT_DIR}/artifactbuilds.json  oc --insecure-skip-tls-verify --request-timeout=5s get artifactbuilds.jvmbuildservice.io --all-namespaces -o json
-queue ${ARTIFACT_DIR}/dependencybuilds.json  oc --insecure-skip-tls-verify --request-timeout=5s get dependencybuilds.jvmbuildservice.io --all-namespaces -o json
-queue ${ARTIFACT_DIR}/jbsconfigs.json  oc --insecure-skip-tls-verify --request-timeout=5s get jbsconfigs.jvmbuildservice.io --all-namespaces -o json
-queue ${ARTIFACT_DIR}/rebuiltartifacts.json  oc --insecure-skip-tls-verify --request-timeout=5s get rebuiltartifacts.jvmbuildservice.io --all-namespaces -o json
-queue ${ARTIFACT_DIR}/systemconfigs.json  oc --insecure-skip-tls-verify --request-timeout=5s get systemconfigs.jvmbuildservice.io --all-namespaces -o json
-
 # ArgoCD resources
 queue ${ARTIFACT_DIR}/applications_argoproj.json  oc --insecure-skip-tls-verify --request-timeout=5s get applications.argoproj.io --all-namespaces -o json
 queue ${ARTIFACT_DIR}/applicationsets.json  oc --insecure-skip-tls-verify --request-timeout=5s get applicationsets.argoproj.io --all-namespaces -o json
@@ -118,7 +111,7 @@ queue ${ARTIFACT_DIR}/gitopsservices.json  oc --insecure-skip-tls-verify --reque
 # Must gather steps to collect OpenShift logs
 mkdir -p ${ARTIFACT_DIR}/must-gather-appstudio
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-appstudio > ${ARTIFACT_DIR}/must-gather-appstudio/must-gather.log
-find "${ARTIFACT_DIR}/must-gather-appstudio" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1"' _ {} \;
+find "${ARTIFACT_DIR}/must-gather-appstudio" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
 
 mkdir -p ${ARTIFACT_DIR}/must-gather-network-appstudio
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-network-appstudio -- gather_network_logs > ${ARTIFACT_DIR}/must-gather-network-appstudio/must-gather-network.log

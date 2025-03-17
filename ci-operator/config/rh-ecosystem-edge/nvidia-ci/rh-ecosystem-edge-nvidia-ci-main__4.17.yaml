@@ -25,84 +25,31 @@ tests:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: single-node-conf-aws
-    - chain: ipi-install
-    test:
-    - as: gpu-operator-e2e
-      commands: NVIDIAGPU_CLEANUP=false TEST_FEATURES="nvidiagpu" NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge"
-        make run-tests
-      from: nvidia-ci
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
+    workflow: nvidia-gpu-operator-e2e-aws
 - as: nvidia-gpu-operator-e2e-master
   cron: 0 01 * * 1-5
   steps:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: single-node-conf-aws
-    - chain: ipi-install
-    test:
-    - as: gpu-operator-e2e
-      commands: NVIDIAGPU_CLEANUP=false NVIDIAGPU_DEPLOY_FROM_BUNDLE=true TEST_FEATURES="nvidiagpu"
-        NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge" make run-tests
-      from: nvidia-ci
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
+      NVIDIAGPU_DEPLOY_FROM_BUNDLE: "true"
+    workflow: nvidia-gpu-operator-e2e-aws
 - as: nvidia-gpu-operator-e2e-24-9-x
   cron: 0 03 * * 1-5
   steps:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: single-node-conf-aws
-    - chain: ipi-install
-    test:
-    - as: gpu-operator-e2e
-      commands: NVIDIAGPU_CLEANUP=false NVIDIAGPU_SUBSCRIPTION_CHANNEL="v24.9" TEST_FEATURES="nvidiagpu"
-        NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge" make run-tests
-      from: nvidia-ci
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v24.9
+    workflow: nvidia-gpu-operator-e2e-aws
 - as: nvidia-gpu-operator-e2e-24-6-x
   cron: 0 05 * * 1-5
   steps:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: single-node-conf-aws
-    - chain: ipi-install
-    test:
-    - as: gpu-operator-e2e
-      commands: NVIDIAGPU_CLEANUP=false NVIDIAGPU_SUBSCRIPTION_CHANNEL="v24.6" TEST_FEATURES="nvidiagpu"
-        NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge" make run-tests
-      from: nvidia-ci
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v24.6
+    workflow: nvidia-gpu-operator-e2e-aws
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

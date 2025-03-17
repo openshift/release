@@ -121,14 +121,14 @@ tests:
   commands: make verify
   container:
     from: src
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
 - as: unit
   commands: make test
   container:
     from: src
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
 - as: e2e-aks
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -137,10 +137,22 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-4-18
+  run_if_changed: ^(test/e2e|hypershift-operator)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-418
+      OCP_IMAGE_N1: release:latest-418
+      OCP_IMAGE_N2: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-418
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -150,8 +162,20 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
+- as: e2e-aws-techpreview
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-external
 - as: e2e-aws-upgrade-hypershift-operator
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -184,7 +208,7 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift
     env:
@@ -232,7 +256,7 @@ tests:
 - as: e2e-kubevirt-metal-conformance
   optional: true
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
@@ -256,7 +280,6 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
     - env: OPENSTACK_CLOUD
@@ -271,15 +294,12 @@ tests:
     cluster_profile: hypershift
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-nfv
-      HYPERSHIFT_ZONES: us-east-1a,us-east-1b,us-east-1c
       NFV_NODEPOOLS: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-nfv-quota-slice
-    test:
-    - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-openstack-aws-nfv
 - always_run: false
   as: e2e-openstack-aws-conformance
   optional: true

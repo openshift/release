@@ -134,6 +134,10 @@ function build_push_operator_images {
     source .prow_ci.env
   fi
 
+  if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
+    GOWORK='' make manifests bindata
+  fi
+
   GOWORK='' make build
 
   # Build and push operator image

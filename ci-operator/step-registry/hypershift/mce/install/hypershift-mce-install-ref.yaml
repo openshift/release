@@ -2,18 +2,31 @@ ref:
   as: hypershift-mce-install
   from: upi-installer
   grace_period: 5m0s
-  timeout: 45m0s
+  timeout: 60m0s
   cli: latest
   env:
   - name: MCE_VERSION
     default: "2.2"
-    documentation: "version of the mce.(2.2, 2.3)"
-  - name: MCE_QE_CATALOG
-    default: "false"
-    documentation: If true, the QE catalog will be used to create MCE
+    documentation: "version of the mce.(2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8)"
   - name: OVERRIDE_HO_IMAGE
     default: ""
-    documentation: "Override the HyperShift operator image. If the default is an empty string, this will not override."
+    documentation: |-
+      Override the HyperShift operator image. If the default is an empty string, this will not override. 
+      E.g: quay.io/hypershift/hypershift-operator:latest (connected)
+      E.g: virthost.ostest.test.metalkube.org:6001/hypershift/hypershift-operator:latest (disconnected)
+  - name: DISCONNECTED
+    default: "false"
+    documentation: Should we work on top of a disconnected environment
+  - name: MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION
+    documentation: |-
+      Optional. Used to override MCE_VERSION, with higher priority than MCE_VERSION.
+      When using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION": "2.4"
+        }
+      }
+    default: ""
   commands: hypershift-mce-install-commands.sh
   resources:
     requests:

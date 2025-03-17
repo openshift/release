@@ -62,22 +62,27 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-azure-ipi-public-to-private
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-z2551dt/release:latest
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe-c3-metal
-    workflow: cucushift-installer-rehearse-gcp-ipi-c3-metal-private
-- as: installer-rehearse-ibmcloud-dis
+    cluster_profile: gcp-qe
+    env:
+      SLEEP_DURATION: 1h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption-provision
+- as: installer-rehearse-aws
   cron: '@yearly'
   steps:
-    cluster_profile: ibmcloud-qe-2
+    cluster_profile: aws-qe
     env:
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-z2551dt/release:latest
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:

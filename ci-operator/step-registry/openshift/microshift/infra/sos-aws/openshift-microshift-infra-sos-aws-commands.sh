@@ -137,7 +137,8 @@ ssh "${INSTANCE_PREFIX}" <<'EOF'
     plugin_list+=",microshift"
   fi
 
-  if sudo sos report --batch --all-logs --tmp-dir /tmp -p ${plugin_list} -o logs ; then
+  podman_opts="-k podman.logs=true -k podman.all=true"
+  if sudo sos report --batch --all-logs --tmp-dir /tmp -p ${plugin_list} -o logs ${podman_opts} ; then
     sudo chmod +r /tmp/sosreport-*
   else
     sudo touch /tmp/sosreport-command-failed

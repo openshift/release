@@ -14,36 +14,25 @@ if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
   exit 0
 fi
 
-## determine if it is hypershift guest cluster or not
 if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
-  echo "Testing on hypershift guest cluster"
+  echo "Run on hypershift hosted cluster"
   ./console-test-frontend-hypershift.sh || true
 else
   export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
   echo "E2E_RUN_TAGS is: ${E2E_RUN_TAGS}"
-  ## determine if running against managed service or smoke scenarios
   if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
-    echo "Testing against online cluster"
+    echo "Run against online cluster"
     ./console-test-managed-service.sh || true
   elif [[ $E2E_RUN_TAGS =~ @level0 ]]; then
     echo "only run level0 scenarios"
     ./console-test-frontend.sh --tags @level0 || true
-  # if the TYPE is ui, then it's a job specific for UI, run full tests
-  # or else, we run smoke tests to balance coverage and cost
-  elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
-    echo "Testing on normal cluster"
-    ./console-test-frontend.sh --tags @userinterface+@e2e || true
   elif [[ "X${E2E_RUN_TAGS}X" == 'XNetwork_ObservabilityX' ]]; then
     # not using --grepTags here since cypress in 4.12 doesn't have that plugin
     echo "Running Network_Observability tests"
     ./console-test-frontend.sh --spec tests/netobserv/* || true
   elif [[ $E2E_RUN_TAGS =~ @wrs ]]; then
-    # WRS specific testing
-    echo 'WRS testing'
+    echo 'Run WRS testing'
     ./console-test-frontend.sh --tags @wrs || true
-  elif [[ $E2E_TEST_TYPE == 'ui_destructive' ]]; then
-    echo 'Running destructive tests'
-    ./console-test-frontend.sh --tags @destructive || true
   elif [[ $E2E_RUN_TAGS =~ @complianceoperator ]]; then
     echo "run all compliance-operator scenarios"
     ./console-test-frontend.sh --spec tests/securityandcompliance/compliance-operator.cy.ts || true
@@ -53,6 +42,17 @@ else
   elif [[ $E2E_RUN_TAGS =~ @spo ]]; then
     echo "run all security profiles operator scenarios"
     ./console-test-frontend.sh --spec tests/securityandcompliance/security-profiles-operator.cy.ts || true
+  elif [[ "X${FEATURE_SET}X" == 'XTechPreviewNoUpgradeX' ]]; then
+    echo 'Run Tech Preview cases'
+    ./console-test-frontend.sh --tags @techpreview || true
+  # if the TYPE is ui, then it's a job specific for UI, run full tests
+  # or else, we run smoke tests to balance coverage and cost
+  elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
+    echo "Run on normal cluster"
+    ./console-test-frontend.sh --tags @userinterface+@e2e || true
+  elif [[ $E2E_TEST_TYPE == 'ui_destructive' ]]; then
+    echo 'Run destructive tests'
+    ./console-test-frontend.sh --tags @destructive || true
   else
     echo "only run smoke scenarios"
     ./console-test-frontend.sh --tags @smoke || true

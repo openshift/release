@@ -49,16 +49,19 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      CLO_SUB_CHANNEL: stable-5.8
-      CLO_TARGET_NAMESPACES: ""
       COMPUTE_NODE_TYPE: e2-standard-8
       E2E_RUN_TAGS: '@logging5.8'
-      EO_SUB_CHANNEL: stable-5.8
       FILTERS_ADDITIONAL: ""
       FIPS_ENABLED: "true"
       FORCE_SUCCESS_EXIT: "true"
-      LO_SUB_CHANNEL: stable-5.8
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.8
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
+        ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
       TEST_IMPORTANCE: ""
@@ -68,9 +71,7 @@ tests:
       TEST_TIMEOUT: "15"
     test:
     - ref: enable-qe-catalogsource-logging
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-cluster-logging-operator
-    - ref: operatorhub-subscribe-loki-operator
+    - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-sdn
 zz_generated_metadata:

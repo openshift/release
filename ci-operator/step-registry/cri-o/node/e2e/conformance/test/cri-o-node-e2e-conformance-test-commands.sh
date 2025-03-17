@@ -110,7 +110,7 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" "${IP}" -- bash - <<EOF
       become: yes
       shell: |
         export CONTAINER_RUNTIME_ENDPOINT="unix:///var/run/crio/crio.sock" &&\
-        make test-e2e-node FOCUS="\[Conformance\]" SKIP="\[sig-node\]\s*Pods\s*should\s*(delete\s*a\s*collection\s*of\s*pods|patch\s*a\s*pod\s*status|run\s*through\s*the\s*lifecycle\s*of\s*Pods\s*and\s*PodStatus)\s*\[Conformance\]" TEST_ARGS="--kubelet-flags='--cgroup-driver=systemd --cgroup-root=/ --cgroups-per-qos=true --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service'"
+        make test-e2e-node FOCUS="\[Conformance\]" TEST_ARGS="--kubelet-flags='--cgroup-driver=systemd --cgroup-root=/ --cgroups-per-qos=true --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service'"
       args:
         chdir: "{{ ansible_env.GOPATH }}/src/k8s.io/kubernetes"
       async: 14400

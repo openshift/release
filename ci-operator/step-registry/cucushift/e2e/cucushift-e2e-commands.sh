@@ -80,12 +80,13 @@ function filter_test_by_arch() {
     echo_e2e_tags
 }
 function filter_test_by_platform() {
-    local platform ipixupi
+    local platform ipixupi enabledgates
     ipixupi='upi'
     if (oc get configmap openshift-install -n openshift-config &>/dev/null) ; then
         ipixupi='ipi'
     fi
     platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    enabledgates="$(oc get featuregate cluster -o yaml | yq '.status.featureGates[].enabled[].name' | sort | uniq)"
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
@@ -96,8 +97,17 @@ function filter_test_by_platform() {
             alibabacloud)
                 export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
                 ;;
-            aws|azure|baremetal|gcp|ibmcloud|nutanix|openstack|vsphere)
+            aws|azure|baremetal|gcp|ibmcloud|nutanix|openstack)
                 export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            vsphere)
+                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
+                if (grep --ignore-case --quiet 'VSphereMultiVCenters' <<< "$enabledgates") ; then
+                    vcenters=$(oc get infrastructure cluster -o yaml | yq '.spec.platformSpec.vsphere.failureDomains[].server' | sort | uniq | wc -l)
+                    if [[ "$vcenters" -ge 2 ]] ; then
+                        export E2E_RUN_TAGS="not @storage and ${E2E_RUN_TAGS}"
+                    fi
+                fi
                 ;;
             *)
                 echo "Unexpected, got platform as '$platform'"

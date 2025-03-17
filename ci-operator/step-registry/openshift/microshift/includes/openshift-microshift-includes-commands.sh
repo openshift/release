@@ -50,8 +50,24 @@ function ci_copy_secrets() {
 
     # Set up the pull secret at the expected location
     if [ -e /tmp/pull-secret ] ; then
+        echo "Setting up a pull secret file"
         export PULL_SECRET="${HOME}/.pull-secret.json"
-        cp /tmp/pull-secret "${PULL_SECRET}"
+
+        if [ -e /tmp/registry.stage.redhat.io ] ; then
+            cat > /tmp/pull-secret-stage <<EOF
+{
+    "auths": {
+        "registry.stage.redhat.io": {
+            "auth": "$(cat /tmp/registry.stage.redhat.io)"
+        }
+    }
+}
+EOF
+            # Merge the files and save the result at the expected location
+            jq -s '.[0] * .[1]' /tmp/pull-secret /tmp/pull-secret-stage > "${PULL_SECRET}"
+        else
+            cp /tmp/pull-secret "${PULL_SECRET}"
+        fi
     fi
 
     # Set up the AWS CLI keys at the expected location for accessing the cached data.
@@ -143,7 +159,7 @@ function download_microshift_scripts() {
 
 function ci_get_clonerefs() {
     local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
-    if (( go_version < 22 )); then
+    if (( go_version < 23 )); then
         # Releases that use older Go, cannot compile the most recent prow code.
         # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
         mkdir -p /tmp/prow

@@ -11,6 +11,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -65,6 +69,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: aws-ipi-ovn-hypershift-replace-f28
+  cron: 6 11 15 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: ibmcloud-ipi-ovn-ipsec-f28
   cron: 3 16 14 * *
   steps:

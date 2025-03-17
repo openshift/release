@@ -67,6 +67,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: libvirt-installer
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -458,8 +462,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
+- as: e2e-vsphere-ovn-host-groups
   cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-host-groups
+- as: e2e-vsphere-ovn-multi-network
+  interval: 24h
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -567,6 +579,20 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
+- as: e2e-vsphere-csi-operator-test
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make operator-e2e-test
+      from: vsphere-csi-driver-operator-test
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-vsphere
 - as: e2e-vsphere-ovn-csi
   interval: 168h
   steps:
@@ -765,9 +791,10 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-csi
 - as: e2e-azurestack-csi
+  cluster: build01
   interval: 168h
   steps:
-    cluster_profile: azurestack
+    cluster_profile: azurestack-dev
     env:
       TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     observers:
@@ -975,9 +1002,10 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-upi
 - as: e2e-azurestack-ovn-upi
+  cluster: build01
   interval: 168h
   steps:
-    cluster_profile: azurestack
+    cluster_profile: azurestack-dev
     observers:
       enable:
       - observers-resource-watch

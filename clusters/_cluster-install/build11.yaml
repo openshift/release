@@ -1,71 +1,85 @@
 clusterName: build11
+credentialsMode: Manual
 provision:
-  aws: {}
+  aws:
+    cloudFormationTemplates:
+    - stackName: build11-iam
+      templateBody: https://raw.githubusercontent.com/bear-redhat/tools/refs/heads/master/cluster-onboarding/iam.cf
+      parameters:
+      - key: BaseDomain
+        value: ci.devcluster.openshift.com
+      - key: ProvisionUserName
+        value: build11-robot-provision
+      - key: GroupName
+        value: ci-robot-provision
+      capabilities: ['CAPABILITY_NAMED_IAM']
+    - stackName: build11-vpc
+      templateBody: https://raw.githubusercontent.com/bear-redhat/tools/refs/heads/master/cluster-onboarding/vpc.yaml
+      parameters:
+      - key: BaseName
+        value: build11
+      capabilities: ['CAPABILITY_IAM']
 onboard:
   osd: false
   hosted: false
   unmanaged: false
   useTokenFileInKubeconfig: true
-  ciSchedulingWebhook:
-    patches:
-    - matches:
-      - kind: MachineAutoscaler
-        name: '^.+\-us-east-2b$'
-      - kind: MachineAutoscaler
-        name: '^.+\-us-east-2a$'
-      inline: {"spec":{"minReplicas": 0}}
-    - type: json-patch
-      matches:
-      - kind: MachineSet
-        name: '^.+\-amd64-us-east-2a$'
-      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/blockDevices/0/ebs/iops", "value": 0}]
-    - type: json-patch
-      matches:
-      - kind: MachineSet
-        name: '^.+\-aarch64-.+$'
-      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-0e9cdc0e85e0a6aeb"}]
-    - type: json-patch
-      matches:
-      - kind: MachineSet
-        name: '^.+\-amd64-.+$'
-      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-0545fae7edbbbf061"}]
+  multiarch: true
   multiarchBuilderController:
     skip: true
-  machineSet:
-    aws:
-      profiles:
-        infra:
-          machineAutoscaler: false
-          architectures:
-            aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
-        worker:
-          architectures:
-            amd64: ["us-east-2a", "us-east-2b", "us-east-2c"]
-            aarch64: ["us-east-2a", "us-east-2b", "us-east-2c"]
+  certificate:
+    imageRegistryPublicHost: registry.build11.ci.openshift.org
+  certManagerOperator:
+    skip: true
+  cloudCredential:
+    aws: {}
+  ciSchedulingWebhook:
     patches:
     - type: json-patch
       matches:
       - kind: MachineSet
-        name: '^.+\-worker-.+$'
-      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/blockDevices/0/ebs/volumeSize", "value": 800}]
+        name: '.+aarch64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-07f2517c49aac0ea0"}]
     - type: json-patch
       matches:
       - kind: MachineSet
-        name: '^.+\-infra-.+$'
-      inline: [
-        {"op": "add", "path": "/spec/replicas", "value": 1},
-        {"op": "add", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m6g.2xlarge"},
-        {"op": "add", "path": "/spec/template/spec/taints", "value": [{"effect": "NoSchedule", "key": "node-role.kubernetes.io/infra", "value": "reserved"}]}]
+        name: '.+amd64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-071da668451fce4d0"}]
+    # volumeType
     - type: json-patch
       matches:
       - kind: MachineSet
-        name: '^.+\-aarch64-.+$'
-      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-0e9cdc0e85e0a6aeb"}]
+        name: 'ci\-builds\-worker\-(amd64|aarch64)'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/blockDevices/0/ebs/volumeType", "value": "gp2"},
+               {"op": "add", "path": "/spec/template/spec/providerSpec/value/blockDevices/0/ebs/throughput", "value": 500}]
+    # instanceType aarch64
     - type: json-patch
       matches:
       - kind: MachineSet
-        name: '^.+\-amd64-.+$'
-      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-0545fae7edbbbf061"}]
+        name: ci-(builds|longtests|prowjobs|tests)-worker-aarch64
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "c6g.4xlarge"}]
+    # instanceType amd64
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: ci-(builds|longtests|prowjobs|tests)-worker-amd64
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "c6a.4xlarge"}]
+  machineSet:
+    patches:
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '.+aarch64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-07f2517c49aac0ea0"}]
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '.+amd64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-071da668451fce4d0"}]
   passthrough:
-    exclude:
-    - ci-operator/**
+    patches:
+    - type: json-patch
+      matches:
+      - kind: MultiArchBuildConfig
+        name: managed-clonerefs
+      inline: [{"op": "add", "path": "/spec/build_spec/source/images/0/from/name", "value": "us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250307-7a867cddc"}]

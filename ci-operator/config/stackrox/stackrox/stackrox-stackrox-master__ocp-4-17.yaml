@@ -6,7 +6,7 @@ base_images:
   ocp-4:
     name: automation-flavors
     namespace: stackrox
-    tag: openshift-4-0.10.34
+    tag: openshift-4-stable
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -15,7 +15,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.4.4
+    tag: stackrox-ui-test-0.4.8
 resources:
   '*':
     requests:
@@ -34,14 +34,14 @@ tests:
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - always_run: false
-  as: scanner-v4-tests
+  as: scanner-v4-install-tests
   optional: true
   run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
   steps:
     env:
       COLLECTION_METHOD: core_bpf
       OCP_VERSION: ocp/fast-4.17
-      TEST_SUITE: ocp-scanner-v4-tests
+      TEST_SUITE: ocp-scanner-v4-install-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - always_run: false
@@ -85,7 +85,7 @@ tests:
   timeout: 5h0m0s
 - as: ui-e2e-tests
   optional: true
-  run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)/
+  run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -141,13 +141,13 @@ tests:
       TEST_SUITE: ocp-operator-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- as: merge-scanner-v4-tests
+- as: merge-scanner-v4-install-tests
   postsubmit: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
       OCP_VERSION: ocp/fast-4.17
-      TEST_SUITE: ocp-scanner-v4-tests
+      TEST_SUITE: ocp-scanner-v4-install-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-ui-e2e-tests

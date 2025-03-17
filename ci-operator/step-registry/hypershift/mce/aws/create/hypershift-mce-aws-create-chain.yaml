@@ -13,6 +13,9 @@ chain:
         - name: HYPERSHIFT_BASE_DOMAIN
           default: "origin-ci-int-aws.dev.rhcloud.com"
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
+        - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+          default: "HighlyAvailable"
+          documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
         - name: HYPERSHIFT_AWS_REGION
           default: "us-east-1"
           documentation: "The AWS region of the cluster."
@@ -35,6 +38,8 @@ chain:
         trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
         
         debug() {
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+          oc get pod -n local-cluster-${CLUSTER_NAME}
           oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
           oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
           oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
@@ -78,6 +83,10 @@ chain:
           PULL_SECRET_PATH="/tmp/.dockerconfigjson"
         fi
         
+        if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
+          HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
+        fi
+        
         CRED_COMMAND=""
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
           echo "MCE version is less than 2.6, use --aws-creds command"
@@ -98,6 +107,7 @@ chain:
         /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
+        --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --instance-type ${HYPERSHIFT_INSTANCE_TYPE} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
@@ -150,6 +160,7 @@ chain:
         echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
         sleep 10s
         done
+        echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
       from_image:
         namespace: ocp
         name: "4.12"

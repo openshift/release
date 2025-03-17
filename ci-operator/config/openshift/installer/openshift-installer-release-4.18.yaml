@@ -31,6 +31,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.59.0
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   ocp_4.10_cli:
     name: "4.18"
     namespace: ocp
@@ -377,6 +381,17 @@ tests:
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-aws-ovn-user-provisioned-dns
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+      USER_PROVISIONED_DNS: "yes"
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-aws-upi-proxy
   optional: true
   steps:
@@ -538,11 +553,14 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: ipi-azure-post
     pre:
     - ref: ipi-conf
     - ref: ipi-conf-azure-default
+    - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install
   timeout: 6h0m0s
 - as: e2e-azure-ovn
@@ -562,6 +580,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA
@@ -574,12 +593,16 @@ tests:
   run_if_changed: azure
   steps:
     cluster_profile: azure4
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-sharednetwork
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
     cluster_profile: azure4
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-resourcegroup
   timeout: 6h0m0s
 - always_run: false
@@ -811,6 +834,14 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
+- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-static-ovn
   optional: true
   steps:
@@ -918,7 +949,7 @@ tests:
   optional: true
   run_if_changed: (azure|azurestack)
   steps:
-    cluster_profile: azurestack-qe
+    cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack
   timeout: 6h0m0s
 - as: e2e-azurestack-upi
@@ -926,7 +957,7 @@ tests:
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)
   steps:
-    cluster_profile: azurestack-qe
+    cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack-upi
   timeout: 6h0m0s
 - as: e2e-ibmcloud-ovn
@@ -1098,6 +1129,14 @@ tests:
     cluster_profile: openstack-hwoffload
     workflow: openshift-e2e-openstack-dualstack
 - always_run: false
+  as: e2e-vsphere-ovn-dualstack
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-vsphere-ovn-dualstack
+- always_run: false
   as: e2e-aws-overlay-mtu-ovn-1200
   optional: true
   steps:
@@ -1114,6 +1153,7 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: azure4
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
       OS_IMAGE_URN: azureopenshift:aro4:aro_417:417.94.20240701
@@ -1121,10 +1161,12 @@ tests:
     - chain: gather-network
     - chain: gather-core-dump
     - chain: ipi-deprovision
+    - ref: azure-deprovision-sp-and-custom-role
     pre:
     - chain: ipi-conf-azure
     - ref: ipi-conf-azure-osimage
     - ref: ovn-conf
+    - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install
     - ref: ipi-azure-rbac
   timeout: 6h0m0s
