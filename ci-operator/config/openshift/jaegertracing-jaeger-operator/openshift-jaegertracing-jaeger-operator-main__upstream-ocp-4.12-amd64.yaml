@@ -1,20 +1,12 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.12"
     namespace: ocp
     tag: cli
-  hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
   operator-sdk:
-    name: "4.14"
+    name: "4.12"
     namespace: origin
     tag: operator-sdk
-  upi-installer:
-    name: "4.16"
-    namespace: ocp
-    tag: upi-installer
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -53,7 +45,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -61,9 +53,23 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: jaeger-e2e-tests
+  as: security-sast-jaeger
   steps:
-    cluster_profile: aws-qe
+    env:
+      PROJECT_NAME: jaeger-operator
+      SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor
+    workflow: openshift-ci-security
+- as: jaeger-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-tracing
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
     env:
       OPERATORS: |
         [
@@ -72,9 +78,6 @@ tests:
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"}
         ]
     test:
-    - ref: cucushift-hypershift-extended-health-check
-    - ref: cucushift-pre
-    - ref: install-operators
     - as: install
       cli: latest
       commands: |
@@ -89,10 +92,11 @@ tests:
         requests:
           cpu: 1000m
           memory: 400Mi
+    - ref: install-operators
     - ref: distributed-tracing-tests-jaeger
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: jaegertracing-jaeger-operator
-  variant: ocp-4.16-hypershift
+  variant: upstream-ocp-4.12-amd64
