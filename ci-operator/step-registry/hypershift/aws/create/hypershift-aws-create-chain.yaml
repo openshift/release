@@ -71,12 +71,6 @@ chain:
       default: "false"
       documentation: |-
         If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
-    - name: HYPERSHIFT_CREATE_BASTION_METADATA
-      default: "false"
-      documentation: |-
-        If set to true, it exports VPC ID and public subnet ID into ${SHARED_DIR}/vpc_id and ${SHARED_DIR}/public_subnet_ids
-        where it's prepared for the aws-provision-bastionhost step. The bastion host can be used to get access to the
-        cluster when it's created with Private endpoint access.
 
     commands: |-
       set -exuo pipefail
@@ -169,25 +163,6 @@ chain:
 
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
-
-      if [[ "$HYPERSHIFT_CREATE_BASTION_METADATA" == "true" ]]; then
-        export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
-
-        vpc_id=$(oc get hc -A -o jsonpath='{.items[0].spec.platform.aws.cloudProviderConfig.vpc}')
-        infra_id="$(oc get hc -A -o jsonpath='{.items[0].spec.infraID}')"
-        public_subnet=$(aws --region "${HC_REGION}" ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
-        
-        if [[ -f "${SHARED_DIR}/vpc_id" ]]; then
-          echo "Error: The file ${SHARED_DIR}/vpc_id already exists. Operation aborted to prevent overwriting."
-          exit 1
-        fi
-        if [[ -f "${SHARED_DIR}/public_subnet_ids" ]]; then
-          echo "Error: The file ${SHARED_DIR}/public_subnet_ids already exists. Operation aborted to prevent overwriting."
-          exit 1
-        fi
-        echo "$vpc_id" > "${SHARED_DIR}/vpc_id"
-        echo "- $public_subnet" > "${SHARED_DIR}/public_subnet_ids"
-      fi
 
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
