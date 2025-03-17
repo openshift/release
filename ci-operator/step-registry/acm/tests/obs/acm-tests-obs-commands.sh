@@ -18,6 +18,7 @@ fi
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # The AWS secrets
+echo "------------ The AWS secrets ------------
 PARAM_AWS_SECRET_ACCESS_KEY=$(cat $SECRETS_DIR/obs/aws-secret-access-key)
 export PARAM_AWS_SECRET_ACCESS_KEY
 
