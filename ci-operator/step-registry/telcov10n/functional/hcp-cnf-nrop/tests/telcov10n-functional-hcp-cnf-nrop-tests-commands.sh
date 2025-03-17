@@ -61,6 +61,7 @@ export PATH=$PATH:$GOBIN
 go get github.com/onsi/gomega@latest
 go mod tidy
 go mod vendor
+# make commands required to run tests
 make vet
 make update-buildinfo
 
