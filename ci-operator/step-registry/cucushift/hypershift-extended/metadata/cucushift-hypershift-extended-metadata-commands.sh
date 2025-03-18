@@ -5,8 +5,8 @@ set -u
 set -x
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-REGION=${LEASED_RESOURCE}
+export AWS_SHARED_CREDENTIALS_FILE="${AWS_SHARED_CREDENTIALS_FILE:-"${CLUSTER_PROFILE_DIR}/.awscred"}"
+REGION="${REGION:-"${LEASED_RESOURCE}"}"
 
 vpc_id=$(oc get hc -A -o jsonpath='{.items[0].spec.platform.aws.cloudProviderConfig.vpc}')
 infra_id="$(oc get hc -A -o jsonpath='{.items[0].spec.infraID}')"

@@ -1,0 +1,30 @@
+ref:
+  as: hypershift-aws-bastion-provision
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  cli: latest
+  env:
+  - name: AWS_SHARED_CREDENTIALS_FILE
+    default: "/etc/hypershift-ci-jobs-awscreds/credentials"
+    documentation: |-
+      Overrides the default AWS credentials file.
+  - name: REGION
+    default: "us-east-1"
+    documentation: |
+      Use a specific AWS region, overriding the LEASED_RESOURCE environment variable in the cluster_profile.
+  commands: hypershift-aws-bastion-provision-commands.sh
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-awscreds
+      name: hypershift-ci-jobs-awscreds
+      namespace: test-credentials
+    - mount_path: /var/run/vault/proxy
+      name: qe-proxy-creds
+      namespace: test-credentials
+  documentation: |-
+    Create a bastion host on AWS for proxy and mirror registry.

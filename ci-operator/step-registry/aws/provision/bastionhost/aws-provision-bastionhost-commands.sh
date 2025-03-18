@@ -12,7 +12,7 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; save_stack_events_to_artifacts' EXIT TERM INT
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_SHARED_CREDENTIALS_FILE="${AWS_SHARED_CREDENTIALS_FILE:-"${CLUSTER_PROFILE_DIR}/.awscred"}"
 
 REGION=${REGION:-$LEASED_RESOURCE}
 
