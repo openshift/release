@@ -36,7 +36,7 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: images/tests/Dockerfile.rhel
-  from: tools
+  from: tools-base
   inputs:
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
@@ -58,6 +58,13 @@ promotion:
   to:
   - name: "4.19"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): add openstack repo
+      curl http://base-openstack-4-19.ocp.svc > /etc/yum.repos.d/base-4-19-rhel-9-openstack-17-rpms.repo
+    from: tools
+    to: tools-base
 releases:
   initial:
     integration:
@@ -465,6 +472,24 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
+  timeout: 5h0m0s
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: baremetalds-e2e-ovn-bgp-pre
+    workflow: baremetalds-e2e-ovn-dualstack
   timeout: 5h0m0s
 - always_run: false
   as: e2e-metal-ovn-single-node-live-iso

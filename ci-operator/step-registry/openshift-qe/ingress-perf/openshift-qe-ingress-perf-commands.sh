@@ -57,7 +57,9 @@ rm -f ${SHARED_DIR}/index.json
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
-cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
+cp $folder_name/index_data.json "${SHARED_DIR}"/index_data.json
+cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/ingress-perf-index_data.json
+cp "${SHARED_DIR}"/ingress-perf-index_data.json "${ARTIFACT_DIR}"/ingress-perf-index_data.json
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
