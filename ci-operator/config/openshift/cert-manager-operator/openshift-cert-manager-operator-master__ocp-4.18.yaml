@@ -1,0 +1,111 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+  use_build_cache: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-operator-upgrade
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export REGISTRY_AUTH_FILE=/tmp/import-secret/.dockerconfigjson
+        export DOCKER_CONFIG=/tmp/.docker
+        mkdir -p $DOCKER_CONFIG
+        cp $REGISTRY_AUTH_FILE $DOCKER_CONFIG/config.json
+        cd /tmp
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --security-context-config restricted -n cert-manager-operator registry.redhat.io/cert-manager/cert-manager-operator-bundle:v1.14.1
+        oc wait --timeout=10m --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+        oc get deployment -n cert-manager
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /tmp/import-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --security-context-config restricted -n cert-manager-operator "$OO_BUNDLE"
+        oc wait --timeout=10m --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+        oc get deployment -n cert-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-operator-extended
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;ConnectedOnly&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-operator-extended-disconnected
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      DISCONNECTED: "true"
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;~ConnectedOnly&
+      TEST_SCENARIOS: cert-manager
+    test:
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cert-manager-operator
+  variant: ocp-4.18
