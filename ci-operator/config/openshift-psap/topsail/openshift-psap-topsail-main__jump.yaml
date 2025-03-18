@@ -133,6 +133,91 @@ tests:
           cpu: 1000m
           memory: 500Mi
       timeout: 23h0m0s
+- always_run: false
+  as: ci-plot
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    post:
+    - as: 006-unlock-cluster
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci run unlock_cluster
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: 001-lock-cluster
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci run lock_cluster
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 1h0m0s
+    - as: 002-prepare-jump-ci
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci run prepare_jump_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 1h0m0s
+    test:
+    - as: 003-plot
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci test generate_plots_from_pr_args
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 1h30m0s
 zz_generated_metadata:
   branch: main
   org: openshift-psap
