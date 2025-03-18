@@ -273,6 +273,13 @@ else
     export ENABLE_V1_REGRESSION="false"
 fi
 
+if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+    export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
+# event API v1 is removed from 4.19 onwards
+else
+    export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
+fi
+
 # wait for the linuxptp-daemon to be deployed
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
