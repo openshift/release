@@ -1166,7 +1166,7 @@ for target in "${TARGET_RELEASES[@]}"; do
 	health_check
     fi
 
-    run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode"
+    # run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode"
     # From OCP 4.19, we do not support cgroupmode v1
     # So update the 'cgroupMode' in the 'cluster' object of nodes.config.openshift.io resource type to 'v2'
     if [[ "${TARGET_MINOR_VERSION}" -eq "18" ]] && [[ "$(oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode)" == "v1" ]]; then
