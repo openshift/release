@@ -771,20 +771,20 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # Cloud infrastructure problems are common, instead of failing and
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
-case $JOB_NAME in
-  *vsphere)
+case $CLUSTER_TYPE in
+  vsphere*)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;
-  *aws)
+  aws*)
     # Do not retry because aws resources can collide when re-using installer assets
     max=1
     ;;
-  *azure)
+  azure*)
     # Do not retry because azure resources always collide when re-using installer assets
     max=1
     ;;
-  *ibmcloud*)
+  ibmcloud*)
     # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
     max=1
     ;;
