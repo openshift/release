@@ -307,6 +307,19 @@ function wait_for_worker_machines() {
 
 # Scales up the intel workers
 function scale_up_intel_workers {
+    echo "Importing the rhcos image again"
+
+    # 1. Find the VPC prefix from the install-config.
+    VPC_PREFIX=$(yq-v4 -r '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+    export VPC_PREFIX
+
+    # 2. Get the VPC Name
+    VPC_NAME=$(ibmcloud is vpcs | grep "${VPC_PREFIX}" | awk '{print $2}')
+    export VPC_NAME
+
+    echo "Image Status: "
+    ibmcloud is images --owner-type user --output json --resource-group-name "${RESOURCE_GROUP}"
+
     echo "Scaling the MachineSet for 2 of the workers/zones"
     for WORKER_MACHINESET in $(oc get machinesets.machine.openshift.io -n openshift-machine-api | grep worker | awk '{print $1}' | head -n 2)
     do
@@ -318,8 +331,8 @@ function scale_up_intel_workers {
     wait_for_worker_machines
 
     echo "Disable mastersSchedulable since we now have a dedicated worker node"
-	oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
-	sleep 10
+    oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
+    sleep 10
 }
 
 ## Main Execution Path
@@ -341,10 +354,11 @@ then
     exit 64
 fi
 
-scale_up_intel_workers
-
 setup_ibmcloud_cli
 login_ibmcloud
+
+scale_up_intel_workers
+
 download_terraform_binary
 download_automation_code
 #cleanup_prior

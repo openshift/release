@@ -63,6 +63,63 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build11
+    context: ci/prow/jump-ci-plot
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/variant: jump
+      ci.openshift.io/generator: prowgen
+    name: pull-ci-openshift-psap-topsail-main-jump-ci-plot
+    rerun_command: /test jump-ci-plot
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-plot
+        - --variant=jump
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(jump-ci-plot|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
     context: ci/prow/mac_ai-jump-ci
     decorate: true
     decoration_config:

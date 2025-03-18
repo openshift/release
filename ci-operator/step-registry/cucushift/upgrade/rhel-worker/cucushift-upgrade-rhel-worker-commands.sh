@@ -30,22 +30,50 @@ function debug() {
     fi
 }
 
+# Explicitly set upgrade failure to operators
+function check_failed_operator(){
+    local latest_ver_in_history failing_status failing_operator failing_operators
+    latest_ver_in_history=$(oc get clusterversion version -ojson|jq -r '.status.history[0].version')
+    if [[ "${latest_ver_in_history}" != "${TARGET_VERSION}" ]]; then
+        # Upgrade does not start, set it to CVO
+        echo "Upgrade does not start, set UPGRADE_FAILURE_TYPE to cvo"
+        export UPGRADE_FAILURE_TYPE="cvo"
+    else
+        failing_status=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").status')
+        # Upgrade stuck at operators while failing=True, check from the operators reported in cv Failing condition
+        if [[ ${failing_status} == "True" ]]; then
+            failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
+            failing_operators="${failing_operator} ${failing_operators}"
+        else
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || true
+            if [[ -z "${failing_operators}" ]]; then
+                failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting on \K.*'|tr -d ',') || true
+            fi
+        fi
+        if [[ -n "${failing_operators}" ]]; then
+            echo "Upgrade stuck, set UPGRADE_FAILURE_TYPE to ${failing_operators}"
+            export UPGRADE_FAILURE_TYPE="${failing_operators}"
+        fi
+    fi
+}
+
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
     echo -e "\n# Generating the Junit for upgrade"
     if (( FRC == 0 )); then
-      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
+        cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="cluster upgrade" tests="1" failures="0">
-  <testcase classname="cluster upgrade" name="upgrade should succeed"/>
+  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}"/>
 </testsuite>
 EOF
     else
-      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
+        cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="cluster upgrade" tests="1" failures="1">
-  <testcase classname="cluster upgrade" name="upgrade should succeed">
-    <failure message="">openshift cluster upgrade failed</failure>
+  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}">
+    <failure message="openshift cluster upgrade failed at ${UPGRADE_FAILURE_TYPE}"></failure>
   </testcase>
 </testsuite>
 EOF
@@ -63,6 +91,8 @@ function rhel_repo(){
             echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
         else
             echo "/etc/passwd is not writeable, and user matching this uid is not found."
+            # Explicitly set failure to rhel for rhel worker upgrade failure
+            export UPGRADE_FAILURE_TYPE="rhel"
             exit 1
         fi
     fi
@@ -172,7 +202,7 @@ function rhel_upgrade(){
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     echo -e "\nRunning RHEL worker upgrade"
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv || { export UPGRADE_FAILURE_TYPE="rhel"; return 1; }
 
     check_upgrade_status
 }
@@ -190,7 +220,9 @@ function rhel_post_upgrade(){
     if [[ ${exp_version} == "${act_version}" ]]; then
         echo "RHEL worker has correct K8s version"
     else
-        echo "RHEL worker has incorrect K8s version" && return 1
+        echo "RHEL worker has incorrect K8s version"
+        export UPGRADE_FAILURE_TYPE="rhel"
+        return 1
     fi
 
     echo "Check the upgrade hook flags created"
@@ -198,7 +230,9 @@ function rhel_post_upgrade(){
         if [[ -f /tmp/${hookname} ]]; then
             echo "The hook ${hookname}.yaml was executed."
         else
-            echo "The hook ${hookname}.yaml was NOT executed." && return 1
+            echo "The hook ${hookname}.yaml was NOT executed."
+            export UPGRADE_FAILURE_TYPE="rhel"
+            return 1
         fi
     done
         
@@ -209,7 +243,9 @@ function rhel_post_upgrade(){
     if [[ "$ret" == "0" ]]; then
         echo "oc logs checking command passed."
     else
-        echo "oc logs checking command failed." && return 1
+        echo "oc logs checking command failed."
+        export UPGRADE_FAILURE_TYPE="rhel"
+        return 1
     fi
 
     if [[ "$TARGET_MINOR_VERSION" -ge 14 ]]; then
@@ -229,7 +265,7 @@ function rhel_post_upgrade(){
       msg: "'/var/lib/kubelet' was NOT found in fixfiles_exclude_dirs. Quitting..."
     when: grep_result.rc != 0
 EOF
-        ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/post_check.yaml -vvv
+        ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/post_check.yaml -vvv || { export UPGRADE_FAILURE_TYPE="rhel"; return 1; }
     fi
 
     echo -e "oc get node -owide\n$(oc get node -owide)"
@@ -265,7 +301,9 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n"
+        check_failed_operator
+        return 1
     fi
 }
 
@@ -277,7 +315,10 @@ function check_history() {
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now upgraded to ${TARGET_VERSION}" && return 0
     else
-        echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting" && return 1
+        echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting"
+	# Explicitly set failure to cvo
+        export UPGRADE_FAILURE_TYPE="cvo"
+        return 1
     fi
 }
 
@@ -298,7 +339,10 @@ function check_mcp() {
         sleep 120
         (( try += 1 ))
     done
-    echo >&2 "Worker pool status check failed" && return 1
+    echo >&2 "Worker pool status check failed"
+    # Explicitly set failure to mco
+    export UPGRADE_FAILURE_TYPE="mco"
+    return 1
 }
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
@@ -330,7 +374,8 @@ export SOURCE_VERSION
 export SOURCE_MINOR_VERSION
 echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
 echo -e "The source release version is gotten from clusterversion resource, that can not stand for the current version of worker nodes!"
-
+# Set genenral upgrade ci failure to overall as default
+export UPGRADE_FAILURE_TYPE="overall"
 if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     run_command "oc get node -owide"
     rhel_repo

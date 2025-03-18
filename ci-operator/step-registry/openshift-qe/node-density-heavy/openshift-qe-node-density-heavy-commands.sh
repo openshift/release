@@ -58,7 +58,10 @@ echo ${SHARED_DIR}
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> "${SHARED_DIR}"/index_data.json
+
+cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
+cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes

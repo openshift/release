@@ -214,14 +214,12 @@ function destroy_upi_cluster() {
         exit 0
     fi
 
-    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
-
     # Destroys the current installation for this run
     cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
         "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
             -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate
+            -state "${SHARED_DIR}"/terraform.tfstate
 }
 
 ############################################################

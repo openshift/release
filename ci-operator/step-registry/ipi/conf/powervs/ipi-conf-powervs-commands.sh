@@ -266,22 +266,6 @@ if [[ "${CONTROL_PLANE_REPLICAS}" == "1" && "${WORKER_REPLICAS}" == "0" ]]; then
   PLATFORM_ARGS_COMPUTE+=( "processors" 6 )
 fi
 
-#
-# Find out the largest system pool type
-#
-curl --output /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz --location https://github.com/hamzy/PowerVS-get-largest-system-pool/releases/download/v0.2.2/PowerVS-get-largest-system-pool-v0.2.2-linux-amd64.tar.gz
-tar -C /tmp -xzf /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz
-chmod u+x /tmp/PowerVS-get-largest-system-pool
-if [[ "${BRANCH}" == "master" || "${BRANCH}" == "main" ]]; then
-  LIMIT_TYPES=${BRANCH} 
-else
-  LIMIT_TYPES="release-${BRANCH}"
-fi
-POOL_TYPE=$(/tmp/PowerVS-get-largest-system-pool -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -serviceGUID "${POWERVS_SERVICE_INSTANCE_ID}" -limitTypes "${LIMIT_TYPES}" -zone "${POWERVS_REGION}")
-echo "POOL_TYPE=${POOL_TYPE}"
-PLATFORM_ARGS_COMPUTE+=( "sysType" "${POOL_TYPE}" )
-PLATFORM_ARGS_WORKER+=( "sysType" "${POOL_TYPE}" )
-
 FILE=$(mktemp)
 
 trap '/bin/rm ${FILE}' EXIT

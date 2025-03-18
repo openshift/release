@@ -29,6 +29,34 @@ function debug() {
     fi
 }
 
+# Explicitly set upgrade failure to operators
+function check_failed_operator(){
+    local latest_ver_in_history failing_status failing_operator failing_operators
+    latest_ver_in_history=$(oc get clusterversion version -ojson|jq -r '.status.history[0].version')
+    if [[ "${latest_ver_in_history}" != "${TARGET_VERSION}" ]]; then
+        # Upgrade does not start, set it to CVO
+        echo "Upgrade does not start, set UPGRADE_FAILURE_TYPE to cvo"
+        export UPGRADE_FAILURE_TYPE="cvo"
+    else
+        failing_status=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").status')
+        # Upgrade stuck at operators while failing=True, check from the operators reported in cv Failing condition
+        if [[ ${failing_status} == "True" ]]; then
+            failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
+            failing_operators="${failing_operator} ${failing_operators}"
+        else
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || true
+            if [[ -z "${failing_operators}" ]]; then
+                failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting on \K.*'|tr -d ',') || true
+            fi
+        fi
+        if [[ -n "${failing_operators}" ]]; then
+            echo "Upgrade stuck, set UPGRADE_FAILURE_TYPE to ${failing_operators}"
+            export UPGRADE_FAILURE_TYPE="${failing_operators}"
+        fi
+    fi
+}
+
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
     echo "Generating the Junit for upgrade"
@@ -36,15 +64,15 @@ function createUpgradeJunit() {
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="cluster upgrade" tests="1" failures="0">
-  <testcase classname="cluster upgrade" name="upgrade should succeed"/>
+  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}"/>
 </testsuite>
 EOF
     else
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="cluster upgrade" tests="1" failures="1">
-  <testcase classname="cluster upgrade" name="upgrade should succeed">
-    <failure message="">openshift cluster upgrade failed</failure>
+  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}">
+    <failure message="openshift cluster upgrade failed at ${UPGRADE_FAILURE_TYPE}"></failure>
   </testcase>
 </testsuite>
 EOF
@@ -99,10 +127,14 @@ function update_cloud_credentials_oidc(){
     mkdir "${preCredsDir}" "${tobeCredsDir}"
     # Extract all CRs from live cluster with --included
     if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
-        echo "Failed to extract CRs from live cluster!" && exit 1
+        echo "Failed to extract CRs from live cluster!"
+        export UPGRADE_FAILURE_TYPE="oc_update"
+        return 1
     fi
     if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
-        echo "Failed to extract CRs from tobe upgrade release payload!" && exit 1
+        echo "Failed to extract CRs from tobe upgrade release payload!"
+        export UPGRADE_FAILURE_TYPE="oc_update"
+        return 1
     fi
 
     # TODO: add gcp and azure
@@ -115,14 +147,17 @@ function update_cloud_credentials_oidc(){
         case "${platform}" in
         "AWS")
             if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
-                echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
+		echo "No aws_oidc_provider_arn file in SHARED_DIR"
+		return 1
             else
                 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
                 infra_name=${NAMESPACE}-${UNIQUE_HASH}
                 oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
-                extract_ccoctl
+                extract_ccoctl || { export UPGRADE_FAILURE_TYPE="cloud-credential"; return 1; }
                 if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
-                    echo "Failed to update iam role!" && exit 1
+		    echo "Failed to update iam role!"
+		    export UPGRADE_FAILURE_TYPE="cloud-credential"
+		    return 1
                 fi
                 if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
                     echo "Apply the new credential secrets."
@@ -131,7 +166,7 @@ function update_cloud_credentials_oidc(){
             fi
             ;;
         *)
-           echo "to be supported platform: ${platform}" 
+           echo "to be supported platform: ${platform}"
            ;;
         esac
     fi
@@ -178,7 +213,10 @@ function cco_annotation(){
         (( wait_time_loop_var += 1 ))
     done
     if (( wait_time_loop_var >= 5 )); then
-        echo >&2 "Timed out waiting for CCO annotation completing, exiting" && return 1
+        echo >&2 "Timed out waiting for CCO annotation completing, exiting"
+        # Explicitly set failure to cco
+        export UPGRADE_FAILURE_TYPE="cloud-credential"
+        return 1
     fi
 }
 
@@ -255,7 +293,10 @@ function admin_ack() {
         (( wait_time_loop_var += 1 ))
     done
     if (( wait_time_loop_var >= 5 )); then
-        echo >&2 "Timed out waiting for admin-acks completing, exiting" && return 1
+        echo >&2 "Timed out waiting for admin-acks completing, exiting"
+        # Explicitly set failure to admin_ack
+        export UPGRADE_FAILURE_TYPE="admin_ack"
+        return 1
     fi
 }
 
@@ -342,7 +383,9 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
-        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n"
+        check_failed_operator
+        return 1
     fi
 }
 
@@ -354,7 +397,10 @@ function check_history() {
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now upgraded to ${TARGET_VERSION}" && return 0
     else
-        echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting" && return 1
+        echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting"
+	# Explicitly set failure to cvo
+        export UPGRADE_FAILURE_TYPE="cvo"
+	return 1
     fi
 }
 
@@ -382,6 +428,9 @@ SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
 export SOURCE_VERSION
 export SOURCE_MINOR_VERSION
 echo "Source release version is: ${SOURCE_VERSION}"
+
+# Set genenral upgrade ci failure to overall as default
+export UPGRADE_FAILURE_TYPE="overall"
 
 x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
 y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )

@@ -44,6 +44,7 @@ tests:
   commands: /usr/local/bin/cincinnati-graph-data
   container:
     from: graphdata-unittests
+  run_if_changed: internal-channels/candidate.yaml|graph-data.rs/.*
 - as: e2e-latest-cincinnati
   cluster_claim:
     architecture: amd64
@@ -53,6 +54,7 @@ tests:
     timeout: 1h0m0s
     version: "4.14"
   optional: true
+  run_if_changed: internal-channels/candidate.yaml
   steps:
     test:
     - as: openshift-e2e-test
@@ -87,6 +89,7 @@ tests:
     exec hack/validate-blocked-edges.py
   container:
     from: content-checks
+  run_if_changed: hack/validate-blocked-edges.py|blocked-edges/.*
 - as: stabilization-bot-tests
   commands: |
     PYTHONPATH=hack python -m unittest hack/stabilization-changes.py
