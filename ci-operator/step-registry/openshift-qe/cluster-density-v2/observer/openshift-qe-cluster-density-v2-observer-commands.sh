@@ -43,12 +43,12 @@ fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
-rm -f ${SHARED_DIR}/index.json
+
 ./run.sh
 rc=$?
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${ARTIFACT_DIR}/index_data.json
 
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
@@ -56,7 +56,7 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
 fi
 
-echo "{'cluster_density': $rc}" >> ${SHARED_DIR}/observer_status.json
+echo "{'cluster_density': $rc}" >> ${ARTIFACT_DIR}/observer_status.json
 
 echo "Return code: $rc"
 exit $rc
