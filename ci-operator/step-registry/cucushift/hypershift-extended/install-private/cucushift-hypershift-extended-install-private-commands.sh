@@ -47,6 +47,12 @@ else
     COMMAND+=(--enable-conversion-webhook="false")
 fi
 
+if [[ "$HYPERSHIFT_ENABLE_CPO_OVERRIDES" == "true" ]]; then
+    COMMAND+=(--enable-cpo-overrides="true")
+else
+    COMMAND+=(--enable-cpo-overrides="false")
+fi
+
 if [[ "$HYPERSHIFT_OPERATOR_PULL_SECRET" == "true" ]]; then
     PULL_SECRET_PATH="${CLUSTER_PROFILE_DIR}/pull-secret"
     if [[ -f "${SHARED_DIR}/hypershift-pull-secret" ]]; then
