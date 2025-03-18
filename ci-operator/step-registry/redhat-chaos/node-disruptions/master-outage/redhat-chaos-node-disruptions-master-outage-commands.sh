@@ -79,6 +79,13 @@ elif [ "$platform" = "VSphere" ]; then
     export VSPHERE_USERNAME
     VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password")
     export VSPHERE_PASSWORD
+    response=$(curl -k -v -s -o /dev/null -w "%{http_code}" -u "$VSPHERE_USERNAME:$VSPHERE_PASSWORD" https://$VSPHERE_IP)
+    # Check the response code
+    if [[ "$response" -eq 200 ]]; then
+    echo "Authentication successful."
+    else
+    echo "Authentication failed with response code: $response"
+    fi
     # vcenter_username_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_username_minimal_permission")
     # export VSPHERE_USERNAME=$vcenter_username_minimal_permission
     # vcenter_password_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_password_minimal_permission")
