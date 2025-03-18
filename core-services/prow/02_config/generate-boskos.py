@@ -278,8 +278,7 @@ CONFIG = {
         'default': 1,
     },
     'openstack-rhoso-quota-slice': {
-        '10.46.4.7': 1, # titan03.lab.eng.tlv2.redhat.com
-        '10.46.4.12': 1, # titan08.lab.eng.tlv2.redhat.com
+        'serval71.lab.eng.tlv2.redhat.com': 1,
     },
     'openstack-nfv-quota-slice': {
         'default': 4,
