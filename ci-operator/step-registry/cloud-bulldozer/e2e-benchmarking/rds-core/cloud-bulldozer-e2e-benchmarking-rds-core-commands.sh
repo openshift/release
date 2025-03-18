@@ -34,7 +34,7 @@ git clone https://github.com/vishnuchalla/e2e-benchmarking --branch v0.0.1 --dep
 pushd e2e-benchmarking
 pushd workloads/kube-burner-ocp-wrapper
 export WORKLOAD=rds-core
-ES_SERVER="" ITERATIONS=1 PPROF=false CHURN=false ./run.sh
+ES_SERVER="" ITERATIONS=1 PPROF=false CHURN=false PERFORMANCE_PROFILE="cpt-pao" ./run.sh
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
