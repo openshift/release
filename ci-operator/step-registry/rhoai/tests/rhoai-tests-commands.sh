@@ -46,8 +46,5 @@ export NAME_3
 export NAME_4
 export NAME_5
 
-# Debug poetry env missing robot
-sleep 1h
-
 # running RHOAI tests
 ./run_interop.sh
