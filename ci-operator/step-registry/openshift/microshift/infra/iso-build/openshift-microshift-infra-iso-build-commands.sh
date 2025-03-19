@@ -12,12 +12,15 @@ set -xeuo pipefail
 
 source /tmp/ci-functions.sh
 ci_subscription_register
+
+download_microshift_scripts
+"\${DNF_RETRY}" "install" "pcp-zeroconf jq"
 ci_copy_secrets "${CACHE_REGION}"
 
-sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
+sudo systemctl start pmcd
+sudo systemctl start pmlogger
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
-
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
