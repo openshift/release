@@ -1,9 +1,8 @@
 #!/bin/bash
-# shellcheck disable=SC2153 #Prow false alert error for env variable HITSIZE CONCURRENCY 
 
 set -o nounset
 
-# 1, Setup Quay performance test environment
+# 1, Prepare Quay performance test environment
 
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
 QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
@@ -150,7 +149,7 @@ spec:
 EOF
 
 echo "the Perf Job needs about 3~4 hours to complete"
-echo "check the OCP Quay Perf Job, if it complete, go to Kibana to generate index pattern and get Quay Perf metrics"
+echo "check the OCP Quay Perf Job, if it complete, go to AWS Opensearch to generate index pattern and get Quay Perf metrics"
 
 #wait until the quay perf testing job complete, and show the job status
 oc get job -n "$quay_perf_namespace"
@@ -183,52 +182,34 @@ fi
 date
 
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
 echo "job end $end_time and status $JOB_STATUS"
+
+# 4, Send the performance test data to ELK
+# original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
 
 # fetch UUID,JOB_START etc required data to dashboard http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
 echo "The Prow Job ID is: $PROW_JOB_ID"
-# echo "The Prow Job URL is: $PROW_JOB_URL"
-
-
-# 4, Send the performance test data to ELK
-# https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
-
-# ES_INDEX=perf_scale_ci
 
 # invoke send to dashboad index.sh
 export ES_SERVER="${ELK_SERVER}"
 export BUILD_ID="${BUILD_ID}"
 export UUID="${TEST_UUID}"
-# export BUILD_URL="${PROW_JOB_URL}"
 export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
 export WORKLOAD="quay-load-test"
 # export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 export TEST_PHASES="${TEST_PHASES}"
-# export hitsize="${HITSIZE}"
-# export concurrency="${CONCURRENCY}"
-# export imagePushPulls="${PUSH_PULL_NUMBERS}"
-export HITSIZE="$HITSIZE"
-export CONCURRENCY="$CONCURRENCY"
-export PUSH_PULL_NUMBERS="$PUSH_PULL_NUMBERS"
+export HITSIZE
+export CONCURRENCY
+export PUSH_PULL_NUMBERS
+# export HITSIZE="$HITSIZE"
+# export CONCURRENCY="$CONCURRENCY"
+# export PUSH_PULL_NUMBERS="$PUSH_PULL_NUMBERS"
 
-echo "HITSIZE $HITSIZE"
-echo "CONCURRENCY $CONCURRENCY"
-echo "PUSH_PULL_NUMBERS $PUSH_PULL_NUMBERS"
+# echo "HITSIZE $HITSIZE"
+# echo "CONCURRENCY $CONCURRENCY"
+# echo "PUSH_PULL_NUMBERS $PUSH_PULL_NUMBERS"
 
 source utility/e2e-benchmarking.sh
 echo "es server is: $ES_SERVER"
-
-
-# setup
-# get_ipsec_config
-# get_fips_config
-# get_ocp_virt_config
-# get_ocp_virt_version_config
-# get_ocp_virt_tuning_policy_config
-# get_encryption_config
-# get_publish_config
-# get_architecture_config
-# index_tasks
