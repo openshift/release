@@ -59,23 +59,21 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
-- as: installer-rehearse-ibmcloud-dis
+- as: installer-rehearse-azure
   cron: '@yearly'
   steps:
-    cluster_profile: ibmcloud-qe-2
+    cluster_profile: azure-qe
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-q2qbqst/release:latest
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-      SLEEP_DURATION: 1m
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      SLEEP_DURATION: 1h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+    - chain: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity-provision 
 zz_generated_metadata:
   branch: master
   org: openshift
