@@ -1,0 +1,23 @@
+workflow:
+  as: baremetalds-arbiter-e2e-extended
+  steps:
+    pre:
+    - chain: baremetalds-ofcir-pre
+    test:
+    - ref: openshift-extended-test
+    post:
+    - chain: baremetalds-ofcir-post
+    env:
+      CLUSTERTYPE: baremetal
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        ENABLE_ARBITER=true
+        FEATURE_SET="TechPreviewNoUpgrade"
+      TEST_SCENARIOS: "MCO|ETCD|Authentication.*Critical"
+      TEST_FILTERS: "~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&"
+      FORCE_SUCCESS_EXIT: "no"
+  documentation: |-
+    The Baremetalds arbiter E2E extended workflow executes `critical cases for components mco, etcd, authentication` on  two node arbiter that was installed during cluster setup.
+
