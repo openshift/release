@@ -46,5 +46,8 @@ export NAME_3
 export NAME_4
 export NAME_5
 
+# Retain cluster pre-test
+sleep 99999999
+
 # running RHOAI tests
 ./run_interop.sh
