@@ -14,6 +14,10 @@ fi
 csv_name=$(echo "${csv}" | jq -r '.metadata.name')
 echo "Found csv '${csv_name}'"
 echo "Found the initialization-resource"
+
+# set the startingCSV field in subscription
+oc patch subscription rhods-operator -n redhat-ods-operator --type='merge' -p "{\"spec\":{\"startingCSV\":\"$csv_name\"}}"
+
 echo "${csv}" | jq -r '.metadata.annotations."operatorframework.io/initialization-resource"' | jq -r | tee "/tmp/default-dsc.json"
 file="/tmp/default-dsc.json"
 oc apply -f "${file}"
@@ -67,4 +71,8 @@ oc_wait_for_pods() {
 oc_wait_for_pods "redhat-ods-applications"
 
 sleep 300
+
+echo "Checking CSV status"
+oc get subscription rhods-operator -n redhat-ods-operator -o jsonpath='{.spec}'
+
 echo "OpenShfit AI Operator is deployed successfully"
