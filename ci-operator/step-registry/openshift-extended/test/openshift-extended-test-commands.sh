@@ -240,7 +240,7 @@ nutanix|nutanix-qe|nutanix-qe-dis)
     exit 0
     ;;
 esac
-
+sleep 5400
 # create execution directory
 mkdir -p /tmp/output
 cd /tmp/output
