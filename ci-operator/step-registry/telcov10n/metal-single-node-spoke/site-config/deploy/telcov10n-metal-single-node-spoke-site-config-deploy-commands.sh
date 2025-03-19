@@ -172,7 +172,7 @@ spec:
       - "172.30.0.0/16"
     additionalNTPSources:
       - ${AUX_HOST}
-    # ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
+    ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
     cpuPartitioningMode: AllNodes
     nodes:
       - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
