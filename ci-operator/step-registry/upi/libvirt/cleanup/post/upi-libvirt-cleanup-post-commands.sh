@@ -19,6 +19,7 @@ if [[ -z "${HOSTNAME}" ]]; then
   exit 1
 fi
 
+
 REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
