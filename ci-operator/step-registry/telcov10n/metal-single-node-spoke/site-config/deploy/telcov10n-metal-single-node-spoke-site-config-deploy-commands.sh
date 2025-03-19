@@ -135,7 +135,10 @@ function generate_site_config {
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
     if [ "${root_device}" != "" ]; then
-      ignition_config_override='{\"ignition\":{\"version\":\"3.2.0\"},\"storage\":{\"disks\":[{\"device\":\"'${root_device}'\",\"wipeTable\":true, \"partitions\": []}]}}'
+        ignition_config_override="$(
+          echo "${NODE_IGNITION_CONF_OVERRIDE}" \
+          | sed "s#\${root_device}#${root_device}#" \
+          | jq --compact-output)"
     fi
 
     cat << EOF > ${site_config_file}
@@ -172,7 +175,7 @@ spec:
       - "172.30.0.0/16"
     additionalNTPSources:
       - ${AUX_HOST}
-    ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
+    ignitionConfigOverride: '$(echo ${GLOBAL_IGNITION_CONF_OVERRIDE} | jq --compact-output)'
     cpuPartitioningMode: AllNodes
     nodes:
       - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
