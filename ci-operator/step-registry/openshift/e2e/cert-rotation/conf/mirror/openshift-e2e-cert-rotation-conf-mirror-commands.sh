@@ -23,7 +23,7 @@ scp "${SSHOPTS[@]}" /usr/bin/openshift-tests "root@${IP}:/usr/local/bin"
 cat >"${SHARED_DIR}"/local-mirror.sh <<'EOF'
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
@@ -297,5 +297,6 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
 	/usr/local/bin/local-mirror.sh
