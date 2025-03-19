@@ -66,5 +66,6 @@ echo "### Running tests"
 timeout --kill-after 10m 480m \
 ssh \
     "${SSHOPTS[@]}" \
+    -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
     "root@${IP}" \
     /usr/local/bin/run-e2e-tests.sh
