@@ -23,6 +23,9 @@ REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
 
+echo "sleep 3000s"
+sleep 8000s
+
 # Test the remote connection
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
 
