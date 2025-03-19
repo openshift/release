@@ -53,8 +53,18 @@ else
     exit 1
 fi
 
-if [[ ! -z "$ORION_CONFIG" ]]; then
-    export CONFIG="${ORION_CONFIG}"
+if [[ -n "$ORION_CONFIG" ]]; then
+    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
+        fileBasename="${ORION_CONFIG##*/}"
+        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+            export CONFIG="$ARTIFACT_DIR/$fileBasename"
+        else
+            echo "Error: Failed to download $ORION_CONFIG" >&2
+            exit 1
+        fi
+    else
+        export CONFIG="$ORION_CONFIG"
+    fi
 fi
 
 if [[ ! -z "$ACK_FILE" ]]; then
@@ -83,7 +93,8 @@ if [[ -n "${LOOKBACK_SIZE}" ]]; then
 fi
 
 set +e
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
+FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
