@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export PATH=/tmp/:$PATH
+which extended-platform-tests
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
 # Set variables needed for test execution
 export PROVIDER=$OADP_CLOUD_PROVIDER
 export BACKUP_LOCATION=$OADP_BACKUP_LOCATION
