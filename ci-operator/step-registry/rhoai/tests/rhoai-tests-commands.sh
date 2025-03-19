@@ -5,6 +5,9 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+# Retain cluster pre-test
+sleep 99999999
+
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export CONSOLE_URL
@@ -45,9 +48,6 @@ export NAME_2
 export NAME_3
 export NAME_4
 export NAME_5
-
-# Retain cluster pre-test
-sleep 99999999
 
 # running RHOAI tests
 ./run_interop.sh
