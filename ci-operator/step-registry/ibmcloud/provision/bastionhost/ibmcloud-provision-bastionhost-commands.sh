@@ -37,7 +37,7 @@ cluster_name="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_info_yaml="${SHARED_DIR}/bastion-info.yaml"
 
 bastion_name="${cluster_name}-bastion"
-MACHINE_TYPE="bx2-2x8"
+MACHINE_TYPE="bx2-4x16"
 #The default coreos image value is gotten from
 #imgProfile="fedora-coreos.*available.*amd64.*stable.*public"
 #ibmcloud is images --visibility public --owner-type provider --resource-group-name Default | grep -i ${imgProfile}

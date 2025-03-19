@@ -184,7 +184,7 @@ function capi_envtest_monitor() {
 # useful for components like observers. In the end, the complete kubeconfig will be copies
 # as before.
 function copy_kubeconfig_minimal() {
-  local dir=${1}
+  local dir=${1} temp_dir
   echo "waiting for ${dir}/auth/kubeconfig to exist"
   while [ ! -s  "${dir}/auth/kubeconfig" ]
   do
@@ -199,7 +199,10 @@ function copy_kubeconfig_minimal() {
   echo 'api available'
 
   echo 'waiting for bootstrap to complete'
-  ${INSTALLER_BINARY} --dir="${dir}" wait-for bootstrap-complete &
+  # create a temporary install working dir to avoid installer log combination
+  temp_dir=$(mktemp -d)
+  cp -rf "${dir}"/* "${temp_dir}/"
+  ${INSTALLER_BINARY} --dir="${temp_dir}" wait-for bootstrap-complete &
   wait "$!"
   ret=$?
   if [ $ret -eq 0 ]; then
@@ -771,20 +774,20 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # Cloud infrastructure problems are common, instead of failing and
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
-case $JOB_NAME in
-  *vsphere)
+case $CLUSTER_TYPE in
+  vsphere*)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;
-  *aws)
+  aws*)
     # Do not retry because aws resources can collide when re-using installer assets
     max=1
     ;;
-  *azure)
+  azure*)
     # Do not retry because azure resources always collide when re-using installer assets
     max=1
     ;;
-  *ibmcloud*)
+  ibmcloud*)
     # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
     max=1
     ;;

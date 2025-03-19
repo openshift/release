@@ -8,10 +8,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+  from_repository: true
 canonical_go_repository: github.com/redhat-cne/cloud-event-proxy
 images:
 - dockerfile_path: Dockerfile
@@ -21,13 +18,6 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cloud-event-proxy
-- dockerfile_path: examples/consumer.Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: cloud-event-consumer
 promotion:
   to:
   - disabled: true
@@ -81,14 +71,12 @@ tests:
         fi
         popd
         export CNE_IMG=${IMAGE_CLOUD_EVENT_PROXY}
-        export CONSUMER_IMG=${IMAGE_CLOUD_EVENT_CONSUMER}
+        export CONSUMER_IMG=quay.io/openshift/origin-cloud-event-proxy:4.18
         hack/deploy_test.sh deploy
         make functests
       dependencies:
       - env: IMAGE_CLOUD_EVENT_PROXY
         name: pipeline:cloud-event-proxy
-      - env: IMAGE_CLOUD_EVENT_CONSUMER
-        name: pipeline:cloud-event-consumer
       from: src
       resources:
         requests:
