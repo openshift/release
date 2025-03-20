@@ -112,8 +112,6 @@ function generate_site_config {
   #   - redfish_base_uri
   #   - mac
   #   - root_device
-  #   - deviceName
-  #   - root_device
   #   - root_dev_hctl
   #   - hctl
   #   - baremetal_iface
@@ -139,6 +137,11 @@ function generate_site_config {
           echo "${NODE_IGNITION_CONF_OVERRIDE}" \
           | sed "s#\${root_device}#${root_device}#" \
           | jq --compact-output)"
+
+      if [ "${root_dev_hctl}" != "" ]; then
+        # Enforce the use of HCTL format
+        root_device=""
+      fi
     fi
 
     cat << EOF > ${site_config_file}
