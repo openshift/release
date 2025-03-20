@@ -1,4 +1,5 @@
 #!/bin/bash
+#refer to https://github.com/quay/quay-performance-scripts
 
 set -o nounset
 
@@ -11,10 +12,9 @@ ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
-echo "ELK_SERVER: $ELK_SERVER"
 echo "QUAY_ROUTE: $QUAY_ROUTE"
 
-#create organization "perftest" and namespace "quay-perf" for Quay performance test
+#Create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
 export WORKLOAD="quay-load-test"
@@ -27,8 +27,6 @@ curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
         "name": "'"${quay_perf_organization}"'",
         "email": "testperf@testperf.com"
     }' -k
-
-#refer to https://github.com/quay/quay-performance-scripts
 
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
@@ -148,20 +146,17 @@ spec:
 
 EOF
 
-echo "the Perf Job needs about 3~4 hours to complete"
-echo "check the OCP Quay Perf Job, if it complete, go to AWS Opensearch to generate index pattern and get Quay Perf metrics"
+echo "the Perf Job needs about 2~3 hours to complete"
+echo "check the OCP Quay Perf Job, if it complete, go to AWS OpenSearch to generate index pattern and get Quay Perf metrics"
 
-#wait until the quay perf testing job complete, and show the job status
+#Wait until the quay perf testing job complete, and show the job status
 oc get job -n "$quay_perf_namespace"
 oc -n "$quay_perf_namespace" wait job/quay-perf-test-orchestrator --for=jsonpath='{.status.ready}'=0 --timeout=600s
 
 # 3, Wait until the job complete
 
-date
 start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
 quayperf_pod_name=$(oc get pod -l job-name=quay-perf-test-orchestrator -n ${quay_perf_namespace} -o jsonpath='{.items[0].metadata.name}')
-echo "$quayperf_pod_name"
 
 if [[ -z "${quayperf_pod_name}" ]]; then
   echo "No quay-perf-test-orchestrator pod started, please check"
@@ -170,8 +165,8 @@ fi
 
 sleep 120 #wait pod start
 
+# Fetch UUID,JOB_START etc required data to dashboard 
 TEST_UUID=$(oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" | grep 'test_uuid' | sed -n 's/^.*test_uuid=\s*\(\S*\).*$/\1/p')
-echo "$TEST_UUID"
 echo "job start: $start_time"
 
 JOB_STATUS="Success"
@@ -187,10 +182,6 @@ echo "job end $end_time and status $JOB_STATUS"
 # 4, Send the performance test data to ELK
 # original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
 
-# fetch UUID,JOB_START etc required data to dashboard http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
-echo "The Prow Job ID is: $PROW_JOB_ID"
-
-# invoke send to dashboad index.sh
 export ES_SERVER="${ELK_SERVER}"
 export BUILD_ID="${BUILD_ID}"
 export UUID="${TEST_UUID}"
@@ -198,18 +189,12 @@ export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
 export WORKLOAD="quay-load-test"
-# export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
+export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 export TEST_PHASES="${TEST_PHASES}"
 export HITSIZE
 export CONCURRENCY
 export PUSH_PULL_NUMBERS
-# export HITSIZE="$HITSIZE"
-# export CONCURRENCY="$CONCURRENCY"
-# export PUSH_PULL_NUMBERS="$PUSH_PULL_NUMBERS"
 
-# echo "HITSIZE $HITSIZE"
-# echo "CONCURRENCY $CONCURRENCY"
-# echo "PUSH_PULL_NUMBERS $PUSH_PULL_NUMBERS"
-
-source utility/e2e-benchmarking.sh
-echo "es server is: $ES_SERVER"
+# Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/ 
+source utility/e2e-benchmarking.sh || true
+echo "Quay performance test finised"
