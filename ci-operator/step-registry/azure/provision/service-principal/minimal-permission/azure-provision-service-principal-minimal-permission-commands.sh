@@ -147,4 +147,6 @@ EOF
     echo "Ensure that role ${role_name} assigned successfully"
     cmd="az role assignment list --role '${role_name}'"
     run_cmd_with_retries "${cmd}"
+
+    [[ "${role_name}" == "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]] && az role assignment list --assignee ${sp_id} --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
 done
