@@ -121,6 +121,55 @@ periodics:
     serviceAccountName: upgrader
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 5 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hosted-mgmt-hypershift-deployment
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the hypershift
+        deployment on `hosted-mgmt` has not been completed. Please check if anything
+        blocks the process.
+  spec:
+    containers:
+    - args:
+      - install
+      - --enable-uwm-telemetry-remote-write=false
+      - --hypershift-image=registry.ci.openshift.org/hypershift/hypershift-operator:latest
+      - --oidc-storage-provider-s3-bucket-name="$(< /mgmt-aws/bucket)"
+      - --oidc-storage-provider-s3-credentials=/mgmt-aws/credentials
+      - --oidc-storage-provider-s3-region="$(< /mgmt-aws/region)"
+      command:
+      - /usr/bin/hypershift
+      env:
+      - name: KUBECONFIG
+        value: /etc/build-farm-credentials/sa.config-updater.hosted-mgmt.config
+      image: registry.ci.openshift.org/hypershift/hypershift-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+      - mountPath: /mgmt-aws
+        name: mgmt-aws-s3-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: config-updater
+    - name: mgmt-aws-s3-credentials
+      secret:
+        secretName: hypershift-operator-oidc-provider-s3-credentials
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 8 * * 2-5
   decorate: true
   labels:
