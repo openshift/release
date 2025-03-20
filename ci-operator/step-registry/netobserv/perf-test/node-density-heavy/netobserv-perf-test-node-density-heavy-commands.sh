@@ -60,6 +60,7 @@ WORKLOAD_PIDS["node-density-heavy"]=$!
 sleep 300 
 
 # Run ingress-perf
+popd
 pushd e2e-benchmarking/workloads/ingress-perf
 ES_INDEX="ingress-performance" ./run.sh &> /tmp/ingress-perf-run.log &
 WORKLOAD_PIDS["ingress-perf"]=$!
