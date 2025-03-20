@@ -15,4 +15,5 @@ oc patch networks.operator.openshift.io cluster --type=merge -p '{"spec":{"defau
 ipsec_config=$(oc get networks.operator.openshift.io cluster -o=jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')
 echo "ipsec: $ipsec_config"
 oc wait pods --for=condition=Ready -l app=ovnkube-node -n openshift-ovn-kubernetes --timeout=120s
+sleep 30m
 oc wait pods --for=condition=Ready -l app=ovn-ipsec -n openshift-ovn-kubernetes --timeout=120s
