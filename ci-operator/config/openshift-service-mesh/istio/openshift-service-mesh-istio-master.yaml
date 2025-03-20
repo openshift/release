@@ -79,6 +79,11 @@ tests:
     - as: integ-pilot-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
@@ -91,12 +96,12 @@ tests:
           prow/integ-suite-ocp.sh \
           pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge'"
         # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -256,6 +261,11 @@ tests:
     - as: integ-telemetry-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
@@ -267,12 +277,12 @@ tests:
           entrypoint \
           prow/integ-suite-ocp.sh \
           telemetry"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -310,6 +320,11 @@ tests:
     - as: integ-helm-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
           export KUBECONFIG=/work/ci-kubeconfig
           oc version
@@ -321,12 +336,12 @@ tests:
           cd /work
           entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease'
         EOF
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
