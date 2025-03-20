@@ -5,9 +5,6 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-# Retain cluster pre-test
-sleep 99999999
-
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export CONSOLE_URL
