@@ -123,6 +123,11 @@ tests:
     - as: integ-helm-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
           export KUBECONFIG=/work/ci-kubeconfig
           oc version
@@ -132,14 +137,15 @@ tests:
           export VARIANT=distroless
           export GCP_REGISTRIES=" "
           cd /work
-          entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease'
+          entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease|TestDefaultInPlaceUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromPreviousMinorRelease'
         EOF
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        # upgrades from previous versions are skipped because of the new approach for opensfhit platform introduced in 1.24 which is no longer using openshift profile but earlier versions still need openshift profile to work on OCP. We agreed we don't want to fix it here https://github.com/openshift-service-mesh/istio/blob/master/tests/integration/helm/util.go#L192 as we are not building istio 1.23 downstream anyway.
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -176,19 +182,23 @@ tests:
     - as: integ-security
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
           export BUILD_WITH_CONTAINER=0 && \
           cd /work && \
           entrypoint \
           prow/integ-suite-kind.sh \
-          test.integration.security.kube.presubmit" && status=0 || status=1
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-        exit ${status}
+          test.integration.security.kube.presubmit"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -226,6 +236,11 @@ tests:
     - as: integ-pilot-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
@@ -236,15 +251,14 @@ tests:
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestCustomGateway|TestCNIRaceRepair|TestGateway/managed-owner|TestProxyHeaders|TestCustomGateway/helm|TestCustomGateway/helm-simple|TestTcpProbe/rewrite-success|TestGRPCProbe|TestTunnelingOutboundTraffic|TestCNIVersionSkew|TestGateway/tagged|TestIngress|TestLabelChanges|TestLocality|TestMirroring/mirror-percent-absent|TestMirroring/mirror-50|TestMirroring/mirror-10|TestMirroringExternalService|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge'"
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
-        # Skipped tests above are combination of skipped test in master branch and release-1.23 branch
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge'"
+          # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -282,6 +296,11 @@ tests:
     - as: integ-telemetry-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
@@ -292,13 +311,13 @@ tests:
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          telemetry 'TestProxyTracingOpenCensusMeshConfig|TestProxyTracingOpenTelemetryProvider|TestClientTracing|TestServerTracing|TestAccessLogs/enabled-with-targetref|TestAccessLogsMode|TestCustomizeMetrics|TestStatsFilter|TestStatsTCPFilter|TestStatsGatewayServerTCPFilter|TestImagePullPolicy|TestGatewaySelection|TestAccessLogs|TestImagePullPolicy|TestGatewaySelection|TestImagePullPolicyWithHTTP|TestBadWasmRemoteLoad|TestBadWasmWithFailOpen|TestOutboundTrafficPolicy_AllowAny|TestOutboundTrafficPolicy_RegistryOnly|TestDashboard|TestRateLimiting|TestLocalRateLimiting|TestLocalRouteSpecificRateLimiting|TestLocalRateLimitingServiceAccount'"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          telemetry
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
