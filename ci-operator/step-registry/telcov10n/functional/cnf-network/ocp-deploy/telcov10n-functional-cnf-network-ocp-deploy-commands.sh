@@ -50,3 +50,7 @@ done
 
 cd /eco-ci-cd
 ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME}"
+
+echo "Store inventory in SHARED_DIR"
+cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* ${SHARED_DIR}/
+cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* ${SHARED_DIR}/
