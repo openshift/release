@@ -296,7 +296,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-cco-manual-security-token-service
 - as: aws-ipi-workers-marketplace-mini-perm-f28
-  cron: 12 6 26 * *
+  cron: 10 0 5 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -446,7 +446,7 @@ tests:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
 - as: azure-ipi-disc-oidc-oc-mirror-f28-ota
-  cron: 5 19 1 * *
+  cron: 32 23 16 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -471,15 +471,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
-- as: azure-ipi-proxy-workers-rhcos-rhel8-f28
-  cron: 48 13 16 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
 - as: azure-ipi-vmgenv1-f28
   cron: 47 10 27 * *
   steps:
@@ -615,8 +606,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv6-fips-f28
-  cron: 51 11 12 * *
+- as: baremetalds-ipi-ovn-ipv6-fips-f999
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -658,22 +649,25 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
-- as: gcp-ipi-confidential-computing-fips-f28
-  cron: 55 1 4 * *
+- as: gcp-ipi-confidential-computing-fips-mini-perm-f28
+  cron: 32 17 14 * *
   steps:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
-- as: gcp-ipi-disc-priv-oidc-fips-f28
-  cron: 9 18 27 * *
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f28
+  cron: 9 22 26 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-upgrade-qe-test-disconnected
@@ -682,13 +676,19 @@ tests:
   cron: 16 20 8 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: custom-4-16384
+      CONTROL_PLANE_NODE_TYPE: custom-4-16384
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission
-- as: gcp-ipi-secureboot-confidential-computing-f28
-  cron: 33 16 15 * *
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-secureboot-confidential-computing-mini-perm-f28
+  cron: 51 23 4 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
@@ -960,16 +960,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-proxy-workers-rhel8-f28
-  cron: 5 19 2 * *
-  steps:
-    cluster_profile: vsphere-dis-2
-    leases:
-    - env: VSPHERE_BASTION_LEASED_RESOURCE
-      resource_type: vsphere-connected-2-quota-slice
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
 - as: vsphere-ipi-remote-worker-f28
   cron: 30 8 11 * *
   steps:
