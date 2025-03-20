@@ -88,9 +88,11 @@ function check_pids(){
 # wait until all background processes are finished and get return code
 wait -n -p ended_pid
 ended_pid_rc=$?
+#shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
 wait -n -p ended_pid
 ended_pid_rc=$?
+#shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
 
 NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' /tmp/node-density-heavy-run.log | cut -d'"' -f 4)
