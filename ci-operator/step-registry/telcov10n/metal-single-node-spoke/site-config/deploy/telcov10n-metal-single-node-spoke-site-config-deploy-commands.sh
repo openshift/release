@@ -7,7 +7,7 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-source ${SHARED_DIR}/spoke-common-functions.sh
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
@@ -265,7 +265,7 @@ GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push
 EOF
 
   gitea_project="${GITEA_NAMESPACE}"
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project}
+  run_script_on_ocp_cluster ${run_script} ${gitea_project}
 }
 
 function get_openshift_baremetal_install_tool {
@@ -357,7 +357,7 @@ EOF
 
   gitea_project="${GITEA_NAMESPACE}"
   pod_name="$(basename ${src_iso_url} | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project} ${pod_name}
+  run_script_on_ocp_cluster ${run_script} ${gitea_project} ${pod_name}
 
   pod_ip=$(oc -n ${gitea_project} get po ${pod_name} -ojsonpath='{.status.podIP}')
   iso_url="http://${pod_ip}:${http_listen_port}/$(basename ${src_iso_url})"
