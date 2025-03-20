@@ -8,7 +8,7 @@ echo "************ Fix container user ************"
 # Fix user IDs in a container
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-source ${SHARED_DIR}/spoke-common-functions.sh
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
 function update_openshift_config_pull_secret {
 
