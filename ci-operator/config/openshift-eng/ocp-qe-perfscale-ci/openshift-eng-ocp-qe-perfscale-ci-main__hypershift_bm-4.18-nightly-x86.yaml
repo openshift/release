@@ -1,0 +1,131 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  test-bin:
+    name: "4.18"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: control-plane-24nodes
+  cron: 0 9 2,9,16,23 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=3
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=40960
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=100G
+        NUM_EXTRA_WORKERS=3
+      ES_SECRETS_PATH: /prod-secret
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+      PPROF: "false"
+      RUN_CERBERUS: "false"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-hypershift-mce-agent-metal3
+  timeout: 8h0m0s
+- as: node-density-heavy-24nodes
+  cron: 0 5 5,12,19,26 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-hypershift-mce-agent-metal3
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - chain: openshift-qe-hypershift-infra
+    - chain: openshift-qe-node-density
+    workflow: openshift-qe-installer-hypershift-mce-agent-metal3
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-cni-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-hypershift-mce-agent-metal3
+  timeout: 5h0m0s
+- as: data-path-9nodes
+  cron: 0 1 1,8,15,22 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - chain: openshift-qe-hypershift-infra
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-hypershift-mce-agent-metal3
+  timeout: 5h0m0s
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-hypershift-mce-agent-metal3
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: hypershift_bm-4.18-nightly-x86

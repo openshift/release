@@ -18,6 +18,20 @@ if [ ${BAREMETAL} == "true" ]; then
   oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
   cd /tmp
 fi
+
+#Support Hypershift Cluster
+cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+hypershift_pods=$(oc -n hypershift get pods| grep -v NAME |wc -l)
+if [[ $cluster_infra == "BareMetal" && $hypershift_pods -gt 1 ]];then
+        echo "Executing cluster-density-v2 in hypershift cluster"
+        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+                echo "Set http proxy for hypershift cluster"
+                . $SHARED_DIR/proxy-conf.sh
+        fi
+        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+fi
+
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe

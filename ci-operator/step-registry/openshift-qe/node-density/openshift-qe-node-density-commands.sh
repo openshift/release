@@ -27,6 +27,18 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density
 
+#Support Hypershift Cluster
+cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+hypershift_pods=$(oc -n hypershift get pods| grep -v NAME |wc -l)
+if [[ $cluster_infra == "BareMetal" && $hypershift_pods -gt 1 ]];then
+        echo "Executing cluster-density-v2 in hypershift cluster"
+        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+                echo "Set http proxy for hypershift cluster"
+                . $SHARED_DIR/proxy-conf.sh
+        fi
+        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+fi
 # A non-indexed warmup run
 ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
 
