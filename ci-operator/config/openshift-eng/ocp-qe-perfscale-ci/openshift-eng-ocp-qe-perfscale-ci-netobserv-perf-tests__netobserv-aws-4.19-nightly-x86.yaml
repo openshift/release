@@ -1,8 +1,4 @@
 base_images:
-  cerberus.prow:
-    name: cerberus
-    namespace: chaos
-    tag: cerberus-prow
   cli:
     name: "4.18"
     namespace: ocp
@@ -21,11 +17,6 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_literal: |-
-    FROM cerberus.prow
-    RUN ls
-  from: cerberus.prow
-  to: cerberus-prow-417-up
 - dockerfile_literal: |-
     FROM ocp-qe-perfscale-ci
     COPY opm /usr/bin/opm
@@ -59,7 +50,6 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
-      ADDITIONAL_PARAMS: ${SHARED_DIR}/netobserv_metadata.json
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "25"
       COMPUTE_NODE_TYPE: m6i.4xlarge
@@ -80,9 +70,6 @@ tests:
       VERSION: "4.19"
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
-    observers:
-      enable:
-      - redhat-chaos-cerberus
     test:
     - ref: netobserv-perf-test-deploy
     - ref: netobserv-perf-test-node-density-heavy
@@ -116,9 +103,6 @@ tests:
       VERSION: "4.19"
       WORKLOAD: cluster-density-v2
       ZONES_COUNT: "3"
-    observers:
-      enable:
-      - redhat-chaos-cerberus
     test:
     - ref: netobserv-perf-test-deploy
     - chain: openshift-qe-cluster-density-v2

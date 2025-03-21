@@ -19,7 +19,7 @@ fi
 # TODO, Add: # PR info?
 export ADDITIONAL_PARAMS="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\"=\"$NOO_BUNDLE_INFO\"}"
 
-
+echo "$ADDITIONAL_PARAMS"
 # Run node-density-heavy in background
 
 python --version
@@ -57,7 +57,7 @@ WORKLOAD_PIDS["node-density-heavy"]=$!
 #node_density_heavy_pid=$!
 
 # wait 20 mins before starting ingress-perf
-sleep 1200 
+sleep 300 
 
 # Run ingress-perf
 popd
@@ -96,33 +96,31 @@ ended_pid_rc=$?
 #shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
 
-NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' /tmp/node-density-heavy-run.log | cut -d'"' -f 4)
-INGRESS_PERF_UUID=$(grep 'uuid"' /tmp/ingress-perf-run.log | cut -d'"' -f 4)
+NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/node-density-heavy-run.log" | cut -d'"' -f 4)
+INGRESS_PERF_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/ingress-perf-run.log" | cut -d'"' -f 4)
 
 echo "===> node-density-heavy UUID $NODE_DENSITY_HEAVY_UUID"
 echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
-if [[ -d /tmp/"$NODE_DENSITY_HEAVY_UUID" &&  -f /tmp/"$NODE_DENSITY_HEAVY_UUID"/index_data.json ]]; then
-        jq ".iterations = $PODS_PER_NODE"  >> /tmp/"$NODE_DENSITY_HEAVY_UUID"/index_data.json
-        cp /tmp/"$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
-        cp /tmp/"$NODE_DENSITY_HEAVY_UUID"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json
+if [[ -d "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID" &&  -f "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID/index_data.json" ]]; then
+    jq ".iterations = $PODS_PER_NODE"  >> "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID/index_data.json"
+    cp "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}/${WORKLOAD}-index_data.json"
+    cp "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID/index_data.json" "${SHARED_DIR}/${WORKLOAD}-index_data.json"
 fi
 
-if [[ -d /tmp/"$INGRESS_PERF_UUID" && -f /tmp/"$INGRESS_PERF_UUID"/index_data.json ]]; then
-    cp /tmp/"$INGRESS_PERF_UUID"/index_data.json "${ARTIFACT_DIR}"/ingress-perf-index_data.json
-    cp /tmp/"$INGRESS_PERF_UUID"/index_data.json "${SHARED_DIR}"/ingress-perf-index_data.json
+if [[ -d "${ARTIFACT_DIR}/$INGRESS_PERF_UUID" && -f "${ARTIFACT_DIR}/$INGRESS_PERF_UUID/index_data.json" ]]; then
+    cp "${ARTIFACT_DIR}/$INGRESS_PERF_UUID/index_data.json" "${ARTIFACT_DIR}/ingress-perf-index_data.json"
+    cp "${ARTIFACT_DIR}/$INGRESS_PERF_UUID/index_data.json" "${SHARED_DIR}/ingress-perf-index_data.json"
 fi
 
 echo "######## Node-density-heavy run logs ########"
-cat /tmp/node-density-heavy-run.log
-cp /tmp/node-density-heavy-run.log "$ARIFACT_DIR"
+cat  "${ARTIFACT_DIR}/node-density-heavy-run.log"
 echo "################"
 
 printf "\n\n\n\n\n"
 
 echo "######## ingress-perf run logs ########"
-cat /tmp/ingress-perf-run.log
-cp /tmp/ingress-perf-run.log "$ARTIFACT_DIR"
+cat  "${ARTIFACT_DIR}/ingress-perf-run.log"
 echo "################"
 
 exit "$ended_pid_rc"
