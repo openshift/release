@@ -11,6 +11,19 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
+#Support Hypershift Cluster
+cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+hypershift_pods=$(oc -n hypershift get pods| grep -v NAME |wc -l)
+if [[ $cluster_infra == "BareMetal" && $hypershift_pods -gt 1 ]];then
+        echo "Executing cluster-density-v2 in hypershift cluster"
+        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+                echo "Set http proxy for hypershift cluster"
+                . $SHARED_DIR/proxy-conf.sh
+        fi
+        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+fi
+
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
