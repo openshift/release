@@ -294,9 +294,9 @@ else
 fi
 
 if [[ "${isOldVersion}" == "true" ]]; then
-    rg_name_line="resourceGroupName: ${resource_group}"
+    rg_name_line="resourceGroupName: ${rg_id}"
 else
-    rg_name_line="networkResourceGroupName: ${resource_group}"
+    rg_name_line="networkResourceGroupName: ${rg_id}"
 fi
 
 cat > "${SHARED_DIR}/customer_vpc_subnets.yaml" << EOF
