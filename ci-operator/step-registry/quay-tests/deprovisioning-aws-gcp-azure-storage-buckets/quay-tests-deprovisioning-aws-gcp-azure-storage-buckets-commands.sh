@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 8h
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
     #Copy GCP auth.json from mounted secret to current directory
