@@ -249,18 +249,20 @@ function collect_diagnostic_data {
               govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
 
               METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
-              JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
+              JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
           done
       done
     done
     
-    govc find . -type m -runtime.powerState poweredOn -network $network
-    echo "no virtual machines found in vCenter ${VCENTER}. not collecting hardware versions"
-  
-    target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
-    echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
-    echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
-  
+    if [ -n "${vms:-}" ]; then
+      target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
+      echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"      
+    fi
+
+    if [ -n "${JSON_DATA:-}" ]; then
+      echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
+    fi
+
     v_idx=$((v_idx+1));
   done
 
@@ -300,30 +302,6 @@ function embed_topology_data() {
     echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
     echo "<br>" >> "${RESULT_HTML}"
   done
-
-  echo "<hr>" >> "${RESULT_HTML}"
-
-  echo "VIPs: $(sed ':a;N;$!ba;s/\n/, /g' ${SHARED_DIR}/vips.txt)<br>" >> "${RESULT_HTML}"
-  echo "Machine CIDR: $(cat ${SHARED_DIR}/machinecidr.txt)<br>" >> "${RESULT_HTML}"
-  for NETWORK in "${SHARED_DIR}"/NETWORK_*; do
-    if [[ $NETWORK == *_single.json* ]]; then
-        continue
-    fi
-    NAME=$(jq --compact-output -r .metadata.name < "${NETWORK}")
-    VLAN=$(jq --compact-output -r .spec.vlanId < "${NETWORK}")
-    POD=$(jq --compact-output -r .spec.podName < "${NETWORK}")
-    DATACENTER=$(jq --compact-output -r .spec.datacenterName < "${NETWORK}")
-    CIDR=$(jq --compact-output -r .spec.machineNetworkCidr < "${NETWORK}")
-    GATEWAY=$(jq --compact-output -r .spec.gateway < "${NETWORK}")    
-
-    echo "Network: ${NAME}<br>" >> "${RESULT_HTML}"
-    echo "- VLAN: ${VLAN}<br>" >> "${RESULT_HTML}"
-    echo "- Pod: ${POD}<br>" >> "${RESULT_HTML}"
-    echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
-    echo "- CIDR: ${CIDR}<br>" >> "${RESULT_HTML}"
-    echo "- Gateway: ${GATEWAY}<br>" >> "${RESULT_HTML}"
-    echo "<br>" >> "${RESULT_HTML}"
-  done
 }
 
 function generate_vm_input() {
@@ -357,6 +335,11 @@ function embed_vm_data() {
   for VM in "${VMS[@]}"; do
     echo "<script type='application/json' id='${VM}'>" >> ${RESULT_HTML}
     FILE=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .file' ${vcenter_state}/metric-files.json)
+    cat $FILE >> ${RESULT_HTML}
+    echo "</script>" >> ${RESULT_HTML}
+
+    echo "<script type='application/json' id='${VM}-screenshot'>" >> ${RESULT_HTML}
+    FILE=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .screenshot' ${vcenter_state}/metric-files.json)
     cat $FILE >> ${RESULT_HTML}
     echo "</script>" >> ${RESULT_HTML}
   done
@@ -469,6 +452,9 @@ EOF
           </div>
           <div class="chart-container">
             <canvas id="mem-usage-avg"></canvas>
+          </div>
+          <div class="chart-container">
+            <img id="vm-screenshot"></img>
           </div>
         </div>
       </div>
@@ -587,6 +573,9 @@ async function processMaster(url, metricLabel, chart, prefix) {
     }
   }
 
+  document.getElementById('vm-screenshot')
+    .src = 'data:image/png;base64,' + document.getElementById(url+"-screenshot").innerHTM
+
   console.log(newData);
   chart.data = newData;
   chart.update();
@@ -594,7 +583,7 @@ async function processMaster(url, metricLabel, chart, prefix) {
 
 function loadVMData() {
   var select = document.getElementById("vm-instances");
-  var vmFile = select.value;
+  var vmFile = select.value;  
   processMaster(vmFile, "cpu.usage.average", this.cpuUsageGraph, "CPU - ");
   processMaster(vmFile, "cpu.used.summation", this.cpuUsedSumGraph, "CPU - ");
   processMaster(vmFile, "cpu.readiness.average", this.readinessGraph, "CPU - ");
@@ -648,7 +637,7 @@ function createVmGraphs() {
   const readinessCtx = document.getElementById('readiness');
   const latencyCtx = document.getElementById('latency');
   const netUsageCtx = document.getElementById('net-usage-avg');
-  const memUsageCtx = document.getElementById('mem-usage-avg');
+  const memUsageCtx = document.getElementById('mem-usage-avg');  
 
   console.log("creating charts")
   this.cpuUsageGraph = new Chart(cpuUsageCtx, getGraphConfig("CPU Usage"));
