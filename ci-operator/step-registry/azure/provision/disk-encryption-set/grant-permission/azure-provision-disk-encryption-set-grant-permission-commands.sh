@@ -18,6 +18,18 @@ function run_command() {
     eval "${CMD}"
 }
 
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+if (( ${ocp_minor_version} > 12 )); then
+    echo "No need to grant permissions to cluster identity on scope of disk encryption set on 4.13+, skip this step!"
+    exit 0
+fi
+
 # az should already be there
 command -v az
 az --version
