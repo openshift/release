@@ -1,5 +1,21 @@
 #!/usr/bin/env bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
+pushd /tmp
+curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+unzip awscli-bundle.zip  
+./awscli-bundle/install -b aws
+export PATH=$PATH:/tmp/
+mkdir -p $HOME/.aws
+cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+aws_region=${REGION:-$LEASED_RESOURCE}
+export AWS_DEFAULT_REGION=$aws_region
+popd
+aws --help
 source scripts/netobserv.sh
 deploy_lokistack
 deploy_kafka
