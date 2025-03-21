@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Export ES environment variables
-es_host="$(cat /secret/es_host)"
+es_host="$(cat /secret/${POLICIES_GROUP}-es-host)"
 export es_host
-es_port="$(cat /secret/es_port)"
+es_port="$(cat /secret/${POLICIES_GROUP}-es-port)"
 export es_port
 PERF_SERVICES_URL="$(cat /secret/perf_services_url)"
 export PERF_SERVICES_URL
