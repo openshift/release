@@ -37,14 +37,17 @@ EOF
 function get_caps_for_version_capset() {
     local version=$1
     local cap_index=$2
+    local caps_ref_version=$3
 
-    if [ -z "${version}" ] || [ -z "${cap_index}" ]; then
+    if [ -z "${version}" ] || [ -z "${cap_index}" ] || [ -z "${caps_ref_version}" ]; then
         echo "ERROR: Missing required arguments"
         return 1
     fi
 
     major_version=$( echo "${version}" | cut -f1 -d. )
     minor_version=$( echo "${version}" | cut -f2 -d. )
+    caps_ref_major=$( echo "${caps_ref_version}" | cut -f1 -d. )
+    caps_ref_minor=$( echo "${caps_ref_version}" | cut -f2 -d. )
     if [[ "${cap_index}" == "vCurrent" ]]; then
         cap_index="v${major_version}.${minor_version}"
     fi
@@ -55,15 +58,15 @@ function get_caps_for_version_capset() {
     ;;
     "v4.11")
     caps_string="baremetal marketplace openshift-samples"   
-    (( minor_version >=14 && major_version == 4 )) && caps_string="${caps_string} MachineAPI"
+    (( minor_version >=14 && major_version == 4 )) || (( caps_ref_minor >=14 && caps_ref_major == 4 )) && caps_string="${caps_string} MachineAPI"
     ;;
     "v4.12")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot"
-    (( minor_version >=14 && major_version == 4 )) && caps_string="${caps_string} MachineAPI"
+    (( minor_version >=14 && major_version == 4 )) || (( caps_ref_minor >=14 && caps_ref_major == 4 )) && caps_string="${caps_string} MachineAPI"
     ;;
     "v4.13")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning"
-    (( minor_version >=14 && major_version == 4 )) && caps_string="${caps_string} MachineAPI"
+    (( minor_version >=14 && major_version == 4 )) || (( caps_ref_minor >=14 && caps_ref_major == 4 )) && caps_string="${caps_string} MachineAPI"
     ;;
     "v4.14")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry"
@@ -84,6 +87,8 @@ function get_caps_for_version_capset() {
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress OperatorLifecycleManagerV1"
     ;;
     esac
+
+    
 
     echo $caps_string
 }
@@ -386,11 +391,14 @@ expected_enabled_caps=""
 expected_implicit_caps=""
 expected_disabled_caps=""
 
-source_baseline_caps=$(get_caps_for_version_capset "${version_set[-1]}" "${baselinecaps_from_cluster}")
-target_baseline_caps=$(get_caps_for_version_capset "${version_set[0]}" "${baselinecaps_from_cluster}")
+#use caps_ref_version is the doc version to refer the capabilities as "MachineAPI is not part v4.13 or lesser, but same is applicable to all version as per doc 4.14 or later"
+caps_ref_version="${version_set[0]}"
 
-source_known_caps=$(get_caps_for_version_capset "${version_set[-1]}" "vCurrent")
-target_known_caps=$(get_caps_for_version_capset "${version_set[0]}" "vCurrent")
+source_baseline_caps=$(get_caps_for_version_capset "${version_set[-1]}" "${baselinecaps_from_cluster}" "${caps_ref_version}")
+target_baseline_caps=$(get_caps_for_version_capset "${version_set[0]}" "${baselinecaps_from_cluster}" "${caps_ref_version}")
+
+source_known_caps=$(get_caps_for_version_capset "${version_set[-1]}" "vCurrent" "${caps_ref_version}")
+target_known_caps=$(get_caps_for_version_capset "${version_set[0]}" "vCurrent" "${caps_ref_version}")
 
 echo -e "\nsource_baseline_caps is ${source_baseline_caps}\
 \ntarget_baseline_caps is ${target_baseline_caps}\
