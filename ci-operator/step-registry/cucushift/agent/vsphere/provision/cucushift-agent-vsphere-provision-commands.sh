@@ -25,9 +25,12 @@ unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
 echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "$RELEASE_IMAGE_LATEST" \
-  --command=openshift-install --to=/tmp
-
+readable_version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" -o jsonpath='{.metadata.version}')
+echo "readable_version: $readable_version"
+#oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "$RELEASE_IMAGE_LATEST" \
+#  --command=openshift-install --to=/tmp
+curl -L https://openshift-release-artifacts.apps.ci.l2s4.p1.openshiftapps.com/"$readable_version"/openshift-install-linux-"$readable_version".tar.gz -o ${HOME}/"$readable_version".tar.gz
+tar -C ${HOME} -xvf ${HOME}/"$readable_version".tar.gz
 echo "Creating agent image..."
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -38,6 +41,7 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
+yq eval '.imageContentSources[] |= select(.source | contains("build02")).source = "registry.ci.openshift.org/ocp/release"' -i "${dir}"/install-config.yaml
 /tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
 
 if ! wait $!; then
@@ -99,7 +103,7 @@ for ((i = 0; i < total_host; i++)); do
   /tmp/govc vm.create \
     -m=16384 \
     -g=coreos64Guest \
-    -c=${cpu} \
+    -c="${cpu}" \
     -disk=120GB \
     -net="${vsphere_portgroup}" \
     -firmware=efi \
