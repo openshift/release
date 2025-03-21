@@ -52,17 +52,17 @@ declare -A WORKLOAD_PIDS
 
 # Kick off run with vars set
 
-EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> /tmp/node-density-heavy-run.log &
+EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}"/node-density-heavy-run.log &
 WORKLOAD_PIDS["node-density-heavy"]=$!
 #node_density_heavy_pid=$!
 
-# wait 5 mins before starting ingress-perf
-sleep 300 
+# wait 20 mins before starting ingress-perf
+sleep 1200 
 
 # Run ingress-perf
 popd
 pushd e2e-benchmarking/workloads/ingress-perf
-ES_INDEX="ingress-performance" ./run.sh &> /tmp/ingress-perf-run.log &
+ES_INDEX="ingress-performance" ./run.sh &> "${ARTIFACT_DIR}"/ingress-perf-run.log &
 WORKLOAD_PIDS["ingress-perf"]=$!
 #ingress_perf_pid=$!
 
@@ -79,9 +79,9 @@ function check_pids(){
         fi
     else
         if [[ $returned_pid == "${WORKLOAD_PIDS["node-density-heavy"]}" ]]; then
-            echo "===> node-density-heavy completed successfully"
+            echo "===> node-density-heavy completed successfully at $(date)"
         else
-            echo "===> ingress-perf completed successfully"
+            echo "===> ingress-perf completed successfully at $(date)"
         fi
     fi
 }
@@ -98,6 +98,9 @@ check_pids $ended_pid_rc $ended_pid
 
 NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' /tmp/node-density-heavy-run.log | cut -d'"' -f 4)
 INGRESS_PERF_UUID=$(grep 'uuid"' /tmp/ingress-perf-run.log | cut -d'"' -f 4)
+
+echo "===> node-density-heavy UUID $NODE_DENSITY_HEAVY_UUID"
+echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
 if [[ -d /tmp/"$NODE_DENSITY_HEAVY_UUID" &&  -f /tmp/"$NODE_DENSITY_HEAVY_UUID"/index_data.json ]]; then
         jq ".iterations = $PODS_PER_NODE"  >> /tmp/"$NODE_DENSITY_HEAVY_UUID"/index_data.json
