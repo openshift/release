@@ -25,7 +25,7 @@ export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 # multiple datacenters
 declare vsphere_url
 declare VCENTER_AUTH_PATH
-
+declare PORTGROUP_RETVAL
 
 
 declare MULTI_TENANT_CAPABLE_WORKFLOWS
@@ -70,8 +70,27 @@ function networkToSubnetsJson() {
   fi
 }
 
+function getPortGroup() {
+  NETWORK_INDEX=$1
+  log "Getting portgroup for networks[${NETWORK_INDEX}]"
+  NETWORK_PATH=$(jq -r ".status.topology.networks[$NETWORK_INDEX]" < /tmp/lease.json)
 
+  # We may have more than one network in the lease.  We'll need to find the owner that matches current
+  NETWORK_RESOURCES=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
+  for RESOURCE in ${NETWORK_RESOURCES}; do
+    log "Checking network resource ${RESOURCE}"
+    NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${RESOURCE}.json"
 
+    if [ ! -f "$NETWORK_CACHE_PATH" ]; then
+      log "Caching network resource ${RESOURCE}"
+      oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${RESOURCE}" -o json > "${NETWORK_CACHE_PATH}"
+    fi
+
+    networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${RESOURCE}"
+  done
+
+  PORTGROUP_RETVAL=$(echo "$NETWORK_PATH" | cut -d '/' -f 4)
+}
 
 log "add jq plugin for converting json to yaml"
 # this snippet enables jq to convert json to yaml
@@ -266,7 +285,7 @@ for POOL in "${pools[@]}"; do
     log "setting required pool ${requiredPool}"
   fi
   networks_number=1
-  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ] || [[ "${MULTI_NIC_IPI}:-}" == "true"]]; then
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" || "${MULTI_NIC_IPI:-}" == "true" ]]; then
     networks_number=2
   fi
   # shellcheck disable=SC1078
@@ -336,26 +355,15 @@ for LEASE in $LEASES; do
 
   # We need to iterate through each network
   networkCount=$(jq '.status.topology.networks | length' < /tmp/lease.json)
-  echo "NETWORK COUNT: ${networkCount}"
+  log "Network count: ${networkCount}"
 
   bastion_leased_resource=$(jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE < /tmp/lease.json)
   #extra_leased_resource=$(jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE < /tmp/lease.json)
 
-  networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${NETWORK_RESOURCE}"
-
   if [ "${bastion_leased_resource}" != "null" ]; then
+    getPortGroup 0
+    portgroup_name=${PORTGROUP_RETVAL}
     log "setting bastion portgroup ${portgroup_name} in vsphere_context.sh"
-    NETWORK_PATH=$(jq -r '.status.topology.networks[0]' < /tmp/lease.json)
-    NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
-    NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
-
-    if [ ! -f "$NETWORK_CACHE_PATH" ]; then
-      log "caching network resource ${NETWORK_RESOURCE}"
-      oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${NETWORK_RESOURCE}" -o json > "${NETWORK_CACHE_PATH}"
-    fi
-
-    portgroup_name=$(echo "$NETWORK_PATH" | cut -d '/' -f 4)
-    log "portgroup ${portgroup_name}"
 
     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_bastion_portgroup="${portgroup_name}"
@@ -371,19 +379,13 @@ EOF
 
   else
     for ((i = 0; i < ${networkCount}; i++)); do
-      NETWORK_PATH=$(jq -r '.status.topology.networks[0]' < /tmp/lease.json)
-      NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < /tmp/lease.json)
-      NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
-
-      if [ ! -f "$NETWORK_CACHE_PATH" ]; then
-        log "caching network resource ${NETWORK_RESOURCE}"
-        oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${NETWORK_RESOURCE}" -o json > "${NETWORK_CACHE_PATH}"
+      getPortGroup $i
+      portgroup_name=${PORTGROUP_RETVAL}
+      previousValue=""
+      if [[ -n "${vcenter_portgroups[$VCENTER]:-}" ]]; then
+        previousValue="${vcenter_portgroups[$VCENTER]}\",\""
       fi
-      portgroup_name=$(echo "$NETWORK_PATH" | cut -d '/' -f 4)
-      if [[ ${vcenter_portgroups[$VCENTER]} -ne "" ]]; then
-        vcenter_portgroups[$VCENTER]="${vcenter_portgroups[$VCENTER]}\",\""
-      fi
-      vcenter_portgroups[$VCENTER]="${vcenter_portgroups[${VCENTER}]}${portgroup_name}"
+      vcenter_portgroups[$VCENTER]="${previousValue}${portgroup_name}"
     done
   fi
 
@@ -427,7 +429,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   pool_usernames[$VCENTER]=${vsphere_user}
   pool_passwords[$VCENTER]=${vsphere_password}
 
-  name=$(jq -r '.spec.name' < /tmp/pool.json)
+  #name=$(jq -r '.spec.name' < /tmp/pool.json)
   shortName=$(jq -r '.spec.shortName' < /tmp/pool.json)
   server=$(jq -r '.spec.server' < /tmp/pool.json)
   region=$(jq -r '.spec.region' < /tmp/pool.json)
@@ -437,7 +439,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   datastore=$(jq -r '.spec.topology.datastore' < /tmp/pool.json)
 
   # Populate network from our map
-  network="${vcenter_portgroups[${server}]}"
+  network="${vcenter_portgroups[$server]}"
   #if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $name == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
   #  network="${vcenter_portgroups_2[${server}]}"
   #else
