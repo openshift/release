@@ -57,7 +57,7 @@ tests:
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-sj2qqdk/release:latest
       ENABLE_DES_DEFAULT_MACHINE: "true"
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
-- as: installer-rehearse-ibmcloud
+- as: installer-rehearse-ibmcloud-cos
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
@@ -91,13 +91,28 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-q2qbqst/release:latest
-      SLEEP_DURATION: 5h
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 1m
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static-deprovision
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-q2qbqst/release:latest
+      SLEEP_DURATION: 1m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision-check
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 zz_generated_metadata:
   branch: master
   org: openshift
