@@ -782,6 +782,7 @@ images:
       - destination_dir: .
         source_path: /go/bin/helpdesk-faq
   to: helpdesk-faq
+operator: {}
 promotion:
   to:
   - namespace: ci
@@ -982,7 +983,10 @@ tests:
     test:
     - as: konflux-test
       commands: make-placeholder
-      from: konflux-image-placeholder
+      from: konflux-artifacts-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
       resources:
         requests:
           cpu: 100m
@@ -992,11 +996,16 @@ tests:
   cron: 0 0 1 1 0
   steps:
     cluster_profile: aws
+    env:
+      OCP_ARCH: amd64
     test:
     - as: konflux-test
       cli: latest
       commands: make-placeholder
-      from: konflux-image-placeholder
+      from: konflux-artifacts-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
       resources:
         requests:
           cpu: 100m
@@ -1005,15 +1014,59 @@ tests:
   cron: 0 0 1 1 0
   steps:
     cluster_profile: gcp
+    env:
+      OCP_ARCH: amd64
     test:
     - as: konflux-test
       cli: latest
       commands: make-placeholder
-      from: konflux-image-placeholder
+      from: konflux-artifacts-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
       resources:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: konflux-test-azure
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: azure4
+    env:
+      OCP_ARCH: amd64
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      from: konflux-artifacts-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: konflux-test-bundle
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: ns-placeholder
+      OO_PACKAGE: package-placeholder
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      from: konflux-artifacts-placeholder
+      dependencies:
+      - env: OO_INDEX
+        name: placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
 - as: security
   optional: true
   steps:
