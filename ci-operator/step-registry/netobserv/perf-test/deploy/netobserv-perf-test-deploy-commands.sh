@@ -3,11 +3,12 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x 
 
-pushd /tmp
+# pushd /tmp
 curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
 unzip awscli-bundle.zip  
-./awscli-bundle/install -b aws
+awscli-bundle/install -b ~/bin/aws
 export PATH=$PATH:/tmp/
 mkdir -p $HOME/.aws
 cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
