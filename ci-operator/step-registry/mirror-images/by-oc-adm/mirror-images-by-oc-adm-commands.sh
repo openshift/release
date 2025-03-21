@@ -127,4 +127,3 @@ sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" > "${
 sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_conf_file}"
 
 run_command "cat '${install_config_mirror_patch}'"
-rm -f "${new_pull_secret}"
