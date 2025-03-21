@@ -104,6 +104,25 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: e2e-agent-ove-iso-builder
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    test:
+    - as: e2e-agent-ove-iso-builder
+      commands: |
+        export PULL_SECRET_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
+        ./tools/iso_builder/hack/build-ove-image.sh --release-image-url $RELEASE_IMAGE_LATEST --pull-secret-file $PULL_SECRET_FILE --arch x86_64
+      credentials:
+      - mount_path: /var/secrets/registry-pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift
