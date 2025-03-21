@@ -89,14 +89,14 @@ export KUBECONFIG="$SHARED_DIR/kubeconfig"
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
 
-echo "Extract the latest oc client..."
-oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=oc --to=/tmp --insecure=true
-
 if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
   oc get secret -n openshift-config pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${day2_pull_secret}"
 fi
+
+echo "Extract the latest oc client..."
+oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+   --command=oc --to=/tmp --insecure=true
 
 DAY2_INSTALL_DIR="${DAY2_INSTALL_DIR:-/tmp/installer_day2}"
 mkdir -p "${DAY2_INSTALL_DIR}"
