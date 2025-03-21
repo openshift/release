@@ -385,7 +385,6 @@ declare -A pool_passwords
 platformSpec='{"vcenters": [],"failureDomains": []}'
 
 log "building local variables and failure domains"
-
 # Iterate through each lease and generate the failure domain and vcenters information
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
@@ -470,10 +469,12 @@ fi
 # For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.
-
-NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
+if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]] && [[ $required_pool == "vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster" ]]; then
+  NETWORK_RESOURCE=$(jq -r '[.metadata.ownerReferences[] | select(.kind=="Network") | .name][1]' < "${SHARED_DIR}"/LEASE_single.json)
+else
+  NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
+fi
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" "${SHARED_DIR}"/NETWORK_single.json
-
 jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 
 # shellcheck source=/dev/null
