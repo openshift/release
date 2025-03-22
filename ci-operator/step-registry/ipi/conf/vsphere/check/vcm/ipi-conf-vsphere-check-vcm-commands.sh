@@ -492,8 +492,9 @@ fi
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.
 
-NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
-cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" "${SHARED_DIR}"/NETWORK_single.json
+#NETWORK_RESOURCE=$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
+IFS=' ' read -ra NETWORK_RESOURCE <<< $(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)
+cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE[0]}.json" "${SHARED_DIR}"/NETWORK_single.json
 
 jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
 
