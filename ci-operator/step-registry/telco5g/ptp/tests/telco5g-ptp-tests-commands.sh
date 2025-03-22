@@ -83,7 +83,9 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #[dev-ci] use forked dev repo
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/jzding/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
@@ -224,6 +226,11 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
+#[dev-ci] use dev branch for test code if needed
+export TEST_BRANCH="remove-consumer-v1"
+#[dev-ci] use dev branch for product code
+export PTP_UNDER_TEST_BRANCH="remove-consumer-v1"
+
 # Set go version
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
     source $HOME/golang-1.20
@@ -245,7 +252,9 @@ build_images
 
 # deploy ptp-operator
 
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+#[dev-ci] use dev branch for product code
+#git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+git clone https://github.com/jzding/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -277,7 +286,7 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
     export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
 # event API v1 is removed from 4.19 onwards
 else
-    export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
+    export CONSUMER_IMG="quay.io/jacding/cloud-event-consumer:remove-v1"
 fi
 
 # wait for the linuxptp-daemon to be deployed
@@ -286,7 +295,9 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#[dev-ci] use dev branch for test code if needed
+#git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/jzding/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
