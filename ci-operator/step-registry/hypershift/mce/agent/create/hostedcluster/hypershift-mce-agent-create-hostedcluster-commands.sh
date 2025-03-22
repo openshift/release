@@ -82,6 +82,7 @@ fi
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
+RENDER_COMMAND=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render" || echo "--render" )
 
 /tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
@@ -92,7 +93,10 @@ fi
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
   --ssh-key="${SHARED_DIR}/id_rsa.pub" \
-  --release-image ${RELEASE_IMAGE}
+  --release-image ${RELEASE_IMAGE} ${RENDER_COMMAND} >/tmp/hc.yaml
+
+cat /tmp/hc.yaml
+sleep 3600
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
