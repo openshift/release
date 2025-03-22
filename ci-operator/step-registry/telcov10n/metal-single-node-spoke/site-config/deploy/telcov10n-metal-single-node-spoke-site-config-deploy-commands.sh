@@ -7,7 +7,7 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-source ${SHARED_DIR}/spoke-common-functions.sh
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
@@ -112,8 +112,6 @@ function generate_site_config {
   #   - redfish_base_uri
   #   - mac
   #   - root_device
-  #   - deviceName
-  #   - root_device
   #   - root_dev_hctl
   #   - hctl
   #   - baremetal_iface
@@ -129,13 +127,25 @@ function generate_site_config {
       exit 1
     fi
 
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
+    if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
+      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
+    else
+      SPOKE_CLUSTER_NAME=${NAMESPACE}
+    fi
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
 
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
     if [ "${root_device}" != "" ]; then
-      ignition_config_override='{\"ignition\":{\"version\":\"3.2.0\"},\"storage\":{\"disks\":[{\"device\":\"'${root_device}'\",\"wipeTable\":true, \"partitions\": []}]}}'
+        ignition_config_override="$(
+          echo "${NODE_IGNITION_CONF_OVERRIDE}" \
+          | sed "s#\${root_device}#${root_device}#" \
+          | jq --compact-output)"
+
+      if [ "${root_dev_hctl}" != "" ]; then
+        # Enforce the use of HCTL format
+        root_device=""
+      fi
     fi
 
     cat << EOF > ${site_config_file}
@@ -163,6 +173,7 @@ spec:
       group-du-sno: ""
       common: true
       sites: "${SPOKE_CLUSTER_NAME}"
+      prowId: "${SPOKE_CLUSTER_NAME}"
     clusterNetwork:
       - cidr: "10.128.0.0/14"
         hostPrefix: 23
@@ -172,7 +183,7 @@ spec:
       - "172.30.0.0/16"
     additionalNTPSources:
       - ${AUX_HOST}
-    # ignitionConfigOverride: '${GLOBAL_IGNITION_CONF_OVERRIDE}'
+    ignitionConfigOverride: '$(echo ${GLOBAL_IGNITION_CONF_OVERRIDE} | jq --compact-output)'
     cpuPartitioningMode: AllNodes
     nodes:
       - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
@@ -223,7 +234,7 @@ git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
 mkdir -pv \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest
-mkdir -pv \${ztp_repo_dir}/site-policies
+mkdir -pv \${ztp_repo_dir}/site-policies/${SPOKE_CLUSTER_NAME}
 cat <<EOS > \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/site-config.yaml
 $(cat ${site_config_file})
 EOS
@@ -234,6 +245,9 @@ EOK
 
 ts="$(date -u +%s%N)"
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/.cluster-image-set-used.\${ts}
+cat <<EO-ICSP >| \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/imageContentSourcePolicy.yaml
+$(cat ${SHARED_DIR}/imageContentSourcePolicy.yaml || echo "---")
+EO-ICSP
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-policies/.cluster-image-set-used.\${ts}
 
 if [ -f \${ztp_repo_dir}/site-configs/kustomization.yaml ]; then
@@ -247,6 +261,8 @@ resources:
 EOK
 fi
 
+cat \${ztp_repo_dir}/site-configs/kustomization.yaml >| \${ztp_repo_dir}/site-policies/kustomization.yaml
+
 cd \${ztp_repo_dir}
 git add .
 git commit -m 'Generated SiteConfig file by ${SPOKE_CLUSTER_NAME}'
@@ -256,7 +272,7 @@ GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push
 EOF
 
   gitea_project="${GITEA_NAMESPACE}"
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project}
+  run_script_on_ocp_cluster ${run_script} ${gitea_project}
 }
 
 function get_openshift_baremetal_install_tool {
@@ -348,7 +364,7 @@ EOF
 
   gitea_project="${GITEA_NAMESPACE}"
   pod_name="$(basename ${src_iso_url} | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project} ${pod_name}
+  run_script_on_ocp_cluster ${run_script} ${gitea_project} ${pod_name}
 
   pod_ip=$(oc -n ${gitea_project} get po ${pod_name} -ojsonpath='{.status.podIP}')
   iso_url="http://${pod_ip}:${http_listen_port}/$(basename ${src_iso_url})"
@@ -395,10 +411,48 @@ function wait_until_assisted_service_is_ready {
     oc -n multicluster-engine wait --for=condition=Available deployment/assisted-service --timeout=30m ;
   } || {
     oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service ;
+    echo ;
     oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
     exit 1 ;
   }
   set +x
+}
+
+function setup-pre-ga-catalog-access {
+
+  if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
+
+      echo "************ telcov10n Setup ZTP to use PreGA catalog ************"
+
+      cat <<EO-cm | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assisted-installer-mirror-config
+  namespace: multicluster-engine
+  labels:
+    app: assisted-service
+data:
+  registries.conf: |
+    unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
+
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test"
+EO-cm
+
+    mirror_registry_ref="mirrorRegistryRef:
+      name: assisted-installer-mirror-config"
+
+      set -x
+      oc -n multicluster-engine get cm assisted-installer-mirror-config -oyaml
+      set +x
+    fi
 }
 
 function generate_agent_service_config {
@@ -422,6 +476,7 @@ EOF
   set +x
 
   get_storage_class_name
+  setup-pre-ga-catalog-access
 
   agent_serv_conf=$(oc get AgentServiceConfig agent 2>/dev/null || echo)
 
@@ -456,6 +511,7 @@ spec:
     resources:
       requests:
         storage: 50Gi
+  ${mirror_registry_ref:-}
   osImages:
   - cpuArchitecture: x86_64
     openshiftVersion: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
@@ -484,6 +540,13 @@ EOF
       echo
       echo "'${openshift_version}' openshiftVersion already exists. Do nothing..."
       echo
+    fi
+
+    if [ -n "${mirror_registry_ref:-}" ]; then
+      oc patch AgentServiceConfig/agent --type=merge --patch-file=/dev/stdin <<-EO-mirror-patch
+spec:
+  ${mirror_registry_ref}
+EO-mirror-patch
     fi
   fi
 

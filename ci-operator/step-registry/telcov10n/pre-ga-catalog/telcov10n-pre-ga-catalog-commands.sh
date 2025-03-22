@@ -8,7 +8,7 @@ echo "************ Fix container user ************"
 # Fix user IDs in a container
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-source ${SHARED_DIR}/spoke-common-functions.sh
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
 function update_openshift_config_pull_secret {
 
@@ -21,69 +21,141 @@ function update_openshift_config_pull_secret {
 
   echo "Adding PreGA pull secret to pull the container image index from the Hub cluster..."
 
+  optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+  optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+  qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+
+  openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+  openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+  openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+
+  reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+  reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+  brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+
   cat <<EOF >| /tmp/pre-ga.json
 {
   "auths": {
     "quay.io/prega": {
       "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
       "email": "prega@redhat.com"
+    },
+    "brew.registry.redhat.io": {
+      "auth": "${brew_registry_auth}",
+      "email": "jiazha@redhat.com"
+    },
+    "quay.io/openshift-qe-optional-operators": {
+      "auth": "${qe_registry_auth}",
+      "email": "jiazha@redhat.com"
+    },
+    "quay.io/openshifttest": {
+      "auth": "${openshifttest_registry_auth}"
     }
   }
 }
 EOF
 
-  new_dot_dockerconfig_data=$(jq -s '.[0] * .[1]' \
+  jq -s '.[0] * .[1]' \
     /tmp/dot-dockerconfig-data.json \
     /tmp/pre-ga.json \
-    | base64 -w 0)
+    >| ${SHARED_DIR}/pull-secret-with-pre-ga.json
+
+  new_dot_dockerconfig_data="$(cat ${SHARED_DIR}/pull-secret-with-pre-ga.json | base64 -w 0)"
 
   jq '.data.".dockerconfigjson" = "'${new_dot_dockerconfig_data}'"' /tmp/dot-dockerconfig.json | oc replace -f -
+}
+
+function apply_catalog_source_and_image_content_source_policy {
+
+  image_index_tag="v${IMAGE_INDEX_OCP_VERSION}.0"
+
+  SSHOPTS=(-o 'ConnectTimeout=5'
+    -o 'StrictHostKeyChecking=no'
+    -o 'UserKnownHostsFile=/dev/null'
+    -o 'ServerAliveInterval=90'
+    -o LogLevel=ERROR
+    -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+  catalog_info_dir=$(mktemp -d)
+
+  timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+    "${PREGA_CATSRC_AND_ICSP_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
+    "${catalog_info_dir}" "${image_index_tag}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+set -x
+catalog_soruces_url="${1}"
+prega_operator_index_tags_url="${2}"
+tag_version="${4}"
+
+version_tag=$(curl -sSL "${prega_operator_index_tags_url}" | jq -r '
+  [.tags[] | select(.name | startswith("'${tag_version}'-"))] |
+  sort_by(.start_ts) |
+  .[].name' | tail -2 | head -1)
+info_dir=${3}/${version_tag}
+
+mkdir -pv ${info_dir}
+pushd .
+cd ${info_dir}
+
+for f in $(curl -sSL ${catalog_soruces_url}/${version_tag}|grep -oP '(?<=href=")[^"]+'|grep 'yaml$'); do
+  set -x
+  curl -sSLO ${catalog_soruces_url}/${version_tag}/${f}
+  set +x
+done
+
+popd
+EOF
+
+  rsync -avP \
+      -e "ssh $(echo "${SSHOPTS[@]}")" \
+      "root@${AUX_HOST}":${catalog_info_dir}/ \
+      ${catalog_info_dir}
+
+  timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+    "${catalog_info_dir}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+set -x
+rm -frv ${1}
+EOF
+
+  echo
+  echo "----------------------------------------------------------------------------------------------"
+  set -x
+  mv -v ${catalog_info_dir} "${ARTIFACT_DIR}/pre-ga-info"
+  prega_info_dir="$(ls -1d ${ARTIFACT_DIR}/pre-ga-info/*)"
+  ls -lhrtR ${prega_info_dir}
+  set +x
+  echo
+  echo "----------------------------------------------------------------------------------------------"
+  echo
+  set -x
+  oc -n openshift-marketplace delete catsrc ${CATALOGSOURCE_NAME} --ignore-not-found
+  sed -i "s/name: .*/name: ${CATALOGSOURCE_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  sed -i "s/displayName: .*/displayName: ${CATALOGSOURCE_DISPLAY_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  set +x
+  echo "--------------------- ${ARTIFACT_DIR}/pre-ga-info/catalogSource.yaml -------------------------"
+  cat ${prega_info_dir}/catalogSource.yaml
+  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageContentSourcePolicy.yaml ----------------------"
+  cat ${prega_info_dir}/imageContentSourcePolicy.yaml
+  echo "----------------------------------------------------------------------------------------------"
+  set -x
+  oc apply -f ${prega_info_dir}/catalogSource.yaml
+  oc apply -f ${prega_info_dir}/imageContentSourcePolicy.yaml
+  cat ${prega_info_dir}/imageContentSourcePolicy.yaml >| ${SHARED_DIR}/imageContentSourcePolicy.yaml
+  set +x
 }
 
 function create_pre_ga_calatog {
 
   echo "************ telcov10n Create Pre GA catalog ************"
 
-  set -x
-  image_index_tag="v${IMAGE_INDEX_OCP_VERSION}.0"
-  oc -n openshift-marketplace delete catsrc $CATALOGSOURCE_NAME --ignore-not-found
-  set +x
-
-  oc create -f - <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: $CATALOGSOURCE_NAME
-  namespace: openshift-marketplace
-  annotations:
-    olm.catalogImageTemplate: "${INDEX_IMAGE}:${image_index_tag}"
-spec:
-  displayName: PreGA Telco Operators
-  nodeSelector:
-    kubernetes.io/os: linux
-    node-role.kubernetes.io/master: ""
-  priorityClassName: system-cluster-critical
-  securityContextConfig: restricted
-  tolerations:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
-    operator: Exists
-  - effect: NoExecute
-    key: node.kubernetes.io/unreachable
-    operator: Exists
-    tolerationSeconds: 120
-  - effect: NoExecute
-    key: node.kubernetes.io/not-ready
-    operator: Exists
-    tolerationSeconds: 120
-  image: ${INDEX_IMAGE}:${image_index_tag}
-  priority: -100
-  publisher: OpenShift Telco Verification
-  sourceType: grpc
-  updateStrategy:
-    registryPoll:
-      interval: 10m
-EOF
+  apply_catalog_source_and_image_content_source_policy
 
   wait_until_command_is_ok \
     "oc -n openshift-marketplace get catalogsource ${CATALOGSOURCE_NAME} -o=jsonpath='{.status.connectionState.lastObservedState}' | grep -w READY" \
