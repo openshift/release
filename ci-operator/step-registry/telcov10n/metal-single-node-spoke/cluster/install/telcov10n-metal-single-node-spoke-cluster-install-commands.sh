@@ -37,6 +37,12 @@ function generate_assisted_deployment_pull_secret {
   SPOKE_CLUSTER_NAME=${NAMESPACE}
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
 
+  if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
+    dot_b64_dockerconfigjson="$(cat ${SHARED_DIR}/pull-secret-with-pre-ga.json | base64 -w 0)"
+  else
+    dot_b64_dockerconfigjson="$(cat ${SHARED_DIR}/pull-secret | base64 -w 0)"
+  fi
+
   cat << EOF | oc apply -f -
 apiVersion: v1
 kind: Secret
@@ -45,7 +51,7 @@ metadata:
   namespace: "${SPOKE_CLUSTER_NAME}"
 type: kubernetes.io/dockerconfigjson
 data:
-  .dockerconfigjson: $(cat $SHARED_DIR/pull-secret | base64 -w 0)
+  .dockerconfigjson: ${dot_b64_dockerconfigjson}
 EOF
 
   set -x
