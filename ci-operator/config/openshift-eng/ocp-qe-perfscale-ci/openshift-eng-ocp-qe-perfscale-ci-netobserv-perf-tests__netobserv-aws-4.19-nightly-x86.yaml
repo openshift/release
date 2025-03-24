@@ -21,6 +21,9 @@ images:
     FROM ocp-qe-perfscale-ci
     COPY opm /usr/bin/opm
     COPY scripts scripts
+    ENV HOME=/home/user
+    RUN mkdir -p /home/user && curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && unzip awscli-bundle.zip && awscli-bundle/install -b $HOME/bin/aws
+    ENV PATH="$PATH:$HOME/bin"
   from: ocp-qe-perfscale-ci
   inputs:
     opm-builder:
@@ -51,7 +54,7 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "25"
+      COMPUTE_NODE_REPLICAS: "10"
       COMPUTE_NODE_TYPE: m6i.4xlarge
       ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
       ES_METADATA_INDEX: perf_scale_ci*
@@ -65,7 +68,7 @@ tests:
       LOOKBACK_SIZE: "15"
       ORION_CONFIG: https://github.com/cloud-bulldozer/orion/blob/3ccfb0437810057c546656689b427373159fa4de/examples/netobserv-node-density-heavy.yaml
       ORION_ENVS: PLATFORM=AWS
-      PODS_PER_NODE: "200"
+      PODS_PER_NODE: "50"
       RUN_ORION: "true"
       VERSION: "4.19"
       WORKLOAD: node-density-heavy
