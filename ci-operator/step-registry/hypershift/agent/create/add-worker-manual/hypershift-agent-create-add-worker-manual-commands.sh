@@ -33,6 +33,7 @@ ISODownloadURL=$(oc get InfraEnv/${HOSTED_CLUSTER_NAME} -n ${HOSTED_CONTROL_PLAN
 curl -L --fail -o /var/lib/libvirt/images/extraworker.iso --insecure ${ISODownloadURL}
 source dev-scripts-additional-config
 
+sleep 2h
 for ((i = 0; i < $NUM_EXTRA_WORKERS; i++)); do
     virsh dumpxml "ostest_extraworker_$i" > "/tmp/ostest_extraworker_$i.xml"
     sed -i "/<devices>/a \\
