@@ -84,6 +84,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.18"
+  n2minor:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
   target:
     candidate:
       architecture: multi
@@ -2116,6 +2121,35 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected
+- as: baremetalds-hypershift-agent-mce-n2minor-guest-f28
+  capabilities:
+  - intranet
+  cron: 23 15 24 * *
+  steps:
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-n2minor-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 17 11 4 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
 - as: baremetal-3-plus-1-agent-ipv4-static-f14
   cluster: build05
   cron: 22 13 14,28 * *
