@@ -10,7 +10,7 @@ set -x
 # awscli-bundle/install -b /bin/aws
 # export PATH=$PATH:/bin
 # mkdir -p $HOME/.aws
-aws help
+which aws
 cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 aws_region=${REGION:-$LEASED_RESOURCE}
