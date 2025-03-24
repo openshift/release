@@ -1,0 +1,16 @@
+# Allow the image-pusher SA to also delete images in the coreos namespace.
+# This is used by the `build-node-image` job to delete temporary tags:
+# https://github.com/coreos/fedora-coreos-pipeline/blob/a3f049e8c24470fa129994070426b58ad8308fe9/jobs/build-node-image.Jenkinsfile#L115-L128
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: system:image-pruner
+  namespace: coreos
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-pruner
+subjects:
+- kind: ServiceAccount
+  name: image-pusher
+  namespace: coreos

@@ -1,0 +1,65 @@
+base_images:
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.17"
+  target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: multi-loaded-upgrade-417to418-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "3"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
+      CUSTOM_AZURE_REGION: eastus
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "5"
+      OCP_ARCH: amd64
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-azure
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: azure-4.18-nightly-multi-loaded-upgrade-from-4.17

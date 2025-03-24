@@ -133,7 +133,7 @@ log "     To  : $DESTINATION_IMAGE_REF"
 mirror_log="${ARTIFACT_DIR}/oc-mirror-output.log"
 
 for i in {1..6}; do
-    if ! oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" 1>${mirror_log}; then
+    if ! oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" 1>${mirror_log}; then
         log "ERROR Unable to mirror image"
         exit 1
     fi

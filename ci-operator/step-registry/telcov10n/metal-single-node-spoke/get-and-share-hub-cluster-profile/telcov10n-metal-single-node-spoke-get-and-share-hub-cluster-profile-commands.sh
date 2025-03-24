@@ -58,11 +58,17 @@ function share_hub_cluster_profile {
   cp -v $local_hub_cluster_profile/* ${SHARED_DIR}/
 }
 
+function set_hub_kubeconfig_as_default {
+  echo "************ telcov10n Set the Hub cluster kubeconfig file as default to be used in later steps ************"
+  cp -v ${SHARED_DIR}/hub-kubeconfig ${SHARED_DIR}/kubeconfig
+}
+
 function main {
   setup_aux_host_ssh_access
   append_pr_tag_cluster_profile_artifacts
   get_hub_cluster_profile_artifacts
   share_hub_cluster_profile
+  set_hub_kubeconfig_as_default
 }
 
 main

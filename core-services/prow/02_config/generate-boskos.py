@@ -227,6 +227,9 @@ CONFIG = {
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 7,
     },
+    'gcp-sustaining-autorelease-412-quota-slice': {
+        'us-east1': 12,
+    },
     'gcp-quota-slice': {
         'us-central1': 70,
     },
@@ -254,6 +257,9 @@ CONFIG = {
         'libvirt-s390x-0-1': 1
     },
     'libvirt-ppc64le-quota-slice': {},
+    'libvirt-ppc64le-s2s-quota-slice':{
+        'libvirt-ppc64le-s2s-0-0': 1
+    },
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'default': 1000,
@@ -278,8 +284,7 @@ CONFIG = {
         'default': 1,
     },
     'openstack-rhoso-quota-slice': {
-        '10.46.4.7': 1, # titan03.lab.eng.tlv2.redhat.com
-        '10.46.4.12': 1, # titan08.lab.eng.tlv2.redhat.com
+        'serval71.lab.eng.tlv2.redhat.com': 1,
     },
     'openstack-nfv-quota-slice': {
         'default': 4,
