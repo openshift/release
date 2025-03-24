@@ -94,6 +94,17 @@ if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publi
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
+echo "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
+  --name=${CLUSTER_NAME} \
+  --pull-secret=/tmp/.dockerconfigjson \
+  --agent-namespace=\"${AGENT_NAMESPACE}\" \
+  --namespace local-cluster \
+  --base-domain=${BASEDOMAIN} \
+  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
+  --image-content-sources \"${SHARED_DIR}/mgmt_icsp.yaml\" \
+  --ssh-key=\"${SHARED_DIR}/id_rsa.pub\" \
+  --release-image ${RELEASE_IMAGE}" > /tmp/agent-create-command.sh
+
 eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
@@ -104,6 +115,8 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} $(support_n-2)"
+
+sleep 2h
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
