@@ -3,14 +3,10 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -x 
+set -x
 
-# curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
-# unzip awscli-bundle.zip  
-# awscli-bundle/install -b /bin/aws
-# export PATH=$PATH:/bin
-# mkdir -p $HOME/.aws
 which aws
+mkdir -p $HOME/.aws
 cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 aws_region=${REGION:-$LEASED_RESOURCE}
