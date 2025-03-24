@@ -86,6 +86,40 @@ tests:
       SCAN_IMAGE: cert-manager
     test:
     - ref: fips-check-image-scan
+- as: cluster-bot
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    test:
+    - as: pre-notifier
+      commands: curl -d "cluster is ready for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}" ntfy.sh/swghosh-openshift-ci
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi 
+    - as: sleeper
+      commands: |
+        #!/bin/bash
+        total_duration=6900 # 1h55m, timeout is 2h
+        elapsed_time=0
+        while [ $elapsed_time -lt $total_duration ]; do
+            sleep 30
+            elapsed_time=$((elapsed_time + 30))
+            echo "Elapsed time: $((elapsed_time / 3600)) hours $(( (elapsed_time % 3600) / 60 )) minutes $((elapsed_time % 60)) seconds"
+        done
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    - as: post-notifier
+      commands: curl -d "cluster about to be destroyed for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}" ntfy.sh/swghosh-openshift-ci
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi 
+    workflow: ipi-gcp
 - as: e2e-operator
   steps:
     cluster_profile: aws
