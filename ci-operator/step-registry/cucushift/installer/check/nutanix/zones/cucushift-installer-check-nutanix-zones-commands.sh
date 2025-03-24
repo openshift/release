@@ -13,8 +13,13 @@ declare prism_element3
 # shellcheck source=/dev/null
 source "${NUTANIX_AUTH_PATH}"
 
+echo "DEBUG_01: prism_element1: $prism_element1"
+echo "DEBUG_02: prism_element2: $prism_element2"
+echo "DEBUG_03: prism_element3: $prism_element3"
+
 if [[ "$SINGLE_ZONE" == "true" ]]; then
     node_zone_list=$(oc get nodes -o=jsonpath='{.items[*].metadata.labels.topology\.kubernetes\.io\/zone}')
+    echo "DEBUG_04: node_zone_list: $node_zone_list"
     echo "Check all nodes running on single zone: $prism_element1"
     for zone in ${node_zone_list}; do
         if [ "$zone" != "$prism_element1" ]; then
@@ -24,10 +29,15 @@ if [[ "$SINGLE_ZONE" == "true" ]]; then
     done
 else
     default_node_pes=$(echo "$prism_element1" "$prism_element2" "$prism_element3" | tr " " "\n" | sort -u | xargs)
+    echo "DEBUG_05: default_node_pes: $default_node_pes"
     control_plane_pes="$default_node_pes"
+    echo "DEBUG_06: control_plane_pes: $control_plane_pes"
     compute_pes="$default_node_pes"
+    echo "DEBUG_07: compute_pes: $compute_pes"
     compute_zone_list=$(oc get nodes -l node-role.kubernetes.io/worker= -o=jsonpath='{.items[*].metadata.labels.topology\.kubernetes\.io\/zone}' | tr " " "\n" | sort -u | xargs)
+    echo "DEBUG_08: compute_zone_list: $compute_zone_list"
     control_plane_zone_list=$(oc get nodes -l node-role.kubernetes.io/master= -o=jsonpath='{.items[*].metadata.labels.topology\.kubernetes\.io\/zone}' | tr " " "\n" | sort -u | xargs)
+    echo "DEBUG_09: control_plane_zone_list: $control_plane_zone_list"
 
     if [[ "$CONTROL_PLANE_ZONE" != "" ]]; then
         control_plane_pes=$(echo "$CONTROL_PLANE_ZONE" | sed -e "s/failure-domain-1/$prism_element1/g" -e "s/failure-domain-2/$prism_element2/g" -e "s/failure-domain-3/$prism_element3/g" | tr " " "\n" | sort -u | xargs)
@@ -41,8 +51,18 @@ else
         echo "Fail: fail to check control plane zone: $control_plane_zone_list, expected: $control_plane_pes"
         exit 1
     fi
+    echo "DEBUG_10: control_plane_pes: $control_plane_pes"
+    echo "DEBUG_11: compute_pes: $compute_pes"
+    echo "DEBUG_12: control_plane_zone_list: $control_plane_zone_list"
+
     IFS=" " read -r -a array_compute_pes <<<"$compute_pes"
     IFS=" " read -r -a array_compute_zone_list <<<"$compute_zone_list"
+
+    echo "DEBUG_13: array_compute_pes:"
+    echo "${array_compute_pes[@]}"
+    ecoh "DEBUG_14: array_compute_zone_list:"
+    echo "${array_compute_zone_list[@]}"
+
     if [[ "$COMPUTE_REPLICAS" != "" ]] && [[ $COMPUTE_REPLICAS -lt ${#array_compute_pes[@]} ]]; then
         # When compute replicas < zone
         # Check compute zone list number equals compute replicas num
