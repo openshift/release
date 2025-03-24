@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+set -x
 echo "************ NROP Deployment setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
@@ -11,16 +12,21 @@ echo "************ NROP Deployment setup command ************"
 date +%s > "${SHARED_DIR}"/start_time
 
 # Environment variables required
-SSH_PKEY_PATH=/var/run/ci-key/cikey
+export KUBECONFIG="${SHARED_DIR}"/mgmt-kubeconfig
+NODEPOOL_NAME=$(oc get np -n clusters -o json | jq -r '.items[0].metadata.name')
+export CLUSTER_NAME="${NODEPOOL_NAME}"
+export SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
-T5CI_HCP_MGMT_KUBECONFIG="${T5CI_HCP_MGMT_KUBECONFIG:=${SHARED_DIR}/mgmt-kubeconfig}"
-T5CI_HCP_HOSTED_KUBECONFIG="${T5CI_HCP_HOSTED_KUBECONFIG:=${SHARED_DIR}/kubeconfig}"
+T5CI_HCP_MGMT_KUBECONFIG="/home/kni/.kube/config_sno-${CLUSTER_NAME}"
+T5CI_HCP_HOSTED_KUBECONFIG="/home/kni/.kube/hcp_config_${CLUSTER_NAME}"
+TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 source "${SHARED_DIR}"/main.env
+echo "shared directory: ${SHARED_DIR}"
 
 # Check if Inventory file exists
 if ! [[ -f "${SHARED_DIR}"/inventory ]]; then
@@ -28,11 +34,32 @@ if ! [[ -f "${SHARED_DIR}"/inventory ]]; then
     exit 1;
 fi
 
+# check if mgmt-kubeconfig file exists
+if ! [[ -f "${SHARED_DIR}/mgmt-kubeconfig" ]]; then
+   echo "No Management cluster kubeconfig found"
+   exit 1;
+fi
+
+# Check hosted cluster kubeconfig
+if ! [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+   echo "No hosted cluster kubeconfig found"
+   exit 1;
+fi
+
+# Check connectivity
+ping ${BASTION_IP} -c 10 || true
+echo "exit" | ncat "${BASTION_IP}" 22 && echo "SSH port is opened"|| echo "status = $?"
+
 # Copy automation repo to local SHARED_DIR
 echo "Copy automation repo to local $SHARED_DIR"
 mkdir "${SHARED_DIR}"/repos
-ssh -i "${SSH_PKEY}" "${COMMON_SSH_ARGS}" "${BASTION_USER}"@"${BASTION_IP}" \
-    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C "${SHARED_DIR}"/repos/
+
+# git clone telco-ci
+git clone "${TELCO_CI_REPO}" "${SHARED_DIR}"/repos/telco-ci
+
+echo "shared directory: ${SHARED_DIR}"
+ssh -i $SSH_PKEY $COMMON_SSH_ARGS ${BASTION_USER}@${BASTION_IP} \
+    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
 
 # Install ansible dependencies
 cd "${SHARED_DIR}"/repos/ansible-automation
@@ -43,6 +70,9 @@ ansible-galaxy collection install -r ansible-requirements.yaml
 echo "Change the host from localhost to hypervisor"
 sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/apply_registry_certs.yml
 sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/install_nrop.yml
+
+echo "Managment kubeconfig file: ${T5CI_HCP_MGMT_KUBECONFIG}"
+echo "Hosted cluster kubeconfig file: ${T5CI_HCP_HOSTED_KUBECONFIG}"
 
 # Install certificates required for internal registries
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/ansible-automation/ansible.cfg
@@ -55,10 +85,7 @@ ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-
 -e mgmt_kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" \
 -e install_sources="${T5CI_NROP_SOURCE}"
 
-# Install telco-ci ansible modules
-ansible-galaxy collection install -r "${SHARED_DIR}"/repos/telco-ci/ansible-requirements.yaml
-
 # Applying performance profile suitable for NROP
 echo "************ Applying Performance Profile suitable for NROP ************"
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/telco-ci/ansible.cfg
-ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_profile_nrop.yml -e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" -c local
+ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_profile_nrop.yml -e kubeconfig="${SHARED_DIR}/mgmt-kubeconfig" -c local
