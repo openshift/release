@@ -30,6 +30,7 @@ pull_secret_filename="new_pull_secret_tag_images"
 new_pull_secret="$(mktemp -d)/${pull_secret_filename}"
 tag_images_list_filename="tag_images_list"
 tag_images_list="$(mktemp -d)/${tag_images_list_filename}"
+OC_BIN="oc"
 
 MIRROR_PROXY_REGISTRY=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
@@ -66,26 +67,44 @@ if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
     remote_tag_images_list="/tmp/${tag_images_list_filename}"
     # shellcheck disable=SC2089
     ssh_options="-o UserKnownHostsFile=/dev/null -o IdentityFile=${SSH_PRIV_KEY_PATH} -o StrictHostKeyChecking=no"
+    remote_oc_bin="/tmp/oc"
 
-    # scp new_pull_secret credential to bastion host
+    if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "which oc && oc version --client"; then
+        echo "use the installed oc in the remote host"
+    elif ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "test -x ${remote_oc_bin}"; then
+        echo "use the installed oc - ${remote_oc_bin} in the remote host"
+        OC_BIN="${remote_oc_bin}"
+    else
+        local_oc_bin=$(which oc)
+        echo "copy ${local_oc_bin} from local to the remote host"
+        # shellcheck disable=SC2090
+        scp ${ssh_options} "${local_oc_bin}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_oc_bin}
+        OC_BIN="${remote_oc_bin}"
+        # Note, if hit "/lib64/libc.so.6: version `GLIBC_2.33' not found" issue, that means the
+        # remote host OS is out of date, maybe need to use a newer bastion image to launch.
+        ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${OC_BIN} version --client"
+    fi
+
+    echo "copy pull secret from local to the remote host"
     # shellcheck disable=SC2090
     scp ${ssh_options} "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_pull_secret}
     args+=(--registry-config="${remote_pull_secret}")
 
+    echo "copy tag images list from local to the remote host"
     # shellcheck disable=SC2090
     scp ${ssh_options} "${tag_images_list}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_tag_images_list}
     args+=(--filename="${remote_tag_images_list}")
 
     # check whether the oc command supports the extra options and add them to the args array.
     # shellcheck disable=SC2090
-    if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "oc image mirror --help | grep -q -- --keep-manifest-list"; then
+    if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${OC_BIN} image mirror --help | grep -q -- --keep-manifest-list"; then
         echo "Adding --keep-manifest-list to the mirror command."
         args+=(--keep-manifest-list=true)
     else
         echo "This oc version does not support --keep-manifest-list, skip it."
     fi
 
-    cmd="oc image mirror ${args[*]}"
+    cmd="${OC_BIN} image mirror ${args[*]}"
     echo "Remote Command: ${cmd}"
     # shellcheck disable=SC2090
     ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${cmd}"
@@ -94,12 +113,12 @@ else
     args+=(--filename="${tag_images_list}")
     # check whether the oc command supports the extra options and add them to the args array.
     # shellcheck disable=SC2090
-    if oc image mirror --help | grep -q -- --keep-manifest-list; then
+    if ${OC_BIN} image mirror --help | grep -q -- --keep-manifest-list; then
         echo "Adding --keep-manifest-list to the mirror command."
         args+=(--keep-manifest-list=true)
     else
         echo "This oc version does not support --keep-manifest-list, skip it."
     fi
-    cmd="oc image mirror ${args[*]}"
+    cmd="${OC_BIN} image mirror ${args[*]}"
     run_command "${cmd}"
 fi
