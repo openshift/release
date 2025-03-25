@@ -87,6 +87,9 @@ fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+if [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+    BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
+fi
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 
 # shellcheck disable=SC2089
