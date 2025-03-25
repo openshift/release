@@ -84,6 +84,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
+  n1minor:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
   target:
     candidate:
       architecture: multi
@@ -665,6 +670,32 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-power
+- as: aws-ipi-ovn-hypershift-mce-n1minor-mgmt-f28
+  cron: 20 6 4 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.5"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
+- as: aws-ipi-ovn-hypershift-mce-n1minor-guest-f28
+  cron: 40 23 27 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.5"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-ipsec-f14-obo
   cron: 5 0 8 * *
   steps:
