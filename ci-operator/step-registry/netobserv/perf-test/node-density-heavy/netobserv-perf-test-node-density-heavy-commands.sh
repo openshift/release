@@ -17,7 +17,7 @@ else
 fi
 
 # TODO, Add: # PR info?
-export ADDITIONAL_PARAMS="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\"=\"$NOO_BUNDLE_INFO\"}"
+export ADDITIONAL_PARAMS="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
 
 echo "$ADDITIONAL_PARAMS"
 # Run node-density-heavy in background
