@@ -48,7 +48,7 @@ images:
       - registry.redhat.io/ubi9/go-toolset:latest
     go_builder:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - builder
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -56,7 +56,7 @@ images:
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
     FROM loki-operator-src AS lo-src
-    FROM registry.redhat.io/ubi9/go-toolset:latest
+    FROM registry.redhat.io/ubi9/go-toolset:latest as builder
     ADD . /go/src/github.com/openshift/cluster-logging-operator
     COPY --from=es-src /go/src/github.com/openshift/elasticsearch-operator /go/src/github.com/openshift/elasticsearch-operator
     COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
@@ -72,7 +72,7 @@ images:
   inputs:
     base:
       as:
-      - registry.redhat.io/ubi9/go-toolset:latest
+      - builder
     elasticsearch-operator-src:
       as:
       - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
