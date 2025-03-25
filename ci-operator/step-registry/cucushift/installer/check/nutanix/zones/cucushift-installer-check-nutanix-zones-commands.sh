@@ -60,7 +60,7 @@ else
 
     echo "DEBUG_13: array_compute_pes:"
     echo "${array_compute_pes[@]}"
-    ecoh "DEBUG_14: array_compute_zone_list:"
+    echo "DEBUG_14: array_compute_zone_list:"
     echo "${array_compute_zone_list[@]}"
 
     if [[ "$COMPUTE_REPLICAS" != "" ]] && [[ $COMPUTE_REPLICAS -lt ${#array_compute_pes[@]} ]]; then
@@ -79,7 +79,7 @@ else
             exit 1
         fi
     else
-        if [[ $compute_zone_list == "$compute_pes" ]]; then
+        if [[ "$compute_zone_list" == "$compute_pes" ]]; then
             echo "Pass: passed to check compute zone: $compute_zone_list, expected: $compute_pes"
         else
             echo "Fail: fail to check compute zone: $compute_zone_list, expected: $compute_pes"
