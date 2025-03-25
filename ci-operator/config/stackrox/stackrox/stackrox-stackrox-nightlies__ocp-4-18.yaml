@@ -25,6 +25,40 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
+- as: 4nodes-scale-scannerv4-lowchurn-test
+  cron: 0 6 6,20 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "4"
+      ES_SECRETS_PATH: /secret_stackrox
+      EXTRA_FLAGS: --churn-duration=2m --timeout=24h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: stackrox-install-helm
+  timeout: 24h0m0s
+- as: 4nodes-scale-scannerv4-test
+  cron: 0 6 6,20 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "4"
+      ES_SECRETS_PATH: /secret_stackrox
+      EXTRA_FLAGS: --churn-duration=20m --timeout=24h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: stackrox-install-helm
+  timeout: 24h0m0s
 - as: 24nodes-scale-scannerv4-test
   cron: 0 6 6,20 * *
   steps:
@@ -34,7 +68,43 @@ tests:
       BASE_DOMAIN: perfscale.rox.systems
       COMPUTE_NODE_REPLICAS: "24"
       ES_SECRETS_PATH: /secret_stackrox
+      EXTRA_FLAGS: --churn-duration=20m --timeout=24h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: stackrox-install-helm
+  timeout: 24h0m0s
+- as: 4nodes-scale-scannerv2-lowchurn-test
+  cron: 0 6 7,21 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "4"
+      ES_SECRETS_PATH: /secret_stackrox
+      EXTRA_FLAGS: --churn-duration=2m --timeout=5h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      ROX_SCANNER_V4: "false"
+      USER_TAGS: |
+        TicketId 382
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: stackrox-install-helm
+  timeout: 5h0m0s
+- as: 4nodes-scale-scannerv2-test
+  cron: 0 6 7,21 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "4"
+      ES_SECRETS_PATH: /secret_stackrox
       EXTRA_FLAGS: --churn-duration=20m --timeout=5h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      ROX_SCANNER_V4: "false"
       USER_TAGS: |
         TicketId 382
       ZONES_COUNT: "3"
