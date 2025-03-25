@@ -39,18 +39,20 @@ for ((i = 0; i < $NUM_EXTRA_WORKERS; i++)); do
      <disk type='file' device='cdrom'>\\
        <driver name='qemu' type='raw'/>\\
        <source file='/var/lib/libvirt/images/extraworker.iso'/>\\
-       <target dev='sdb' bus='scsi'/>\\
+       <target dev='sdc' bus='scsi'/>\\
        <readonly/>\\
      </disk>" "/tmp/ostest_extraworker_$i.xml"
     sed -i "s/<boot dev='network'\/>/<boot dev='hd'\/>/g" "/tmp/ostest_extraworker_$i.xml"
     virsh define "/tmp/ostest_extraworker_$i.xml"
     virsh start "ostest_extraworker_$i"
 done
-
+sleep 3h
 _agentExist=0
 set +e
 for ((i=1; i<=10; i++)); do
     count=$(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers --ignore-not-found | wc -l)
+    echo $count
+    oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o wide
     if [ ${count} == ${NUM_EXTRA_WORKERS} ]  ; then
         echo "agent resources already exist"
         _agentExist=1
