@@ -18,6 +18,11 @@ if [[ "${MIRROR_BIN}" != "oc-adm" ]]; then
   exit 0
 fi
 
+if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
+  echo "users are going to mirror images from bastion, skip this step."
+  exit 0
+fi
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
