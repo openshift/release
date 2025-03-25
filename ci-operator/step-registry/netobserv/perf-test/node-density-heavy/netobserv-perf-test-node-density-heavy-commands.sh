@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x 
+set -x
 
 # get NetObserv metadata 
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
@@ -55,9 +55,8 @@ declare -A WORKLOAD_PIDS
 
 EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
 WORKLOAD_PIDS["$WORKLOAD"]=$!
-#node_density_heavy_pid=$!
 
-# wait 20 mins before starting ingress-perf
+# TODO: wait 5 mins before starting ingress-perf before merging
 # sleep 300 
 
 # Run ingress-perf

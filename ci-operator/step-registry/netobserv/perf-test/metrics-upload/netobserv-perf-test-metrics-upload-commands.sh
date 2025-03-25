@@ -22,7 +22,7 @@ if [[ $WORKLOAD == "node-density-heavy" ]]; then
     END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/$WORKLOAD-index_data.json")
 fi
 
-NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/netobserv_metadata.json")
+NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/$WORKLOAD-index_data.json")
 export NOO_BUNDLE_VERSION
 
 E2E_BENCHMARKING_REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking"
@@ -56,9 +56,10 @@ function generate_metrics_sheet(){
     export COMPARISON_CONFIG="netobserv_touchstone_statistics_config.json"
     export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
     export GEN_CSV=true
+    export EMAIL_ID_FOR_RESULTS_SHEET="openshift-netobserv-team@redhat.com"
     cd e2e-benchmarking/utils && source compare.sh
     # generate metrics sheet
-    run_benchmark_comparison > "$ARTIFACT_DIR"/benchmark_csv.log
+    run_benchmark_comparison > "$ARTIFACT_DIR/benchmark_csv.log"
 }
 
 function do_comparison(){
@@ -69,7 +70,7 @@ function do_comparison(){
     export ES_SERVER_BASELINE="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
     pushd "$PWD" || exit
     cd e2e-benchmarking/utils && source compare.sh
-    run_benchmark_comparison > "$ARTIFACT_DIR"/benchmark_comp.log
+    run_benchmark_comparison > "$ARTIFACT_DIR/benchmark_comp.log"
 }
 
 function update_sheet(){
@@ -88,7 +89,8 @@ BASELINE_UUID=$(jq '.BASELINE_UUID' < data/baseline.json)
 export BASELINE_UUID
 pushd "$PWD" || exit
 do_comparison
-COMP_SHEET_ID=$(grep Google "$ARTIFACT_DIR"/benchmark_comp.log | awk '{print $6}' )
+# get the SHEET ID from the benchmark_comparison run logs
+COMP_SHEET_ID=$(grep Google "$ARTIFACT_DIR/benchmark_comp.log" | awk '{print $6}')
 export COMP_SHEET_ID
 popd || exit
 update_sheet
