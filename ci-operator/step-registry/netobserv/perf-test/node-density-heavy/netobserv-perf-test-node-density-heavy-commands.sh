@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x 
 
 # get NetObserv metadata 
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
@@ -52,12 +53,12 @@ declare -A WORKLOAD_PIDS
 
 # Kick off run with vars set
 
-EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}"/node-density-heavy-run.log &
-WORKLOAD_PIDS["node-density-heavy"]=$!
+EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+WORKLOAD_PIDS["$WORKLOAD"]=$!
 #node_density_heavy_pid=$!
 
 # wait 20 mins before starting ingress-perf
-sleep 300 
+# sleep 300 
 
 # Run ingress-perf
 popd
@@ -70,16 +71,16 @@ function check_pids(){
     pid_rc=$1
     returned_pid=$2
     if [[ $pid_rc == "1" ]]; then
-        if [[ $returned_pid == "${WORKLOAD_PIDS["node-density-heavy"]}" ]]; then
-            echo "===> node-density-heavy failed; exit code: $ended_pid_rc. Killing ingress-perf"
+        if [[ $returned_pid == "${WORKLOAD_PIDS["$WORKLOAD"]}" ]]; then
+            echo "===> $WORKLOAD failed; exit code: $ended_pid_rc. Killing ingress-perf"
             kill -9 "${WORKLOAD_PIDS["ingress-perf"]}" 
         else
-            echo "===> ingress-perf failed; exit code: $ended_pid_rc. Killing node-density-heavy"
-            kill -9 "${WORKLOAD_PIDS["node-density-heavy"]}"
+            echo "===> ingress-perf failed; exit code: $ended_pid_rc. Killing $WORKLOAD"
+            kill -9 "${WORKLOAD_PIDS["$WORKLOAD"]}"
         fi
     else
-        if [[ $returned_pid == "${WORKLOAD_PIDS["node-density-heavy"]}" ]]; then
-            echo "===> node-density-heavy completed successfully at $(date)"
+        if [[ $returned_pid == "${WORKLOAD_PIDS["$WORKLOAD"]}" ]]; then
+            echo "===> $WORKLOAD completed successfully at $(date)"
         else
             echo "===> ingress-perf completed successfully at $(date)"
         fi
@@ -96,25 +97,25 @@ ended_pid_rc=$?
 #shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
 
-NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/node-density-heavy-run.log" | cut -d'"' -f 4)
+NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/$WORKLOAD-run.log" | cut -d'"' -f 4)
 INGRESS_PERF_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/ingress-perf-run.log" | cut -d'"' -f 4)
 
-echo "===> node-density-heavy UUID $NODE_DENSITY_HEAVY_UUID"
+echo "===> $WORKLOAD UUID $NODE_DENSITY_HEAVY_UUID"
 echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
-if [[ -d "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID" &&  -f "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID/index_data.json" ]]; then
-    jq ".iterations = $PODS_PER_NODE"  >> "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID/index_data.json"
-    cp "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}/${WORKLOAD}-index_data.json"
-    cp "${ARTIFACT_DIR}/$NODE_DENSITY_HEAVY_UUID/index_data.json" "${SHARED_DIR}/${WORKLOAD}-index_data.json"
+if [[ -d "/tmp/$NODE_DENSITY_HEAVY_UUID" &&  -f "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" ]]; then
+    jq ".iterations = $PODS_PER_NODE"  >> "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json"
+    cp "/tmp/$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}/${WORKLOAD}-index_data.json"
+    cp "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" "${SHARED_DIR}/${WORKLOAD}-index_data.json"
 fi
 
-if [[ -d "${ARTIFACT_DIR}/$INGRESS_PERF_UUID" && -f "${ARTIFACT_DIR}/$INGRESS_PERF_UUID/index_data.json" ]]; then
-    cp "${ARTIFACT_DIR}/$INGRESS_PERF_UUID/index_data.json" "${ARTIFACT_DIR}/ingress-perf-index_data.json"
-    cp "${ARTIFACT_DIR}/$INGRESS_PERF_UUID/index_data.json" "${SHARED_DIR}/ingress-perf-index_data.json"
+if [[ -d "/tmp/$INGRESS_PERF_UUID" && -f "/tmp/$INGRESS_PERF_UUID/index_data.json" ]]; then
+    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${ARTIFACT_DIR}/ingress-perf-index_data.json"
+    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${SHARED_DIR}/ingress-perf-index_data.json"
 fi
 
-echo "######## Node-density-heavy run logs ########"
-cat  "${ARTIFACT_DIR}/node-density-heavy-run.log"
+echo "######## $WORKLOAD run logs ########"
+cat  "${ARTIFACT_DIR}/$WORKLOAD-run.log"
 echo "################"
 
 printf "\n\n\n\n\n"
