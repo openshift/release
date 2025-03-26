@@ -6,9 +6,11 @@ set -o pipefail
 set -x
 
 which aws
-mkdir -p $HOME/.aws
-cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+mkdir -p $HOME/.aws
+aws configure set profile default
+aws configure set region "$LEASED_RESOURCE"
+aws configure get region
 aws_region=${REGION:-$LEASED_RESOURCE}
 export AWS_DEFAULT_REGION=$aws_region
 source scripts/netobserv.sh
