@@ -197,6 +197,10 @@ function destroy_upi_cluster() {
     cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa.pub
     chmod 0600 "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
 
+    PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+    cp "${PULL_SECRET}" "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
+    echo "Copied the pull secret"
+
     # Loads the tfvars if it exists in the shared directory
     if [ ! -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
     then
@@ -215,11 +219,11 @@ function destroy_upi_cluster() {
     fi
 
     # Destroys the current installation for this run
-    cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
-            -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars \
-            -state "${SHARED_DIR}"/terraform.tfstate
+    echo "Running init"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
+    echo "Running destroy"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy -var-file="${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
+    echo "Finished Running"
 }
 
 ############################################################
