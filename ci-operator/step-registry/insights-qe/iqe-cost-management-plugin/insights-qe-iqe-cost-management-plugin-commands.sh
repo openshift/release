@@ -39,7 +39,7 @@ spec:
   - name: insights-container
     image: quay.io/cloudservices/iqe-tests:cost-management
     command: ["/bin/sh", "-c"]
-    args: ["iqe tests plugin cost_management -m cost_interop -vv --junitxml=test_run.xml && sleep 120"]
+    args: ["iqe tests plugin cost_management -m cost_interop -vv --junitxml=test_run.xml && sleep 240"]
     env:
     - name: KUBECONFIG
       value: "/kubeconfig/kubeconfig"
@@ -88,7 +88,7 @@ spec:
         memory: 1000Mi
       requests:
         cpu: 200m
-        memory: 500Mi
+        memory: 2Gi
     securityContext:
         allowPrivilegeEscalation: false
         runAsNonRoot: true
