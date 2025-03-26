@@ -20,7 +20,8 @@ END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/$WORKLOAD-index_data.json")
 
 INGRESS_PERF_END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/ingress-perf-index_data.json")
 
-if [[ $INGRESS_PERF_END_TIME -gt $END_TIME ]]; then
+# cluster-density-v2 takes longer to complete than ingress-perf
+if [[ $WORKLOAD == "node-density-heavy" ]]; then
     END_TIME=$INGRESS_PERF_END_TIME
 fi
 
@@ -42,7 +43,8 @@ function install_requirements(){
 
 function upload_metrics(){
     install_requirements scripts/requirements.txt
-    python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION"
+    #shellcheck disable=SC2086
+    python scripts/nope.py --starttime $START_TIME --endtime $END_TIME --uuid $UUID --noo-bundle-version $NOO_BUNDLE_VERSION
 }
 
 function get_baseline(){
@@ -67,7 +69,8 @@ function update_sheet(){
     pushd scripts/sheets || exit
     enable_venv
     install_requirements requirements.txt
-    python noo_perfsheets_update.py --sheet-id "$1" --uuid1 "$UUID" --uuid2 "$BASELINE_UUID" --service-account "$GSHEET_KEY_LOCATION"
+    #shellcheck disable=SC2086
+    python noo_perfsheets_update.py --sheet-id $1 --uuid1 $UUID --uuid2 $BASELINE_UUID --service-account $GSHEET_KEY_LOCATION
 }
 
 function do_comparison(){
@@ -79,7 +82,8 @@ function do_comparison(){
     run_benchmark_comparison > "$ARTIFACT_DIR/benchmark_comp.log"
     # get the SHEET ID from the benchmark_comparison run logs
     COMP_SHEET_ID=$(grep Google "$ARTIFACT_DIR/benchmark_comp.log" | awk '{print $6}')
-    update_sheet "$COMP_SHEET_ID"
+    #shellcheck disable=SC2086
+    update_sheet $COMP_SHEET_ID
     popd
 }
 
