@@ -20,7 +20,14 @@ END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/$WORKLOAD-index_data.json")
 
 INGRESS_PERF_END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/ingress-perf-index_data.json")
 
-if [[ $INGRESS_PERF_END_TIME -gt $END_TIME ]]; then
+# strip quotes
+UUID=${UUID//\"/}
+START_TIME=${START_TIME//\"/}
+END_TIME=${END_TIME//\"/}
+INGRESS_PERF_END_TIME=${INGRESS_PERF_END_TIME//\"/}
+
+# cluster-density-v2 takes longer to complete than ingress-perf
+if [[ $WORKLOAD == "node-density-heavy" ]]; then
     END_TIME=$INGRESS_PERF_END_TIME
 fi
 
