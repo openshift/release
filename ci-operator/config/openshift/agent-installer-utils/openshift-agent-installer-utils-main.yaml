@@ -110,8 +110,14 @@ tests:
     test:
     - as: e2e-agent-ove-iso-builder
       commands: |
+        imageRepo=$(echo $RELEASE_IMAGE_LATEST | jq -r 'split("@")[0]')
+        echo "imageRepo: $imageRepo"
+        releaseImageVersion=$(skopeo inspect docker://$RELEASE_IMAGE_LATEST | jq -r '.Labels["io.openshift.release"]')
+        echo "releaseImageVersion: $releaseImageVersion"
+        releaseImageURL=$imageRepo:$releaseImageVersion
+        echo "releaseImageURL: $releaseImageURL"
         export PULL_SECRET_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
-        ./tools/iso_builder/hack/build-ove-image.sh --release-image-url $RELEASE_IMAGE_LATEST --pull-secret-file $PULL_SECRET_FILE --arch x86_64
+        ./tools/iso_builder/hack/build-ove-image.sh --release-image-url $releaseImageURL --pull-secret-file $PULL_SECRET_FILE --arch x86_64
       credentials:
       - mount_path: /var/secrets/registry-pull-secret
         name: registry-pull-credentials
