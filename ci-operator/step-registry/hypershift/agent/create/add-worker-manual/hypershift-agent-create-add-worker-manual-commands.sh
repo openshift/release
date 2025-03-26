@@ -33,45 +33,46 @@ ISODownloadURL=$(oc get InfraEnv/${HOSTED_CLUSTER_NAME} -n ${HOSTED_CONTROL_PLAN
 curl -L --fail -o /var/lib/libvirt/images/extraworker.iso --insecure ${ISODownloadURL}
 source dev-scripts-additional-config
 
-for ((i = 0; i < $NUM_EXTRA_WORKERS; i++)); do
-    virsh dumpxml "ostest_extraworker_$i" > "/tmp/ostest_extraworker_$i.xml"
-    sed -i "/<devices>/a \\
-     <disk type='file' device='cdrom'>\\
-       <driver name='qemu' type='raw'/>\\
-       <source file='/var/lib/libvirt/images/extraworker.iso'/>\\
-       <target dev='sdb' bus='scsi'/>\\
-       <readonly/>\\
-     </disk>" "/tmp/ostest_extraworker_$i.xml"
-    sed -i "s/<boot dev='network'\/>/<boot dev='hd'\/>/g" "/tmp/ostest_extraworker_$i.xml"
-    virsh define "/tmp/ostest_extraworker_$i.xml"
-    virsh start "ostest_extraworker_$i"
-done
-
-_agentExist=0
-set +e
-for ((i=1; i<=10; i++)); do
-    count=$(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers --ignore-not-found | wc -l)
-    if [ ${count} == ${NUM_EXTRA_WORKERS} ]  ; then
-        echo "agent resources already exist"
-        _agentExist=1
-        break
-    fi
-    echo "Waiting on agent resources create"
-    sleep 60
-done
-set -e
-if [ $_agentExist -eq 0 ]; then
-  echo "FATAL: agent cr not Exist"
-  exit 1
-fi
-
-echo "update agent spec.approved to true"
-for item in $(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers | awk '{print $1}'); do
-oc patch agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} ${item} -p '{"spec":{"approved":true}}' --type merge
-done
-
-echo "scale nodepool replicas => $NUM_EXTRA_WORKERS"
-oc scale nodepool ${HOSTED_CLUSTER_NAME} -n ${HOSTED_CLUSTER_NS} --replicas ${NUM_EXTRA_WORKERS}
-echo "wait agent ready"
-oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
+#for ((i = 0; i < $NUM_EXTRA_WORKERS; i++)); do
+#    virsh dumpxml "ostest_extraworker_$i" > "/tmp/ostest_extraworker_$i.xml"
+#    sed -i '/<disk type=.file. device=.cdrom.>/,/<\/disk>/d' "/tmp/ostest_extraworker_$i.xml"
+#    sed -i "/<devices>/a \\
+#     <disk type='file' device='cdrom'>\\
+#       <driver name='qemu' type='raw'/>\\
+#       <source file='/var/lib/libvirt/images/extraworker.iso'/>\\
+#       <target dev='sdb' bus='sata'/>\\
+#       <readonly/>\\
+#     </disk>" "/tmp/ostest_extraworker_$i.xml"
+#    sed -i "s/<boot dev='network'\/>/<boot dev='hd'\/>/g" "/tmp/ostest_extraworker_$i.xml"
+#    virsh define "/tmp/ostest_extraworker_$i.xml"
+#    virsh start "ostest_extraworker_$i"
+#done
+#
+#_agentExist=0
+#set +e
+#for ((i=1; i<=10; i++)); do
+#    count=$(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers --ignore-not-found | wc -l)
+#    if [ ${count} == ${NUM_EXTRA_WORKERS} ]  ; then
+#        echo "agent resources already exist"
+#        _agentExist=1
+#        break
+#    fi
+#    echo "Waiting on agent resources create"
+#    sleep 60
+#done
+#set -e
+#if [ $_agentExist -eq 0 ]; then
+#  echo "FATAL: agent cr not Exist"
+#  exit 1
+#fi
+#
+#echo "update agent spec.approved to true"
+#for item in $(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers | awk '{print $1}'); do
+#oc patch agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} ${item} -p '{"spec":{"approved":true}}' --type merge
+#done
+#
+#echo "scale nodepool replicas => $NUM_EXTRA_WORKERS"
+#oc scale nodepool ${HOSTED_CLUSTER_NAME} -n ${HOSTED_CLUSTER_NS} --replicas ${NUM_EXTRA_WORKERS}
+#echo "wait agent ready"
+#oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
 EOF
