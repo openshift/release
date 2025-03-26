@@ -49,5 +49,25 @@ echo "TEST_SUITE: ${TEST_SUITE}"
 export TEST_SUITE
 
 mkdir -p ${ARTIFACT_DIR}/${TEST_SUITE}
+
 # running RHOAI tests
-./run_sealights.sh
+./run_interop.sh
+
+export CY_TEST_CONFIG=${PWD}/test-variables.yml
+ 
+echo $CY_TEST_CONFIG
+
+token="$(cat ${BUCKET_INFO}/token)"
+name="$(cat ${BUCKET_INFO}/token_name)"
+
+git clone https://$name:$token@github.com/opendatahub-io/odh-dashboard.git
+
+cd odh-dashboard/frontend 
+dnf install -y \
+    nodejs npm \
+    libXScrnSaver libX11-xcb libXcomposite libXcursor libXdamage libXext libXi libXrandr libXrender libXtst \
+    alsa-lib gtk3 nss \
+    && dnf clean all || true
+
+
+

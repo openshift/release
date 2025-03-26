@@ -49,5 +49,7 @@ echo "TEST_SUITE: ${TEST_SUITE}"
 export TEST_SUITE
 
 mkdir -p ${ARTIFACT_DIR}/${TEST_SUITE}
+
+name=
 # running RHOAI tests
 ./run_interop.sh
