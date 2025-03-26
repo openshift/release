@@ -43,6 +43,10 @@ export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
 
+echo "JOB_TIMEOUT:${JOB_TIMEOUT:-unknown}"
+export JOB_TIMEOUT=${JOB_TIMEOUT:-8h}
+echo "TEST_TIMEOUT:${TEST_TIMEOUT:-unknown}"
+export TEST_TIMEOUT=${TEST_TIMEOUT:-8h}
 ./run.sh 
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
