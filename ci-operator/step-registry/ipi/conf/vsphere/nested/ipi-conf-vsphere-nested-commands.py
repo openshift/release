@@ -67,9 +67,14 @@ for key in os.environ:
 
 os.environ["ANSIBLE_TASK_TIMEOUT"] = str(20 * 60)
 
+if os.environ["VCENTER_VERSION"] == "7":
+    vcenter_version="VC7.0.3.01400-21477706-ESXi7.0u3q"
+else:
+    vcenter_version="VC8.0.2.00100-22617221-ESXi8.0u2c"
+
 r = ansible_runner.run_command(
     executable_cmd='ansible-playbook',
-    cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=VC8.0.2.00100-22617221-ESXi8.0u2c','-vvvv', '-k'],
+    cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=%s' %vcenter_version,'-vvvv', '-k'],
     input_fd=sys.stdin,
     output_fd=sys.stdout,
     error_fd=sys.stdout,
