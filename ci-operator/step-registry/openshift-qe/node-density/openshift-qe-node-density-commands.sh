@@ -31,6 +31,7 @@ export WORKLOAD=node-density
 ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
 
 # The measurable run
+PODS_PER_NODE=5
 EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
@@ -39,6 +40,7 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
 
+EXTRA_FLAGS=" --iterations-per-namespace=10 ${EXTRA_FLAGS}"
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
