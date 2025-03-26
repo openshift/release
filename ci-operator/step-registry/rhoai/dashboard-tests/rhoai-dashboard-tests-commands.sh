@@ -57,8 +57,8 @@ export CY_TEST_CONFIG=${PWD}/test-variables.yml
  
 echo $CY_TEST_CONFIG
 
-token="$(cat ${BUCKET_INFO}/token)"
-name="$(cat ${BUCKET_INFO}/token_name)"
+token="$(cat ${BUCKET_INFO}/dashboard_token)"
+name="$(cat ${BUCKET_INFO}/dashboard_token_name)"
 
 git clone https://$name:$token@github.com/opendatahub-io/odh-dashboard.git
 
