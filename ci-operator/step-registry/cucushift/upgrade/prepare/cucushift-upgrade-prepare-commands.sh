@@ -309,6 +309,14 @@ if [[ -z "$UPGRADE_PRE_RUN_TAGS" ]] ; then
 else
     export UPGRADE_PRE_RUN_TAGS="$UPGRADE_PRE_RUN_TAGS and $CUCUSHIFT_FORCE_SKIP_TAGS"
 fi
+
+# check if the cluster is ready
+oc version --client
+oc wait nodes --all --for=condition=Ready=true --timeout=25m
+if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
+    oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=15m
+fi
+
 set_cluster_access
 preparation_for_test
 filter_tests
