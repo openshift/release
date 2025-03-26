@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
   elasticsearch-operator-src:
     name: "5.8"
     namespace: logging
@@ -43,15 +39,13 @@ build_root:
 images:
 - from: ubi9-minimal
   inputs:
-    base:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
     go_builder:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - golang:1.23
+      - registry.redhat.io/ubi9/go-toolset:latest
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: base
+  from: ubi9-minimal
   to: cluster-logging-operator-registry
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
@@ -70,12 +64,12 @@ images:
     RUN chmod -R 777 /go
     RUN make bin/functional-benchmarker
   inputs:
-    base:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
     elasticsearch-operator-src:
       as:
       - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
+    go_builder:
+      as:
+      - registry.redhat.io/ubi9/go-toolset:latest
     loki-operator-src:
       as:
       - loki-operator-src
