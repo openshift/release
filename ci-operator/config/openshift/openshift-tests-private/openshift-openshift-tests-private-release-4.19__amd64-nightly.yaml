@@ -31,6 +31,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "4.19"
     namespace: ocp
@@ -3430,7 +3434,7 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-longduration-reliability-test-f14
+- as: vsphere-ipi-f14-sanity-reliability-test
   cron: 30 9 2,16 * *
   steps:
     cluster_profile: vsphere-elastic
@@ -3777,6 +3781,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-template-usertags
+- as: vsphere-ipi-vsphere7-f28
+  cron: 57 13 21 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      HOSTS: "2"
+      NETWORK_TYPE: nested-multi-tenant
+      VCENTER_VERSION: "7"
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi-nested
+- as: vsphere-ipi-vsphere7-f60-destructive
+  cron: 0 10 3 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      HOSTS: "2"
+      NETWORK_TYPE: nested-multi-tenant
+      VCENTER_VERSION: "7"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi-nested
 - as: vsphere-ipi-zones-multi-nic-f28
   cron: 44 23 22 * *
   steps:

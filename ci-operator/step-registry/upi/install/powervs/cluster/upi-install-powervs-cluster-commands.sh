@@ -332,13 +332,17 @@ EOF
 # Builds the cluster based on the set configuration / tfvars
 function build_upi_cluster() {
     OUTPUT="yes"
-    echo "Applying terraform to build PowerVS UPI cluster"
-    cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init -no-color -upgrade && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform apply -auto-approve -no-color \
-            -var-file "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars \
-            -state "${SHARED_DIR}"/terraform.tfstate \
-            | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+    # Applies the current installation for this run
+    echo ">Applying terraform to build PowerVS UPI cluster<"
+    echo "Running init"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
+    echo "Running plan"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ plan -var-file="${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars-no-color
+    echo "Running apply"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
+        -var-file="${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars -auto-approve -no-color \
+        -state="${SHARED_DIR}"/terraform.tfstate \
+        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
                 while read LINE
                 do
                     if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
@@ -354,6 +358,7 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
+    echo "Finished Running"
 
     echo "Extracting the terraformm output from the state file"
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
