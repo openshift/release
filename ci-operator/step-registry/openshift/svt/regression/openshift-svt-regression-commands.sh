@@ -15,9 +15,9 @@ ES_USERNAME=$(cat "/secret/username")
 export ES_USERNAME
 
 # If running from the one folder, will reset SCRIPT and PARAMETERS variables
-export SCRIPT=${SCRIPT_1:-$SCRIPT}
+export SCRIPT=${SCRIPT_1:-${SCRIPT_2:-${SCRIPT_3:-$SCRIPT}}}
 
-export PARAMETERS=${PARAMETERS_1:-${PARAMETERS:-""}}
+export PARAMETERS=${PARAMETERS_1:-${PARAMETERS_2:-${PARAMETERS_3:-${PARAMETERS:-""}}}}
 
 pushd /tmp
 
