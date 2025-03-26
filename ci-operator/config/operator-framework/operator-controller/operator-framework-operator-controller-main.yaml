@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: olmv1-system
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: build
+  commands: make build
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e
+  commands: make test-e2e
+  container:
+    from: src
+- as: e2e-upgrade
+  commands: make test-upgrade-e2e
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: operator-framework
+  repo: operator-controller
