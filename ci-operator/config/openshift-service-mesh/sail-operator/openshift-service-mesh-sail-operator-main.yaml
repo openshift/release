@@ -17,6 +17,7 @@ releases:
       version: "4.18"
   latest:
     release:
+      architecture: multi
       channel: stable
       version: "4.18"
   target:
@@ -108,8 +109,8 @@ tests:
   steps:
     cluster_profile: ossm-aws
     env:
+      CONTROL_PLANE_NODE_SELECTOR: kubernetes.io/arch=amd64
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.2-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -157,16 +158,12 @@ tests:
 - as: e2e-ocp-4-18-arm
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:master-dbd3c673faecfbd1910fdb09012099fa184dde92
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_NODE_SELECTOR: kubernetes.io/arch=arm64
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      OCP_ARCH: arm64
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -207,7 +204,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
+    workflow: servicemesh-istio-e2e-hypershift
 - as: e2e-next-ocp-4-19
   optional: true
   steps:
