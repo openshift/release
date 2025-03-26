@@ -50,4 +50,4 @@ export TEST_SUITE
 
 mkdir -p ${ARTIFACT_DIR}/${TEST_SUITE}
 # running RHOAI tests
-./run_interop.sh
+./run_sealights.sh
