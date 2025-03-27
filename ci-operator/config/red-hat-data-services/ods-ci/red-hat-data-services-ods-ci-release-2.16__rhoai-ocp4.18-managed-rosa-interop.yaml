@@ -33,19 +33,16 @@ tests:
   steps:
     cluster_profile: aws-managed-rosa-rhoai-qe
     env:
-      COMPUTE_NODE_REPLICAS: "3"
-      COMPUTE_NODE_TYPE: m5.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
-      CONTROL_PLANE_REPLICAS: "3"
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
             [
-              {"step": "rhoai-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHODS", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "rhoai-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHODS", "group": {"name": "rhoai-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","rhoai-lp"]'
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/blob/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","rosa-managed","rhoai"]'
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
@@ -56,9 +53,7 @@ tests:
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
         ]
-      RE_TRIGGER_ON_FAILURE: "false"
-      USER_TAGS: |
-        scenario rhoai
+      REPLICAS: "3"
     test:
     - ref: install-operators
     - ref: rhoai-ocm-install
@@ -69,3 +64,4 @@ zz_generated_metadata:
   branch: release-2.16
   org: red-hat-data-services
   repo: ods-ci
+  variant: rhoai-ocp4.18-managed-rosa-interop
