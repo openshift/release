@@ -3,6 +3,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: cli
+  rhoai-tests:
+    name: ods-ci
+    namespace: ci
+    tag: dev
 build_root:
   image_stream_tag:
     name: release
@@ -11,7 +15,7 @@ build_root:
 images:
 - context_dir: .
   dockerfile_path: ods_ci/build/Dockerfile_interop
-  to: rhoai-tests
+  to: rhoai-branch-tests
 releases:
   latest:
     prerelease:
@@ -23,10 +27,10 @@ releases:
 resources:
   '*':
     limits:
-      memory: 128Gi
+      memory: 4Gi
     requests:
-      cpu: 8000m
-      memory: 64Gi
+      cpu: 800m
+      memory: 2000Mi
 tests:
 - as: rhoai-interop-aws
   cron: 0 6 * * 1
@@ -59,15 +63,20 @@ tests:
             {"name": "rhods-operator", "source": "redhat-operators", "channel": "fast", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
         ]
       RE_TRIGGER_ON_FAILURE: "false"
+      TEST_SUITE: PreUpgrade
+      UPGRADE_VERSION: "2.18"
       USER_TAGS: |
         scenario rhoai
     test:
     - ref: install-operators
     - ref: rhoai-deploy-dsc
     - ref: rhoai-tests
+    - ref: rhoai-setup-catalog
+    - ref: rhoai-upgrade
     workflow: firewatch-ipi-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
-  branch: release-2.16
+  branch: releases-2.17
   org: red-hat-data-services
   repo: ods-ci
-  variant: rhoai-ocp4.18-lp-interop
+  variant: rhoai-upgrade-ocp4.18-lp-interop
