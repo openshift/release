@@ -5,6 +5,10 @@ set -o nounset
 ############################################################
 # Variables
 IBMCLOUD_HOME=/tmp/ibmcloud
+
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
 export IBMCLOUD_HOME
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
