@@ -200,8 +200,7 @@ function destroy_upi_cluster() {
     cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa.pub
     chmod 0600 "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
 
-    PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-    cp "${PULL_SECRET}" "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
+    cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
     echo "Copied the pull secret"
 
     # Loads the tfvars if it exists in the shared directory
