@@ -224,7 +224,7 @@ function destroy_upi_cluster() {
     echo "Running init"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
     echo "Running destroy"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy -var-file="${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
     echo "Finished Running"
 }
 
