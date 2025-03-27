@@ -1,0 +1,63 @@
+workflow:
+  as: hypershift-kubevirt-baremetalds-conformance-cilium
+  documentation: |-
+    Executes tests against a new ephemeral HyperShift cluster with Cilium CNI.
+    Administrative access to the control plane is provided via the `KUBECONFIG`
+    environment variable.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: hypershift-kubevirt-destroy
+    - chain: baremetalds-ipi-post
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: cucushift-hypershift-extended-cilium
+    - ref: cucushift-hypershift-extended-cilium-health-check
+    env:
+      HYPERSHIFT_NETWORK_TYPE: "Other" # Required for Cilium.
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      ETCD_STORAGE_CLASS: lvms-vg1
+      TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
+        access to server in CIDR block\| Netpol NetworkPolicy between server and client
+        should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed\|
+        Services should serve endpoints on same port and different protocols\|
+        Netpol NetworkPolicy between server and client should enforce
+        except clause while egress access to server in CIDR block\| Unidling
+        \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling
+        \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\] should work with
+        TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\| DNS should answer queries using the local DNS
+        endpoint\|\[Feature:bond\]\| StatefulSet Basic\| StatefulSet Non-retain\|\[OCPFeatureGate:RouteExternalCertificate\]
+      PACKET_OS: rocky_9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G
