@@ -89,4 +89,7 @@ oc_wait_for_pods() {
 
 oc_wait_for_pods "${NAMESPACE_RHOAI}"
 
+# TODO: Debug RHOAI updateApproval label
+
+
 echo "OpenShift AI addon is installed successfully"
