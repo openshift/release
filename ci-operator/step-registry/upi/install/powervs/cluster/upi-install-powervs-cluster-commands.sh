@@ -341,7 +341,7 @@ function build_upi_cluster() {
     echo "Running init"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
     echo "Running plan"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ plan -var-file="${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars-no-color
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ plan -var-file="${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars -no-color
     echo "Running apply"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
         -var-file="${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars -auto-approve -no-color \
