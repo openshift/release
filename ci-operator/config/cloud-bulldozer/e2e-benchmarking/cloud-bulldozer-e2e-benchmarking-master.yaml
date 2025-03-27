@@ -402,7 +402,7 @@ tests:
     - ref: cloud-bulldozer-e2e-benchmarking-router-perf
     workflow: openshift-qe-installer-aws
 - always_run: false
-  as: e2e-udn-density-pods-l3
+  as: e2e-udn-density-pods-l3-single-node
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -426,7 +426,7 @@ tests:
     - ref: cloud-bulldozer-e2e-benchmarking-udn-density-pods
     workflow: openshift-qe-installer-aws
 - always_run: false
-  as: e2e-udn-density-pods-l2
+  as: e2e-udn-density-pods-l2-single-node
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -473,6 +473,39 @@ tests:
     test:
     - ref: cloud-bulldozer-e2e-benchmarking-egressip
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: e2e-rds-core-mno
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+      BASTION_CP_INTERFACE: ens7f1
+      CRUCIBLE: "false"
+      ISOLATED_CORES: 2-39,42-79
+      JETLAG_BRANCH: main
+      LAB_CLOUD: cloud19
+      LAB_INTERFACE: eno3
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      OCP_BUILD: ga
+      OCP_VERSION: 4.18.5
+      PUBLIC_VLAN: "true"
+      RESERVED_CORES: 0,40,1,41
+      SRIOV_NODE_SELECTOR: node-role.kubernetes.io/worker
+      SRIOV_NUM_VFS: "64"
+      SRIOV_PF_NAME: ens7f0
+      TELCO: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-sriov
+    - chain: openshift-qe-installer-bm-day2-metallb
+    - chain: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: cloud-bulldozer-e2e-benchmarking-rds-core
 zz_generated_metadata:
   branch: master
   org: cloud-bulldozer
