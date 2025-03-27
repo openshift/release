@@ -1,0 +1,55 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-env-provision-quay314
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "5"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.18
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: quay-env-provision
