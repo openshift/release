@@ -86,8 +86,17 @@ spec:
           git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
-          sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
-          make docker-build
+          export T5CI_VERSION="T5CI_VERSION_VAL"
+          # OCPBUGS-52327 fix build due to libresolv.so link error
+          sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
+          if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
+            make docker-build
+          else
+            # Dockerfile is updated to upstream in 4.19+
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ocp
+            podman build -t ${IMG} -f Dockerfile.ocp
+          fi
           podman push ${IMG} --tls-verify=false
           cd ..
       securityContext:
@@ -98,7 +107,6 @@ spec:
           readOnly: true
         - name: secret-volume
           mountPath: /root/.docker
-
   volumes:
     - name: secret-volume
       secret:
@@ -114,6 +122,7 @@ spec:
 
 jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<< "$jobdefinition")
 jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<< "$jobdefinition")
+jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<< "$jobdefinition")
 #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
 retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
@@ -262,6 +271,13 @@ if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
     export ENABLE_V1_REGRESSION="true"
 else
     export ENABLE_V1_REGRESSION="false"
+fi
+
+if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+    export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
+# event API v1 is removed from 4.19 onwards
+else
+    export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
 fi
 
 # wait for the linuxptp-daemon to be deployed

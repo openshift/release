@@ -5,13 +5,13 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build11
     context: ci/prow/jump-ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      capability/vpn: vpn
+      capability/intranet: intranet
       ci-operator.openshift.io/variant: jump
       ci.openshift.io/generator: prowgen
     name: pull-ci-openshift-psap-topsail-main-jump-ci
@@ -56,30 +56,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )jump-ci,?($|\s.*)
+    trigger: (?m)^/test( | .* )(jump-ci|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build10
-    context: ci/prow/jump-images
+    cluster: build11
+    context: ci/prow/jump-ci-plot
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/variant: jump
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-topsail-main-jump-images
-    rerun_command: /test jump-images
+    name: pull-ci-openshift-psap-topsail-main-jump-ci-plot
+    rerun_command: /test jump-ci-plot
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=ci-plot
         - --variant=jump
         command:
         - ci-operator
@@ -113,13 +113,70 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )jump-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )(jump-ci-plot|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
+    context: ci/prow/mac_ai-jump-ci
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/variant: mac_ai
+      ci.openshift.io/generator: prowgen
+    name: pull-ci-openshift-psap-topsail-main-mac_ai-jump-ci
+    rerun_command: /test mac_ai-jump-ci
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=jump-ci
+        - --variant=mac_ai
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(mac_ai-jump-ci|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
     context: ci/prow/rhoai-e2e
     decorate: true
     decoration_config:
@@ -175,7 +232,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build09
     context: ci/prow/rhoai-images
     decorate: true
     decoration_config:
@@ -232,7 +289,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build09
     context: ci/prow/rhoai-light
     decorate: true
     decoration_config:
@@ -302,7 +359,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build09
     context: ci/prow/rhoai-long
     decorate: true
     decoration_config:
@@ -359,7 +416,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build09
     context: ci/prow/rhoai-plot
     decorate: true
     decoration_config:

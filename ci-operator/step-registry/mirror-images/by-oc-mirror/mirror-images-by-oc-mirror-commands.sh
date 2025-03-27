@@ -61,7 +61,7 @@ new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
-
+oc registry login --to "${new_pull_secret}"
 
 # This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
 #if ! whoami &> /dev/null; then
@@ -91,13 +91,6 @@ cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.lo
 #        fi
 #    fi
 #done
-#Because user does not have permission to update subgid and subuid file, so use another workaround.
-ocp_version=$(oc adm release info ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
-if ((ocp_minor_version > 17)); then
-    echo "export TEST_E2E=true to workaournd OCPBUGS-43986"
-    export TEST_E2E=true
-fi
 
 oc_mirror_bin="oc-mirror"
 run_command "'${oc_mirror_bin}' version --output=yaml"

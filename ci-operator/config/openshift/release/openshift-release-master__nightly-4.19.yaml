@@ -4,27 +4,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -67,6 +67,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: libvirt-installer
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -438,6 +442,26 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack-cgroupsv1
+- as: e2e-metal-ovn-arbiter
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-arbiter
+- as: e2e-metal-ovn-arbiter-upgrade
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-arbiter-upgrade
+- as: metal-ovn-network-flow-matrix-bm-single-node
+  cron: 0 23 * * 0,2,4,6
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: network-flow-matrix-tests
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -565,6 +589,20 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
+- as: e2e-vsphere-csi-operator-test
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make operator-e2e-test
+      from: vsphere-csi-driver-operator-test
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-vsphere
 - as: e2e-vsphere-ovn-csi
   interval: 168h
   steps:
@@ -577,6 +615,14 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
+- as: e2e-vsphere-ovn-host-groups-csi
+  cron: '@weekly'
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-host-groups-csi
 - as: e2e-vsphere-ovn-zones
   interval: 168h
   steps:
@@ -587,6 +633,14 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
+- as: e2e-vsphere-host-groups-ovn
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-ovn-multi-vcenter
   cron: '@daily'
   steps:
@@ -609,26 +663,6 @@ tests:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
   timeout: 6h0m0s
-- as: e2e-aws-ovn-workers-rhel8
-  cron: '@daily'
-  steps:
-    cluster_profile: aws
-    env:
-      PLATFORM_VERSION: "8.4"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-workers-rhel
-- as: e2e-aws-ovn-workers-rhel8-upgrade
-  cron: '@daily'
-  steps:
-    cluster_profile: aws
-    env:
-      PLATFORM_VERSION: "8.4"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-workers-rhel
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -643,6 +677,22 @@ tests:
     - chain: ipi-aws-pre
     - ref: fips-check
     workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-upgrade-fips
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FAIL_ON_CORE_DUMP: "true"
+      FIPS_ENABLED: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: fips-check
+    workflow: openshift-upgrade-aws-ovn
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -1532,7 +1582,7 @@ tests:
     cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
-      MAJOR_MINOR: "4.18"
+      MAJOR_MINOR: "4.19"
     test:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips

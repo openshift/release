@@ -24,6 +24,11 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
+  418-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
   latest:
     candidate:
       product: ocp
@@ -47,7 +52,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-ovn-conformance
-  cron: 0 4 * * *
+  cron: 59 23 12,15 * *
   steps:
     cluster_profile: aws
     env:
@@ -55,7 +60,7 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-aws-conformance
 - as: e2e-agent-connected-ovn-ipv4-manual-conformance
-  cron: 0 0 * * *
+  cron: 57 7 7,20 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -63,7 +68,7 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-manual-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-conformance
-  cron: 0 4 * * *
+  cron: 58 9 7,17 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -71,7 +76,7 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-dualstack-metal-conformance
-  cron: 0 8 * * *
+  cron: 23 21 10,24 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -87,7 +92,7 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-compact-conformance
-  cron: 0 12 * * *
+  cron: 24 2 11,24 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -106,7 +111,7 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-disconnected-ovn-ipv6-metal-conformance
-  cron: 0 16 * * *
+  cron: 1 18 12,18 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -114,7 +119,7 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-disconnected-conformance
 - as: e2e-agent-disconnected-ovn-dualstack-metal-conformance
-  cron: 0 20 * * *
+  cron: 58 22 10,24 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -131,7 +136,7 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-disconnected-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-oadp
-  cron: 0 4 * * *
+  cron: 23 12 8,22 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -157,7 +162,7 @@ tests:
 - as: e2e-kubevirt-metal-ovn
   cron: 0 4 1 1 *
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.18
@@ -167,7 +172,7 @@ tests:
       REDHAT_OPERATORS_INDEX_TAG: v4.17
     workflow: hypershift-mce-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-azure-ovn
-  cron: 0 4 * * *
+  cron: 38 15 7,16 * *
   steps:
     cluster_profile: azure4
     env:
@@ -182,7 +187,7 @@ tests:
 - as: e2e-kubevirt-metal-ovn-multinet
   cron: 31 7 9,17 * *
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       ATTACH_DEFAULT_NETWORK: "false"
       HYPERSHIFT_NODE_COUNT: "2"
@@ -195,7 +200,7 @@ tests:
 - as: e2e-kubevirt-metal-ovn-multinet-default-net
   cron: 22 3 14,18 * *
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       ATTACH_DEFAULT_NETWORK: "true"
       HYPERSHIFT_NODE_COUNT: "2"
@@ -206,7 +211,7 @@ tests:
       REDHAT_OPERATORS_INDEX_TAG: v4.17
     workflow: hypershift-mce-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-aws-ovn-gpu
-  cron: 0 0 1,7,13,19 * *
+  cron: 3 10 5,28 * *
   steps:
     cluster_profile: aws-kubevirt
     dependencies:
@@ -217,21 +222,21 @@ tests:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-kubevirt-gpu-conformance
 - as: e2e-ibmz-ovn-conformance
-  cron: 0 4 * * *
+  cron: 49 6 5,26 * *
   steps:
     cluster_profile: aws
     env:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-ibmz-conformance
 - as: e2e-power-ovn-conformance
-  cron: 0 8 * * *
+  cron: 15 4 10,19 * *
   steps:
     cluster_profile: aws
     env:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-power-conformance
 - as: e2e-x86-power-heterogeneous-conformance
-  cron: 0 8 * * *
+  cron: 47 3 11,18 * *
   steps:
     cluster_profile: aws
     env:
@@ -248,6 +253,33 @@ tests:
     - chain: hypershift-mce-power-test
     - ref: hypershift-mce-agent-info
     workflow: hypershift-mce-power-conformance
+- as: e2e-aws-critical
+  cron: 0 0 29 2 *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:418-latest
+    env:
+      MCE_VERSION: "2.8"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-mce-multi-version-test-info
+    - chain: hypershift-conformance
+    workflow: hypershift-mce-aws-conformance
+- as: e2e-agent-critical
+  cron: 0 0 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:418-latest
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-mce-multi-version-test-info
+    - chain: hypershift-conformance
+    workflow: hypershift-mce-agent-metal3-conformance
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

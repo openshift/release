@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
     labels:
@@ -2158,7 +2158,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-azure
     decorate: true
     labels:
@@ -2231,7 +2231,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-azure-ovn-etcd-scaling
     decorate: true
     labels:
@@ -2304,7 +2304,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     labels:
@@ -3483,7 +3483,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-hypershift-conformance
     decorate: true
     labels:
@@ -3700,6 +3700,82 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+    decorate: true
+    decoration_config:
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.19-e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+    optional: true
+    rerun_command: /test e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack-bgp-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -4154,7 +4230,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-metal-ovn-single-node-live-iso
     decorate: true
     labels:
@@ -4227,7 +4303,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-metal-ovn-single-node-with-worker-live-iso
     decorate: true
     labels:
@@ -4448,16 +4524,16 @@ presubmits:
     - ^release-4\.19$
     - ^release-4\.19-
     cluster: vsphere02
-    context: ci/prow/e2e-vsphere
+    context: ci/prow/e2e-vsphere-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-release-4.19-e2e-vsphere
-    optional: true
-    rerun_command: /test e2e-vsphere
+    name: pull-ci-openshift-origin-release-4.19-e2e-vsphere-ovn
+    rerun_command: /test e2e-vsphere-ovn
+    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -4466,7 +4542,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-vsphere
+        - --target=e2e-vsphere-ovn
         command:
         - ci-operator
         image: ci-operator:latest
@@ -4514,7 +4590,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-vsphere-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -4662,11 +4738,84 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn-etcd-scaling,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.19$
+    - ^release-4\.19-
+    cluster: vsphere02
+    context: ci/prow/e2e-vsphere-ovn-upi
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.19-e2e-vsphere-ovn-upi
+    rerun_command: /test e2e-vsphere-ovn-upi
+    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-vsphere-ovn-upi
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-vsphere-ovn-upi,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -4719,7 +4868,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/lint
     decorate: true
     labels:
@@ -4773,7 +4922,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     labels:
@@ -4827,7 +4976,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     labels:
@@ -4881,7 +5030,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build11
+    cluster: build06
     context: ci/prow/verify-deps
     decorate: true
     labels:

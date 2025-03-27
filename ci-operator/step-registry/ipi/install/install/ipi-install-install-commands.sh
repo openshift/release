@@ -184,7 +184,7 @@ function capi_envtest_monitor() {
 # useful for components like observers. In the end, the complete kubeconfig will be copies
 # as before.
 function copy_kubeconfig_minimal() {
-  local dir=${1}
+  local dir=${1} temp_dir
   echo "waiting for ${dir}/auth/kubeconfig to exist"
   while [ ! -s  "${dir}/auth/kubeconfig" ]
   do
@@ -199,7 +199,10 @@ function copy_kubeconfig_minimal() {
   echo 'api available'
 
   echo 'waiting for bootstrap to complete'
-  openshift-install --dir="${dir}" wait-for bootstrap-complete &
+  # create a temporary install working dir to avoid installer log combination
+  temp_dir=$(mktemp -d)
+  cp -rf "${dir}"/* "${temp_dir}/"
+  ${INSTALLER_BINARY} --dir="${temp_dir}" wait-for bootstrap-complete &
   wait "$!"
   ret=$?
   if [ $ret -eq 0 ]; then
@@ -487,7 +490,7 @@ function inject_spot_instance_config() {
       if [[ -d ${dir}/cluster-api/machines ]]; then
         echo "Spot masters supported via CAPA"
         manifests="${dir}/cluster-api/machines/10_inframachine_*.yaml $manifests"
-      elif openshift-install list-hidden-features 2>/dev/null | grep -q terraform-spot-masters; then
+      elif ${INSTALLER_BINARY} list-hidden-features 2>/dev/null | grep -q terraform-spot-masters; then
         echo "Spot masters supported via terraform"
       else
         echo "Spot masters are not supported in this configuration!"
@@ -562,8 +565,16 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
 fi
 
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
   echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to="/tmp" || exit 1
+  export INSTALLER_BINARY="/tmp/openshift-install"
+else
+  export INSTALLER_BINARY="openshift-install"
 fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -610,9 +621,6 @@ gcp)
     if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
-    elif [ -f "${SHARED_DIR}/gcp_min_permissions_without_actas.json" ]; then
-      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account, which hasn't the 'iam.serviceAccounts.actAs' permission, for the minimum permissions testing on GCP..."
-      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions_without_actas.json"
     elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
@@ -649,7 +657,11 @@ openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
 ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
-nutanix) ;;
+nutanix)
+    if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+      export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+    fi
+    ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
@@ -674,7 +686,9 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 set +o errexit
-openshift-install --dir="${dir}" create manifests &
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
+${INSTALLER_BINARY} --dir="${dir}" create manifests &
 wait "$!"
 ret="$?"
 if test "${ret}" -ne 0 ; then
@@ -739,7 +753,7 @@ esac
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign
-  openshift-install --dir="${dir}" create ignition-configs &
+  ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
   wait "$!"
   ret="$?"
   if test "${ret}" -ne 0 ; then
@@ -760,20 +774,20 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # Cloud infrastructure problems are common, instead of failing and
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
-case $JOB_NAME in
-  *vsphere)
+case $CLUSTER_TYPE in
+  vsphere*)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;
-  *aws)
+  aws*)
     # Do not retry because aws resources can collide when re-using installer assets
     max=1
     ;;
-  *azure)
+  azure*)
     # Do not retry because azure resources always collide when re-using installer assets
     max=1
     ;;
-  *ibmcloud*)
+  ibmcloud*)
     # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
     max=1
     ;;
@@ -792,7 +806,7 @@ do
   if [ $tries -gt 1 ]; then
     write_install_status
     populate_artifact_dir
-    openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    ${INSTALLER_BINARY} --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
@@ -812,8 +826,7 @@ do
 
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
-
-  openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  ${INSTALLER_BINARY} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"

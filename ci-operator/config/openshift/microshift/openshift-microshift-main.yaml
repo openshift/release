@@ -1,3 +1,8 @@
+base_images:
+  microshift-ci-brew:
+    name: brew
+    namespace: microshift
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -85,14 +90,18 @@ tests:
   steps:
     workflow: openshift-microshift-rebase
 - as: e2e-aws-tests-cache-nightly
+  cluster: build11
   cron: 0 0 * * *
+  restrict_network_access: false
   steps:
     cluster_profile: aws
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests-cache-nightly-arm
+  cluster: build11
   cron: 0 0 * * *
+  restrict_network_access: false
   steps:
     cluster_profile: aws
     env:
@@ -116,6 +125,8 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-cache
+  cluster: build11
+  restrict_network_access: false
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
     cluster_profile: aws
@@ -123,6 +134,8 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests-cache-arm
+  cluster: build11
+  restrict_network_access: false
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
     cluster_profile: aws
@@ -200,7 +213,16 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-footprint-and-performance
+    workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-ai-model-serving
+  run_if_changed: ^(scripts/ci-ai-model-serving/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: g4dn.xlarge
+      MICROSHIFT_OS: rhel-9.4
+      SUITE: ai-model-serving
+    workflow: openshift-microshift-e2e-bare-metal-tests
 zz_generated_metadata:
   branch: main
   org: openshift

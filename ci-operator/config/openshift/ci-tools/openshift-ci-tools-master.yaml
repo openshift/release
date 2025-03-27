@@ -541,7 +541,7 @@ images:
   to: serviceaccount-secret-rotation-trigger
 - dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-    RUN microdnf install -y git diffutils && microdnf clean all && rm -rf /var/cache/dnf
+    RUN microdnf install -y git diffutils make which npm go && microdnf clean all && rm -rf /var/cache/dnf
     ADD sippy-config-generator /usr/bin/sippy-config-generator
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["/usr/bin/sippy-config-generator"]
@@ -764,7 +764,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/ci-scheduling-webhook
   to: ci-scheduling-webhook
-- context_dir: images/gpu-scheduling-webhook
+- additional_architectures:
+  - arm64
+  context_dir: images/gpu-scheduling-webhook
   from: os
   inputs:
     bin:
@@ -798,31 +800,28 @@ resources:
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  cluster: build10
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
   node_architecture: arm64
 - as: codegen
-  cluster: build10
   commands: make verify-gen
   container:
     from: src
   node_architecture: arm64
 - as: format
-  cluster: build10
   commands: make format
   container:
     from: src
   node_architecture: arm64
 - as: integration
-  cluster: build10
   commands: make integration
   container:
     from: test-bin
   node_architecture: arm64
 - always_run: false
   as: e2e
+  cluster: build11
   steps:
     test:
     - as: e2e
@@ -856,6 +855,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo
+  cluster: build11
   optional: true
   pipeline_run_if_changed: pkg/steps/(index|bundle).*.go
   steps:
@@ -888,6 +888,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo-post
+  cluster: build11
   postsubmit: true
   steps:
     test:
@@ -919,7 +920,6 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  cluster: build10
   node_architecture: arm64
   optional: true
   steps:
@@ -939,19 +939,16 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: checkconfig
-  cluster: build10
   commands: make validate-checkconfig
   container:
     from: test-bin
   node_architecture: arm64
 - as: validate-vendor
-  cluster: build10
   commands: make validate-vendor
   container:
     from: src
   node_architecture: arm64
 - as: frontend-checks
-  cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin

@@ -6,7 +6,7 @@ set -o pipefail
 
 RELEASE_REPO=${RELEASE_REPO:-.}
 
-echo >&2 "$(date --iso-8601=seconds) Executing sync-rover-groups validation"
+echo >&2 "$(date -u +'%Y-%m-%dT%H:%M:%S%z') Executing sync-rover-groups validation"
 out=$(sync-rover-groups --manifest-dir=$RELEASE_REPO/clusters --config-file=$RELEASE_REPO/core-services/sync-rover-groups/_config.yaml --log-level=debug --print-config)
 
 # && true avoids the abrupt script termination because diff return code.
