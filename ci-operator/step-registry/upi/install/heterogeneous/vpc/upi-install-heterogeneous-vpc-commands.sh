@@ -11,6 +11,9 @@ trap 'error_handler $? $LINENO' ERR
 IBMCLOUD_HOME=/tmp/ibmcloud
 export IBMCLOUD_HOME
 
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
 export PATH=$PATH:/tmp:"${IBMCLOUD_HOME}"
 
 echo "Invoking installation of UPI based heterogeneous VPC"

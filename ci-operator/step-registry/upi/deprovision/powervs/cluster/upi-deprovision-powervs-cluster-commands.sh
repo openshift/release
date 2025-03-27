@@ -9,6 +9,9 @@ NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 export VPC_REGION
 
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
 
