@@ -153,21 +153,22 @@ tests:
           export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
           export CONTROL_PLANE_SOURCE=sail &&\
+          export INSTALL_SAIL_OPERATOR=true &&\
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          telemetry"
+          telemetry 'TestStatsGatewayServerTCPFilter|TestDashboard/pilot-dashboard.json|TestStatsGatewayServerTCPFilter|TestStatsTCPFilter/additional-labels|TestStatsFilter/additional-labels|TestStatsFilter/mockprom-to-metrics|TestServerTracing/primary-0|TestClientTracing/primary-0|TestBadWasmRemoteLoad|TestStatsGatewayServerTCPFilter'"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
-      grace_period: 30m0s
+      grace_period: 1h0m0s
       resources:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-pilot-sail-controlplane
   optional: true
@@ -214,21 +215,22 @@ tests:
           export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
           export CONTROL_PLANE_SOURCE=sail &&\
+          export INSTALL_SAIL_OPERATOR=true &&\
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge'"
+          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestCNIVersionSkew|TestValidation|TestWebhook|TestMultiRevision|TestTraffic/dns/a|TestPreserveHTTPHeaderCaseConfiguration|TestLocality/TrafficDistribution/EDS'"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
-      grace_period: 30m0s
+      grace_period: 1h0m0s
       resources:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-telemetry
   steps:
