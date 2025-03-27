@@ -63,10 +63,12 @@ if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
 fi
 
 echo ${SHARED_DIR}/metadata.json
-
 if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
     echo "Setting AZURE credential with minimal permissions for installer"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+    echo "Setting AZURE credential with Contributor role only for installer"
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
 fi
 
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
