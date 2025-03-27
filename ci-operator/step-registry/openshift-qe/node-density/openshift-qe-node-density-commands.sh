@@ -40,9 +40,6 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
 
-EXTRA_FLAGS=" --iterations-per-namespace=10 ${EXTRA_FLAGS}"
-export EXTRA_FLAGS
-
 rm -f ${SHARED_DIR}/index.json
 
 echo "JOB_TIMEOUT:${JOB_TIMEOUT:-unknown}"
