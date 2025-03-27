@@ -3,69 +3,90 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: 1. fetch CLUSTER_ID from OCM
-# CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") ?
+CLUSTER_ID=$(< "${SHARED_DIR}/cluster-id")
+NAMESPACE_RHOAI="redhat-ods-applications"
+NAMESPACE_OPERATOR="openshift-operators"
+NAMESPACE_SERVERLESS="openshift-serverless"
+TIMEOUT="400s"
 
-# TODO: 2. add rhoai_addon.json content for OCM post
-#{
-#  "addon": {
-#    "id": "managed-odh"
-#},
-#  "addon_version": {
-#    "id": ${RHOAI_VERSION}
-#},
-#  "parameters": {
-#        "items": []  --> TODO: check how updateApproval label is controlled
-#    }
-#}
+# Modify Upgrade policy
+NEXT_UPGRADE_RUN=""
+if [[ "${UPDATE_APPROVAL}" == "manual" ]]; then
+  NEXT_UPGRADE_RUN=', "next_run": "2040-01-01T00:00:00Z"'
+fi
 
-# TODO: 2. post addon config body with OCM
-# ocm post /api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/addons --body rhoai_addon.json
-
-# Verify RHOAI operator installation
-namespace="openshift-operators"
-timeout=400s
-label_selectors=("control-plane=authorino-operator" "authorino-component=authorino-webhooks" "name=istio-operator")
-echo "Wait For Pods To Be Ready"
-for label_selector in "${label_selectors[@]}"; do
-  oc wait --for=condition=ready=true pod -l ${label_selector} -n ${namespace} --timeout=${timeout}
-done
-
-namespace="openshift-serverless"
-label_selectors=("name=knative-openshift" "name=knative-openshift-ingress" "name=knative-operator")
-for label_selector in "${label_selectors[@]}"; do
-  oc wait --for=condition=ready=true pod -l ${label_selector} -n ${namespace} --timeout=${timeout}
-done
-
-echo "Wait For Deployment Replica To Be Ready"
-namespace="redhat-ods-applications"
-label_selectors=("app=rhods-dashboard" "app=notebook-controller" "app.kubernetes.io/name=modelmesh-controller" "app.kubernetes.io/name=data-science-pipelines-operator" "control-plane=kserve-controller-manager" "app.kubernetes.io/part-of=model-registry-operator")
-for label_selector in "${label_selectors[@]}"; do
-  oc get deployment -l ${label_selector} -n ${namespace} -o json | jq -e '.status | .replicas == .readyReplicas'
-done
-
-# Verify all pods are running
-oc_wait_for_pods() {
-    local ns="${1}"
-    local pods
-
-    for _ in {1..60}; do
-        echo "Waiting for pods in '${ns}' in state Running or Completed"
-        pods=$(oc get pod -n "${ns}" | grep -v "Running\|Completed" | tail -n +2)
-        echo "${pods}"
-        if [[ -z "${pods}" ]]; then
-            echo "All pods in '${ns}' are in state Running or Completed"
-            break
-        fi
-        sleep 20
-    done
-    if [[ -n "${pods}" ]]; then
-        echo "ERROR: Some pods in '${ns}' are not in state Running or Completed"
-        echo "${pods}"
-        exit 1
-    fi
+cat > upgrade_policy.json <<EOF
+{
+  "addon_id": "managed-odh",
+  "cluster_id": "${CLUSTER_ID}",
+  "schedule_type": "${UPDATE_APPROVAL}",
+  "version": "${RHOAI_VERSION}"${NEXT_UPGRADE_RUN}
 }
-oc_wait_for_pods "redhat-ods-applications"
+EOF
 
-sleep 300
-echo "OpenShfit AI addon is installed successfully"
+ocm post "/api/addons_mgmt/v1/clusters/${CLUSTER_ID}/upgrade_plans" --body upgrade_policy.json
+
+# Install RHOAI Addon
+cat > rhoai_addon.json <<EOF
+{
+  "addon": {
+    "id": "managed-odh"
+  },
+  "addon_version": {
+    "id": "${RHOAI_VERSION}"
+  },
+  "parameters": {
+    "items": []
+  }
+}
+EOF
+
+ocm post "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/addons" --body rhoai_addon.json
+
+# Wait for Operator Workloads
+echo "Wait for Operator Pods to be Ready"
+LABEL_SELECTORS_OPERATOR=("control-plane=authorino-operator" "authorino-component=authorino-webhooks" "name=istio-operator")
+for selector in "${LABEL_SELECTORS_OPERATOR[@]}"; do
+  oc wait --for=condition=ready pod -l "${selector}" -n "${NAMESPACE_OPERATOR}" --timeout="${TIMEOUT}"
+done
+
+LABEL_SELECTORS_SERVERLESS=("name=knative-openshift" "name=knative-openshift-ingress" "name=knative-operator")
+for selector in "${LABEL_SELECTORS_SERVERLESS[@]}"; do
+  oc wait --for=condition=ready pod -l "${selector}" -n "${NAMESPACE_SERVERLESS}" --timeout="${TIMEOUT}"
+done
+
+echo "Wait for Deployment Replicas to be Ready"
+LABEL_SELECTORS_RHOAI=(
+  "app=rhods-dashboard"
+  "app=notebook-controller"
+  "app.kubernetes.io/name=modelmesh-controller"
+  "app.kubernetes.io/name=data-science-pipelines-operator"
+  "control-plane=kserve-controller-manager"
+  "app.kubernetes.io/part-of=model-registry-operator"
+)
+
+for selector in "${LABEL_SELECTORS_RHOAI[@]}"; do
+  oc get deployment -l "${selector}" -n "${NAMESPACE_RHOAI}" -o json | jq -e '.status | .replicas == .readyReplicas'
+done
+
+oc_wait_for_pods() {
+  local ns="${1}"
+  for _ in {1..60}; do
+    echo "Waiting for pods in '${ns}' to be Running or Completed"
+    local pods
+    pods=$(oc get pod -n "${ns}" | grep -Ev "Running|Completed" | tail -n +2 || true)
+    if [[ -z "${pods}" ]]; then
+      echo "All pods in '${ns}' are Running or Completed"
+      return
+    fi
+    echo "${pods}"
+    sleep 20
+  done
+  echo "ERROR: Some pods in '${ns}' are not in Running or Completed state"
+  echo "${pods}"
+  exit 1
+}
+
+oc_wait_for_pods "${NAMESPACE_RHOAI}"
+
+echo "OpenShift AI addon is installed successfully"
