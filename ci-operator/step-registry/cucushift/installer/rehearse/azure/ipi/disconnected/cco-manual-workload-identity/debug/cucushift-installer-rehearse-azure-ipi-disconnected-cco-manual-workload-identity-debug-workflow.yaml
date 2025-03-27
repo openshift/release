@@ -1,0 +1,34 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity-debug
+  steps:
+    pre:
+      - ref: azure-provision-resourcegroup
+      - ref: azure-provision-vnet
+#      - chain: azure-provision-bastionhost
+      - ref: openshift-cluster-bot-rbac
+#      - chain: mirror-images-payload
+      - chain: ipi-conf-azure
+      - ref: ipi-conf-manual-creds
+#      - ref: ipi-conf-mirror
+      - ref: ipi-conf-azure-provisionednetwork
+      - chain: azure-provision-service-principal-minimal-permission
+      - ref: ipi-conf-azure-oidc-creds-provision
+      - ref: ipi-conf-azure-provisioned-resourcegroup
+#      - ref: ipi-install-install
+#      - ref: ipi-install-times-collection
+#      - ref: enable-qe-catalogsource-disconnected
+#      - ref: mirror-images-tag-images
+#      - ref: set-sample-operator-disconnected
+#      - chain: cucushift-installer-check
+    post:
+      - chain: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity-deprovision
+    env:
+      RESTRICTED_NETWORK: "yes"
+  documentation: |-
+    The IPI workflow provides provision- and deprovision- steps that provision and
+    deprovision an OpenShift disconnected & private cluster with AZURE workload identity, 
+    allowing job authors to inject their own end-to-end test logic.
+    All modifications to this workflow should be done by modifying the
+    `cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity-{provision,deprovision}` 
+    chains to allow other workflows to mimic and extend this base workflow without 
+    a need to backport changes.
