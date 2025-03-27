@@ -172,6 +172,9 @@ if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
 fi
 
+if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+fi
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
