@@ -223,6 +223,9 @@ cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
+cp "${INSTALL_DIR}/.openshift*" "${ARTIFACT_DIR}/"
+
+
 # Copy coreos stream file so the observer pod can check if the correct live image was booted
 echo -e "\nGenerating coreOS stream file..."
 

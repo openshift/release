@@ -15,4 +15,5 @@ cat >> "${CONFIG}" << EOF
 proxy:
   httpProxy: ${proxy_private_url}
   httpsProxy: ${proxy_private_url}
+  noProxy: 192.168.80.0/22
 EOF
