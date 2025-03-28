@@ -54,12 +54,14 @@ function upload_metrics(){
 }
 
 function get_baseline(){
-    python scripts/nope.py baseline --fetch "$WORKLOAD"
+    pushd /scripts
+    python nope.py baseline --fetch "$WORKLOAD"
     BASELINE_UUID=$(jq '.BASELINE_UUID' < /tmp/data/baseline.json)
     export BASELINE_UUID
 }
 
 function generate_metrics_sheet(){
+    pushd /tmp
     git clone -b main --depth=1 $E2E_BENCHMARKING_REPO_URL
     export CONFIG_LOC="$PWD/scripts/queries"
     export COMPARISON_CONFIG="netobserv_touchstone_statistics_config.json"
@@ -68,17 +70,17 @@ function generate_metrics_sheet(){
     pushd e2e-benchmarking/utils && source compare.sh
     # generate metrics sheet
     run_benchmark_comparison > "$ARTIFACT_DIR/benchmark_csv.log"
-    popd
 }
 
 function update_sheet(){
-    pushd scripts/sheets || exit
+    pushd /scripts/sheets
     enable_venv
     install_requirements requirements.txt
     python noo_perfsheets_update.py --sheet-id "$1" --uuid1 "$UUID" --uuid2 "$BASELINE_UUID" --service-account "$GSHEET_KEY_LOCATION"
 }
 
 function do_comparison(){
+    pushd /tmp
     export TOLERANCE_LOC="$PWD/scripts/queries"
     export TOLERANCY_RULES="netobserv_touchstone_tolerancy_rules.yaml"
     export COMPARISON_CONFIG="netobserv_touchstone_tolerancy_config.json"
@@ -88,7 +90,6 @@ function do_comparison(){
     # get the SHEET ID from the benchmark_comparison run logs
     COMP_SHEET_ID=$(grep Google "$ARTIFACT_DIR/benchmark_comp.log" | awk '{print $6}')
     update_sheet "$COMP_SHEET_ID"
-    popd
 }
 
 upload_metrics
