@@ -9,6 +9,8 @@ set -o pipefail
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 API_VIP="$(yq .api_vip "$SHARED_DIR/vips.yaml")"
 INGRESS_VIP="$(yq .ingress_vip "$SHARED_DIR/vips.yaml")"
+API_VIP_V6="$(yq .api_vip_v6 "$SHARED_DIR/vips.yaml")"
+INGRESS_VIP_V6="$(yq .ingress_vip_v6 "$SHARED_DIR/vips.yaml")"
 SSH=""
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -63,22 +65,25 @@ stats uri /stats
 listen api-server-6443
     bind :::6443
     mode tcp
-    server api_vip $API_VIP:6443 check inter 1s
+    server api $API_VIP:6443 check inter 1s
+    server apiv6 [$API_VIP_V6]:6443 check inter 1s
 listen machine-config-server-22623
     bind :::22623
     mode tcp
-    server api_vip $API_VIP:22623 check inter 1s
-
+    server api $API_VIP:22623 check inter 1s
+    server apiv6 [$API_VIP_V6]:22623 check inter 1s
 listen ingress-router-80
     bind :::80
     mode tcp
     balance source
-    server api_vip $INGRESS_VIP:80 check inter 1s
+    server ingress $INGRESS_VIP:80 check inter 1s
+    server ingressv6 [$INGRESS_VIP_V6]:80 check inter 1s
 listen ingress-router-443
     bind :::443
     mode tcp
     balance source
-    server api_vip $INGRESS_VIP:443 check inter 1s
+    server ingress $INGRESS_VIP:443 check inter 1s
+    server ingressv6 [$INGRESS_VIP_V6]:443 check inter 1s
 $SSH
 EOF
 
