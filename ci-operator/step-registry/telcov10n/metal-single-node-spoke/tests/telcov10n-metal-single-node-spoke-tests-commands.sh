@@ -7,6 +7,8 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
+
 function set_spoke_cluster_kubeconfig {
 
   echo "************ telcov10n Set Spoke kubeconfig ************"
@@ -16,34 +18,6 @@ function set_spoke_cluster_kubeconfig {
   # secret_adm_pass=${SPOKE_CLUSTER_NAME}-admin-password
 
   export KUBECONFIG="${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
-}
-
-function run_script_in_the_spoke_cluster {
-  local helper_img="${SPOKE_HELPER_IMG}"
-  local script_file=$1
-  shift && local ns=$1
-  [ $# -gt 1 ] && shift && local pod_name="${1}"
-
-  set -x
-  if [[ "${pod_name:="--rm spoke-script"}" != "--rm spoke-script" ]]; then
-    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
-      oc -n ${ns} run ${pod_name} \
-        --image=${helper_img} --restart=Never -- sleep infinity ; \
-      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
-    }
-    oc -n ${ns} exec -i ${pod_name} -- \
-      bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
-  else
-    oc -n ${ns} run -i ${pod_name} \
-      --image=${helper_img} --restart=Never -- \
-        bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  fi
-  set +x
 }
 
 ##############################################################################################################
@@ -128,7 +102,7 @@ ls -l
 EOF
 
   spoke_cluster_project="default"
-  run_script_in_the_spoke_cluster ${run_script} ${spoke_cluster_project} "spoke-cluster-pod-helper" "done"
+  run_script_on_ocp_cluster ${run_script} ${spoke_cluster_project} "spoke-cluster-pod-helper" "done"
 }
 
 function test_spoke_deployment {

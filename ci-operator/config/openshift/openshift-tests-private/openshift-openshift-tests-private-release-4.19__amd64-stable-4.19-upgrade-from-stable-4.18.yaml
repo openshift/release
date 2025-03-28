@@ -121,6 +121,21 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: azure-ipi-disc-oidc-oc-mirror-f28-ota
+  cron: 17 9 3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MIRROR_BIN: oc-mirror
+      MIRROR_GRAPH_DATA: "true"
+    test:
+    - ref: cucushift-upgrade-mirror-images-by-oc-mirror
+    - ref: cucushift-upgrade-prehealthcheck
+    - ref: cucushift-upgrade-toimage
+    - ref: cucushift-upgrade-healthcheck
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
 - as: azure-mag-ipi-fips-f28
   cron: 56 20 30 * *
   steps:
@@ -162,7 +177,6 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
     test:
-    - ref: nutanix-upgrade-pre-config
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-minimal-permission
 - as: vsphere-ipi-disc-f28

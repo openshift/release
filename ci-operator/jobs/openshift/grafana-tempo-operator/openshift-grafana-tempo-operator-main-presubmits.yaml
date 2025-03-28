@@ -64,14 +64,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build03
     context: ci/prow/tempo-product-ocp-4.12-stage-tempo-stage-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
       ci-operator.openshift.io/variant: tempo-product-ocp-4.12-stage
       ci.openshift.io/generator: prowgen
       job-release: "4.12"
@@ -83,8 +81,8 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=tempo-stage-tests
@@ -98,14 +96,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -118,15 +116,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -397,263 +392,6 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/tempo-product-ocp-4.14-stage-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.14-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.14"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.14-stage-images
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.14-stage-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=tempo-product-ocp-4.14-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )tempo-product-ocp-4.14-stage-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/tempo-product-ocp-4.14-stage-tempo-stage-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.14-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.14"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.14-stage-tempo-stage-tests
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.14-stage-tempo-stage-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-stage-tests
-        - --variant=tempo-product-ocp-4.14-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.14-stage-tempo-stage-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/tempo-product-ocp-4.15-ibm-z-stage-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.15-ibm-z-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.15-ibm-z-stage-images
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.15-ibm-z-stage-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=tempo-product-ocp-4.15-ibm-z-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )tempo-product-ocp-4.15-ibm-z-stage-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/tempo-product-ocp-4.15-ibm-z-stage-tempo-stage-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.15-ibm-z-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.15-ibm-z-stage-tempo-stage-tests
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.15-ibm-z-stage-tempo-stage-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-stage-tests
-        - --variant=tempo-product-ocp-4.15-ibm-z-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.15-ibm-z-stage-tempo-stage-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
     context: ci/prow/tempo-product-ocp-4.15-lp-interop-images
     decorate: true
     decoration_config:
@@ -771,18 +509,18 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/tempo-product-ocp-4.15-stage-images
+    context: ci/prow/tempo-product-ocp-4.16-ibm-z-stage-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.15-stage
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.16-ibm-z-stage
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.15-stage-images
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-ibm-z-stage-images
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.15-stage-images
+    rerun_command: /test tempo-product-ocp-4.16-ibm-z-stage-images
     spec:
       containers:
       - args:
@@ -790,7 +528,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=tempo-product-ocp-4.15-stage
+        - --variant=tempo-product-ocp-4.16-ibm-z-stage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -823,157 +561,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )tempo-product-ocp-4.15-stage-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )tempo-product-ocp-4.16-ibm-z-stage-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/tempo-product-ocp-4.15-stage-tempo-stage-tests
+    context: ci/prow/tempo-product-ocp-4.16-ibm-z-stage-tempo-stage-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.15-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.15-stage-tempo-stage-tests
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.15-stage-tempo-stage-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-stage-tests
-        - --variant=tempo-product-ocp-4.15-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.15-stage-tempo-stage-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/tempo-product-ocp-4.16-ibm-p-stage-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.16-ibm-p-stage
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.16-ibm-z-stage
       ci.openshift.io/generator: prowgen
       job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-ibm-p-stage-images
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-ibm-z-stage-tempo-stage-tests
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.16-ibm-p-stage-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=tempo-product-ocp-4.16-ibm-p-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )tempo-product-ocp-4.16-ibm-p-stage-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/tempo-product-ocp-4.16-ibm-p-stage-tempo-stage-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.16-ibm-p-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-ibm-p-stage-tempo-stage-tests
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.16-ibm-p-stage-tempo-stage-tests
+    rerun_command: /test tempo-product-ocp-4.16-ibm-z-stage-tempo-stage-tests
     spec:
       containers:
       - args:
@@ -982,7 +588,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=tempo-stage-tests
-        - --variant=tempo-product-ocp-4.16-ibm-p-stage
+        - --variant=tempo-product-ocp-4.16-ibm-z-stage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1021,7 +627,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.16-ibm-p-stage-tempo-stage-tests|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.16-ibm-z-stage-tempo-stage-tests|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1145,18 +751,18 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/tempo-product-ocp-4.16-stage-images
+    context: ci/prow/tempo-product-ocp-4.17-fips-stage-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.16-stage
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-fips-stage
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-stage-images
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-fips-stage-images
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.16-stage-images
+    rerun_command: /test tempo-product-ocp-4.17-fips-stage-images
     spec:
       containers:
       - args:
@@ -1164,7 +770,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=tempo-product-ocp-4.16-stage
+        - --variant=tempo-product-ocp-4.17-fips-stage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1197,105 +803,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )tempo-product-ocp-4.16-stage-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )tempo-product-ocp-4.17-fips-stage-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build07
-    context: ci/prow/tempo-product-ocp-4.16-stage-tempo-stage-tests
+    context: ci/prow/tempo-product-ocp-4.17-fips-stage-tempo-stage-tests-fips
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.16-stage
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-fips-stage
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-stage-tempo-stage-tests
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-fips-stage-tempo-stage-tests-fips
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.16-stage-tempo-stage-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-stage-tests
-        - --variant=tempo-product-ocp-4.16-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.16-stage-tempo-stage-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build07
-    context: ci/prow/tempo-product-ocp-4.16-stage-tempo-stage-tests-fips
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.16-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.16-stage-tempo-stage-tests-fips
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.16-stage-tempo-stage-tests-fips
+    rerun_command: /test tempo-product-ocp-4.17-fips-stage-tempo-stage-tests-fips
     spec:
       containers:
       - args:
@@ -1305,7 +833,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=tempo-stage-tests-fips
-        - --variant=tempo-product-ocp-4.16-stage
+        - --variant=tempo-product-ocp-4.17-fips-stage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1353,7 +881,132 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.16-stage-tempo-stage-tests-fips|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.17-fips-stage-tempo-stage-tests-fips|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/tempo-product-ocp-4.17-ibm-p-stage-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-ibm-p-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-ibm-p-stage-images
+    path_alias: github.com/grafana/tempo-operator
+    rerun_command: /test tempo-product-ocp-4.17-ibm-p-stage-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=tempo-product-ocp-4.17-ibm-p-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )tempo-product-ocp-4.17-ibm-p-stage-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/tempo-product-ocp-4.17-ibm-p-stage-tempo-stage-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-ibm-p-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-ibm-p-stage-tempo-stage-tests
+    path_alias: github.com/grafana/tempo-operator
+    rerun_command: /test tempo-product-ocp-4.17-ibm-p-stage-tempo-stage-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=tempo-stage-tests
+        - --variant=tempo-product-ocp-4.17-ibm-p-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.17-ibm-p-stage-tempo-stage-tests|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1478,221 +1131,6 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/tempo-product-ocp-4.17-stage-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-stage-images
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.17-stage-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=tempo-product-ocp-4.17-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )tempo-product-ocp-4.17-stage-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build07
-    context: ci/prow/tempo-product-ocp-4.17-stage-tempo-stage-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-stage-tempo-stage-tests
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.17-stage-tempo-stage-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-stage-tests
-        - --variant=tempo-product-ocp-4.17-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.17-stage-tempo-stage-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build07
-    context: ci/prow/tempo-product-ocp-4.17-stage-tempo-stage-tests-fips
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-      ci-operator.openshift.io/variant: tempo-product-ocp-4.17-stage
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.17-stage-tempo-stage-tests-fips
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test tempo-product-ocp-4.17-stage-tempo-stage-tests-fips
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-stage-tests-fips
-        - --variant=tempo-product-ocp-4.17-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.17-stage-tempo-stage-tests-fips|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
     context: ci/prow/tempo-product-ocp-4.18-lp-interop-images
     decorate: true
     decoration_config:
@@ -1752,77 +1190,18 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-ci-index-tempo-bundle
+    context: ci/prow/tempo-product-ocp-4.18-stage-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.18-stage
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-ci-index-tempo-bundle
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.18-stage-images
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-ci-index-tempo-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-tempo-bundle
-        - --variant=upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-ci-index-tempo-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
-      ci.openshift.io/generator: prowgen
-      job-release: "4.14"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-images
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-images
+    rerun_command: /test tempo-product-ocp-4.18-stage-images
     spec:
       containers:
       - args:
@@ -1830,7 +1209,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
+        - --variant=tempo-product-ocp-4.18-stage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1863,287 +1242,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build02
-    context: ci/prow/upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-tempo-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-      ci-operator.openshift.io/variant: upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
-      ci.openshift.io/generator: prowgen
-      job-release: "4.14"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-tempo-e2e-tests
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-tempo-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-e2e-tests
-        - --variant=upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(upstream-ocp-4.14-amd64-gcp-ipi-ovn-ipsec-tempo-e2e-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/upstream-ocp-4.15-amd64-aws-ci-index-tempo-bundle
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.15-amd64-aws
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.15-amd64-aws-ci-index-tempo-bundle
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.15-amd64-aws-ci-index-tempo-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-tempo-bundle
-        - --variant=upstream-ocp-4.15-amd64-aws
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-ocp-4.15-amd64-aws-ci-index-tempo-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/upstream-ocp-4.15-amd64-aws-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.15-amd64-aws
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.15-amd64-aws-images
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.15-amd64-aws-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=upstream-ocp-4.15-amd64-aws
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-ocp-4.15-amd64-aws-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )tempo-product-ocp-4.18-stage-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/upstream-ocp-4.15-amd64-aws-security-sast
+    context: ci/prow/tempo-product-ocp-4.18-stage-tempo-stage-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.15-amd64-aws
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.18-stage
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.15-amd64-aws-security-sast
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.18-stage-tempo-stage-tests
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.15-amd64-aws-security-sast
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security-sast
-        - --variant=upstream-ocp-4.15-amd64-aws
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(upstream-ocp-4.15-amd64-aws-security-sast|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/upstream-ocp-4.15-amd64-aws-tempo-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.15-amd64-aws
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.15-amd64-aws-tempo-e2e-tests
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.15-amd64-aws-tempo-e2e-tests
+    rerun_command: /test tempo-product-ocp-4.18-stage-tempo-stage-tests
     spec:
       containers:
       - args:
@@ -2152,8 +1269,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=tempo-e2e-tests
-        - --variant=upstream-ocp-4.15-amd64-aws
+        - --target=tempo-stage-tests
+        - --variant=tempo-product-ocp-4.18-stage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2198,84 +1315,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-ocp-4.15-amd64-aws-tempo-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )(tempo-product-ocp-4.18-stage-tempo-stage-tests|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-ci-index-tempo-bundle
+    context: ci/prow/tempo-product-ocp-4.19-lp-interop-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
+      ci-operator.openshift.io/variant: tempo-product-ocp-4.19-lp-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-ci-index-tempo-bundle
+    name: pull-ci-openshift-grafana-tempo-operator-main-tempo-product-ocp-4.19-lp-interop-images
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-ci-index-tempo-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-tempo-bundle
-        - --variant=upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-ci-index-tempo-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-images
-    path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-images
+    rerun_command: /test tempo-product-ocp-4.19-lp-interop-images
     spec:
       containers:
       - args:
@@ -2283,7 +1341,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
+        - --variant=tempo-product-ocp-4.19-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2316,37 +1374,219 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )tempo-product-ocp-4.19-lp-interop-images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build07
-    context: ci/prow/upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-tempo-e2e-tests
+    cluster: build03
+    context: ci/prow/upstream-ocp-4.12-amd64-aws-ci-index-tempo-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-      ci-operator.openshift.io/variant: upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
+      ci-operator.openshift.io/variant: upstream-ocp-4.12-amd64-aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-tempo-e2e-tests
+    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.12-amd64-aws-ci-index-tempo-bundle
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-tempo-e2e-tests
+    rerun_command: /test upstream-ocp-4.12-amd64-aws-ci-index-tempo-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index-tempo-bundle
+        - --variant=upstream-ocp-4.12-amd64-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )upstream-ocp-4.12-amd64-aws-ci-index-tempo-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/upstream-ocp-4.12-amd64-aws-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: upstream-ocp-4.12-amd64-aws
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.12-amd64-aws-images
+    path_alias: github.com/grafana/tempo-operator
+    rerun_command: /test upstream-ocp-4.12-amd64-aws-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=upstream-ocp-4.12-amd64-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )upstream-ocp-4.12-amd64-aws-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/upstream-ocp-4.12-amd64-aws-security-sast-tempo
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: upstream-ocp-4.12-amd64-aws
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.12-amd64-aws-security-sast-tempo
+    path_alias: github.com/grafana/tempo-operator
+    rerun_command: /test upstream-ocp-4.12-amd64-aws-security-sast-tempo
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=security-sast-tempo
+        - --variant=upstream-ocp-4.12-amd64-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(upstream-ocp-4.12-amd64-aws-security-sast-tempo|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/upstream-ocp-4.12-amd64-aws-tempo-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: upstream-ocp-4.12-amd64-aws
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-ocp-4.12-amd64-aws-tempo-e2e-tests
+    path_alias: github.com/grafana/tempo-operator
+    rerun_command: /test upstream-ocp-4.12-amd64-aws-tempo-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=tempo-e2e-tests
-        - --variant=upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts
+        - --variant=upstream-ocp-4.12-amd64-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2356,14 +1596,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -2376,15 +1616,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2394,25 +1631,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(upstream-ocp-4.16-amd64-aws-ipi-shared-vpc-phz-sts-tempo-e2e-tests|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )upstream-ocp-4.12-amd64-aws-tempo-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/upstream-upgrade-ocp-4.17-amd64-azure-ci-index-tempo-bundle
+    context: ci/prow/upstream-upgrade-ocp-4.18-amd64-aws-ci-index-tempo-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: upstream-upgrade-ocp-4.17-amd64-azure
+      ci-operator.openshift.io/variant: upstream-upgrade-ocp-4.18-amd64-aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-upgrade-ocp-4.17-amd64-azure-ci-index-tempo-bundle
+    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-upgrade-ocp-4.18-amd64-aws-ci-index-tempo-bundle
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-upgrade-ocp-4.17-amd64-azure-ci-index-tempo-bundle
+    rerun_command: /test upstream-upgrade-ocp-4.18-amd64-aws-ci-index-tempo-bundle
     spec:
       containers:
       - args:
@@ -2420,7 +1657,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=ci-index-tempo-bundle
-        - --variant=upstream-upgrade-ocp-4.17-amd64-azure
+        - --variant=upstream-upgrade-ocp-4.18-amd64-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2453,25 +1690,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-upgrade-ocp-4.17-amd64-azure-ci-index-tempo-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )upstream-upgrade-ocp-4.18-amd64-aws-ci-index-tempo-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/upstream-upgrade-ocp-4.17-amd64-azure-images
+    context: ci/prow/upstream-upgrade-ocp-4.18-amd64-aws-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: upstream-upgrade-ocp-4.17-amd64-azure
+      ci-operator.openshift.io/variant: upstream-upgrade-ocp-4.18-amd64-aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-upgrade-ocp-4.17-amd64-azure-images
+    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-upgrade-ocp-4.18-amd64-aws-images
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-upgrade-ocp-4.17-amd64-azure-images
+    rerun_command: /test upstream-upgrade-ocp-4.18-amd64-aws-images
     spec:
       containers:
       - args:
@@ -2479,7 +1716,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=upstream-upgrade-ocp-4.17-amd64-azure
+        - --variant=upstream-upgrade-ocp-4.18-amd64-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2512,37 +1749,35 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-upgrade-ocp-4.17-amd64-azure-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )upstream-upgrade-ocp-4.18-amd64-aws-images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/upstream-upgrade-ocp-4.17-amd64-azure-tempo-operator-upgrade
+    context: ci/prow/upstream-upgrade-ocp-4.18-amd64-aws-tempo-operator-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
-      ci-operator.openshift.io/variant: upstream-upgrade-ocp-4.17-amd64-azure
+      ci-operator.openshift.io/variant: upstream-upgrade-ocp-4.18-amd64-aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-upgrade-ocp-4.17-amd64-azure-tempo-operator-upgrade
+    name: pull-ci-openshift-grafana-tempo-operator-main-upstream-upgrade-ocp-4.18-amd64-aws-tempo-operator-upgrade
     path_alias: github.com/grafana/tempo-operator
-    rerun_command: /test upstream-upgrade-ocp-4.17-amd64-azure-tempo-operator-upgrade
+    rerun_command: /test upstream-upgrade-ocp-4.18-amd64-aws-tempo-operator-upgrade
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=tempo-operator-upgrade
-        - --variant=upstream-upgrade-ocp-4.17-amd64-azure
+        - --variant=upstream-upgrade-ocp-4.18-amd64-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2552,15 +1787,15 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2572,15 +1807,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2590,4 +1822,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(upstream-upgrade-ocp-4.17-amd64-azure-tempo-operator-upgrade|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )upstream-upgrade-ocp-4.18-amd64-aws-tempo-operator-upgrade,?($|\s.*)

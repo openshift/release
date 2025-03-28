@@ -59,17 +59,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ci
+- always_run: false
+  as: ci
   commands: make ci-job
   container:
     from: src
+  skip_if_only_changed: \.tekton/.*
 - as: ztp-ci
   commands: make ztp-ci-job
   container:
     from: src
   run_if_changed: ^ztp
-- as: e2e-aws-ci-tests
-  skip_if_only_changed: ^ztp
+- always_run: false
+  as: e2e-aws-ci-tests
+  skip_if_only_changed: ^ztp|\.tekton/.*
   steps:
     cluster_profile: aws-telco
     env:
@@ -84,7 +87,8 @@ tests:
         ci-org-name openshift-kni
     test:
     - as: e2e-aws-ci-tests
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" TARGET_RELEASE=release-4.19
+        make functests-on-ci
       from: src
       resources:
         requests:
@@ -117,16 +121,16 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-ovn
-- as: security
+- always_run: false
+  as: security
   optional: true
-  skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  skip_if_only_changed: \.tekton/.*|^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     env:
       PROJECT_NAME: cnf-features-deploy
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
-- always_run: false
-  as: e2e-telco5g-cnftests
+- as: e2e-telco5g-cnftests
   cluster: build05
   optional: true
   restrict_network_access: false
@@ -139,8 +143,7 @@ tests:
       T5CI_VERSION: "4.19"
     workflow: telco5g-cnf
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-telco5g-sno-cnftests
+- as: e2e-telco5g-sno-cnftests
   cluster: build05
   optional: true
   restrict_network_access: false
@@ -152,8 +155,7 @@ tests:
       T5CI_JOB_TYPE: sno-cnftests
       T5CI_VERSION: "4.19"
     workflow: telco5g-sno-cnf
-- always_run: false
-  as: e2e-telco5g-hcp-cnftests
+- as: e2e-telco5g-hcp-cnftests
   cluster: build05
   optional: true
   restrict_network_access: false

@@ -1,0 +1,80 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build01-9hdwj
+  name: build01-9hdwj-worker-gpu-amd64-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build01-9hdwj
+      machine.openshift.io/cluster-api-machineset: build01-9hdwj-worker-gpu-amd64-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build01-9hdwj
+        machine.openshift.io/cluster-api-machine-role: worker-gpu
+        machine.openshift.io/cluster-api-machine-type: worker-gpu
+        machine.openshift.io/cluster-api-machineset: build01-9hdwj-worker-gpu-amd64-us-east-1a
+    spec:
+      metadata: {}
+      providerSpec:
+        value:
+          ami:
+            id: ami-01d27bac546351489
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 3000
+              kmsKey:
+                arn: ""
+              volumeSize: 200
+              volumeType: gp2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build01-9hdwj-worker-profile
+          instanceType: g6.2xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build01-9hdwj-worker-sg
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - build01-9hdwj-private-us-east-1a
+          tags:
+          - name: kubernetes.io/cluster/build01-9hdwj
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        value: 'true'
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build01-9hdwj-worker-gpu-amd64-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 1
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build01-9hdwj-worker-gpu-amd64-us-east-1a

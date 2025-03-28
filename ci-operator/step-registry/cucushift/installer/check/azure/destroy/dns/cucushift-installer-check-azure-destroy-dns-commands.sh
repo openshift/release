@@ -20,6 +20,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -32,6 +33,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 function run_command() {
     local CMD="$1"
@@ -48,7 +50,7 @@ check_result=0
 
 # case-1: ensure all cluster dns records are cleaned, even cluster resource group is removed prior to destoyer
 dns_record_after_destroy=$(mktemp)
-run_command "az network dns record-set list -g ${base_domain_rg} -z ${base_domain} --query \"[?contains(name, '$cluster_name')]\" -o json | tee ${dns_record_after_destroy}"
+run_command "az network dns record-set list -g ${base_domain_rg} -z ${base_domain} --query '[?contains(name, \`$cluster_name\`) && !contains(name, \`mirror-registry\`)]' -o json | tee ${dns_record_after_destroy}"
 dns_record_set_len=$(jq '.|length' "${dns_record_after_destroy}")
 if [[ ${dns_record_set_len} -ne 0 ]]; then
     echo "Some cluter dns records are left after cluster is destroyed, something is wrong, please check!"
