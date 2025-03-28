@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+################################################################################
+# This script uses the following parameters from CI jobs.
+#
+# CLUSTER_PROFILE_NAME - Specifies the profile name.  "vsphere-elastic" uses VMC
+#      to assign configurations.
+# MULTI_NIC_IPI - Enables the script to create multiple networks in each failure
+#      domain.
+# VSPHERE_MULTI_NETWORKS - Configures script to create a unique subnet for each
+#      failure domain.
+################################################################################
+
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   echo "using legacy sibling of this step"
   exit 0
@@ -247,6 +258,7 @@ fi
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 # create a lease for each pool
+POOL_INDEX=0
 for POOL in "${pools[@]}"; do
   log "creating lease for pool ${POOL}"
   requiredPool=""
@@ -254,11 +266,21 @@ for POOL in "${pools[@]}"; do
     requiredPool="required-pool: $POOL"
     log "setting required pool ${requiredPool}"
   fi
+
   networks_number=1
   # Base vs private ci jobs use different flags to represent multi nic.  If either is set, increase number to 2 networks.
-  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" || "${MULTI_NIC_IPI:-}" == "true" ]]; then
+  # Future change will change this to be an integer and allow jobs to pass in the number of networks to acquire.
+  if [[ "${MULTI_NIC_IPI:-}" == "true" ]]; then
     networks_number=2
   fi
+
+  # For this flag, we need to make sure each FD has a unique name so it gets a unique subnet.
+  unique_name=""
+  if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]]; then
+    unique_name="-${POOL_INDEX}"
+    POOL_INDEX=$((POOL_INDEX + 1))
+  fi
+
   # shellcheck disable=SC1078
   echo "apiVersion: vspherecapacitymanager.splat.io/v1
 kind: Lease
@@ -269,7 +291,7 @@ metadata:
   labels:
     cluster-id: \"${cluster_name}\"
     vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
-    boskos-lease-id: \"${LEASED_RESOURCE}\"
+    boskos-lease-id: \"${LEASED_RESOURCE}${unique_name}\"
     job-name: \"${JOB_NAME_SAFE}\"
 spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
@@ -307,7 +329,7 @@ LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECO
 for LEASE in $LEASES; do
   log "getting lease ${LEASE}"
   oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${LEASE}" -o json > /tmp/lease.json
-  VCENTER=$(jq -r '.status.server' < /tmp/lease.json )
+  VCENTER=$(jq -r '.status.name' < /tmp/lease.json )
 
   log "got lease ${LEASE}"
 
@@ -400,7 +422,7 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   datastore=$(jq -r '.spec.topology.datastore' < /tmp/pool.json)
 
   # Populate network from our map.  Add quotes around the comma for json creation below
-  network="${vcenter_portgroups[$server]/,/\",\"}"
+  network="${vcenter_portgroups[$RESOURCE_POOL]/,/\",\"}"
   if [ $IPI -eq 0 ]; then
     resource_pool=${cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
   else
