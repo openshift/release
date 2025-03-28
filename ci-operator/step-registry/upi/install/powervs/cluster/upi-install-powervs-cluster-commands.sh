@@ -281,9 +281,11 @@ function configure_terraform() {
     echo "${POWERVS_SERVICE_INSTANCE_ID}" > "${SHARED_DIR}"/POWERVS_SERVICE_INSTANCE_ID
 
     echo "Release Image used is:"
-    curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
-    jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0].payload' /tmp/versions.json > /tmp/target_version
-    TARGET_VERSION="$(< /tmp/target_version)"
+    openshift-install version | grep 
+    #curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
+    #jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0].payload' /tmp/versions.json > /tmp/target_version
+    #TARGET_VERSION="$(< /tmp/target_version)"
+    TARGET_VERSION="$(openshift-install version | grep 'release image ' | awk '{print $NF}')"
     export TARGET_VERSION
     echo "${TARGET_VERSION}"
 
