@@ -30,6 +30,9 @@ chain:
     - name: HYPERSHIFT_AZURE_CP_MI
       default: "false"
       documentation: Specifies whether control plane components should authenticate to Azure using managed identities.
+    - name: HYPERSHIFT_AZURE_DP_MI
+      default: "false"
+      documentation: Specifies whether data plane components should authenticate to Azure using managed identities.
     - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
       default: ""
       documentation: "Specifies the type of storage account for storing diagnostics data."
@@ -178,7 +181,9 @@ chain:
         --azure-creds ${AZURE_CREDS} \
         --location ${HC_LOCATION} \
         --release-image ${RELEASE_IMAGE} \
+        # --release-image registry.build06.ci.openshift.org/ci-ln-15rjgrk/release:latest \
         --encryption-key-id=${ENCRYPTION_KEY_ID} \
+        # --control-plane-operator-image=quay.io/pewang/hcp:cpo \
         --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
         --resource-group-name=${RESOURCE_GROUP_NAME} \
         --vnet-id=${VNET_ID} \
@@ -205,6 +210,10 @@ chain:
         else
           COMMAND+=(--managed-identities-file "${SHARED_DIR}/hypershift_azure_mi_file.json")
         fi
+      fi
+
+      if [[ $HYPERSHIFT_AZURE_DP_MI == "true" ]]; then
+        COMMAND+=(--data-plane-identities-file "${SHARED_DIR}/hypershift_azure_data_plane_identities_file.json")
       fi
       
       HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
@@ -286,8 +295,13 @@ chain:
         "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
-      
-      "${COMMAND[@]}"
+
+      echo "Running command: ${COMMAND[@]}" > /tmp/create_hc_commands
+
+      ("${COMMAND[@]}" || true)
+
+      # keep the aks for debugging
+      sleep 12h
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
@@ -322,13 +336,15 @@ chain:
           oc get clusterversion 2>/dev/null || true
           sleep 1s
       done
+      echo "Hosted cluster cluster-operators are ready"
+      sleep 12h
     from: hypershift-operator
     grace_period: 5m0s
     resources:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 45m0s
+    timeout: 24h
     credentials:
     - mount_path: /etc/ci-pull-credentials
       name: ci-pull-credentials
