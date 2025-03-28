@@ -330,11 +330,24 @@ EOF
     for ((i = 0; i < ${networkCount}; i++)); do
       getPortGroup $i
       portgroup_name=${PORTGROUP_RETVAL}
-      previousValue=""
-      if [[ -n "${vcenter_portgroups[$VCENTER]:-}" ]]; then
-        previousValue="${vcenter_portgroups[$VCENTER]}\",\""
+
+      # Check to see if portgroup already in list in the case of multiple zones
+      pgExists="false"
+      IFS=',' read -ra PG_LIST <<< "${vcenter_portgroups[$VCENTER]:- }"
+      for PG in "${PG_LIST[@]}"; do
+        if [[ "${PG}" == "${portgroup_name}" ]]; then
+          pgExists="true"
+          break
+        fi
+      done
+
+      if [[ "${pgExists}" == "false" ]]; then
+        previousValue=""
+        if [[ -n "${vcenter_portgroups[$VCENTER]:-}" ]]; then
+          previousValue="${vcenter_portgroups[$VCENTER]},"
+        fi
+        vcenter_portgroups[$VCENTER]="${previousValue}${portgroup_name}"
       fi
-      vcenter_portgroups[$VCENTER]="${previousValue}${portgroup_name}"
     done
   fi
 
@@ -386,8 +399,8 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   datacenter=$(jq -r '.spec.topology.datacenter' < /tmp/pool.json)
   datastore=$(jq -r '.spec.topology.datastore' < /tmp/pool.json)
 
-  # Populate network from our map
-  network="${vcenter_portgroups[$server]}"
+  # Populate network from our map.  Add quotes around the comma for json creation below
+  network="${vcenter_portgroups[$server]/,/\",\"}"
   if [ $IPI -eq 0 ]; then
     resource_pool=${cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
   else
