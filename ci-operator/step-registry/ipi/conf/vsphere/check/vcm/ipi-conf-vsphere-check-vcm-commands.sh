@@ -230,6 +230,7 @@ metadata:
   labels:
     vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
     boskos-lease-id: \"${LEASED_RESOURCE}\"
+    boskos-lease-group: \"${LEASED_RESOURCE}\"
     job-name: \"${JOB_NAME_SAFE}\"
     VSPHERE_BASTION_LEASED_RESOURCE: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
 spec:
@@ -292,6 +293,7 @@ metadata:
     cluster-id: \"${cluster_name}\"
     vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
     boskos-lease-id: \"${LEASED_RESOURCE}${unique_name}\"
+    boskos-lease-group: \"${LEASED_RESOURCE}\"
     job-name: \"${JOB_NAME_SAFE}\"
 spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
@@ -305,7 +307,7 @@ log "waiting for lease to be fulfilled..."
 n=0
 until [ "$n" -ge 5 ]
 do
-  if oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o json | jq -e '.items[].status?'; then
+  if oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-group="${LEASED_RESOURCE}" -o json | jq -e '.items[].status?'; then
     break
   fi
 
@@ -315,17 +317,17 @@ done
 
 if [ "$n" -ge 5 ]; then
   log "status was never available for lease, exit 1"
-  oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o yaml
+  oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-group="${LEASED_RESOURCE}" -o yaml
   exit 1
 fi
 
-oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
+oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-group="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
 
 # reconcile leases
 log "Extracting portgroups from leases..."
-LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -l boskos-lease-id="${LEASED_RESOURCE}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
+LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -l boskos-lease-group="${LEASED_RESOURCE}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
 for LEASE in $LEASES; do
   log "getting lease ${LEASE}"
   oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${LEASE}" -o json > /tmp/lease.json
