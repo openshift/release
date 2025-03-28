@@ -31,18 +31,14 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.18"
-  ubi-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   upi-installer:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
-  test-bin:
-    name: "4.18"
+  ubi-minimal:
+    name: ubi-minimal
     namespace: ocp
-    tag: hypershift-tests
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -66,13 +62,14 @@ resources:
     requests:
       cpu: "8"
       memory: 8000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: interop-opp-aws
   cron: 0 1,15 * * *
   steps:
-    cluster_profile: aws-interop-qe
+    cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: release-ci.cnv-qe.rhood.us
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG: |
@@ -124,7 +121,6 @@ tests:
     - ref: acm-policies-openshift-plus
     - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
-    - ref: stackrox-qa-e2e
   timeout: 8h0m0s
 - as: interop-opp-vsphere
   cron: 0 0 1,15 * *
@@ -143,7 +139,7 @@ tests:
               {"step": "acm-tests-obs", "failure_type": "all", "classification": "OBS testcase failure", "jira_project": "!default", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default"},
               {"step": "cucushift-installer-check-cluster-health", "failure_type": "all", "classification": "Cucushift testcase failure", "jira_project": "!default", "jira_component": ["!default"], "group": {"name": "opp-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default"},
               {"step": "acm-must-gather", "failure_type": "pod_failure", "classification": "ACM must-gather failure", "group": {"name": "opp-tests", "priority": 2}},
-              {"step": "mce-must-gather", "failure_type": "pod_failure", "classification": "MCE must-gather failure", "group": {"name": "opp-tests", "priority": 2}, "jira_additional_labels": ["!default","OPP"]}
+              {"step": "mce-must-gather", "failure_type": "pod_failure", "classification": "MCE must-gather failure", "group": {"name": "opp-tests", "priority": 2}}
             ]
         }
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
@@ -165,7 +161,6 @@ tests:
     - ref: acm-tests-obs
     - chain: cucushift-installer-check-cluster-health
     - ref: acm-opp-app
-    - ref: openshift-extended-test
     workflow: acm-ipi-vsphere
   timeout: 8h0m0s
 zz_generated_metadata:
