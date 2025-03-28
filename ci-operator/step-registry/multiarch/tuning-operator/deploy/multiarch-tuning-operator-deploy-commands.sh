@@ -6,7 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-trap 'FRC=$?; createMTOJunit; debug' EXIT TERM
+trap 'FRC=$?; createMTOJunit; sleep 14400; debug' EXIT TERM
 
 # Print deployments, pods, nodes for debug purpose
 function debug() {
