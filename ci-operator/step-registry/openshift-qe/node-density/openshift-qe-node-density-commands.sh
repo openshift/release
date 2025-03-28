@@ -31,7 +31,8 @@ export WORKLOAD=node-density
 ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
 
 # The measurable run
-PODS_PER_NODE=5
+PODS_PER_NODE=50
+POD_READY_THRESHOLD='60s'
 EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
