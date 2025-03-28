@@ -17,4 +17,4 @@ cp ${SHARED_DIR}/bastion /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
 
 cd /eco-ci-cd/
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml \
-    --extra-vars 'kubeconfig="/home/telcov10n/project/generated/'${CLUSTER_NAME}'/auth/kubeconfig" version="'${VERSION}'" operators='\'${OPERATORS}\'''
+    --extra-vars "kubeconfig="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig" version=${VERSION} operators='${OPERATORS}'"
