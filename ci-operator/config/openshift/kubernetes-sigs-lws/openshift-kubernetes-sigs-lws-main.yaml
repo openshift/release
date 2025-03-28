@@ -41,6 +41,19 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- as: test-e2e-aws
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$|^site/
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make -f Makefile-ocp.mk test-e2e-ocp
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
