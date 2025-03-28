@@ -50,11 +50,12 @@ function install_requirements(){
 function upload_metrics(){
     install_requirements scripts/requirements.txt
     python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION"
+    cp -r /tmp/data "$ARTIFACT_DIR"
 }
 
 function get_baseline(){
     python scripts/nope.py baseline --fetch "$WORKLOAD"
-    BASELINE_UUID=$(jq '.BASELINE_UUID' < data/baseline.json)
+    BASELINE_UUID=$(jq '.BASELINE_UUID' < /tmp/data/baseline.json)
     export BASELINE_UUID
 }
 
