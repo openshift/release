@@ -28,6 +28,18 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=cluster-density-v2
 
+#Support Hypershift Cluster
+cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+hypershift_pods=$(oc -n hypershift get pods| grep -v NAME |wc -l)
+if [[ $cluster_infra == "BareMetal" && $hypershift_pods -gt 1 ]];then
+        echo "Executing cluster-density-v2 in hypershift cluster"
+        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+                echo "Set http proxy for hypershift cluster"
+                . $SHARED_DIR/proxy-conf.sh
+        fi
+        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+fi
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # Run a non-indexed warmup for scheduling inconsistencies
