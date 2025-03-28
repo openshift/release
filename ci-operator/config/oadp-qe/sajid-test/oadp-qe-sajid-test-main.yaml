@@ -1,0 +1,48 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+promotion:
+  to:
+  - name: test-image-stream
+    namespace: ci
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-stable
+        upper: 4.17.0-0
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: basic-test
+  steps:
+    cluster_profile: aws-cspi-qe
+    test:
+    - as: run-test
+      commands: |
+        echo "Running basic test..."
+        echo "Hello, OpenShift CI!"
+      from: cli
+      resources:
+        limits:
+          cpu: 500m
+          memory: 500Mi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: oadp-qe
+  repo: sajid-test
