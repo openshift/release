@@ -118,6 +118,8 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/tests/chainsaw/config.yaml" ]; the
   fi
 
   cd ${HOME}/install_yamls
+  # set slow etcd profile
+  make set_slower_etcd_profile
   # Create/enable openstack namespace
   make namespace
 
