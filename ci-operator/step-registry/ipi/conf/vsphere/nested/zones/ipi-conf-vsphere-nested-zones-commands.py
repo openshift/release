@@ -19,10 +19,9 @@ cluster_name=f"{namespace}"
 platform_spec = f"""platform:
   vsphere:
     vcenters:
-      - server: {cluster_name}-vcenter-1
+      - server: {cluster_name}-1
         datacenters:
         - cidatacenter-nested-0
-        - cidatacenter-nested-1
     failureDomains:
       - server: {cluster_name}-1
         name: "zone-1"
@@ -33,17 +32,6 @@ platform_spec = f"""platform:
           computeCluster: /cidatacenter-nested-0/host/cicluster-nested-0
           datacenter: cidatacenter-nested-0
           datastore: /cidatacenter-nested-0/datastore/dsnested
-          networks:
-            - "VM Network"
-      - server: {cluster_name}-vcenter-1
-        name: "zone-2"
-        zone: "zone-2"
-        region: "region-2"
-        topology:
-          resourcePool: /cidatacenter-nested-1/host/cicluster-nested-1/Resources/ipi-ci-clusters
-          computeCluster: /cidatacenter-nested-1/host/cicluster-nested-1
-          datacenter: cidatacenter-nested-1
-          datastore: /cidatacenter-nested-1/datastore/dsnested
           networks:
             - "VM Network"
 """

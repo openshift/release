@@ -13,7 +13,6 @@ fi
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
-    cp /tmp/installer/metadata.json "${ARTIFACT_DIR}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -32,9 +31,6 @@ export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
-elif [ -f "${SHARED_DIR}/gcp_min_permissions_without_actas.json" ]; then
-  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account, which hasn't the 'iam.serviceAccounts.actAs' permission, for the minimum permissions testing on GCP..."
-  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions_without_actas.json"
 elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
