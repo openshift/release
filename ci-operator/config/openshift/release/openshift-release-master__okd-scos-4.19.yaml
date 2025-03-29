@@ -1,4 +1,36 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   upi-installer:
     name: "4.19"
     namespace: origin
@@ -41,21 +73,36 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
-- as: e2e-gcp-ovn-upgrade
+- as: e2e-gcp
   interval: 168h
   steps:
     cluster_profile: gcp-3
-    env:
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-gcp
+    workflow: openshift-e2e-gcp
 - as: e2e-vsphere-ovn
   interval: 168h
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
+- as: e2e-metal-ovn-assisted
+  interval: 168h
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
+    env:
+      ASSISTED_CONFIG: |
+        OS_IMAGES='[{"openshift_version":"4.19","cpu_architecture":"x86_64","url":"https://cloud.centos.org/centos/scos/9/prod/streams/9.0.20250222-0/x86_64/scos-9.0.20250222-0-live-iso.x86_64.iso","version": "9.0.20250222-0"}]'
+    workflow: assisted-baremetal
+- as: e2e-agent-single-node-ipv6
+  cluster: build05
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
