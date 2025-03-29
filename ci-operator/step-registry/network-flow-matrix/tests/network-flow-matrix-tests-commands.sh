@@ -1,5 +1,41 @@
 #!/bin/bash
 
+
+function pr_debug_mode_waiting {
+
+  echo "################################################################################"
+  echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
+  echo "################################################################################"
+
+  TZ=UTC
+  END_TIME=$(date -d "+3 hours" +%s)
+  debug_done=/tmp/debug.done
+
+  while sleep 1m; do
+
+    test -f ${debug_done} && break
+    echo
+    echo "-------------------------------------------------------------------"
+    echo "'${debug_done}' not found. Debugging can continue... "
+    now=$(date +%s)
+    if [ ${END_TIME} -lt ${now} ] ; then
+      echo "Time out reached. Exiting by timeout..."
+      break
+    else
+      echo "Now:     $(date -d @${now})"
+      echo "Timeout: $(date -d @${END_TIME})"
+    fi
+    echo "Note: To exit from debug mode before the timeout is reached,"
+    echo "just run the following command from the POD Terminal:"
+    echo "$ touch ${debug_done}"
+
+  done
+
+  echo
+  echo "Exiting from Pull Request debug mode..."
+}
+
+
 # Extract and format the cluster version to branch
 cluster_version_to_branch() {
   version=$(oc version | grep "Server Version:" | awk '{print $3}')
@@ -39,6 +75,9 @@ git clone https://github.com/openshift-kni/commatrix ${SHARED_DIR}/commatrix
 pushd ${SHARED_DIR}/commatrix || exit
 git checkout ${BRANCH}
 go mod vendor
+
+pr_debug_mode_waiting
+
 EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" SUITE="${SUITE}" \
 OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE}" OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT}" make e2e-test
 popd || exit
