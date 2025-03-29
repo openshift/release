@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.17"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -14,13 +14,13 @@ base_images:
   tests-private-ui:
     name: tests-private-ui
     namespace: ci
-    tag: "4.17"
+    tag: "4.14"
   tools:
-    name: "4.18"
+    name: "4.17"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.18"
+    name: "4.17"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -29,7 +29,13 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.17"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -38,25 +44,25 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: gcp-ipi-fips-f7-logging
-  cron: 18 10 11,28 * *
+- as: gcp-ipi-sdn-fips-f28-logging
+  cron: 6 22 17 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: e2-standard-8
+      E2E_RUN_TAGS: '@logging5.8'
       FILTERS_ADDITIONAL: ""
       FIPS_ENABLED: "true"
       FORCE_SUCCESS_EXIT: "true"
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.1
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.8
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.1", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
         ]
       TEST_ADDITIONAL: ""
-      TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~WIF&;~STS&;~AZMonitor&
+      TEST_FILTERS: kafka
       TEST_IMPORTANCE: ""
       TEST_PARALLEL: "3"
       TEST_ROSA_LOGIN_ENV: ""
@@ -66,9 +72,9 @@ tests:
     - ref: enable-qe-catalogsource-logging
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi-sdn
 zz_generated_metadata:
-  branch: release-4.18
+  branch: release-4.17
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-openshift-logging-6.1
+  variant: amd64-nightly-openshift-logging-5.8
