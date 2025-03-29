@@ -10,7 +10,7 @@ build_root:
       USER root
       RUN dnf remove -y golang && wget -q https://go.dev/dl/go1.23.6.linux-amd64.tar.gz &&\
       rm -rf /usr/local/go && tar -C /usr/local -xzf go1.23.6.linux-amd64.tar.gz
-      RUN dnf install -y python3-pip diffutils && pip install ansible
+      RUN dnf install -y python3-pip diffutils && pip install ansible ansible-lint
       ENV PATH=$PATH:/usr/local/go/bin
 releases:
   latest:
@@ -38,6 +38,12 @@ tests:
   commands: XDG_CACHE_HOME=/tmp/.cache make check-generated-files
   container:
     from: src
+- as: ansible-lint
+  commands: ANSIBLE_HOME=/tmp/.ansible ANSIBLE_LOCAL_TEMP=/tmp/.ansible.tmp XDG_CACHE_HOME=/tmp/.cache
+    ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/.ansible-cache make ansible-lint
+  container:
+    from: src
+  run_if_changed: ^(test/playbooks/.*|test/e2e/.*)$
 - always_run: false
   as: e2e-capi-multinode
   optional: true
