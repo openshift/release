@@ -64,7 +64,11 @@ wait_for_mcp() {
   timeout=${1}
   # Wait until MCO starts applying new machine config to nodes
   log "Waiting for all MachineConfigPools to start updating..."
-  time oc wait mcp --all --for='condition=UPDATING=True' --timeout=300s &>/dev/null
+  # The worker MachineConfigPool gets updated immediately if there are no machines.
+  if [[ $(oc get mcp worker -ojsonpath='{.status.machineCount}') -ne 0 ]]; then
+    time oc wait mcp worker --for='condition=UPDATING=True' --timeout=300s &>/dev/null
+  fi
+  time oc wait mcp master --for='condition=UPDATING=True' --timeout=300s &>/dev/null
 
   log "Waiting for all MachineConfigPools to finish updating..."
   timeout "${timeout}" bash <<EOT
