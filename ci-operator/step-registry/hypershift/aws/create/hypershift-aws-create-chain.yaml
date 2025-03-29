@@ -71,6 +71,9 @@ chain:
       default: "false"
       documentation: |-
         If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
+    - name: HYPERSHIFT_AUTONODE
+      default: "false"
+      documentation: "If set to true, it sets the --auto-node flag to true"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -107,7 +110,8 @@ chain:
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}
         --release-image ${RELEASE_IMAGE}
         --annotations=hypershift.openshift.io/skip-release-image-validation=true
-        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" 
+        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+        --auto-node=${HYPERSHIFT_AUTONODE}
       )
       
       if [[ $HYPERSHIFT_SHARED_VPC == "true" ]]; then
