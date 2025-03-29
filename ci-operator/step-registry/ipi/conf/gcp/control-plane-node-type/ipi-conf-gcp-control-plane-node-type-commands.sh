@@ -18,6 +18,18 @@ controlPlane:
       type: ${CONTROL_PLANE_NODE_TYPE}
 EOF
 
+if echo "${CONTROL_PLANE_NODE_TYPE}" | grep gpu; then
+       GPU_PATCH="${SHARED_DIR}/gpu.yaml.patch"
+       cat >"${GPU_PATCH}" <<EOF
+  controlPlane:
+    platform:
+      gcp:
+        onHostMaintenance: Terminate
+EOF
+       yq-go m -x -i "${PATCH}" "${GPU_PATCH}"
+       rm "${GPU_PATCH}"
+fi
+
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 yq-go r "${CONFIG}" controlPlane
 
