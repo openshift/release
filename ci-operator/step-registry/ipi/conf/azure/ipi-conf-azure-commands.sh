@@ -151,3 +151,9 @@ EOF
 else
   echo "Omit baseDomainResourceGroupName for private cluster"
 fi
+
+# starting from 4.19, cluster sp only needs Contributor role
+if (( minor_version > 18 && major_version == 4 )) && [[ -f "${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json" ]]; then
+    echo "Copy Azure credential azure-sp-contributor.json to SHARED_DIR"
+    cp ${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json ${SHARED_DIR}/azure-sp-contributor.json
+fi
