@@ -9,6 +9,11 @@ NAMESPACE_OPERATOR="openshift-operators"
 NAMESPACE_SERVERLESS="openshift-serverless"
 TIMEOUT="400s"
 
+# TODO: verify ocm-token path exists
+OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+echo "Logging into stage with offline token using ocm cli ${OCM_VERSION}"
+ocm login --url "https://api.stage.openshift.com" --token "${OCM_TOKEN}"
+
 # Modify Upgrade policy
 NEXT_UPGRADE_RUN=""
 if [[ "${UPDATE_APPROVAL}" == "manual" ]]; then
