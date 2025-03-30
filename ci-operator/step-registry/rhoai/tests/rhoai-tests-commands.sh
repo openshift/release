@@ -46,7 +46,5 @@ export NAME_3
 export NAME_4
 export NAME_5
 
-sleep 99999
-
 # running RHOAI tests
 ./run_interop.sh
