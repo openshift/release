@@ -43,7 +43,7 @@ images:
     FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
     WORKDIR /artifacts
     RUN mkdir -p /artifacts/{scripts,isc,workingdir} && chmod -R 777 /artifacts
-    RUN mkdir -p /root/.docker /root/.oc-mirror/.cache
+    RUN mkdir -p /root/.docker /root/.oc-mirror/.cache && chmod -R 777 /root/.docker/ /root/.oc-mirror/
     COPY --from=embed artifacts/scripts /artifacts/scripts
     COPY --from=embed artifacts/isc /artifacts/isc
     COPY --from=embed artifacts/uid_entrypoint.sh /artifacts/
@@ -113,6 +113,7 @@ tests:
     from: golangci-lint
 - as: integration
   commands: |
+    export TEST_REGISTRY=quay.io/oc-mirror/cicd-images
     ./scripts/flow-controller.sh all_happy_path
   container:
     from: oc-mirror-tests
