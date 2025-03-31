@@ -4,6 +4,10 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+NAME_SPACE="showcase-operator-nightly"
+NAME_SPACE_RBAC="showcase-op-rbac-nightly"
+export NAME_SPACE NAME_SPACE_RBAC
+
 export OPENSHIFT_PASSWORD
 export OPENSHIFT_API
 export OPENSHIFT_USERNAME
@@ -43,19 +47,6 @@ oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
 oc logout
-
-echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
-
-mkdir -p /tmp/openshift-client
-# Download and Extract the oc binary
-wget -O /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OC_CLIENT_VERSION/openshift-client-linux.tar.gz
-tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz
-export PATH=/tmp/openshift-client:$PATH
-oc version
-
-NAME_SPACE="showcase-operator-nightly"
-NAME_SPACE_RBAC="showcase-op-rbac-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
 
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
@@ -113,7 +104,6 @@ if [[ "$ONLY_IN_DIRS" == "true" || "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "
     else
         TAG_NAME="next"
     fi
-
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
@@ -151,6 +141,5 @@ fi
 echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
-
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
