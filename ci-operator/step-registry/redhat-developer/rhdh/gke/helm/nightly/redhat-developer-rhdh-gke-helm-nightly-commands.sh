@@ -4,8 +4,6 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
-
 NAME_SPACE="showcase-k8s-ci-nightly"
 NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
 export NAME_SPACE NAME_SPACE_RBAC
