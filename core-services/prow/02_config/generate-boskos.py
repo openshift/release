@@ -34,7 +34,7 @@ CONFIG = {
     },
     'aws-qe-quota-slice': {
         'us-east-1': 25,
-        'ap-northeast-1': 5,
+        'ap-northeast-1': 10,
     },
     'aws-autorelease-qe-quota-slice': {
         'us-east-1': 7,
@@ -226,6 +226,9 @@ CONFIG = {
     },
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 7,
+    },
+    'gcp-sustaining-autorelease-412-quota-slice': {
+        'us-east1': 12,
     },
     'gcp-quota-slice': {
         'us-central1': 70,

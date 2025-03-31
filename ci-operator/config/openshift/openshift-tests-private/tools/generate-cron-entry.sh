@@ -52,15 +52,6 @@ let DAY_OF_MONTH=10#${NUMBERS:4:2}%30+1
 let MONTH=10#${NUMBERS:6:2}%12+1
 let DAY_OF_WEEK=10#${NUMBERS:8:1}%7
 
-# For f999 jobs, hard code the cron to:
-# 	Feb 29, 8:08
-if [[ "${TEST_NAME}" =~ -f999 ]] ; then
-	MINUTE=8
-	HOUR=8
-	DAY_OF_MONTH=29
-	MONTH=2
-fi
-
 if [[ "${TEST_NAME}" =~ baremetal- ]] ; then
 	# Raleigh working hours, 8~17 (in UTC, 13~22)
 	WK_HOUR_BEGIN=13
@@ -68,6 +59,15 @@ if [[ "${TEST_NAME}" =~ baremetal- ]] ; then
 	if [[ $HOUR -lt $WK_HOUR_BEGIN ]] || [[ $HOUR -ge $WK_HOUR_END ]] ; then
 		let HOUR=HOUR%$((WK_HOUR_END-WK_HOUR_BEGIN))+WK_HOUR_BEGIN
 	fi
+fi
+
+# For f999 jobs, hard code the cron to:
+# 	Feb 29, 8:08
+if [[ "${TEST_NAME}" =~ -f999 ]] ; then
+	MINUTE=8
+	HOUR=8
+	DAY_OF_MONTH=29
+	MONTH=2
 fi
 
 if [[ $DEBUG = "true" ]] ; then

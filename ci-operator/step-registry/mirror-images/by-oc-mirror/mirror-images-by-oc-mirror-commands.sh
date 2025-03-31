@@ -61,7 +61,7 @@ new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
-
+oc registry login --to "${new_pull_secret}"
 
 # This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
 #if ! whoami &> /dev/null; then

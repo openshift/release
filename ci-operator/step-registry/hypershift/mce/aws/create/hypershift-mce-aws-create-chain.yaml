@@ -45,6 +45,17 @@ chain:
           oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
         }
 
+        support_np_skew() {
+          curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+          local extra_flags=""
+          if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+            extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+          fi
+          extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+          extra_flags+="&& oc apply -f /tmp/hc.yaml"
+          echo "$extra_flags"
+        }
+
         MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
         HYPERSHIFT_NAME=hcp
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
@@ -104,7 +115,7 @@ chain:
           sleep 60
         fi
       
-        /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
+        eval "/tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
         --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
@@ -114,7 +125,7 @@ chain:
         --region ${HYPERSHIFT_AWS_REGION} \
         --pull-secret ${PULL_SECRET_PATH} \
         --namespace local-cluster \
-        --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}
+        --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} $(support_np_skew)"
         
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
           echo "MCE version is less than 2.4"
@@ -181,5 +192,7 @@ chain:
       dependencies:
         - name: "release:latest"
           env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
+        - name: "release:latest"
+          env: NODEPOOL_RELEASE_IMAGE_LATEST
         - name: hypershift-operator
           env: HYPERSHIFT_RELEASE_LATEST

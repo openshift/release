@@ -11,7 +11,7 @@ function generate_shared_functions {
 
 echo "************ telcov10n Generating Shared functions ************"
 
-  functions_path=${SHARED_DIR}/spoke-common-functions.sh
+  functions_path=${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
   cat <<EO-shared-function >| ${functions_path}
 ########################################################################
@@ -21,31 +21,43 @@ echo "************ telcov10n Generating Shared functions ************"
 EO-shared-function
 
 echo "----------------------------------------------------------------------"
-echo " run_script_in_the_hub_cluster"
+echo " run_script_on_ocp_cluster"
 echo "----------------------------------------------------------------------"
 
   cat <<EO-shared-function >> ${functions_path}
 
 # ----------------------------------------------------------------------
-# run_script_in_the_hub_cluster
+# run_script_on_ocp_cluster
 # ----------------------------------------------------------------------
 
-function run_script_in_the_hub_cluster {
+function run_script_on_ocp_cluster {
   local helper_img="${RUN_CMDS_HELPER_IMG}"
   local script_file=\$1
   shift && local ns=\$1
   [ \$# -gt 1 ] && shift && local pod_name="\${1}"
 
   set -x
-  if [[ "\${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
+  if [[ "\${pod_name:="--rm script-running-on-ocp"}" != "--rm script-running-on-ocp" ]]; then
     oc -n \${ns} get pod \${pod_name} 2> /dev/null || {
       oc -n \${ns} run \${pod_name} --image=\${helper_img} --restart=Never -- sleep infinity || echo ;
       oc -n \${ns} wait --for=condition=Ready pod/\${pod_name} --timeout=10m ;
     }
-    oc -n \${ns} exec -i \${pod_name} -- bash -s -- <<EOF
+    for ((attempts = 0 ; attempts < \${max_attempts:=5}; attempts++)); do
+      oc -n \${ns} exec -i \${pod_name} -- bash -s -- <<EOF && break
 \$(cat \${script_file})
 EOF
-  [ \$# -gt 1 ] && oc -n \${ns} delete pod \${pod_name}
+      oc -n \${ns} get pod
+      oc -n \${ns} describe pod \${pod_name}
+      sleep 5
+    done
+    [ \$# -gt 1 ] && oc -n \${ns} delete pod \${pod_name}
+    if [ \${attempts} -eq \${max_attempts} ]; then
+      set +x
+      echo
+      echo "[ERROR]. Something fails upon trying to exec the script on the OCP cluster!!!"
+      echo
+      exit 1
+    fi
   else
     pn="\${pod_name}-\$(date +%s%N)"
     oc -n \${ns} run -i \${pn} --image=\${helper_img} --restart=Never -- bash -s -- <<EOF

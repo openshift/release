@@ -11,6 +11,9 @@ chain:
     - name: HYPERSHIFT_NODE_COUNT
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: ""
+      documentation: "Specifies the cluster SDN provider."
     - name: HYPERSHIFT_BASE_DOMAIN
       default: ""
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
@@ -123,6 +126,10 @@ chain:
         COMMAND+=(--node-upgrade-type=InPlace)
       fi
 
+      if [[ -n $HYPERSHIFT_NETWORK_TYPE ]]; then
+        COMMAND+=(--network-type="${HYPERSHIFT_NETWORK_TYPE}")
+      fi
+
       if [[ -n $EXTRA_ARGS ]]; then
         COMMAND+=(${EXTRA_ARGS})
       fi
@@ -153,13 +160,39 @@ chain:
 
       "${COMMAND[@]}"
 
-      set +e
-      export CLUSTER_NAME
-      timeout 25m bash -c '
-        until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
-            sleep 15
-        done
-      '
+      echo "Waiting for cluster to become available"
+      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+      echo "Cluster became available, creating kubeconfig"
+      bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+      # In case of BYO CNI, the HC will never be ready before CNI components are up and running
+      if [[ "$HYPERSHIFT_NETWORK_TYPE" == "Other" ]]; then
+        echo "Waiting for nodes to join the hosted cluster"
+        num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+        export num_nodes_expected
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        set +e
+        timeout 25m bash -c '
+          while true; do
+            num_nodes=$(oc get nodes --no-headers | wc -l)
+            if (( num_nodes == num_nodes_expected )); then
+              break
+            fi
+            echo "$num_nodes/$num_nodes_expected have joined the HC"
+            sleep 15s
+          done
+        '
+      else
+        set +e
+        export CLUSTER_NAME
+        timeout 25m bash -c '
+          until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
+              sleep 15
+          done
+        '
+      fi
+
       if [[ $? -ne 0 ]]; then
         cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
       <?xml version="1.0" encoding="UTF-8"?>
@@ -190,11 +223,6 @@ chain:
       </testsuite>
       EOF
       fi
-      set -e
-
-      echo "Cluster became available, creating kubeconfig"
-      bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
-      echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
     from: hypershift-operator
     grace_period: 5m0s
     resources:
