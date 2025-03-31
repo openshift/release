@@ -6,11 +6,6 @@ cd /tmp || exit
 
 echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
 
-# use kubeconfig from mapt
-chmod 600 "${SHARED_DIR}/kubeconfig"
-KUBECONFIG="${SHARED_DIR}/kubeconfig"
-export KUBECONFIG
-
 # Create a service account and assign cluster url and token
 sa_namespace="default"
 sa_name="tester-sa-2"

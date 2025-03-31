@@ -65,6 +65,10 @@ fi
 K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
 export K8S_CLUSTER_TOKEN K8S_CLUSTER_URL
 
+NAME_SPACE="showcase-k8s-ci-nightly"
+NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
+export NAME_SPACE NAME_SPACE_RBAC
+
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
