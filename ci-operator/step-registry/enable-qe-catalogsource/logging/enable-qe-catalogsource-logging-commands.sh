@@ -97,7 +97,7 @@ function create_icsp_connected () {
         source: registry-proxy.engineering.redhat.com
 EOF
     if [ $? == 0 ]; then
-        echo "create the ICSP successfully" 
+        echo "create the ICSP successfully"
     else
         echo "!!! fail to create the ICSP"
         return 1
@@ -107,13 +107,14 @@ EOF
 function create_catalog_sources()
 {
     echo "create QE catalogsource: qe-app-registry"
+    echo "Use ${LOGGING_INDEX_IMAGE} in catalogsource/qe-app-registry"
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
     kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
     # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
-        echo "the index image as the initContainer cache image)" 
+        echo "the index image as the initContainer cache image)"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -135,7 +136,7 @@ spec:
       interval: 15m
 EOF
     else
-        echo "the index image as the server image" 
+        echo "the index image as the server image"
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -152,7 +153,7 @@ spec:
       interval: 15m
 EOF
     fi
-    set +e 
+    set +e
     COUNTER=0
     while [ $COUNTER -lt 600 ]
     do
@@ -179,7 +180,7 @@ EOF
 
         return 1
     fi
-    set -e 
+    set -e
 }
 
 # From 4.11 on, the marketplace is optional.
@@ -198,7 +199,7 @@ function check_marketplace () {
         echo "openshift-marketplace project AlreadyExists, skip creating."
         return 0
     fi
-    
+
     cat <<EOF | oc create -f -
 apiVersion: v1
 kind: Namespace
