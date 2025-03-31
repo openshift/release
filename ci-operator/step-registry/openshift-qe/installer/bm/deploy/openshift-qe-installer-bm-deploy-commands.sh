@@ -21,7 +21,6 @@ lab: $LAB
 lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
-sno_node_count: $NUM_SNO_NODES
 ocp_version: $OCP_VERSION
 ocp_build: $OCP_BUILD
 public_vlan: $PUBLIC_VLAN
@@ -37,7 +36,6 @@ controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
-jumbo_mtu: $ENABLE_JUMBO_MTU
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 EOF
@@ -68,7 +66,7 @@ PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
   HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
 elif [[ "$TYPE" == "sno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:1+"$NUM_SNO_NODES"][].name")
+  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:2][].name")
 fi
 echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
@@ -135,7 +133,7 @@ if [[ $LAB == "performancelab" ]]; then
 elif [[ $LAB == "scalelab" ]]; then
   export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 fi
-envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_WORKER_NODES},${NUM_SNO_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
