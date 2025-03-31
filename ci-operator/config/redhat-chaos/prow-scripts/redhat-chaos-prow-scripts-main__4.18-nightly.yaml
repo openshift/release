@@ -75,6 +75,51 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: redhat-chaos-krkn-hub-node-tests
   timeout: 6h0m0s
+- as: krkn-hub-tests-udn
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "False"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-udn-density-pods
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-console-tests
+    - chain: redhat-chaos-krkn-hub-ovn-disruption
+    - chain: redhat-chaos-krkn-hub-prometheus-tests
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
+- as: krkn-hub-node-tests-udn
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "False"
+      GC: "False"
+      ITERATION_MULTIPLIER_ENV: "3"
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.18
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-udn-density-pods
+    - chain: redhat-chaos-krkn-hub-cluster-disruption
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
 - as: gcp-fipsetcd-krkn-hub-tests
   cron: 0 4 28 * *
   steps:
