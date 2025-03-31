@@ -202,6 +202,17 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
   # shellcheck disable=SC2086
+
+  EXTRA_ARGS="$EXTRA_ARGS --annotations hypershift.openshift.io/kubevirt-vm-jsonpatch='
+  [
+    {
+      \"op\": \"add\",
+      \"path\": \"/spec/template/spec/domain/memory/maxGuest\",
+      \"value\": \"128Gi\"
+    }
+  ]'"
+
+
   eval "${HCP_CLI} create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
     --name ${CLUSTER_NAME} \
     --namespace ${CLUSTER_NAMESPACE_PREFIX} \
