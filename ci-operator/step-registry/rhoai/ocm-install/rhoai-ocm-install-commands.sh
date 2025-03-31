@@ -9,8 +9,8 @@ NAMESPACE_OPERATOR="openshift-operators"
 NAMESPACE_SERVERLESS="openshift-serverless"
 TIMEOUT="400s"
 
-# TODO: verify ocm-token path exists
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+OCM_VERSION=$(ocm version)
 echo "Logging into stage with offline token using ocm cli ${OCM_VERSION}"
 ocm login --url "https://api.stage.openshift.com" --token "${OCM_TOKEN}"
 
@@ -93,8 +93,6 @@ oc_wait_for_pods() {
 }
 
 oc_wait_for_pods "${NAMESPACE_RHOAI}"
-
-# TODO: Debug RHOAI updateApproval label
 
 
 echo "OpenShift AI addon is installed successfully"
