@@ -1,12 +1,15 @@
 #!/bin/bash
 
 # Export ES environment variables
-es_host="$(cat /secret/${POLICIES_GROUP}-es-host)"
+es_host="$(cat /secret/es-host)"
 export es_host
-es_port="$(cat /secret/${POLICIES_GROUP}-es-port)"
+es_port="$(cat /secret/es-port)"
 export es_port
+es_index="${POLICIES_GROUP}-$(cat /secret/policy-es-index)"
+export es_index
 PERF_SERVICES_URL="$(cat /secret/perf_services_url)"
 export PERF_SERVICES_URL
+
 
 account_group="$(cat "/secret/${account_group}")"
 export account_group
@@ -29,9 +32,10 @@ function run_policy() {
         export s3_bucket
         for region in "${regions[@]}"; do
             export AWS_DEFAULT_REGION="${region}"
-
-            policy_output="s3://${s3_bucket}/${LOGS}/${AWS_DEFAULT_REGION}"
-            export policy_output
+            if [ -n "$s3_bucket" ]; then
+                policy_output="s3://${s3_bucket}/${LOGS}/${AWS_DEFAULT_REGION}"
+                export policy_output
+            fi
 
             echo "Running $policy in region: $AWS_DEFAULT_REGION on account: $account_name"
 
@@ -43,7 +47,6 @@ function run_policy() {
                 fi
             fi
         done
-        run_aggregated_mail
     done
 }
 
@@ -64,6 +67,8 @@ function run_policies() {
 
         echo "Running policies for ${account_name}"
         run_policy "$policies"
+        echo "Running Email alert"
+        run_aggregated_mail
         echo "Exiting ${account_name}"
         echo
     done
