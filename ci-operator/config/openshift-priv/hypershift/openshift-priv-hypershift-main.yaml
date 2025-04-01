@@ -152,6 +152,8 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
+  capabilities:
+  - build-tmpfs
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift
@@ -175,6 +177,8 @@ tests:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-upgrade-hypershift-operator
+  capabilities:
+  - build-tmpfs
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift
@@ -186,6 +190,8 @@ tests:
       RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-override
+  capabilities:
+  - build-tmpfs
   run_if_changed: (/overrides\.yaml$)
   steps:
     cluster_profile: hypershift
@@ -195,6 +201,8 @@ tests:
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-4-18
+  capabilities:
+  - build-tmpfs
   run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift
@@ -256,7 +264,7 @@ tests:
 - as: e2e-kubevirt-metal-conformance
   optional: true
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
@@ -341,6 +349,46 @@ tests:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vh-mecha-central-quota-slice
     workflow: hypershift-openstack-aws-conformance
+- always_run: false
+  as: e2e-aws-karpenter-core
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      HYPERSHIFT_AUTONODE: "true"
+      HYPERSHIFT_NODE_COUNT: "1"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    test:
+    - as: e2e-aws-karpenter-core
+      cli: latest
+      commands: |-
+        export CLUSTER="$(<"${SHARED_DIR}/cluster-name")"
+        export HYPERSHIFT_NAMESPACE="$(<"${SHARED_DIR}/management_cluster_namespace")"
+
+        mkdir -p /tmp/karpenter
+        YQ="/tmp/karpenter/yq"
+        curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        chmod +x ${YQ}
+        export PATH="/tmp/karpenter:$PATH"
+
+        dir=$(mktemp -d)
+        git clone https://github.com/openshift/kubernetes-sigs-karpenter.git --depth=1 $dir
+        go -C $dir mod vendor
+
+        export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
+        oc annotate -n ${HYPERSHIFT_NAMESPACE}-${CLUSTER} hcp/${CLUSTER} hypershift.openshift.io/karpenter-core-e2e-override=true
+
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        # delete the binding to allow ec2nodeclass to be deleted; the karpenter-core-e2e-override annotation allows the binding to be deleted
+        oc delete validatingadmissionpolicybindings.admissionregistration.k8s.io karpenter-binding.ec2nodeclass.hypershift.io
+        KARPENTER_CORE_DIR=$dir make karpenter-upstream-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    workflow: hypershift-aws-e2e-cluster
 zz_generated_metadata:
   branch: main
   org: openshift-priv

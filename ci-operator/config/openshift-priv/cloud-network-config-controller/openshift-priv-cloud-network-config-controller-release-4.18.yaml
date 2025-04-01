@@ -1,4 +1,12 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
@@ -56,6 +64,12 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- as: e2e-azure-serial
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    workflow: openshift-e2e-azure-serial
 - as: unit
   commands: make test
   container:
@@ -85,6 +99,13 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: cloud-network-config-controller
     workflow: openshift-ci-security
+- as: hypershift-e2e-aks
+  steps:
+    cluster_profile: hypershift
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-e2e
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

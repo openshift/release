@@ -1,4 +1,12 @@
 base_images:
+  e2e:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: e2e-test-ubi9
+  rust:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: ubi9
   ubi:
     name: ubi
     namespace: ocp
@@ -11,7 +19,7 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM ubi
-    COPY . /opt/app-root/src/
+    COPY . /opt/app-root/src/cincinnati/
     WORKDIR /opt/app-root/src/cincinnati
     USER 0
     ENV HOME="/root"
@@ -32,23 +40,17 @@ images:
     RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
     USER 1001
   from: ubi
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/cincinnati
   to: src-rust
 - dockerfile_path: dist/Dockerfile.rust-toolset/Dockerfile
-  inputs:
-    ubi:
-      as:
-      - registry.access.redhat.com/ubi8/ubi:latest
   to: deploy
-- dockerfile_path: dist/Dockerfile.e2e-ubi8/Dockerfile
+- dockerfile_path: dist/Dockerfile.e2e-ubi/Dockerfile
   inputs:
-    ubi:
+    e2e:
       as:
-      - registry.access.redhat.com/ubi8/ubi:latest
+      - registry.ci.openshift.org/cincinnati-ci-public/rust:e2e-test-ubi9
+    rust:
+      as:
+      - registry.ci.openshift.org/cincinnati-ci-public/rust:ubi9
   to: e2e-test
 resources:
   '*':
@@ -133,7 +135,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.17"
   steps:
     test:
     - as: openshift-e2e-test

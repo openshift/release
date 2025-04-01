@@ -5,6 +5,10 @@ set -o nounset
 ############################################################
 # Variables
 IBMCLOUD_HOME=/tmp/ibmcloud
+
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
 export IBMCLOUD_HOME
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
@@ -130,10 +134,10 @@ function download_automation_code() {
     echo "Downloading the head for ocp-upi-powervs"
     # Need to revert to ocp-power-automation
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
+        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/terraform-1.76.2-updates.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
-        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
     echo "Down ... Downloading the head for ocp-upi-powervs"
 }
 
@@ -168,9 +172,9 @@ function cleanup_prior() {
     echo "Cleaning up prior runs for lease"
     # PowerVS Instances
     echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-p-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
+    for CRN in $(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-p-px-${POWERVS_ZONE}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
     do
-        echo "Targetting power cloud instance"
+        echo "Targeting power cloud instance"
         ibmcloud pi workspace target "${CRN}"
 
         echo "Deleting the PVM Instances"
@@ -230,7 +234,7 @@ function cleanup_prior() {
 
     # VPC Images
     # TODO: FIXME add filtering by date.... ?
-    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[].id')
+    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[] | select(.name | contains("ci-op-") | not) .id?')
     do
         ibmcloud is image-delete "${RESOURCE_TGT}" -f
     done
@@ -278,7 +282,7 @@ function configure_terraform() {
 
     echo "Release Image used is:"
     curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
-    jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0].payload' /tmp/versions.json > /tmp/target_version
+    jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0] | .payload' /tmp/versions.json > /tmp/target_version
     TARGET_VERSION="$(< /tmp/target_version)"
     export TARGET_VERSION
     echo "${TARGET_VERSION}"
@@ -313,7 +317,7 @@ release_image_override    = "${TARGET_VERSION}"
 use_zone_info_for_names    = true
 use_ibm_cloud_services     = true
 ibm_cloud_vpc_name         = "${VPC_NAME}"
-private_network_mtu        = 9000
+private_network_mtu        = 1450
 ibm_cloud_vpc_subnet_name  = "sn01"
 ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
@@ -332,13 +336,13 @@ EOF
 # Builds the cluster based on the set configuration / tfvars
 function build_upi_cluster() {
     OUTPUT="yes"
-    echo "Applying terraform to build PowerVS UPI cluster"
-    cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init -no-color -upgrade && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform apply -auto-approve -no-color \
-            -var-file "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
-            | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+    # Applies the current installation for this run
+    echo ">Applying terraform to build PowerVS UPI cluster<"
+    echo "Running init"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
+    echo "Running plan"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ plan -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -no-color \
+        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
                 while read LINE
                 do
                     if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
@@ -354,17 +358,32 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
-
-    if [ ! -f "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate ]
-    then
-        echo "Terraform did not execute, exiting"
-        exit 76
-    fi
+    echo "Running apply"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
+        -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
+        -state="${SHARED_DIR}"/terraform.tfstate \
+        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                while read LINE
+                do
+                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT=""
+                    fi
+                    if [ ! -z "${OUTPUT}" ]
+                    then
+                        echo "${LINE}"
+                    fi
+                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT="yes"
+                    fi
+                done
+    echo "Finished Running"
 
     echo "Extracting the terraformm output from the state file"
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate \
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_public_ip > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
     # public ip not shared for security reasons
@@ -383,8 +402,11 @@ function build_upi_cluster() {
     echo "Done with retrieval"
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
 
-    echo "Copying the terraform.tfstate"
-    cp "${IBMCLOUD_HOME}"/ocp4-upi-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
+    # Create ~/.kube directory on the Bastion if it doesn't exist
+    ssh -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}/ocp4-upi-powervs/data/id_rsa" root@"${BASTION_PUBLIC_IP}" "mkdir -p ~/.kube"
+    scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig root@"${BASTION_PUBLIC_IP}":~/.kube/config
+    echo "Done copying kubeconfig to bastion location ~/.kube/config"
+
     if [ ! -f "${SHARED_DIR}"/kubeconfig ]
     then
         echo "kubeconfig not found install failed"
