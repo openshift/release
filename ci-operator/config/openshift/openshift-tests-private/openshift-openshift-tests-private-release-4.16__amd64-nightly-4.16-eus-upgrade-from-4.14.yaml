@@ -15,6 +15,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -23,6 +27,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.14"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.16"
   tools:
     name: "4.14"
     namespace: ocp
@@ -31,6 +39,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
 releases:
   latest:
     release:
@@ -57,9 +69,9 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --node-upgrade-type=InPlace
       MCE_VERSION: "2.6"
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      TEST_FILTERS: ~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
     test:
-    - chain: openshift-upgrade-qe-test-hypershift
+    - chain: openshift-upgrade-qe-test-hypershift-eus
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-replace-f28
   cron: 16 23 25 * *
@@ -68,9 +80,9 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       MCE_VERSION: "2.6"
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      TEST_FILTERS: ~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
     test:
-    - chain: openshift-upgrade-qe-test-hypershift
+    - chain: openshift-upgrade-qe-test-hypershift-eus
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-mceupgrade-replace-f28
   cron: 0 18 7 * *
@@ -165,7 +177,7 @@ tests:
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetalds-kubevirt-hypershift-mce-mceupgrade-replace-f28
   cluster: build05
-  cron: 37 8 6 * *
+  cron: 37 7 6 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
