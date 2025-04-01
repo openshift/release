@@ -5,6 +5,10 @@ set -o nounset
 ############################################################
 # Variables
 IBMCLOUD_HOME=/tmp/ibmcloud
+
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
 export IBMCLOUD_HOME
 NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
@@ -130,10 +134,10 @@ function download_automation_code() {
     echo "Downloading the head for ocp-upi-powervs"
     # Need to revert to ocp-power-automation
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
+        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/terraform-1.76.2-updates.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
-        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
     echo "Down ... Downloading the head for ocp-upi-powervs"
 }
 
@@ -278,7 +282,7 @@ function configure_terraform() {
 
     echo "Release Image used is:"
     curl -o /tmp/versions.json -s 'https://multi.ocp.releases.ci.openshift.org/graph?arch=ppc64le'
-    jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0].payload' /tmp/versions.json > /tmp/target_version
+    jq -r --arg nightly nightly --arg version ${OCP_VERSION} '[.nodes[] | select(.version | (contains($nightly) and startswith($version)))][0] | .payload' /tmp/versions.json > /tmp/target_version
     TARGET_VERSION="$(< /tmp/target_version)"
     export TARGET_VERSION
     echo "${TARGET_VERSION}"
@@ -337,10 +341,26 @@ function build_upi_cluster() {
     echo "Running init"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
     echo "Running plan"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ plan -var-file="${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars-no-color
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ plan -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -no-color \
+        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                while read LINE
+                do
+                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT=""
+                    fi
+                    if [ ! -z "${OUTPUT}" ]
+                    then
+                        echo "${LINE}"
+                    fi
+                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT="yes"
+                    fi
+                done
     echo "Running apply"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
-        -var-file="${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars -auto-approve -no-color \
+        -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
         -state="${SHARED_DIR}"/terraform.tfstate \
         | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
                 while read LINE
