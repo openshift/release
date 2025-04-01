@@ -194,7 +194,6 @@ function cleanup_prior() {
             if [ ! -z "$(< /tmp/image_old.json)" ]
             then
                 echo "Deleting Image"
-                IMAGE_CREATED_DATE="$(jq -r '.created_at' /tmp/image.json)"
                 ibmcloud is image-delete "${RESOURCE_TGT}" -f
             fi
         done
