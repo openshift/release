@@ -106,7 +106,6 @@ EOF
 
 function create_catalog_sources()
 {
-    env | sort
     echo "create QE catalogsource: qe-app-registry"
     echo "Use ${LOGGING_INDEX_IMAGE} in catalogsource/qe-app-registry"
     # get cluster Major.Minor version
