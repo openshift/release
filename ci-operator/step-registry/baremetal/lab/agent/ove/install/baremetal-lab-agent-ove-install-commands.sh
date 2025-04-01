@@ -78,10 +78,10 @@ case "${BOOT_MODE}" in
     fi
     if [ "${transfer_protocol_type}" == "cifs" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-      iso_path="${IP_ADDRESS}/isos/ocp-abi-ove.iso"
+      iso_path="${IP_ADDRESS}/isos/agent-ove-x86_64.iso"
     else
       # Assuming HTTP or HTTPS
-      iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/ocp-abi-ove.iso"
+      iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove-x86_64.iso"
     fi
     mount_virtual_media "${host}" "${iso_path}"
   done
