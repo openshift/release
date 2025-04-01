@@ -31,6 +31,14 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.19"
 build_root:
   from_repository: true
   use_build_cache: true
@@ -403,6 +411,20 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- always_run: false
+  as: e2e-aws-ext-oidc
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --render-sensitive
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-hypershift-extended-external-oidc-guest
 zz_generated_metadata:
   branch: main
   org: openshift
