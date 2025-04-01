@@ -17,6 +17,8 @@ export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
 yarn install
 NO_COLOR=1 yarn run cypress run --spec "cypress/e2e/quay_api_testing_all.cy.js" --browser electron --headless --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json > quay_api_testing_report || true
 
+sleep 6h
+
 mkdir -p $ARTIFACT_DIR/quay_api_testing_cypress_videos || true
 cp cypress/results/quay_api_testing_report.xml $ARTIFACT_DIR/quay_api_testing_report.xml || true
 cp quay_api_testing_report $ARTIFACT_DIR/quay_api_testing_report || true
