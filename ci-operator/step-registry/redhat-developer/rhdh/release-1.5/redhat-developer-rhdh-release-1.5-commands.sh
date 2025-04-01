@@ -4,41 +4,88 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME NAME_SPACE NAME_SPACE_RBAC NAME_SPACE_POSTGRES_DB QUAY_REPO
+NAME_SPACE="showcase-1-5-x"
+NAME_SPACE_RBAC="showcase-rbac-1-5-x"
+NAME_SPACE_POSTGRES_DB=postgress-external-db-1-5-x
+export NAME_SPACE NAME_SPACE_RBAC NAME_SPACE_POSTGRES_DB
+
+export OPENSHIFT_PASSWORD
+export OPENSHIFT_API
+export OPENSHIFT_USERNAME
+
+OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' "$KUBECONFIG")"
+OPENSHIFT_USERNAME="kubeadmin"
+
+yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' "$KUBECONFIG"
+if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
+    OPENSHIFT_PASSWORD="$(cat "$KUBEADMIN_PASSWORD_FILE")"
+elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
+    # Recommendation from hypershift qe team in slack channel..
+    OPENSHIFT_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"
+else
+    echo "Kubeadmin password file is empty... Aborting job"
+    exit 1
+fi
+
+timeout --foreground 5m bash <<-"EOF"
+    while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
+            sleep 20
+    done
+EOF
+if [ $? -ne 0 ]; then
+    echo "Timed out waiting for login"
+    exit 1
+fi
+
+export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
+K8S_CLUSTER_URL=$(oc whoami --show-server)
+echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
+
+echo "Note: This cluster will be automatically deleted 4 hours after being claimed."
+echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
+
+oc create serviceaccount tester-sa-2 -n default
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
+K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
+oc logout
+
+# Prepare to git checkout
+export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh"
-NAME_SPACE="showcase-1-5-x"
-NAME_SPACE_RBAC="showcase-rbac-1-5-x"
-NAME_SPACE_POSTGRES_DB=postgress-external-db-1-5-x
+
+export QUAY_REPO RELEASE_BRANCH_NAME
 QUAY_REPO="rhdh-community/rhdh"
+# Get the base branch name based on job.
+RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
-cd rhdh || exit
-git checkout "release-1.5" || exit
+cd "${GITHUB_REPOSITORY_NAME}" || exit
+git checkout "$RELEASE_BRANCH_NAME" || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
-    # if this is executed as PR check of https://github.com/redhat-developer/rhdh.git repo, switch to PR branch.
+    # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
-    git merge origin/release-1.5 --no-edit
+    git merge origin/$RELEASE_BRANCH_NAME --no-edit
     GIT_PR_RESPONSE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}")
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
-    SHORT_SHA=$(git rev-parse --short ${LONG_SHA})
+    SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "Tag name: $TAG_NAME"
     IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
 fi
 
-PR_CHANGESET=$(git diff --name-only release-1.5)
+PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
-# Directories to check if changes are exclusively within the specified directories
+# Check if changes are exclusively within the specified directories
 DIRECTORIES_TO_CHECK=".ibm|e2e-tests"
 ONLY_IN_DIRS=true
 
@@ -50,11 +97,16 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
-    echo "Skipping wait for new PR image and proceeding with image tag : 1.5"
-    echo "updated image tag : 1.5"
-    QUAY_REPO="rhdh/rhdh-hub-rhel9"
-    TAG_NAME="1.5"
+if [[ "$ONLY_IN_DIRS" == "true" || "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
+    if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
+        QUAY_REPO="rhdh/rhdh-hub-rhel9"
+        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
+        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+    else
+        TAG_NAME="next"
+    fi
+    echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
+    echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
     TIMEOUT=3000         # Maximum wait time of 50 mins (3000 seconds)
     INTERVAL=60             # Check every 60 seconds
@@ -85,7 +137,10 @@ else
             exit 1
         fi
     done
-
 fi
+
+echo "############## Current branch ##############"
+echo "Current branch: $(git branch --show-current)"
+echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
