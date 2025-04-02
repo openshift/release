@@ -95,4 +95,4 @@ oc_wait_for_pods() {
 oc_wait_for_pods "${NAMESPACE_RHOAI}"
 
 
-echo "OpenShift AI addon is installed successfully"
+echo -e "OpenShift AI addon is installed successfully with $UPDATE_APPROVAL upgrade policy."
