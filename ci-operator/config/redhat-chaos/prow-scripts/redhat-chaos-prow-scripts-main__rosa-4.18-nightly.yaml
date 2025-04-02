@@ -3,21 +3,21 @@ base_images:
     name: cerberus
     namespace: chaos
     tag: cerberus-prow
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
   cli-ocm:
     name: cli-ocm
+    namespace: ci
+    tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
-  cli: 
-    name: "4.18"
-    namespace: ocp
-    tag: cli
-  ocp-qe-perfscale-ci:
-    namespace: ci
-    name: ocp-qe-perfscale-ci
     tag: latest
 build_root:
   image_stream_tag:
@@ -52,17 +52,16 @@ tests:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "true"
       ENABLE_AUTOSCALING: "false"
-      ITERATION_MULTIPLIER_ENV: "10"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.18"
       PROFILE_TYPE: reporting
       REPLICAS: "3"
       TELEMETRY_GROUP: prow-rosa-4.18
-      CHURN: "true"
-      EXTRA_FLAGS: "--churn-duration=90m --timeout=5h --churn-percent 25"
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
     observers:
       enable:
       - redhat-chaos-cerberus
@@ -81,9 +80,9 @@ tests:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: nightly
-      ENABLE_AUTOSCALING: "false"
       CHURN: "true"
-      EXTRA_FLAGS: "--churn-duration=90m --timeout=5h --churn-percent 25"
+      ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
@@ -106,14 +105,14 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "true"
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
-      CHURN: "true"
-      EXTRA_FLAGS: "--churn-duration=90m --timeout=5h --churn-percent 25"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       HOSTED_CP: "true"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.18"
       PROFILE_TYPE: reporting
@@ -138,13 +137,13 @@ tests:
     env:
       CHANNEL_GROUP: nightly
       CHURN: "true"
-      EXTRA_FLAGS: "--churn-duration=90m --timeout=5h --churn-percent 25"
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
       HOSTED_CP: "true"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.18"
       PROFILE_TYPE: reporting
