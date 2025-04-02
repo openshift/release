@@ -90,10 +90,36 @@ catalog_soruces_url="${1}"
 prega_operator_index_tags_url="${2}"
 tag_version="${4}"
 
-version_tag=$(curl -sSL "${prega_operator_index_tags_url}" | jq -r '
-  [.tags[] | select(.name | startswith("'${tag_version}'-"))] |
-  sort_by(.start_ts) |
-  .[].name' | tail -2 | head -1)
+function findout_manifest_digest {
+  curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
+    [ .tags[] ]
+    | sort_by(.start_ts)
+    | last.manifest_digest'
+}
+function get_related_catalogs_and_icsp_manifests {
+
+  query_tag="${tag_version%.*}-"
+
+  for ((page = 1 ; page < ${max_pages:=50}; page++)); do
+
+    index_list=$(curl -sSL "${prega_operator_index_tags_url}/?filter_tag_name=like:${query_tag}&page=${page}" | jq)
+
+    tag=$(echo "${index_list}" | jq -r '
+      [.tags[]
+      | select(.manifest_digest == "'${selected_manifest_digest}'")]
+      | first.name')
+    [ "${tag}" != "null" ] && break
+    tag="${selected_manifest_digest}-not-found"
+
+    has_additional=$(echo "${index_list}" | jq -r '.has_additional')
+    [ "${has_additional}" == "false" ] && break
+  done
+
+  echo ${tag/-/.0-}
+}
+
+selected_manifest_digest=$(findout_manifest_digest)
+version_tag=$(get_related_catalogs_and_icsp_manifests)
 info_dir=${3}/${version_tag}
 
 mkdir -pv ${info_dir}

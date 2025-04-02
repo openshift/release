@@ -20,11 +20,11 @@ function clean_up {
 
   set -x
   oc -n ${SPOKE_CLUSTER_NAME} delete agentclusterinstalls.extensions.hive.openshift.io ${SPOKE_CLUSTER_NAME} || echo
-  set +x
 
   if [ -n "${CATALOGSOURCE_NAME}" ]; then
-    oc -n openshift-marketplace delete catsrc ${CATALOGSOURCE_NAME}
+    oc -n openshift-marketplace delete catsrc ${CATALOGSOURCE_NAME} --ignore-not-found
   fi
+  set +x
 }
 
 function main {
