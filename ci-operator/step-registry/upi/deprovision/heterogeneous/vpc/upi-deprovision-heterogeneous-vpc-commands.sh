@@ -24,6 +24,12 @@ echo "TRIMMED BUILD ID - ${TRIM_BID}"
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
 
+if [ ! -f "${SHARED_DIR}"/WORKSPACE_NAME ]
+then
+    echo "short-circuit - workspace name does not exist, nothing to deprovision"
+    exit 0
+fi
+
 WORKSPACE_NAME=$(<"${SHARED_DIR}"/WORKSPACE_NAME)
 export WORKSPACE_NAME
 VPC_NAME="${WORKSPACE_NAME}-vpc"

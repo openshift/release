@@ -27,10 +27,6 @@ base_images:
     name: 5.y
     namespace: logging
     tag: loki-operator-src
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -46,9 +42,6 @@ images:
     go_builder:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: ubi9-minimal
@@ -62,6 +55,7 @@ images:
     COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
     WORKDIR /go/src/github.com/openshift/cluster-logging-operator
     USER 0
+    RUN dnf install gettext -y
     RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
       && chmod 755 kubectl && mv kubectl /go/bin
     RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/

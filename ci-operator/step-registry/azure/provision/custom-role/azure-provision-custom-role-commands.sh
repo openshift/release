@@ -139,12 +139,13 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_des_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.osDisk.diskEncryptionSet')
     install_config_des_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.osDisk.diskEncryptionSet')
     install_config_des_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.osDisk.diskEncryptionSet')
+    install_config_identity_user_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
+    install_config_identity_user_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
+    install_config_identity_user_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
 
     required_permissions="""
 \"Microsoft.Authorization/policies/audit/action\",
 \"Microsoft.Authorization/policies/auditIfNotExists/action\",
-\"Microsoft.Authorization/roleAssignments/read\",
-\"Microsoft.Authorization/roleAssignments/write\",
 \"Microsoft.Compute/availabilitySets/read\",
 \"Microsoft.Compute/availabilitySets/write\",
 \"Microsoft.Compute/availabilitySets/delete\",
@@ -165,9 +166,6 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 \"Microsoft.Compute/virtualMachines/powerOff/action\",
 \"Microsoft.Compute/virtualMachines/read\",
 \"Microsoft.Compute/virtualMachines/write\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/write\",
 \"Microsoft.Network/dnsZones/A/write\",
 \"Microsoft.Network/dnsZones/CNAME/write\",
 \"Microsoft.Network/dnszones/CNAME/read\",
@@ -222,13 +220,11 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 \"Microsoft.Storage/storageAccounts/listKeys/action\",
 \"Microsoft.Storage/storageAccounts/read\",
 \"Microsoft.Storage/storageAccounts/write\",
-\"Microsoft.Authorization/roleAssignments/delete\",
 \"Microsoft.Compute/disks/delete\",
 \"Microsoft.Compute/galleries/delete\",
 \"Microsoft.Compute/galleries/images/delete\",
 \"Microsoft.Compute/galleries/images/versions/delete\",
 \"Microsoft.Compute/virtualMachines/delete\",
-\"Microsoft.ManagedIdentity/userAssignedIdentities/delete\",
 \"Microsoft.Network/dnszones/read\",
 \"Microsoft.Network/dnsZones/A/read\",
 \"Microsoft.Network/dnsZones/A/delete\",
@@ -280,6 +276,29 @@ ${required_permissions}
 \"Microsoft.Network/loadBalancers/inboundNatRules/write\",
 \"Microsoft.Network/loadBalancers/inboundNatRules/join/action\",
 \"Microsoft.Network/loadBalancers/inboundNatRules/delete\",
+${required_permissions}
+"""
+    fi
+
+    # Starting from 4.19, user-assigned identity created by installer is removed, related permissions are not required any more.
+    if (( ocp_minor_version <=18 && ocp_major_version == 4 )) || [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
+        required_permissions="""
+\"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/write\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/delete\",
+\"Microsoft.Authorization/roleAssignments/read\",
+\"Microsoft.Authorization/roleAssignments/write\",
+\"Microsoft.Authorization/roleAssignments/delete\",
+${required_permissions}
+"""
+    fi
+
+    # optional permissions when specifying UserAssigned identity
+    if [[ "${install_config_identity_user_default}" == "UserAssigned" ]] || [[ "${install_config_identity_user_master}" == "UserAssigned" ]] || [[ "${install_config_identity_user_compute}" == "UserAssigned" ]]; then
+        required_permissions="""
+\"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
+\"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
 ${required_permissions}
 """
     fi
