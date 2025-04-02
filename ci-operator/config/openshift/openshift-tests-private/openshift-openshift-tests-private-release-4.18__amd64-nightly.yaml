@@ -113,12 +113,16 @@ tests:
     cluster_profile: aws-c2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
+      DISCONNECTED: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;~ConnectedOnly&;~62006&
+      TEST_SCENARIOS: cert-manager
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-c2s-ipi-disc-priv-fips-f28-destructive
   cron: 38 4 13 * *
@@ -199,12 +203,16 @@ tests:
         Ingress
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected'
+      DISCONNECTED: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
       PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;~ConnectedOnly&;~62006&
+      TEST_SCENARIOS: cert-manager
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
 - as: aws-ipi-disc-priv-sts-efs-mini-perm-f28-destructive
   cron: 5 0 23 * *
@@ -270,11 +278,15 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
+      DISCONNECTED: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;~ConnectedOnly&;~62006&
+      TEST_SCENARIOS: cert-manager
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-workers-rhcos-rhel8
 - as: aws-ipi-disc-priv-workers-rhcos-rhel8-f28-destructive
   cron: 2 2 17 * *
@@ -1402,11 +1414,15 @@ tests:
     cluster_profile: aws-sc2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
+      DISCONNECTED: "true"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;~ConnectedOnly&;~62006&
+      TEST_SCENARIOS: cert-manager
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-sc2s-ipi-disconnected-private
 - as: aws-sc2s-ipi-disc-priv-fips-f28-destructive
   cron: 13 20 6 * *
@@ -2252,17 +2268,21 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      E2E_RUN_TAGS: '@disconnected'
+      DISCONNECTED: "true"
       FIPS_ENABLED: "true"
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
       RESERVE_BOOTSTRAP: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;~ConnectedOnly&;~62006&
+      TEST_SCENARIOS: cert-manager
       architecture: amd64
       ipv4_enabled: "true"
       ipv6_enabled: "false"
       masters: "3"
       workers: "2"
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: baremetal-lab-agent-install-network-static-disconnected
 - as: baremetal-ha-agent-platform-none-ipv4-static-f14
   cluster: build05
@@ -2742,14 +2762,18 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      E2E_RUN_TAGS: '@disconnected'
+      DISCONNECTED: "true"
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      INDEX_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      TEST_FILTERS: ~NonPreRelease&;~CPaasrunOnly&;~ConnectedOnly&;~62006&
+      TEST_SCENARIOS: cert-manager
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cert-manager-install
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 - as: gcp-ipi-disc-priv-oidc-oc-mirror-fips-f28-destructive
   cron: 25 5 13 * *
