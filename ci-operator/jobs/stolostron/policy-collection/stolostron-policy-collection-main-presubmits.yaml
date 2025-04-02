@@ -6,64 +6,6 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build06
-    context: ci/prow/opp-ocp4.17-interop-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: opp-ocp4.17-interop
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-policy-collection-main-opp-ocp4.17-interop-images
-    rerun_command: /test opp-ocp4.17-interop-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=opp-ocp4.17-interop
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )opp-ocp4.17-interop-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build06
     context: ci/prow/opp-ocp4.18-interop-images
     decorate: true
     decoration_config:
@@ -121,18 +63,18 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: vsphere02
-    context: ci/prow/opp-ocp4.18-interop-vsphere-images
+    cluster: build06
+    context: ci/prow/opp-ocp4.19-interop-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: opp-ocp4.18-interop-vsphere
+      ci-operator.openshift.io/variant: opp-ocp4.19-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-policy-collection-main-opp-ocp4.18-interop-vsphere-images
-    rerun_command: /test opp-ocp4.18-interop-vsphere-images
+    name: pull-ci-stolostron-policy-collection-main-opp-ocp4.19-interop-images
+    rerun_command: /test opp-ocp4.19-interop-images
     spec:
       containers:
       - args:
@@ -140,7 +82,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=opp-ocp4.18-interop-vsphere
+        - --variant=opp-ocp4.19-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -173,4 +115,62 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )opp-ocp4.18-interop-vsphere-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )opp-ocp4.19-interop-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: vsphere02
+    context: ci/prow/opp-ocp4.19-interop-vsphere-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: opp-ocp4.19-interop-vsphere
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-policy-collection-main-opp-ocp4.19-interop-vsphere-images
+    rerun_command: /test opp-ocp4.19-interop-vsphere-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=opp-ocp4.19-interop-vsphere
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )opp-ocp4.19-interop-vsphere-images,?($|\s.*)

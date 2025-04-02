@@ -85,16 +85,30 @@ for release in ${releases[@]}; do
 	annotate "ocp" "${release}" "ocp-${release}-ci.json"
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
 	annotate "ocp" "${release}-konflux-art-latest" "konflux-ocp-${release}.json"
+
 	annotate "ocp-s390x" "${release}-art-latest-s390x" "ocp-${release}-s390x.json"
 	annotate "ocp-ppc64le" "${release}-art-latest-ppc64le" "ocp-${release}-ppc64le.json"
 	annotate "ocp-arm64" "${release}-art-latest-arm64" "ocp-${release}-arm64.json"
 	annotate "ocp-multi" "${release}-art-latest-multi" "ocp-${release}-multi.json"
 	annotate "ocp-multi-2" "${release}-art-latest-multi-2" "ocp-${release}-multi-2.json"
+
+	annotate "ocp-s390x" "${release}-konflux-art-latest-s390x" "konflux-ocp-${release}-s390x.json"
+	annotate "ocp-ppc64le" "${release}-konflux-art-latest-ppc64le" "konflux-ocp-${release}-ppc64le.json"
+	annotate "ocp-arm64" "${release}-konflux-art-latest-arm64" "konflux-ocp-${release}-arm64.json"
+	annotate "ocp-multi" "${release}-konflux-art-latest-multi" "konflux-ocp-${release}-multi.json"
+	annotate "ocp-multi-2" "${release}-konflux-art-latest-multi-2" "konflux-ocp-${release}-multi-2.json"
+
 	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
 	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
 	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
 	annotate "ocp-arm64-priv" "${release}-art-latest-arm64-priv" "ocp-${release}-arm64.json" "private"
 	annotate "ocp-multi-priv" "${release}-art-latest-multi-priv" "ocp-${release}-multi.json" "private"
+
+	annotate "ocp-priv" "${release}-konflux-art-latest-priv" "konflux-ocp-${release}.json" "private"
+	annotate "ocp-s390x-priv" "${release}-konflux-art-latest-s390x-priv" "konflux-ocp-${release}-s390x.json" "private"
+	annotate "ocp-ppc64le-priv" "${release}-konflux-art-latest-ppc64le-priv" "konflux-ocp-${release}-ppc64le.json" "private"
+	annotate "ocp-arm64-priv" "${release}-konflux-art-latest-arm64-priv" "konflux-ocp-${release}-arm64.json" "private"
+	annotate "ocp-multi-priv" "${release}-konflux-art-latest-multi-priv" "konflux-ocp-${release}-multi.json" "private"
 done
 
 annotate "origin" "release" "okd-4.y-stable.json"

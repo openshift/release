@@ -83,6 +83,13 @@ fi
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
+# Check if we should replace the pipeline OLM LCA bundle pull spec with a promoted one
+# that's hosted on quay. This is required for the IBIO CI jobs that use the seed
+# images generated from this script.
+if [[ ! -z "${OO_BUNDLE_OVERRIDE}" ]]; then
+  OO_BUNDLE=$OO_BUNDLE_OVERRIDE
+fi
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash

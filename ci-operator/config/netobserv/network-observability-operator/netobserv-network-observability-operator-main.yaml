@@ -12,7 +12,7 @@ base_images:
     namespace: netobserv
     tag: ci
   operator-sdk:
-    name: "4.16"
+    name: "4.18"
     namespace: origin
     tag: operator-sdk
   ubi:
@@ -47,7 +47,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -66,7 +66,7 @@ tests:
     owner: obs-netobserv
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.18"
   optional: true
   steps:
     test:
@@ -122,7 +122,7 @@ tests:
         timeout=0
         rc=1
         while [ $timeout -lt 180 ]; do
-          status=$(oc get flowcollector/cluster -o jsonpath='{.status.conditions[0].type}' -n netobserv)
+          status=$(oc get flowcollector/cluster -o jsonpath='{.status.conditions[0].reason}' -n netobserv)
           if [[ $status == "Ready" ]]; then
             rc=0
             break
@@ -132,7 +132,7 @@ tests:
         done
         if [ "${rc}" == 1 ]; then
           echo "flowcollector did not become Ready after 180 secs!!!"
-          return 1
+          exit $rc
         fi
 
         echo "====> Deleting flowcollector"

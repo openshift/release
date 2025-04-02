@@ -43,7 +43,7 @@ else
     fi
     IFS=" " read -r -a array_compute_pes <<<"$compute_pes"
     IFS=" " read -r -a array_compute_zone_list <<<"$compute_zone_list"
-    if [[ "$COMPUTE_REPLICAS" != "" ]] && [[ $COMPUTE_REPLICAS < ${#array_compute_pes[@]} ]]; then
+    if [[ "$COMPUTE_REPLICAS" != "" ]] && [[ $COMPUTE_REPLICAS -lt ${#array_compute_pes[@]} ]]; then
         # When compute replicas < zone
         # Check compute zone list number equals compute replicas num
         if [[ ${#array_compute_zone_list[@]} == "$COMPUTE_REPLICAS" ]]; then
@@ -59,7 +59,7 @@ else
             exit 1
         fi
     else
-        if [[ $compute_zone_list == "$compute_pes" ]]; then
+        if [[ "$compute_zone_list" == "$compute_pes" ]]; then
             echo "Pass: passed to check compute zone: $compute_zone_list, expected: $compute_pes"
         else
             echo "Fail: fail to check compute zone: $compute_zone_list, expected: $compute_pes"

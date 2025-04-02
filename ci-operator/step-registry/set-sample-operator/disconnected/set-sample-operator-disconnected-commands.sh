@@ -81,7 +81,7 @@ function check_mirror_registry () {
 
 set_proxy
 run_command "oc whoami"
-run_command "oc version --client"
+run_command "which oc && oc version --client"
 
 ret=0
 run_command "oc get config.samples.operator.openshift.io cluster" || ret=$?

@@ -66,6 +66,13 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 case "${PLATFORM}" in
   "aws")
+    DEFAULT_NODE_SELECTOR="hypershift.openshift.io/control-plane=true"
+    if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
+      NODE_SELECTOR="${DEFAULT_NODE_SELECTOR},${CONTROL_PLANE_NODE_SELECTOR}"
+    else
+      NODE_SELECTOR="${DEFAULT_NODE_SELECTOR}"
+    fi
+
     ARGS=( --name "${CLUSTER_NAME}" \
       --infra-id "${INFRA_ID}" \
       --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
@@ -77,7 +84,7 @@ case "${PLATFORM}" in
       --pull-secret /tmp/pull-secret.json \
       --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
       --release-image "${RELEASE_IMAGE}" \
-      --node-selector "hypershift.openshift.io/control-plane=true" \
+      --node-selector "${NODE_SELECTOR}" \
       --olm-catalog-placement "${OLM_CATALOG_PLACEMENT}" \
       --additional-tags "expirationDate=${EXPIRATION_DATE}" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
@@ -91,10 +98,6 @@ case "${PLATFORM}" in
 
     if [[ "${MULTI_ARCH_IMAGE}" == "true" ]]; then
       ARGS+=( "--multi-arch" )
-    fi
-
-    if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
-      ARGS+=( "--node-selector \"${CONTROL_PLANE_NODE_SELECTOR}\"" )
     fi
 
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"

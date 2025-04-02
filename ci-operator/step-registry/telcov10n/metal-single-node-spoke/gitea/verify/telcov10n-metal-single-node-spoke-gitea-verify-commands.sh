@@ -7,7 +7,7 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-source ${SHARED_DIR}/spoke-common-functions.sh
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
@@ -36,7 +36,7 @@ test -f \${ztp_repo_dir}/README.md
 grep -w "$(cat ${ssh_pri_key_file}.pub)" \${ztp_repo_dir}/README.md
 EOF
 
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "${NAMESPACE}-helper" "done"
+  run_script_on_ocp_cluster ${run_script} ${gitea_project} "${NAMESPACE}-helper" "done"
 }
 
 function test_gitea_deployment {
