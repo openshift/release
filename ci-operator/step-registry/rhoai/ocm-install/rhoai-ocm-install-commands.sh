@@ -17,7 +17,7 @@ ocm login --url "https://api.stage.openshift.com" --token "${OCM_TOKEN}"
 # Modify Upgrade policy
 NEXT_UPGRADE_RUN=""
 if [[ "${UPDATE_APPROVAL}" == "manual" ]]; then
-  NEXT_UPGRADE_RUN=', "next_run": "2040-01-01T00:00:00Z"'
+  NEXT_UPGRADE_RUN=', "next_run": "2025-10-01T10:00:00Z"'
 fi
 
 cat > upgrade_policy.json <<EOF
