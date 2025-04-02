@@ -116,12 +116,8 @@ tests:
     - as: iso-builder
       commands: |
         export PULL_SECRET_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
-        imageRepo=$(echo "\"$RELEASE_IMAGE_LATEST\"" | jq -r 'split("@")[0]')
-        releaseImageVersion=$(skopeo inspect --authfile $PULL_SECRET_FILE docker://$RELEASE_IMAGE_LATEST | jq -r '.Labels["io.openshift.release"]')
-        releaseImageURL=$imageRepo:$releaseImageVersion
-        echo "releaseImageURL: $releaseImageURL"
         cd tools/iso_builder
-        ./hack/build-ove-image.sh --release-image-url $releaseImageURL --pull-secret-file $PULL_SECRET_FILE --arch x86_64
+        ./hack/build-ove-image.sh --release-image-url $RELEASE_IMAGE_LATEST --pull-secret-file $PULL_SECRET_FILE --arch x86_64
       credentials:
       - mount_path: /var/secrets/registry-pull-secret
         name: registry-pull-credentials
