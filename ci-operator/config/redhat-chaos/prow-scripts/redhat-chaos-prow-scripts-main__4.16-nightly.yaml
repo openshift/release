@@ -7,6 +7,14 @@ base_images:
     name: krkn
     namespace: chaos
     tag: latest
+  cli: 
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -16,6 +24,12 @@ images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
   to: cerberus-main-prow-416
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   initial:
     integration:
@@ -47,6 +61,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     post:
     - chain: ipi-aws-post
     pre:
@@ -64,6 +79,10 @@ tests:
       SPOT_INSTANCES: "false"
       USER_TAGS: |
         TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     post:
     - chain: ipi-aws-post
     pre:
@@ -95,8 +114,11 @@ tests:
       CHURN: "False"
       GC: "False"
       PROFILE_TYPE: reporting
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
@@ -111,8 +133,11 @@ tests:
       GC: "False"
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-azure-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
@@ -138,6 +163,10 @@ tests:
       GC: "False"
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-azure-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure
@@ -154,8 +183,11 @@ tests:
       GC: "false"
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-aro-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
     - chain: redhat-chaos-krkn-hub-etcd-tests
     - chain: redhat-chaos-krkn-hub-console-tests
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
