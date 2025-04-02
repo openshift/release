@@ -42,27 +42,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-mkdir -p "${INSTALL_DIR}"
-
-# We change the payload image to the one in the mirror registry only when the mirroring happens.
-# For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
-# To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
-if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
-  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
-fi
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
-
-gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
-
-if [ "${FIPS_ENABLED:-false}" = "true" ]; then
-    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
-fi
 
 case "${BOOT_MODE}" in
 "iso")
@@ -71,11 +55,6 @@ case "${BOOT_MODE}" in
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
-      # Do not mount image to additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
-      # on a single-arch payload migrated to a multi-arch cluster)
-      continue
-    fi
     if [ "${transfer_protocol_type}" == "cifs" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
       iso_path="${IP_ADDRESS}/isos/agent-ove-x86_64.iso"
@@ -102,13 +81,11 @@ proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
-    # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
-    # on a single-arch payload migrated to a multi-arch cluster)
-    continue
-  fi
   echo "Power on #${host} (${name})..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
 done
+
+echo "BASE_DOMAIN ${BASE_DOMAIN}"
+echo "CLUSTER_NAME ${CLUSTER_NAME}"
 
 
