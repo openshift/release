@@ -11,6 +11,14 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  cli: 
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -20,6 +28,12 @@ images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
   to: cerberus-prow-rosa-415
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 promotion:
   to:
   - namespace: ci
@@ -50,6 +64,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: rosa-aws-sts
@@ -67,6 +82,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - chain: redhat-chaos-hog-scenarios
     workflow: rosa-aws-sts
@@ -91,6 +107,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
@@ -121,6 +138,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - ref: openshift-qe-cluster-density-v2
     - chain: redhat-chaos-hog-scenarios
@@ -148,6 +166,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-node-disruptions-infra-outage

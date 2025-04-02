@@ -7,6 +7,14 @@ base_images:
     name: krkn
     namespace: chaos
     tag: latest
+  cli: 
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -16,6 +24,12 @@ images:
 - dockerfile_path: Dockerfile
   from: krkn
   to: prow-scripts
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   initial:
     integration:
@@ -47,6 +61,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     post:
     - chain: ipi-aws-post
     pre:
@@ -68,6 +83,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     post:
     - chain: ipi-aws-post
     pre:
