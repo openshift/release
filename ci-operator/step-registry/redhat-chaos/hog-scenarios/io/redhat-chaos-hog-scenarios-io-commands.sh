@@ -25,5 +25,7 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./io-hog/prow_run.sh
 rc=$?
+
+cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 echo "Finished running io hog scenario"
 echo "Return code: $rc"
