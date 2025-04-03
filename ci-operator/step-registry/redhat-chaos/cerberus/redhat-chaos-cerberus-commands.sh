@@ -16,7 +16,7 @@ function cerberus_cleanup() {
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$c_status'}' >> test.json
-  oc cp test.json observer-status:/tmp/test.json
+  oc cp -n observer test.json observer-status:/tmp/test.json 
   
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
