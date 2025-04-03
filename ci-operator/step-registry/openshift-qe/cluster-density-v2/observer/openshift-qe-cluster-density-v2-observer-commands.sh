@@ -26,6 +26,13 @@ printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 echo "kubeconfig loc $KUBECONFIG"
 
+if [[ $WAIT_FOR_NS == "true" ]]; then
+  while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
+    echo "start kraken not found yet, waiting"
+    sleep 10
+  done
+fi
+
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=cluster-density-v2
 
