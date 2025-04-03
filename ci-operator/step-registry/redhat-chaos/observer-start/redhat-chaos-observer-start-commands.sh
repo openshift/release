@@ -2,12 +2,12 @@
 
 set -o nounset
 
-oc create project $TEST_NAMESPACE
+oc create ns $TEST_NAMESPACE
 
 oc label ns $TEST_NAMESPACE security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite
 
 
-oc apply -f- <<EOF
+oc apply -f- -n $TEST_NAMESPACE <<EOF
 kind: Pod
 apiVersion: v1
 metadata:
