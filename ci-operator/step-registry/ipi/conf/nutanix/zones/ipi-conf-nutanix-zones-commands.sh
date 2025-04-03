@@ -11,8 +11,6 @@ NUTANIX_AUTH_PATH=${CLUSTER_PROFILE_DIR}/secrets.sh
 
 echo "--------------- config"
 cat "$CONFIG"
-echo "---------------- patch"
-cat "$PATCH"
 
 declare prism_element1_host
 declare prism_element1_port
