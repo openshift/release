@@ -2633,6 +2633,62 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )artifacts-images,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/artifacts-okd-scos-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: artifacts-okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-artifacts-okd-scos-images
+    rerun_command: /test artifacts-okd-scos-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=artifacts-okd-scos
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )artifacts-okd-scos-images,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -4909,81 +4965,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-user-provisioned-dns,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build09
-    context: ci/prow/e2e-aws-ovn-workers-rhel8
-    decorate: true
-    decoration_config:
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-aws-ovn-workers-rhel8
-    optional: true
-    rerun_command: /test e2e-aws-ovn-workers-rhel8
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-workers-rhel8
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-workers-rhel8,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -8180,6 +8161,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-externallb-ovn
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-externallb-ovn
     skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
@@ -8329,6 +8319,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-multi-vcenter-ovn
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-multi-vcenter-ovn
     run_if_changed: vsphere
     spec:
@@ -8404,6 +8403,15 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-ovn
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn
     run_if_changed: vsphere
     spec:
@@ -8480,6 +8488,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-ovn-multi-disk
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-multi-disk
     run_if_changed: vsphere
     spec:
@@ -8554,6 +8571,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-ovn-multi-network
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-multi-network
     skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
@@ -8619,6 +8645,79 @@ presubmits:
     - ^main$
     - ^main-
     cluster: vsphere02
+    context: ci/prow/e2e-vsphere-ovn-multi-network-techpreview
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-e2e-vsphere-ovn-multi-network-techpreview
+    optional: true
+    rerun_command: /test e2e-vsphere-ovn-multi-network-techpreview
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-vsphere-ovn-multi-network-techpreview
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-vsphere-ovn-multi-network-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn-techpreview
     decorate: true
     decoration_config:
@@ -8630,6 +8729,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-ovn-techpreview
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-techpreview
     run_if_changed: vsphere
     spec:
@@ -8705,6 +8813,15 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-ovn-upi
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-upi
     run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
     spec:
@@ -8857,6 +8974,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-ovn-zones
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-zones
     run_if_changed: vsphere
     spec:
@@ -8933,6 +9059,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-ovn-zones-techpreview
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-zones-techpreview
     run_if_changed: vsphere
     spec:
@@ -9009,6 +9144,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-main-e2e-vsphere-static-ovn
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-static-ovn
     skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
@@ -9675,6 +9819,118 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )terraform-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/terraform-okd-scos-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: terraform-okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-terraform-okd-scos-images
+    rerun_command: /test terraform-okd-scos-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=terraform-okd-scos
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )terraform-okd-scos-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/terraform-okd-scos-verify-vendor
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: terraform-okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-terraform-okd-scos-verify-vendor
+    rerun_command: /test terraform-okd-scos-verify-vendor
+    run_if_changed: ^terraform/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify-vendor
+        - --variant=terraform-okd-scos
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )terraform-okd-scos-verify-vendor,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

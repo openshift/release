@@ -26,5 +26,7 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./pod-network-chaos/prow_run.sh
 rc=$?
+
+cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 echo "Finished running pod-network chaos"
 echo "Return code: $rc"

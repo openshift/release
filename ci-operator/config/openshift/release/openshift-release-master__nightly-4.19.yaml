@@ -454,6 +454,14 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-arbiter-upgrade
+- as: metal-ovn-network-flow-matrix-bm-single-node
+  cron: 0 23 * * 0,2,4,6
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: network-flow-matrix-tests
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -474,13 +482,23 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
-  interval: 8h
+- as: e2e-vsphere-ovn-multi-network-techpreview
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["VSphereMultiNetworks=true"]'
       FEATURE_SET: CustomNoUpgrade
+      MULTI_NIC_IPI: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-multi-network
+  interval: 8h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
       MULTI_NIC_IPI: "true"
     observers:
       enable:
@@ -655,26 +673,6 @@ tests:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
   timeout: 6h0m0s
-- as: e2e-aws-ovn-workers-rhel8
-  cron: '@daily'
-  steps:
-    cluster_profile: aws
-    env:
-      PLATFORM_VERSION: "8.4"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-workers-rhel
-- as: e2e-aws-ovn-workers-rhel8-upgrade
-  cron: '@daily'
-  steps:
-    cluster_profile: aws
-    env:
-      PLATFORM_VERSION: "8.4"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-workers-rhel
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -797,6 +795,18 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
+- as: e2e-aws-ovn-serial-nat-instance
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      CI_NAT_REPLACE: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -1007,6 +1017,17 @@ tests:
   interval: 24h
   steps:
     cluster_profile: ibmcloud
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-ibmcloud-ovn
+- as: e2e-ibmcloud-capi-ovn
+  interval: 24h
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -1594,7 +1615,7 @@ tests:
     cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
-      MAJOR_MINOR: "4.18"
+      MAJOR_MINOR: "4.19"
     test:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips

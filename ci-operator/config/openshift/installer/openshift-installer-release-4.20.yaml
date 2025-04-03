@@ -640,15 +640,6 @@ tests:
     workflow: openshift-e2e-azure-upi
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-workers-rhel8
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      PLATFORM_VERSION: "8.4"
-    workflow: openshift-e2e-aws-workers-rhel
-  timeout: 6h0m0s
-- always_run: false
   as: e2e-gcp-upgrade
   optional: true
   steps:
@@ -849,13 +840,23 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-multi-network
+- as: e2e-vsphere-ovn-multi-network-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["VSphereMultiNetworks=true"]'
       FEATURE_SET: CustomNoUpgrade
+      MULTI_NIC_IPI: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-multi-network
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
       MULTI_NIC_IPI: "true"
     observers:
       enable:
