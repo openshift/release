@@ -31,9 +31,43 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: oc-mirror
+- dockerfile_literal: |
+    FROM quay.io/oc-mirror/integration-tests-artifacts:v0.0.1 as embed
+
+    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+    WORKDIR /go/src/github.com/openshift/oc-mirror
+    COPY . .
+    # Statically link the binary so we can run it in any container image base
+    RUN DISABLE_CGO=1 CGO_ENABLED=0 make build
+
+    FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+    WORKDIR /artifacts
+    RUN mkdir -p /artifacts/{scripts,isc,workingdir} && chmod -R 777 /artifacts
+    RUN mkdir -p /root/{.docker,.cache} /root/.oc-mirror/.cache && chmod -R 777 /root/
+    COPY --from=embed artifacts/ /artifacts
+    COPY --from=embed /usr/bin/registry /usr/bin/registry
+    COPY --from=builder /go/src/github.com/openshift/oc-mirror/bin/oc-mirror /bin/oc-mirror
+
+    LABEL io.k8s.display-name="oc-mirror-integration-tests" \
+        io.k8s.description="Integration tests for oc-mirror plugin." \
+        io.openshift.tags="cli,mirror" \
+        maintainer="luzuccar@redhat.com"
+
+    ENV HOME /root
+    ENTRYPOINT ["./uid_entrypoint.sh"]
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel9-golang-1.23-openshift-4.19
+  to: oc-mirror-tests
 promotion:
   to:
-  - name: "4.19"
+  - excluded_images:
+    - oc-mirror-tests
+    name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -77,6 +111,12 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: integration
+  commands: |
+    ./scripts/flow-controller.sh all_happy_path
+  container:
+    from: oc-mirror-tests
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 zz_generated_metadata:
   branch: main
   org: openshift
