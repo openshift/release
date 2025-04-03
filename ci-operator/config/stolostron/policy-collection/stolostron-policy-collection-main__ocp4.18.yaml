@@ -12,7 +12,7 @@ base_images:
     namespace: acm-qe
     tag: clc-ui-e2e
   cli:
-    name: "4.13"
+    name: "4.18"
     namespace: ocp
     tag: cli
   fetch-managed-clusters:
@@ -35,14 +35,6 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.18"
-  ubi-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
-  upi-installer:
-    name: "4.18"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -108,10 +100,12 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8084
       FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.18"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.13", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      SLEEP_DURATION: 20h
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
       ZONES_COUNT: "3"
@@ -146,6 +140,7 @@ tests:
     - ref: acm-opp-app
     - ref: openshift-extended-test
     - ref: stackrox-qa-e2e
+    - ref: cucushift-installer-wait
   timeout: 8h0m0s
 - as: interop-opp-vsphere
   cron: 0 0 1,15 * *
@@ -176,10 +171,12 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8084
       FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.18"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.13", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      SLEEP_DURATION: 20h
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
     test:
@@ -191,6 +188,7 @@ tests:
     - ref: acm-tests-obs
     - chain: cucushift-installer-check-cluster-health
     - ref: quay-tests-quay-interop-test
+    - ref: cucushift-installer-wait
     - ref: acm-opp-app
     - ref: openshift-extended-test
     workflow: acm-ipi-vsphere
