@@ -40,11 +40,7 @@ function generate_assisted_deployment_pull_secret {
 
   echo "************ telcov10n Generate Assited Deployment Pull Secret object ************"
 
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
 
   if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
@@ -73,11 +69,7 @@ function generate_baremetal_secret {
 
   echo "************ telcov10n Generate Baremetal Secrets ************"
 
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
 
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/master.yaml"); do
