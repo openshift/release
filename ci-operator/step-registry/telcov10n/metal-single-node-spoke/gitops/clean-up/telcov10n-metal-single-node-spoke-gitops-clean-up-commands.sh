@@ -16,11 +16,7 @@ function set_hub_cluster_kubeconfig {
 
 function remove_related_git_info {
 
-    if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-    else
-      SPOKE_CLUSTER_NAME=${NAMESPACE}
-    fi
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
 
   echo "************ telcov10n Removing related Git into for the ${SPOKE_CLUSTER_NAME} spoke cluster ************"
 

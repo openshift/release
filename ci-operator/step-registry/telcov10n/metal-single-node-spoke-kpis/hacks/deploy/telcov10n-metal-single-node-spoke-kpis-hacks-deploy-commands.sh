@@ -7,12 +7,16 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+function define_spoke_cluster_name {
+
+  #### Spoke cluster
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
+}
+
 function load_env {
 
   baremetal_host_path="${1}"
 
-  #### Spoke cluster
-  SPOKE_CLUSTER_NAME="spoke-${OCP_SPOKE_VERSION//./-}"
   # shellcheck disable=SC2089
   BAREMETAL_SPOKE_CLUSTER_NIC_MAC="$(cat ${baremetal_host_path}/network_spoke_mac_address)"
   # shellcheck disable=SC2089
@@ -40,11 +44,6 @@ function set_spoke_cluster_kubeconfig {
 
   echo "************ telcov10n Set Spoke kubeconfig ************"
 
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
   secret_kubeconfig=${SPOKE_CLUSTER_NAME}-admin-kubeconfig
 
   export KUBECONFIG="${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
@@ -203,24 +202,13 @@ function update_base_domain {
   set +x
 }
 
-function update_spoke_cluster_name {
-
-  echo "************ telcov10n update spoke cluster name ************"
-
-  local spoke_cluster_name="spoke-${OCP_SPOKE_VERSION//./-}"
-  set -x
-  echo -n "${spoke_cluster_name}" >| ${SHARED_DIR}/spoke_cluster_name
-  set +x
-}
-
 function update_dns_domains {
 
-  local spoke_cluster_name="spoke-${OCP_SPOKE_VERSION//./-}"
   local cluster_base_domain
   cluster_base_domain="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
-  local spoke_base_domain="${spoke_cluster_name}.${cluster_base_domain}"
+  local spoke_base_domain="${SPOKE_CLUSTER_NAME}.${cluster_base_domain}"
 
-  echo "************ telcov10n update DNS domains for the Spoke cluster '${spoke_cluster_name}' ************"
+  echo "************ telcov10n update DNS domains for the Spoke cluster '${SPOKE_CLUSTER_NAME}' ************"
 
   echo
   echo -n "Using ${spoke_base_domain} domain name..."
@@ -281,7 +269,6 @@ function hack_spoke_deployment {
   echo "************ telcov10n hack spoke deployment values ************"
 
   select_baremetal_host_from_pool
-  update_spoke_cluster_name
   update_base_domain
   update_dns_domains
 }
@@ -289,6 +276,7 @@ function hack_spoke_deployment {
 function main {
 
   setup_aux_host_ssh_access
+  define_spoke_cluster_name
   set_spoke_cluster_kubeconfig
   hack_spoke_deployment
 }

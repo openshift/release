@@ -28,11 +28,7 @@ function run_tests {
 
   echo "************ telcov10n Verifying all Policies are Healthy ************"
 
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
 
   show_current_policies_status
 
