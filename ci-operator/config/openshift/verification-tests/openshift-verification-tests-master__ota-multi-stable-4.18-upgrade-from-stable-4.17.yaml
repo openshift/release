@@ -36,6 +36,17 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  intermediate1:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  intermediate2:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.19"
   latest:
     release:
       architecture: multi
@@ -85,6 +96,53 @@ tests:
     - ref: cucushift-upgrade-healthcheck
     - ref: cucushift-ota-postupgrade
     workflow: cucushift-installer-rehearse-azure-ipi
+- as: baremetal-ipi-ovn-ipv4-fips-vmedia-amd-f28
+  capabilities:
+  - intranet
+  cron: 36 16 8 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_OTA_TEST: OCP-25473
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${INTERMEDIATE_RETARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: INTERMEDIATE_RETARGET
+        name: release:intermediate2
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test
+    workflow: baremetal-lab-ipi-virtual-media
+- as: gcp-ipi-confidential-computing-fips-f28
+  cron: 19 22 24 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ENABLE_OTA_TEST: OCP-25473
+      FIPS_ENABLED: "true"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${INTERMEDIATE_RETARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: INTERMEDIATE_RETARGET
+        name: release:intermediate1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
 zz_generated_metadata:
   branch: master
   org: openshift
