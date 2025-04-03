@@ -31,11 +31,7 @@ function push_source_crs {
 
   echo "************ telcov10n Pushing Source CR files ************"
 
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
 
   gitea_ssh_nodeport_uri="$(cat ${SHARED_DIR}/gitea-ssh-nodeport-uri.txt)"
   ssh_pri_key_file=/tmp/ssh-prikey

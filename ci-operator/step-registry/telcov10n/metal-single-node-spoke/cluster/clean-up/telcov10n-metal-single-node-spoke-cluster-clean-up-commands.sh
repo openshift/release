@@ -16,11 +16,7 @@ function clean_up {
 
   echo "************ telcov10n Clean up SNO Spoke cluster artefacts ************"
 
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
 
   set -x
   oc -n ${SPOKE_CLUSTER_NAME} delete agentclusterinstalls.extensions.hive.openshift.io ${SPOKE_CLUSTER_NAME} || echo

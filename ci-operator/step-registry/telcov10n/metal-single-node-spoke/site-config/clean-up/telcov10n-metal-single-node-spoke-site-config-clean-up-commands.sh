@@ -16,11 +16,7 @@ function clean_up {
 
   echo "************ telcov10n Clean up ManagedCluster object and related Spoke namespace ************"
 
-  if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-    SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-  else
-    SPOKE_CLUSTER_NAME=${NAMESPACE}
-  fi
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
   set -x
   oc delete managedcluster ${SPOKE_CLUSTER_NAME} --ignore-not-found
   oc delete ns ${SPOKE_CLUSTER_NAME} --ignore-not-found

@@ -127,11 +127,7 @@ function generate_site_config {
       exit 1
     fi
 
-    if [ -f "${SHARED_DIR}/spoke_cluster_name" ]; then
-      SPOKE_CLUSTER_NAME="$(cat ${SHARED_DIR}/spoke_cluster_name)"
-    else
-      SPOKE_CLUSTER_NAME=${NAMESPACE}
-    fi
+    SPOKE_CLUSTER_NAME=${NAMESPACE}
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
 
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
