@@ -202,7 +202,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
   # shellcheck disable=SC2086
-  eval "${HCP_CLI} create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
+  echo "${HCP_CLI} create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
     --name ${CLUSTER_NAME} \
     --namespace ${CLUSTER_NAMESPACE_PREFIX} \
     --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
@@ -215,9 +215,10 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(SUPPORT_NP_SKEW)"
+    --cluster-cidr 10.136.0.0/14  $(SUPPORT_NP_SKEW)" > /tmp/create-hc-cmd.yaml
 fi
 
+sleep 3600
 
 if [[ -n ${MCE} ]] ; then
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
