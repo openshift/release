@@ -18,6 +18,8 @@ function debug() {
           oc describe ${r} -n "${NAMESPACE}" |& tee "${ARTIFACT_DIR}/${r}.txt"
           oc get ${r} -n "${NAMESPACE}" -o wide
         done
+        echo "sleep 14400"
+        sleep 14400
     fi
 }
 
@@ -118,8 +120,8 @@ echo "Waiting for multiarch-tuning-operator"
 wait_created deployments -n ${NAMESPACE} -l app.kubernetes.io/part-of=multiarch-tuning-operator
 oc wait deployments -n ${NAMESPACE} \
   -l app.kubernetes.io/part-of=multiarch-tuning-operator \
-  --for=condition=Available=True
+  --for=condition=Available=True --timeout=300s
 wait_created pods -n ${NAMESPACE} -l control-plane=controller-manager
 oc wait pods -n ${NAMESPACE} \
   -l control-plane=controller-manager \
-  --for=condition=Ready=True
+  --for=condition=Ready=True --timeout=300s
