@@ -9,6 +9,11 @@ PATCH="${SHARED_DIR}/install-config-failureDomains.yaml"
 
 NUTANIX_AUTH_PATH=${CLUSTER_PROFILE_DIR}/secrets.sh
 
+echo "--------------- config"
+cat "$CONFIG"
+echo "---------------- patch"
+cat "$PATCH"
+
 declare prism_element1_host
 declare prism_element1_port
 declare prism_element1_uuid
@@ -23,6 +28,19 @@ declare prism_element3_uuid
 declare prism_element3_subnet
 # shellcheck source=/dev/null
 source "${NUTANIX_AUTH_PATH}"
+
+echo "--- prism_element1_host $prism_element1_host"
+echo "--- prism_element1_port $prism_element1_port"
+echo "--- prism_element1_uuid $prism_element1_uuid"
+echo "--- prism_element1_subnet $prism_element1_subnet"
+echo "--- prism_element2_host $prism_element2_host"
+echo "--- prism_element2_port $prism_element2_port"
+echo "--- prism_element2_uuid $prism_element2_uuid"
+echo "--- prism_element2_subnet $prism_element2_subnet"
+echo "--- prism_element3_host $prism_element3_host"
+echo "--- prism_element3_port $prism_element3_port"
+echo "--- prism_element3_uuid $prism_element3_uuid"
+echo "--- prism_element3_subnet $prism_element3_subnet"
 
 failureDomains="- failure-domain-1
         - failure-domain-2
@@ -72,16 +90,16 @@ echo "Updated failureDomains in '${CONFIG}'"
 if [[ "$COMPUTE_ZONE" != "" ]]; then
   PATCH="${SHARED_DIR}/install-config-failureDomains-compute.yaml"
 
-cat >"${PATCH}" <<EOF
+  cat >"${PATCH}" <<EOF
 compute:
 - platform:
     nutanix:
       failureDomains:
 $(
     for zone in $COMPUTE_ZONE; do
-        echo "        - $zone"
+      echo "        - $zone"
     done
-)
+  )
 EOF
 
   yq-go m -x -i "${CONFIG}" "${PATCH}"
@@ -91,16 +109,16 @@ fi
 if [[ "$CONTROL_PLANE_ZONE" != "" ]]; then
   PATCH="${SHARED_DIR}/install-config-failureDomains-control-plane.yaml"
 
-cat >"${PATCH}" <<EOF
+  cat >"${PATCH}" <<EOF
 controlPlane:
   platform:
     nutanix:
       failureDomains:
 $(
     for zone in $CONTROL_PLANE_ZONE; do
-        echo "        - $zone"
+      echo "        - $zone"
     done
-)
+  )
 EOF
 
   yq-go m -x -i "${CONFIG}" "${PATCH}"
