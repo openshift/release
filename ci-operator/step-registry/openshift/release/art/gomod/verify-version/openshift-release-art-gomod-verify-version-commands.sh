@@ -46,7 +46,7 @@ print(f"Found paths to check: {gomod_paths}")
 for gomod_path in gomod_paths:
     if gomod_path.exists():
         print(f"go mod file exists at: {gomod_path.absolute()}")
-        with open(gomod_path, 'r') as file:
+        with open(gomod_path, "r") as file:
             lines = file.readlines()
 
             for line in lines:
