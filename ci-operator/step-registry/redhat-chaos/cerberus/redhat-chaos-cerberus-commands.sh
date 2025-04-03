@@ -11,11 +11,12 @@ function cerberus_cleanup() {
   echo "killing cerberus observer"
   kill -15 ${cerberus_pid}
 
-  replaced_str=$(less -XF /tmp/cerberus_status | sed "s/True/0/g" | sed "s/False/1/g" )
+  c_status=$(cat /tmp/cerberus_status)
   date
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
-  exit $replaced_str
+  echo '{"cerberus": '$c_status'}' >> test.json
+  oc cp test.json observer-status:/tmp/test.json
   
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
