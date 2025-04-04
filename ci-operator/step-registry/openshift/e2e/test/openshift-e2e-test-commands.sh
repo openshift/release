@@ -204,7 +204,7 @@ external)
     # https://github.com/openshift/origin/pull/29623
     # Presubmits on origin repo is currently permanent failing, skips is addressed on OCPBUGS-53249, required by
     # https://github.com/openshift/kubernetes/pull/2247
-    if [[ $JOB_NAME == *"pull-ci-openshift-origin"* ]]; then
+    if [[ $JOB_NAME == *"pull-ci-openshift-origin"* ]] || [[ $JOB_NAME == *"pull-ci-openshift-kubernetes"* ]]; then
         export TEST_PROVIDER='{"type":"external"}'
     else
         export TEST_PROVIDER=''
