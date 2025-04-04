@@ -1,12 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
-pip3 install yaml --user
-
-python3 -c '
 import os
 import yaml
 import requests
@@ -59,5 +52,3 @@ for gomod_path in gomod_paths:
         print("No issues found")
     else:
         print(f"go mod file not found at path {gomod_path.absolute()}")
-
-'
