@@ -18,6 +18,8 @@ export AWS_ACCOUNT_ID
 export OCM_TOKEN
 export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 
+uv run openshift_cli_installer/cli.py --help
+
 RUN_COMMAND="uv run openshift_cli_installer/cli.py \
             --action create \
             --clusters-install-data-directory $CLUSTER_DATA_DIR \
