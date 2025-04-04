@@ -19,7 +19,7 @@ function show_current_policies_status {
   set -x
   oc -n ztp-install get cgu
   oc -n openshift-gitops get apps/policies
-  oc get policies.policy.open-cluster-management.io -A | grep "${SPOKE_CLUSTER_NAME}"
+  oc get policies.policy.open-cluster-management.io -A | grep "${ns_tail}"
   set +x
 
 }
@@ -29,6 +29,8 @@ function run_tests {
   echo "************ telcov10n Verifying all Policies are Healthy ************"
 
   SPOKE_CLUSTER_NAME=${NAMESPACE}
+  ns_padded="000${SPOKE_CLUSTER_NAME}"
+  ns_tail="${ns_padded: -4}"
 
   show_current_policies_status
 
@@ -37,7 +39,7 @@ function run_tests {
       oc -n openshift-gitops get apps/policies -ojsonpath='{.status.resources}' | jq '
         .[]
         | select( .kind == \"Policy\" )
-        | select( .namespace | endswith(\"${SPOKE_CLUSTER_NAME}\") )
+        | select( .namespace | endswith(\"${ns_tail}\") )
         | .health.status' \
       || echo \
     ) \

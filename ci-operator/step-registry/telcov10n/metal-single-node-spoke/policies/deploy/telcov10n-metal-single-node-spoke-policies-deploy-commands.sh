@@ -67,6 +67,9 @@ function generate_policy_related_files {
     catatlog_index_img="$(oc -n openshift-marketplace get catsrc ${CATALOGSOURCE_NAME} -ojsonpath='{.spec.image}')"
   fi
 
+  ns_padded="000${SPOKE_CLUSTER_NAME}"
+  ns_tail="${ns_padded: -4}"
+
   jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})" | while read -r entry; do
     # Extract the filename and content
     filename=${policies_path}/$(echo "$entry" | jq -r '.filename')
@@ -76,8 +79,8 @@ function generate_policy_related_files {
     echo "mkdir -pv $(dirname $filename)"
     echo "cat <<EOPGT >| $filename"
     echo -e "$content" | \
-      yq eval '. | select(.kind == "Namespace") .metadata.name += "-'${SPOKE_CLUSTER_NAME}'"' | \
-      yq eval '. | select(.metadata.namespace) .metadata.namespace += "-'${SPOKE_CLUSTER_NAME}'"' | \
+      yq eval '. | select(.kind == "Namespace") .metadata.name += "'${ns_tail}'"' | \
+      yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"' | \
       yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"' | \
       yq eval '. | select(.metadata.name == "'${CATALOGSOURCE_NAME:-}'") .spec.image = "'${catatlog_index_img}'"'
     echo "EOPGT"
