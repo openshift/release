@@ -1,0 +1,61 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  test-bin:
+    name: "4.19"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  stable-latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-agent-connected-metal-conformance-cilium
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.8"
+    workflow: hypershift-mce-agent-metal3-conformance-cilium
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: hypershift
+  variant: periodics-mce
