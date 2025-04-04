@@ -85,9 +85,13 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   source "${SHARED_DIR}/packet-conf.sh"
   # disconnected requires the additional trust bundle containing the local registry certificate
   scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
-  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes "
+  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt "
   EXTRA_ARGS+=" --olm-disable-default-sources "
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+fi
+
+if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
+  EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
