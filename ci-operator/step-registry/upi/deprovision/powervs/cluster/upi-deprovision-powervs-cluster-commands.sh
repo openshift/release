@@ -234,7 +234,25 @@ function destroy_upi_cluster() {
     echo "Running init"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
     echo "Running destroy"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy \
+        -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
+        -state="${SHARED_DIR}"/terraform.tfstate \
+        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                while read LINE
+                do
+                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT=""
+                    fi
+                    if [ ! -z "${OUTPUT}" ]
+                    then
+                        echo "${LINE}"
+                    fi
+                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT="yes"
+                    fi
+                done
     echo "Finished Running"
 }
 
