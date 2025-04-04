@@ -369,34 +369,20 @@ for mode in "${TEST_MODES[@]}"; do
   print_time
 done
 
+status=0
 # Display all statuses
 for mode in "${TEST_MODES[@]}"; do
   temp_status="temp_status_${mode}"
   # If the variable is not set return an error
   if [[ -z ${!temp_status+x} ]]; then
     echo "Error: Variable $temp_status is unset!"
+    status=1
     continue
   fi
 
   value="${!temp_status}"
   echo "$temp_status = $value"
-done
 
-status=0
-
-# Sets overall status to 0 if all statuses are 0
-# Sets overall status to 1 if any status is 1
-for mode in "${TEST_MODES[@]}"; do
-  temp_status="temp_status_${mode}"
-
-  # If the variable is not set return an error
-  if [[ -z ${!temp_status+x} ]]; then
-    echo "Error: Variable $temp_status is unset!"
-    status=1
-    break
-  fi
-
-  value="${!temp_status}"
   if [[ "$value" -ne 0 ]]; then
     status=1
     break
