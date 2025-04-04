@@ -126,6 +126,160 @@ tests:
         requests:
           cpu: 300m
           memory: 500Mi
+- as: test-e2e-upstream
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: e2e-kueue
+      cli: latest
+      commands: |-
+        echo "Current PWD: $(pwd)"
+        echo "Listing directory contents:"
+        ls -lah
+
+        TEMP_DIR=$(mktemp -d)
+        git clone --depth 1 --branch release-0.11 https://github.com/openshift/kubernetes-sigs-kueue.git ${TEMP_DIR}
+        cd ${TEMP_DIR}
+        KUEUE_COMMIT_ID=$(git rev-parse HEAD)
+        cd -
+        rm -rf ${TEMP_DIR}
+
+        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
+        export KUEUE_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue:${KUEUE_COMMIT_ID}
+        echo "Using Kueue Image: ${KUEUE_IMAGE}"
+
+        echo "Current Git branch:"
+        git branch --show-current
+
+        echo "Latest Git commits:"
+        git log --oneline -5
+
+        echo "Git status:"
+        git status
+
+        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator:0e5728ddd8d2aae5ea2590229a8c8f95e90813db
+        echo "Using Operator Image: ${OPERATOR_IMAGE}"
+
+        echo "Waiting for operator image ${OPERATOR_IMAGE} to be available..."
+        function wait_for_image() {
+            until skopeo inspect docker://${OPERATOR_IMAGE} >/dev/null 2>&1; do
+                echo "Operator image not found yet. Retrying in 30s..."
+                sleep 30
+            done
+        }
+        export -f wait_for_image
+        timeout 10m bash -c "wait_for_image"
+
+        echo "Operator image is available. Proceeding with tests..."
+
+        make deploy-cert-manager
+        # Wait until the cert-manager CRDs are installed.
+        function wait_for_cert_manager_crds() {
+            echo "Waiting for cert-manager CRDs to be installed..."
+            local timeout=120
+            local interval=5
+            local elapsed=0
+
+            until oc get crd certificates.cert-manager.io >/dev/null 2>&1; do
+              if [ $elapsed -ge $timeout ]; then
+                  echo "Timeout waiting for cert-manager CRDs"
+                  exit 1
+              fi
+              sleep $interval
+              elapsed=$((elapsed + interval))
+          done
+          echo "cert-manager CRDs are installed."
+        }
+
+        # Wait until all cert-manager deployments are available.
+        function wait_for_cert_manager_ready() {
+          echo "Waiting for cert-manager components to be ready..."
+          local deployments=(cert-manager cert-manager-cainjector cert-manager-webhook)
+          for dep in "${deployments[@]}"; do
+              echo "Waiting for deployment '$dep'..."
+              if ! oc wait --for=condition=Available deployment/"$dep" -n cert-manager --timeout=300s; then
+                  echo "Timeout waiting for deployment '$dep' to become available."
+                  exit 1
+              fi
+          done
+          echo "All cert-manager components are ready."
+        }
+
+        function wait_for_cert_manager_csv() {
+          echo "Waiting for cert-manager Operator CSV to reach Succeeded status..."
+          local timeout=300
+          local interval=10
+          local elapsed=0
+          local csv_namespace="cert-manager-operator"
+          while true; do
+              local status
+              status=$(oc get csv -n "$csv_namespace" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "NotFound")
+              if [ "$status" = "Succeeded" ]; then
+                  echo "cert-manager Operator CSV is Succeeded."
+                  break
+              fi
+              if [ $elapsed -ge $timeout ]; then
+                  echo "Timeout waiting for cert-manager Operator CSV to succeed."
+                  exit 1
+              fi
+              sleep $interval
+              elapsed=$((elapsed + interval))
+          done
+        }
+        wait_for_cert_manager_crds
+        wait_for_cert_manager_csv
+        wait_for_cert_manager_ready
+        make deploy-ocp
+        # Replace sleep 360 with this
+        function wait_for_kueue_deployment() {
+          echo "Waiting for kueue-controller-manager deployment..."
+          local timeout=600
+          local start_time=$(date +%s)
+
+          while : ; do
+            if oc get deployment -n openshift-kueue-operator kueue-controller-manager >/dev/null 2>&1; then
+              echo "Deployment found. Checking availability..."
+              if oc wait --for=condition=Available deployment/kueue-controller-manager \
+                -n openshift-kueue-operator --timeout=300s; then
+                break
+              else
+                echo "Deployment not available yet..."
+              fi
+            fi
+            
+            if [ $(($(date +%s) - start_time)) -gt $timeout ]; then
+              echo "Timeout waiting for kueue deployment"
+              exit 1
+            fi
+            sleep 15
+          done
+        }
+        echo "### Debugging Kueue Deployment ###"
+
+        # Check deployment status and conditions
+        oc get deployment -n openshift-kueue-operator kueue-controller-manager -o yaml
+
+        # Check pods in the namespace
+        oc get pods -n openshift-kueue-operator
+        wait_for_kueue_deployment
+        TEMP_DIR=$(mktemp -d)
+        git clone --depth 1 --branch dummy-test https://github.com/sohankunkerkar/kueue.git ${TEMP_DIR}
+        cd ${TEMP_DIR}
+        KUEUE_NAMESPACE="openshift-kueue-operator" make -f Makefile-test-ocp.mk test-e2e-ocp
+        cd -
+        rm -rf ${TEMP_DIR}
+        make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
 zz_generated_metadata:
   branch: main
   org: openshift
