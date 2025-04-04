@@ -6,7 +6,7 @@ set -o pipefail
 # Fix user IDs in a container
 ~/fix_uid.sh
 
-SSH_KEY_PATH=/var/run/ssh-key/ssh-key
+SSH_KEY_PATH=/var/run/ansible_group_all/ansible_ssh_private_key
 SSH_KEY=~/key
 JENKINS_USER_NAME="$(cat /var/run/jenkins-credentials/jenkins-username)"
 JENKINS_USER_TOKEN="$(cat /var/run/jenkins-credentials/auto-jenkins-token)"
