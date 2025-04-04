@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: cli
+  rhoai-tests:
+    name: ods-ci
+    namespace: ci
+    tag: dev
 build_root:
   image_stream_tag:
     name: release
@@ -11,22 +15,22 @@ build_root:
 images:
 - context_dir: .
   dockerfile_path: ods_ci/build/Dockerfile_interop
-  to: rhoai-tests
+  to: rhoai-branch-tests
 releases:
   latest:
     prerelease:
       product: ocp
       version_bounds:
-        lower: 4.18.0-0
-        stream: 4-stable
-        upper: 4.19.0-0
+        lower: 4.19.0-0
+        stream: 4-dev-preview
+        upper: 4.20.0-0
 resources:
   '*':
     limits:
-      memory: 128Gi
+      memory: 4Gi
     requests:
-      cpu: 8000m
-      memory: 64Gi
+      cpu: 800m
+      memory: 2000Mi
 tests:
 - as: rhoai-interop-aws
   cron: 0 6 * * 1
@@ -46,7 +50,7 @@ tests:
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","rhoai-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","rhoai-lp"]'
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
@@ -67,7 +71,7 @@ tests:
     - ref: rhoai-tests
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
-  branch: release-2.16
+  branch: releases-2.17
   org: red-hat-data-services
   repo: ods-ci
-  variant: rhoai-ocp4.18-lp-interop
+  variant: rhoai-ocp4.19-lp-interop
