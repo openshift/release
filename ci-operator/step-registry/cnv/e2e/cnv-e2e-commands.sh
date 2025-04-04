@@ -27,9 +27,18 @@ unset KUBERNETES_PORT_443_TCP_PORT
 set -x
 START_TIME=$(date "+%s")
 
-# Get oc binary
-# curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
+# Use cnv-ci archive URL requested with Gangway API in the Prow job spec if any
+CNV_CI_ARCHIVE_URL=$(
+  curl -sSL https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID} \
+    | sed -nr '/name: CNV_CI_ARCHIVE_URL/ { n; s|\s+value: (.*)|\1|p }'
+)
+
+# Fallback to release branch from upstream repo
+if [[ -z "${CNV_CI_ARCHIVE_URL}" ]]; then
+  CNV_CI_ARCHIVE_URL=https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}
+fi
+
+curl -L "${CNV_CI_ARCHIVE_URL}" -o /tmp/cnv-ci.tgz
 mkdir -p /tmp/cnv-ci
 tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
@@ -81,8 +90,8 @@ else
 fi
 
 if [ "${exit_code:-0}" -ne 0 ]; then
-    echo "deploy_test failed with exit code $exit_code"
+    echo "${MAKEFILE_TARGET} failed with exit code ${exit_code}"
     exit ${exit_code}
 else
-    echo "deploy_test succeeded"
+    echo "${MAKEFILE_TARGET} succeeded"
 fi
