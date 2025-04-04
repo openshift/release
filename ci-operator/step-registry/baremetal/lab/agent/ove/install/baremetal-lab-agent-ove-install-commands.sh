@@ -85,6 +85,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
 done
 
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    touch /var/builds/${CLUSTER_NAME}/preserve
+
 echo "BASE_DOMAIN ${BASE_DOMAIN}"
 echo "CLUSTER_NAME ${CLUSTER_NAME}"
 
