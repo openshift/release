@@ -61,6 +61,12 @@ DEPLOYMENT:
   skip_download_client: True
 __EOF__
 
+if [[ "${ODF_TEST_PLATFORM}" == "vsphere" ]]; then
+  cat >> "./test.log" << __EOF__
+ENV_DATA:
+  platform: 'vsphere'
+__EOF__
+fi
 
 set -x
 START_TIME=$(date "+%s")

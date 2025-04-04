@@ -27,19 +27,15 @@ base_images:
     name: ocs-ci-container
     namespace: ci
     tag: stable
-  test-bin:
-    name: "4.19"
-    namespace: ocp
-    tag: hypershift-tests
   tests-private:
     name: tests-private
     namespace: ci
     tag: "4.19"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-0.4.8
 images:
 - dockerfile_literal: |
     FROM this-is-ignored
@@ -58,6 +54,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: interop-opp-aws
   cron: 0 1,15 * * *
@@ -169,6 +166,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8084
       FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_TEST_PLATFORM: vsphere
       ODF_VERSION_MAJOR_MINOR: "4.18"
       OPERATORS: |
         [
