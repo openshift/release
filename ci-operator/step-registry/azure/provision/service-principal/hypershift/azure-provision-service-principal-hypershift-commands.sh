@@ -8,12 +8,6 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
-echo AZURE_AUTH_LOCATION  $AZURE_AUTH_LOCATION
-echo AZURE_AUTH_CLIENT_ID $AZURE_AUTH_CLIENT_ID
-echo AZURE_AUTH_CLIENT_SECRET $AZURE_AUTH_CLIENT_SECRET
-echo AZURE_AUTH_SUBSCRIPTION_ID $AZURE_AUTH_SUBSCRIPTION_ID
-echo AZURE_AUTH_TENANT_ID $AZURE_AUTH_TENANT_ID
-
 az --version
 az cloud set --name AzureCloud
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
@@ -199,12 +193,12 @@ az identity federated-credential create --name "${AZURE_FILE_MI_NAME}"-fed-id \
 --subject system:serviceaccount:openshift-cluster-csi-drivers:azure-file-csi-driver-node-sa \
 --audience openshift
 
-az identity federated-credential create --name "${IMAGE_REGISTRY_MI_NAME}"-fed-id \
---identity-name "${IMAGE_REGISTRY_MI_NAME}" \
---resource-group "$RG_HC" \
---issuer "${OIDC_ISSUER_URL}" \
---subject system:serviceaccount:openshift-image-registry:cluster-image-registry-operator \
---audience openshift
+#az identity federated-credential create --name "${IMAGE_REGISTRY_MI_NAME}"-fed-id \
+#--identity-name "${IMAGE_REGISTRY_MI_NAME}" \
+#--resource-group "$RG_HC" \
+#--issuer "${OIDC_ISSUER_URL}" \
+#--subject system:serviceaccount:openshift-image-registry:cluster-image-registry-operator \
+#--audience openshift
 
 az identity federated-credential create --name "${IMAGE_REGISTRY_MI_NAME}"-fed-id \
 --identity-name "${IMAGE_REGISTRY_MI_NAME}" \
