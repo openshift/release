@@ -12,17 +12,18 @@ function set_hub_cluster_kubeconfig {
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
 }
 
-function run_tests {
-  echo "************ telcov10n Verifying installation ************"
-  oc get managedcluster || echo "No ready..."
+function clean_up {
+
+  echo "************ telcov10n Clean up Policies related Spoke namespace ************"
 }
+
 
 function main {
   set_hub_cluster_kubeconfig
-  run_tests
+  clean_up
 
   echo
-  echo "Success!!! The Site Config file has been pushed correctly."
+  echo "Success!!! The Policies have been removed correctly."
 }
 
 main
