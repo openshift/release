@@ -112,6 +112,9 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
   echo "Setting AZURE credential with minimal permissions to install UPI"
   AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission"
+elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+  echo "Setting AZURE credential with Contributor role only to install UPI"
+  export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
 fi
 export AZURE_AUTH_LOCATION
 
@@ -211,9 +214,6 @@ else
   az group create --name $RESOURCE_GROUP --location $AZURE_REGION
 fi
 
-echo "Creating identity"
-az identity create -g $RESOURCE_GROUP -n ${INFRA_ID}-identity
-
 ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
 
 echo "Creating storage account"
@@ -263,10 +263,16 @@ az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -
 echo "Creating private DNS zone"
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 
-PRINCIPAL_ID=$(az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv)
-echo "Assigning 'Contributor' role to principal ID ${PRINCIPAL_ID}"
-RESOURCE_GROUP_ID=$(az group show -g $RESOURCE_GROUP --query id --out tsv)
-az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
+# The file azure-sp-contributor.json only exists under SHARED_DIR on 4.19+
+# On 4.19+, user-assigned identity is not requried.
+if [[ ! -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+    echo "Creating identity"
+    az identity create -g $RESOURCE_GROUP -n ${INFRA_ID}-identity
+    PRINCIPAL_ID=$(az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv)
+    echo "Assigning 'Contributor' role to principal ID ${PRINCIPAL_ID}"
+    RESOURCE_GROUP_ID=$(az group show -g $RESOURCE_GROUP --query id --out tsv)
+    az role assignment create --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type "ServicePrincipal" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
+fi
 
 pushd /tmp/azure
 
