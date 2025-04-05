@@ -56,7 +56,7 @@ find /var/host_variables/${CLUSTER_NAME}/ -mindepth 1 -type d | while read -r di
 done
 
 cd /eco-ci-cd
-ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME}"
+# ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME}"
 
 echo "Store inventory in SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* ${SHARED_DIR}/
