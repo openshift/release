@@ -43,7 +43,13 @@ export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
 
-./run.sh 
+./run.sh || {
+    rm -f ${SHARED_DIR}/index.json
+    PODS_PER_NODE=50
+    POD_READY_THRESHOLD='60s'
+    export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}";
+    ./run.sh
+}
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
