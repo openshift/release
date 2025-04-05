@@ -48,17 +48,34 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
+JOB="$(echo "${JOB_SPEC}" | jq '.job')"
+BOOTSTRAP_IP=""
+
+if [[ "$JOB" =~ "baremetal-ipi" ]]; then
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+  BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address")"
+
+  # copy bootstrap ip to bastion host for use in cleanup
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/ipi_bootstrap_ip_address" "root@${AUX_HOST}:/var/builds/$CLUSTER_NAME/"
+fi
+
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
+  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" "${BOOTSTRAP_IP}" << 'EOF'
   set -o nounset
   set -o errexit
   INTERNAL_NET_CIDR="${1}"
   IP_ARRAY="${@:2}"
+  BOOTSTRAP_IP="${3}"
   for ip in $IP_ARRAY; do
     # TODO: change to firewalld or nftables
+    iptables -A FORWARD -s ${ip} -d 192.168.70.0/24 -j ACCEPT
     # Allow connections on port 22 used by observer pod
     iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
   done
+  if [ -n "${BOOTSTRAP_IP}" ]; then
+    iptables -A FORWARD -s ${BOOTSTRAP_IP} -d 192.168.70.0/24 -j ACCEPT
+    iptables -A FORWARD -s ${BOOTSTRAP_IP} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+  fi
 EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
