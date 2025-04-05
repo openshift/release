@@ -34,25 +34,18 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: azure-qe
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
-      SLEEP_DURATION: 10m
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_AZURE_REGION: eastus
+      SLEEP_DURATION: 8h
+      SPOT_INSTANCES: "false"
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-deprovision
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-provision
-- as: installer-rehearse-aws
-  cron: '@yearly'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      RHEL_VM_TYPE: m5.xlarge
-      RHEL_WORKER_COUNT_PER_ZONE: "3"
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
+    - chain: cucushift-installer-rehearse-azure-ipi-generation-provision
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
