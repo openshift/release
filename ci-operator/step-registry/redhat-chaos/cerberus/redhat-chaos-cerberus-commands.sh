@@ -11,11 +11,12 @@ function cerberus_cleanup() {
   echo "killing cerberus observer"
   kill -15 ${cerberus_pid}
 
-  replaced_str=$(less -XF /tmp/cerberus_status | sed "s/True/0/g" | sed "s/False/1/g" )
+  c_status=$(cat /tmp/cerberus_status)
   date
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
-  exit $replaced_str
+  echo '{"cerberus": '$c_status'}' >> test.json
+  oc cp -n observer test.json observer-status:/tmp/test.json 
   
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
@@ -27,6 +28,30 @@ done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 echo "kubeconfig loc $KUBECONFIG"
+
+oc create ns $TEST_NAMESPACE
+
+oc label ns $TEST_NAMESPACE security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite
+
+oc apply -f- -n $TEST_NAMESPACE <<EOF
+kind: Pod
+apiVersion: v1
+metadata:
+  name: $POD_NAME
+  creationTimestamp: 
+  labels:
+    name: pause-amd64
+spec:
+  containers:
+  - name: pause-amd64
+    image: docker.io/ocpqe/hello-pod
+    securityContext:
+      capabilities: {}
+      privileged: true
+  restartPolicy: Always
+  dnsPolicy: ClusterFirst
+EOF
+
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
 export CERBERUS_WATCH_NAMESPACES="[^.*$]"
