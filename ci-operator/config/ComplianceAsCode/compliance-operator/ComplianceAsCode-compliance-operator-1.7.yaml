@@ -1,0 +1,212 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.ci
+  from: base
+  inputs:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+  to: compliance-operator
+- additional_architectures:
+  - arm64
+  dockerfile_path: images/testcontent/Dockerfile.ci
+  to: testcontent
+- additional_architectures:
+  - arm64
+  dockerfile_path: images/openscap/Dockerfile
+  to: testopenscap
+promotion:
+  to:
+  - excluded_images:
+    - testcontent
+    - testopenscap
+    name: "1.7"
+    namespace: ComplianceAsCode
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: go-build
+  commands: make
+  container:
+    from: src
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+- as: verify
+  commands: make verify
+  container:
+    from: src
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
+- as: e2e-aws-parallel
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-parallel
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-serial
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-serial
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-rosa
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BYO_OIDC: "true"
+      CHANNEL_GROUP: stable
+      ENABLE_BILLING_ACCOUNT: "yes"
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: 4.15.48
+      REGION: us-east-2
+    test:
+    - ref: ipi-install-rbac
+    - as: test-ocp4-pci-dss-node
+      cli: latest
+      commands: make e2e-rosa
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
+- always_run: false
+  as: e2e-aws-parallel-arm
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-parallel
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-serial-arm
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-serial
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: "1.7"
+  org: ComplianceAsCode
+  repo: compliance-operator

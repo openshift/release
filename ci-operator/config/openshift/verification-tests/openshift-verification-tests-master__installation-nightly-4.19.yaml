@@ -545,6 +545,32 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private-sshkey
+- as: azure-ipi-user-assigned-identity-f14
+  cron: 31 21 16,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_AZURE_IDENTITY_COMPUTE: "true"
+      ENABLE_AZURE_IDENTITY_CONTROL_PLANE: "true"
+      ENABLE_AZURE_IDENTITY_DEFAULT_MACHINE: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-identity
+- as: azure-ipi-multi-user-assigned-identity-mini-perm-f28
+  cron: 54 13 29 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_USER_ASSIGNED_IDENTITY_NUMBER: "2"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_AZURE_IDENTITY_DEFAULT_MACHINE: "true"
+      FEATURE_GATES: '["MachineAPIMigration=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-identity
 - as: azure-ipi-valid-cluster-name-f28
   cron: 51 14 4 * *
   steps:
