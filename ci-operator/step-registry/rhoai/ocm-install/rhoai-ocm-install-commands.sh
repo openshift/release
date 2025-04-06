@@ -14,23 +14,6 @@ OCM_VERSION=$(ocm version)
 echo "Logging into stage with offline token using ocm cli ${OCM_VERSION}"
 ocm login --url "https://api.stage.openshift.com" --token "${OCM_TOKEN}"
 
-# Modify Upgrade policy
-NEXT_UPGRADE_RUN=""
-if [[ "${UPDATE_APPROVAL}" == "manual" ]]; then
-  NEXT_UPGRADE_RUN=', "next_run": "2025-10-01T10:00:00Z"'
-fi
-
-cat > upgrade_policy.json <<EOF
-{
-  "addon_id": "managed-odh",
-  "cluster_id": "${CLUSTER_ID}",
-  "schedule_type": "${UPDATE_APPROVAL}",
-  "version": "${RHOAI_VERSION}"${NEXT_UPGRADE_RUN}
-}
-EOF
-
-ocm post "/api/addons_mgmt/v1/clusters/${CLUSTER_ID}/upgrade_plans" --body upgrade_policy.json
-
 # Install RHOAI Addon
 cat > rhoai_addon.json <<EOF
 {
@@ -47,6 +30,23 @@ cat > rhoai_addon.json <<EOF
 EOF
 
 ocm post "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/addons" --body rhoai_addon.json
+
+# Modify Upgrade policy
+NEXT_UPGRADE_RUN=""
+if [[ "${UPDATE_APPROVAL}" == "manual" ]]; then
+  NEXT_UPGRADE_RUN=', "next_run": "2025-10-01T10:00:00Z"'
+fi
+
+cat > upgrade_policy.json <<EOF
+{
+  "addon_id": "managed-odh",
+  "cluster_id": "${CLUSTER_ID}",
+  "schedule_type": "${UPDATE_APPROVAL}",
+  "version": "${RHOAI_VERSION}"${NEXT_UPGRADE_RUN}
+}
+EOF
+
+ocm post "/api/addons_mgmt/v1/clusters/${CLUSTER_ID}/upgrade_plans" --body upgrade_policy.json
 
 # Wait for Operator Workloads
 echo "Wait for Operator Pods to be Ready"
