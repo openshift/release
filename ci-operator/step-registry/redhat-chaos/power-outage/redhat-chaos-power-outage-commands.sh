@@ -55,5 +55,6 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./power-outage/prow_run.sh
 rc=$?
+cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 echo "Finished running power outages"
 echo "Return code: $rc"

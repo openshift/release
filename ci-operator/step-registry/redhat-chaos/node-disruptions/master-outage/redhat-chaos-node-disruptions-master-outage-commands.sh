@@ -70,5 +70,6 @@ fi
 
 ./node-disruptions/prow_run.sh
 rc=$?
+cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 echo "Finished running node disruptions"
 echo "Return code: $rc"

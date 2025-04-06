@@ -9,12 +9,14 @@ function check_vm_identity()
 
     local node_type=$1 expected_identity=$2 nodes_list ret=0
     nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/${node_type} -o json | jq -r '.items[].metadata.name')
+    expected_identity=${expected_identity//resourcegroups/resourceGroups}
     if [[ ${node_type} == "worker" ]]; then
         expected_identity=$(echo ${expected_identity} | awk '{print $1}')
     fi
     for node in ${nodes_list}; do
         echo "checking ${node_type} node: ${node}..."
         node_identity_id=$(az vm show -g "${RESOURCE_GROUP}" -n "${node}" -otsv --query "identity.userAssignedIdentities.keys(@)" -otsv)
+        node_identity_id=${node_identity_id//resourcegroups/resourceGroups}
         for id in ${expected_identity}; do
             if [[ "${node_identity_id}" =~ ${id} ]]; then
                 echo "INFO: expected identity ${id} is attached to node!"

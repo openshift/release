@@ -182,10 +182,8 @@ function collect_diagnostic_data {
     echo "Processing vcenter $GOVC_URL"
 
     IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
-
     IFS=$'\n' read -d '' -r -a PORTGROUPS <<< "$(jq -r -c --arg vcenter "${GOVC_URL}" '[.failureDomains[] | select(.server == $vcenter) | .topology.networks[]] | unique | .[]' < "$SHARED_DIR"/platform.json)"
-    
-    echo "test -- $PORTGROUPS"
+        
     if [ -z ${PORTGROUPS:-} ]; then
       echo "${GOVC_URL}; port groups in failure domain: ${#PORTGROUPS[@]}"
       v_idx=$((v_idx+1));
@@ -249,18 +247,20 @@ function collect_diagnostic_data {
               govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
 
               METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
-              JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
+              JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
           done
       done
     done
     
-    govc find . -type m -runtime.powerState poweredOn -network $network
-    echo "no virtual machines found in vCenter ${VCENTER}. not collecting hardware versions"
-  
-    target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
-    echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
-    echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
-  
+    if [ -n "${vms:-}" ]; then
+      target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
+      echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"      
+    fi
+
+    if [ -n "${JSON_DATA:-}" ]; then
+      echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
+    fi  
+    
     v_idx=$((v_idx+1));
   done
 
@@ -359,6 +359,11 @@ function embed_vm_data() {
     FILE=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .file' ${vcenter_state}/metric-files.json)
     cat $FILE >> ${RESULT_HTML}
     echo "</script>" >> ${RESULT_HTML}
+
+    echo "<script type='application/json' id='${VM}-screenshot'>" >> ${RESULT_HTML}
+    SCREENSHOT_BASE64=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .screenshot' ${vcenter_state}/metric-files.json)
+    echo $SCREENSHOT_BASE64 >> ${RESULT_HTML}
+    echo "</script>" >> ${RESULT_HTML}    
   done
 }
 
@@ -379,7 +384,7 @@ function write_results_html() {
 <html lang="en-US">
   <head>
     <meta charset="utf-8">
-    <title>vSphere Metrics</title>
+    <title>vSphere Environment Summary and Metrics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
     <style>
   div#nav-col ul {
@@ -452,6 +457,11 @@ EOF
   echo ${VM_INPUT} >> ${RESULT_HTML}
   cat >> ${RESULT_HTML} << EOF
         <div id="chart-div">
+          <div class="chart-container" style="text-align: center">
+            <h4>Screenshot taken at the conclusion of the job</h4>
+            <img id="vm-screenshot"></img>
+          </div>
+          <hr>
           <div class="chart-container">
             <canvas id="cpu-usage"></canvas>
           </div>
@@ -587,6 +597,11 @@ async function processMaster(url, metricLabel, chart, prefix) {
     }
   }
 
+  screenShotBase64Elem = document.getElementById(url+"-screenshot")
+  if (screenShotBase64Elem != null) {
+    document.getElementById('vm-screenshot')
+      .src = 'data:image/png;base64,' + screenShotBase64Elem.innerHTML
+  }
   console.log(newData);
   chart.data = newData;
   chart.update();

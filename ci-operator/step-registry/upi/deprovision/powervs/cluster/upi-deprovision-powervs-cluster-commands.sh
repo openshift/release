@@ -85,7 +85,7 @@ function login_ibmcloud() {
 function download_automation_code() {
     echo "Downloading the head for ocp-upi-powervs"
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/ocp-power-automation/ocp4-upi-powervs/archive/refs/heads/ocp4-upi-powervs-terraform-1.76.2-updates.tar.gz \
+        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/terraform-1.76.2-updates.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
@@ -185,10 +185,17 @@ function cleanup_prior() {
             || true
 
         # VPC Images
-        # TODO: FIXME add filtering by date.... ?
-        for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "$(< ${SHARED_DIR}/RESOURCE_GROUP)" --output json | jq -r '.[].id')
+        for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[] | select(.name | contains("ci-op-") | not) .id?')
         do
-            ibmcloud is image-delete "${RESOURCE_TGT}" -f
+            echo "Removing image with id/details"
+            ibmcloud is image --output json "${RESOURCE_TGT}" > /tmp/image.json
+            cat /tmp/image.json
+            jq -r 'select((.created_at | split(".")[0] | strptime("%Y-%m-%dT%H:%M:%S") | mktime | strftime("%F %X")) < (now - 86400))' /tmp/image.json > /tmp/image_old.json
+            if [ ! -z "$(< /tmp/image_old.json)" ]
+            then
+                echo "Deleting Image"
+                ibmcloud is image-delete "${RESOURCE_TGT}" -f
+            fi
         done
 
         echo "Done cleaning up prior runs"
@@ -227,7 +234,25 @@ function destroy_upi_cluster() {
     echo "Running init"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
     echo "Running destroy"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy \
+        -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
+        -state="${SHARED_DIR}"/terraform.tfstate \
+        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                while read LINE
+                do
+                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT=""
+                    fi
+                    if [ ! -z "${OUTPUT}" ]
+                    then
+                        echo "${LINE}"
+                    fi
+                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT="yes"
+                    fi
+                done
     echo "Finished Running"
 }
 

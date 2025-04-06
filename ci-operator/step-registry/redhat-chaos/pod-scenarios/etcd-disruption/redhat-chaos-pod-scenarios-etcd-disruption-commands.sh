@@ -32,7 +32,7 @@ rc=$?
 echo "Done running the test!" 
 
 cat /tmp/*.log 
+cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 
 echo "Return code: $rc"
 exit $rc
-echo $ENABLE_ALERTS
