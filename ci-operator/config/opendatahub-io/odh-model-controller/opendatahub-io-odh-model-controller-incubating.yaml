@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  opendatahub-tests:
+    name: opendatahub-tests
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -54,6 +58,15 @@ tests:
       IMAGE_REPO: odh-model-controller
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
+- as: run-opendatahub-tests
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    cluster_profile: xxxx
+    env:
+      TEST_MARKER: "smoke"
+    test:
+      - ref: rhoai-opendatahub-tests
+    workflow: xxxx
 zz_generated_metadata:
   branch: incubating
   org: opendatahub-io
