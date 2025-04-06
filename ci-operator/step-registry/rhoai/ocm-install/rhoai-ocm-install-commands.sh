@@ -24,7 +24,12 @@ cat > rhoai_addon.json <<EOF
     "id": "${RHOAI_VERSION}"
   },
   "parameters": {
-    "items": []
+    "items": [
+        {
+          "id": "notification-email",
+          "value": "obarhaim@redhat.com"
+        }
+      ]
   }
 }
 EOF
