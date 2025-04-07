@@ -23,7 +23,7 @@ function set_proxy () {
     fi
 }
 
-function add_pull_secret () {
+function configure_cluster_pull_secret () {
     echo "Retrieving the redhat stage pull secret from shared credentials..."
     stage_registry_path="/var/run/vault/mirror-registry/registry_stage.json"
     stage_auth_user=$(jq -r '.user' $stage_registry_path)
@@ -54,7 +54,7 @@ function wait_for_state() {
     return $?
 }
 
-function create_catalogsource () {
+function create_catalog () {
     echo "Creating a custom catalog source using image: '$INDEX_IMG'..."
     oc apply -f - << EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -66,7 +66,74 @@ spec:
   sourceType: grpc
   image: $INDEX_IMG
 EOF
+}
 
+function check_mirror_registry () {
+    if test -s "${SHARED_DIR}/mirror_registry_url" ; then
+        export MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+        echo "Using mirror registry: ${MIRROR_REGISTRY_HOST}"
+    else
+        echo "This is not a disconnected environment as no mirror registry url found. Skipping rest of steps..."
+        exit 0
+    fi
+}
+
+function configure_host_pull_secret () {
+    echo "Retrieving the redhat, redhat stage, and mirror registries pull secrets from shared credentials..."
+    redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
+    redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
+    redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
+    redhat_registry_auth=$(echo -n " " "$redhat_auth_user":"$redhat_auth_password" | base64 -w 0)
+
+    stage_registry_path="/var/run/vault/mirror-registry/registry_stage.json"
+    stage_auth_user=$(jq -r '.user' $stage_registry_path)
+    stage_auth_password=$(jq -r '.password' $stage_registry_path)
+    stage_registry_auth=$(echo -n " " "$stage_auth_user":"$stage_auth_password" | base64 -w 0)
+
+    mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
+    mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
+    
+    echo "Appending the pull secrets to Podman auth configuration file '${XDG_RUNTIME_DIR}/containers/auth.json'..."
+    oc extract secret/pull-secret -n openshift-config --confirm --to ${TMP_DIR}
+    jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
+}
+
+function install_oc_mirror () {
+    echo "Installing the latest oc-mirror client..."
+    run_command "curl -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz"
+    run_command "tar -xvzf oc-mirror.tar.gz && chmod +x ./oc-mirror && rm -f oc-mirror.tar.gz"
+}
+
+function mirror_catalog_and_operator() {
+    echo "Creaing ImageSetConfiguration for catalog and operator related images..."
+    cat > ${TMP_DIR}/imageset.yaml << EOF
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+  operators:
+  - catalog: ${INDEX_IMG}
+    packages:
+    - name: openshift-cert-manager-operator
+  additionalImages:
+  - name: quay.io/openshifttest/helm:3.17.0
+  - name: quay.io/openshifttest/vault:1.19.0
+  - name: quay.io/openshifttest/letsencrypt-pebble:2.7.0
+EOF
+
+    echo "Mirroring the images to the mirror registry..."
+    run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=debug --src-tls-verify=false --dest-tls-verify=false"
+
+    echo "Replacing the generated catalog source name with the ENV var '$CATSRC_NAME'..."
+    run_command "curl -k -L -o yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') && chmod +x ./yq"
+    run_command "./yq eval '.metadata.name = \"$CATSRC_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/cs-*.yaml"
+
+    echo "Checking and applying the generated resource files..."
+    run_command "find ${OC_MIRROR_OUTPUT_DIR} -type f -exec cat {} \;"
+    run_command "oc apply -f ${OC_MIRROR_OUTPUT_DIR}"
+}
+
+function check_catalog_readiness () {
+    echo "Waiting the applied catalog source to become READY..."
     if wait_for_state "catalogsource/${CATSRC_NAME}" "jsonpath={.status.connectionState.lastObservedState}=READY" "5m" "openshift-marketplace"; then
         echo "CatalogSource is ready"
     else
@@ -87,7 +154,22 @@ fi
 
 timestamp
 set_proxy
-add_pull_secret
-create_catalogsource
 
+if [ "${DISCONNECTED}" == "true" ]; then
+    export TMP_DIR=/tmp/disconnected
+    export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
+    export XDG_RUNTIME_DIR="${TMP_DIR}/run"
+    mkdir -p "${XDG_RUNTIME_DIR}/containers"
+    cd "$TMP_DIR"
+
+    check_mirror_registry
+    configure_host_pull_secret
+    install_oc_mirror
+    mirror_catalog_and_operator
+else
+    configure_cluster_pull_secret
+    create_catalog
+fi
+
+check_catalog_readiness
 echo "[$(timestamp)] Succeeded in creating the catalog source!"
