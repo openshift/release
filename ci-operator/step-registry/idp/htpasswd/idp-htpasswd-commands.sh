@@ -39,6 +39,9 @@ function set_common_variables () {
         TARGET_RESOURCE="hostedcluster/$cluster_name -n $MIDDLE_NAMESPACE"
         OAUTH_NAMESPACE="$MIDDLE_NAMESPACE-$cluster_name"
         IDP_FIELD=".spec.configuration.oauth.identityProviders"
+
+        #backup kubeadmin-password
+        oc get secret -n ${HYPERSHIFT_NAMESPACE} ${cluster_name}-kubeadmin-password --template={{.data.password}} | base64 -d > ${SHARED_DIR}/kubeadmin-password
     else
         MIDDLE_NAMESPACE="openshift-config"
         TARGET_RESOURCE="oauth/cluster"
