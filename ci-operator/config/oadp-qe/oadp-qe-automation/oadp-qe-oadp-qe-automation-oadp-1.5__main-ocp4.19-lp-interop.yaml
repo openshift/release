@@ -37,6 +37,12 @@ images:
       - destination_dir: oadp-e2e-qe.tar.gz
         source_path: /oadp-e2e-qe.tar.gz
   to: oadp-runner
+operator:
+  bundles:
+  - dockerfile_path: build/Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/konveyor/oadp-operator:latest
+    with: oadp-operator
 releases:
   latest:
     candidate:
@@ -53,6 +59,8 @@ tests:
   cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
+    dependencies:
+      OO_INDEX: ci-index
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       EXECUTE_KUBEVIRT_TESTS: "false"
@@ -73,17 +81,16 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       ODF_STORAGE_CLUSTER_NAME: odf-operator
-      OPERATORS: |
-        [
-          {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.4", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"}
-        ]
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
       RE_TRIGGER_ON_FAILURE: "false"
       USER_TAGS: |
         scenario oadp
     test:
-    - ref: install-operators
     - ref: oadp-execute-tests
-    workflow: oadp-ipi-aws
+    workflow: oadp-ipi-aws-talayan
 zz_generated_metadata:
   branch: oadp-1.5
   org: oadp-qe
