@@ -181,11 +181,24 @@ function test_spoke_deployment {
   echo "Success!!! spoke_cluster has been deployed correctly."
   echo "-----------------------------------------------------"
   oc get clusterversion
+  echo
+}
+
+function test_kpis {
+
+  echo "************ telcov10n Run KPIs tests ************"
+
+  # TODO: Run all KPIs testing from this point onward
+
+  echo
+  echo "Running KPIs tests..."
+  echo
 }
 
 function main {
   set_spoke_cluster_kubeconfig
   test_spoke_deployment
+  test_kpis
 }
 
 main
