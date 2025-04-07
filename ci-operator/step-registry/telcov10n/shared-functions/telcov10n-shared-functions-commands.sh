@@ -56,7 +56,7 @@ EOF
       echo
       echo "[ERROR]. Something fails upon trying to exec the script on the OCP cluster!!!"
       echo
-      exit 1
+      return 1
     fi
   else
     pn="\${pod_name}-\$(date +%s%N)"
