@@ -536,6 +536,14 @@ function report_health_check_result()
   cat <<< "$(jq --arg region ${region} --arg m ${fail_or_pass} '.[$region].health_check_result = $m' "${RESULT}")" > ${RESULT}
 }
 
+function report_amiid_result()
+{
+  local region=$1
+  local fail_or_pass=$2
+  echo ">>> ${fail_or_pass}: AMI ID CHECK: ${region} $(get_cluster_name $region)"
+  cat <<< "$(jq --arg region ${region} --arg m ${fail_or_pass} '.[$region].is_AMI_ready = $m' "${RESULT}")" > ${RESULT}
+}
+
 
 # -------------------------------------------------------------------------------------
 # generate regions
@@ -559,6 +567,7 @@ while IFS= read -r region; do
   "infra_id": "NA",
   "install_result": "NA",
   "health_check_result": "NA",
+  "is_AMI_ready": "NA",
   "destroy_result": "NA",
   "metadata": ""
 }
@@ -582,6 +591,25 @@ while IFS= read -r region; do
     echo "================================================================"
     echo "Creating cluster [${region}][${cluster_name}], ${i}/${total}"
     echo "================================================================"
+
+    # checking if AMI is ready
+    ami_exist=0
+    for ARCH in aarch64 x86_64;
+    do
+      
+      amiid=$(openshift-install coreos print-stream-json | jq -r --arg a $ARCH --arg r $region '.architectures[$a].images.aws.regions[$r].image')
+      echo "AMI id $region $ARCH: $amiid"
+      if is_empty "$amiid"; then
+        ami_exist=1
+      fi
+    done
+
+    if [[ "${ami_exist}" == "0" ]]; then
+      report_amiid_result "${region}" "PASS"
+    else
+      report_amiid_result "${region}" "FAIL"
+    fi
+
     create_install_config $region $cluster_name $install_dir
 
     # create manifests
