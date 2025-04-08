@@ -75,9 +75,9 @@ elif [ "$platform" = "VSphere" ]; then
     VSPHERE_IP_WITHOUTDOT=$(echo "$VSPHERE_IP" | sed 's/\./\\./g')
     jsonpath_username="{.data.${VSPHERE_IP_WITHOUTDOT}\.username}"
     jsonpath_password="{.data.${VSPHERE_IP_WITHOUTDOT}\.password}"
-    VSPHERE_USERNAME=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username")
+    VSPHERE_USERNAME=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username" | base64 --decode)
     export VSPHERE_USERNAME
-    VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password")
+    VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
     export VSPHERE_PASSWORD
     response=$(curl -k -v -s -o /dev/null -w "%{http_code}" -u "$VSPHERE_USERNAME:$VSPHERE_PASSWORD" https://$VSPHERE_IP)
     # Check the response code
