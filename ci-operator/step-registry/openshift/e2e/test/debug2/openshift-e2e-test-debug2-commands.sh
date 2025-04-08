@@ -4,23 +4,24 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "DEBUG2....."
-for n in `oc get no |grep -v "^NAME" |cut -d ' ' -f1`; do
-  echo "NODE $n"
-  CURRENT_ROOT_DISK=$(oc debug --to-namespace default node/$n -- chroot /host /usr/bin/bash -c "head -1 /proc/mounts |cut -d ' ' -f1")
-  echo "CURRENT_ROOT_DISK $CURRENT_ROOT_DISK"
-  cat $SHARED_DIR/disk-by-id-for-$n.out
-  for p in $(cat $SHARED_DIR/disk-by-id-for-$n.out); do
-    SYMLINK_PRESENT=$(oc debug --to-namespace default node/$n -- chroot /host /usr/bin/bash -c "if [ -L /dev/disk/by-id/$p ]; then echo 1; else echo 0; fi")
-    if [ $SYMLINK_PRESENT != "1" ]; then
-      echo "Missed symlink $p for node $n"
-      exit 1
-    fi
-    DISK=$(oc debug --to-namespace default node/$n -- chroot /host /usr/bin/realpath /dev/disk/by-id/$p)
-    if [ $CURRENT_ROOT_DISK != $DISK ]; then
-      echo "MISMATCH for node $n: The symlink $p exists, but points to disk $DISK, not $CURRENT_ROOT_DISK as expected"
-      exit 1
-    fi
-  done
+for NODE in `oc -o custom-columns=NAME:.metadata.name get no --no-headers`; do
+    echo "NODE $NODE"
+    OUT=$SHARED_DIR/disk-by-id-for-$NODE.out
+    ROOT_DISK=$(oc debug --to-namespace default node/$NODE -- chroot /host /usr/bin/bash -c "findmnt -o SOURCE --noheadings --nofsroot --mountpoint /sysroot")
+    if [ -z $ROOT_DISK ]; then echo "root disk not found"; exit 1; fi
+    echo "ROOT_DISK $ROOT_DISK"
+    cat $OUT
+
+    for SYMLINK in `cat $OUT`; do
+	SYMLINK_PRESENT=$(oc debug --to-namespace default node/$NODE -- chroot /host /usr/bin/bash -c "if [ -L /dev/disk/by-id/$SYMLINK ]; then echo 1; else echo 0; fi")
+	if [ $SYMLINK_PRESENT != "1" ]; then
+	    echo "Missed symlink $p for node $n"
+	    exit 1
+	fi
+	DISK=$(oc debug --to-namespace default node/$NODE -- chroot /host /usr/bin/realpath /dev/disk/by-id/$SYMLINK)
+	if [ $ROOT_DISK != $DISK ]; then
+	    echo "MISMATCH for node $NODE: The symlink $SYMLINK exists, but points to disk $DISK, not $ROOT_DISK as expected"
+	    exit 1
+	fi
+    done
 done
-echo "DEBUG2 ---- DONE"
