@@ -41,20 +41,26 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
-# A non-indexed warmup run
-#ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50  --pod-ready-threshold=2m" ./run.sh
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-
 
 declare -A WORKLOAD_PIDS
 
 # Kick off run with vars set
+if [[ $WORKLOAD == "node-density-heavy" ]]; then
+    EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+fi
 
-EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+if [[ $WORKLOAD == "cluster-density-v2" ]]; then
+    current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+    iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
+    export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+    EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}" ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+fi
+
 WORKLOAD_PIDS["$WORKLOAD"]=$!
 
-# TODO: wait 5 mins before starting ingress-perf before merging
-# sleep 300 
+# sleep 5 mins before triggering ingress-perf
+sleep 300 
 
 # Run ingress-perf
 popd
