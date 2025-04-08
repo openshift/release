@@ -23,6 +23,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: hypershift-operator
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "4.18"
     namespace: ocp
@@ -921,6 +925,17 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
+- as: vsphere-ipi-vsphere7-f60
+  cron: 2 19 11 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      HOSTS: "2"
+      NETWORK_TYPE: nested-multi-tenant
+      VCENTER_VERSION: "7"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-nested
 - as: vsphere-ipi-zones-template-f60
   cron: 1 20 19 2,4,6,8,10,12 *
   steps:

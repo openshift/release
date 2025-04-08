@@ -27,6 +27,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "4.18"
     namespace: ocp
@@ -985,6 +989,17 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-custom-transit-switch-masquerade-subnet
+- as: vsphere-ipi-vsphere7-f28
+  cron: 8 14 25 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      HOSTS: "2"
+      NETWORK_TYPE: nested-multi-tenant
+      VCENTER_VERSION: "7"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-nested
 - as: vsphere-ipi-zones-template-f28
   cron: 37 21 23 * *
   steps:

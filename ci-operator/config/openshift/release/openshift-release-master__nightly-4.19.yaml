@@ -482,13 +482,23 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
-  interval: 8h
+- as: e2e-vsphere-ovn-multi-network-techpreview
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["VSphereMultiNetworks=true"]'
       FEATURE_SET: CustomNoUpgrade
+      MULTI_NIC_IPI: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-multi-network
+  interval: 8h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
       MULTI_NIC_IPI: "true"
     observers:
       enable:
@@ -693,6 +703,23 @@ tests:
     - chain: ipi-aws-pre-stableinitial
     - ref: fips-check
     workflow: openshift-upgrade-aws-ovn
+- as: e2e-aws-ovn-upgrade-fips-nat-instance
+  interval: 8h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      CI_NAT_REPLACE: "true"
+      FAIL_ON_CORE_DUMP: "true"
+      FIPS_ENABLED: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: fips-check
+    workflow: openshift-upgrade-aws-ovn
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -762,6 +789,28 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: console-aws-nat-instance
+  interval: 8h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      CI_NAT_REPLACE: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: ./test-prow-e2e.sh release
+      from: console-tests
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: e2e-gcp-ovn-rt
   interval: 168h
   steps:
@@ -785,6 +834,18 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
+- as: e2e-aws-ovn-serial-nat-instance
+  interval: 8h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      CI_NAT_REPLACE: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -899,7 +960,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 9 */1 * *
+  cron: 0 1 * * 0
   restrict_network_access: false
   steps:
     env:
@@ -995,6 +1056,17 @@ tests:
   interval: 24h
   steps:
     cluster_profile: ibmcloud
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-ibmcloud-ovn
+- as: e2e-ibmcloud-capi-ovn
+  interval: 24h
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -1104,6 +1176,15 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
+- as: e2e-aws-ovn-single-node-one-core-serial-nat-instance
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      CI_NAT_REPLACE: "true"
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node-one-core
 - as: e2e-gcp-graceful-shutdown
   interval: 168h
   steps:
@@ -1115,6 +1196,15 @@ tests:
     cluster_profile: aws
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-shared-vpc-phz
+- as: e2e-aws-ovn-shared-vpc-phz-techpreview-nat-instance
+  interval: 168h
+  steps:
+    cluster_profile: aws
+    env:
+      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      CI_NAT_REPLACE: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-shared-vpc-phz
 - as: e2e-agent-compact-fips
@@ -1582,7 +1672,7 @@ tests:
     cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
-      MAJOR_MINOR: "4.18"
+      MAJOR_MINOR: "4.19"
     test:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips
