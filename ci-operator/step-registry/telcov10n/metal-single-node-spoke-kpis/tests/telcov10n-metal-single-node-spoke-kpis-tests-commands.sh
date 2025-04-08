@@ -26,6 +26,13 @@ function set_spoke_cluster_kubeconfig {
   # fi
 }
 
+function install_test_tools {
+
+  set -x
+  pip3 install --no-cache-dir "pytest==8.2.2" "pytest-shell==0.3.2" "requests[socks]==2.32.3"
+  set +x
+}
+
 ##############################################################################################################
 # Test results
 ##############################################################################################################
@@ -33,7 +40,7 @@ function set_spoke_cluster_kubeconfig {
 function run_pytest {
   test_name=$1
   test_results_xml_output=${ARTIFACT_DIR}/junit_${test_name}-test-results.xml
-  pytest ${PYTEST_VERBOSITY} ${tc_file} --junitxml=${test_results_xml_output}
+  python3 -m pytest ${PYTEST_VERBOSITY} ${tc_file} --junitxml=${test_results_xml_output}
 }
 
 function test_deployment_and_services {
@@ -197,6 +204,7 @@ function test_kpis {
 
 function main {
   set_spoke_cluster_kubeconfig
+  install_test_tools
   test_spoke_deployment
   test_kpis
 }
