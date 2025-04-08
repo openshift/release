@@ -92,15 +92,17 @@ tests:
     name: assisted-image-service-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: e2e-metal-assisted
+  cluster: build05
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-deploy-nodes
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -108,7 +110,7 @@ tests:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="deploy_nodes"
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-day2-arm-workers
   optional: true
@@ -124,17 +126,6 @@ tests:
         DAY2_CPU_ARCHITECTURE=arm64
         OPENSHIFT_VERSION=ocp-version-placeholder-multi
     workflow: assisted-equinix
-- as: e2e-ai-operator-ztp
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      INDEX_IMAGE: assisted-service-index
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal-operator-ztp
 - always_run: false
   as: e2e-oci-assisted
   optional: true
@@ -146,6 +137,7 @@ tests:
     workflow: assisted-oci
 - always_run: false
   as: e2e-metal-assisted-external
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -153,7 +145,7 @@ tests:
       ASSISTED_CONFIG: |
         PLATFORM=external
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: assisted-version-placeholder
   org: openshift
