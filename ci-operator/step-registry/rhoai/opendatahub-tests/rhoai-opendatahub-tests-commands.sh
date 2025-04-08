@@ -24,7 +24,7 @@ export CI_S3_BUCKET_ENDPOINT
 export MODELS_S3_BUCKET_NAME
 export MODELS_S3_BUCKET_REGION
 export MODELS_S3_BUCKET_ENDPOINT
-
+export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 
 RUN_COMMAND="uv run pytest tests/model_serving/model_server \
             -s -p no:logging \
