@@ -7,25 +7,14 @@ build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
-    tag: upstream-master
+    tag: upstream-1.24
   use_build_cache: true
 releases:
-  arm64-latest:
-    release:
-      architecture: arm64
-      channel: stable
-      version: "4.18"
   latest:
     release:
       architecture: multi
       channel: stable
       version: "4.18"
-  target:
-    candidate:
-      architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "4.19"
 resources:
   '*':
     limits:
@@ -36,7 +25,8 @@ resources:
 tests:
 - as: unit
   commands: |
-    make test.unit \
+    make gen test.unit \
+    VERSIONS_YAML_FILE="versions.yaml" \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
@@ -48,7 +38,8 @@ tests:
   timeout: 1h0m0s
 - as: integration
   commands: |
-    make test.integration \
+    make gen test.integration \
+    VERSIONS_YAML_FILE="versions.yaml" \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
@@ -79,7 +70,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-  timeout: 20m0s
+  timeout: 1h0m0s
 - as: sync-upstream
   commands: |
     git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
@@ -89,14 +80,15 @@ tests:
     export GOCACHE="/tmp/cache"
     export GOMODCACHE="/tmp/cache"
     export GITHUB_TOKEN_PATH=/creds-github/token
+    export MERGE_BRANCH=release-1.0
     ./tools/automator-main.sh \
     --org=openshift-service-mesh \
     --repo=sail-operator \
-    --branch=main \
+    --branch=release-3.0 \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
     "--labels=auto-merge,tide/merge-method-merge" \
-    --modifier=merge_upstream_main \
+    --modifier=merge_upstream_release-1.0 \
     --cmd=./ossm/merge_upstream.sh
   container:
     from: src
@@ -104,13 +96,13 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: ossm-github-simple-job
-  timeout: 20m0s
-- as: e2e-ocp-4-18
+  timeout: 40m0s
+- as: e2e-ocp
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -130,113 +122,7 @@ tests:
           cpu: 200m
           memory: 200Mi
       timeout: 10m0s
-    - as: e2e-ocp-4-18
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          cd /work && \
-          entrypoint \
-          make test.e2e.ocp"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-      timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
-- as: e2e-ocp-4-18-arm
-  steps:
-    cluster_profile: ossm-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      RELEASE_IMAGE_LATEST: release:arm64-latest
-    env:
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:master-561a5364527219539f8e4c1ac768d6cf1dd5d799
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      OCP_ARCH: arm64
-      XDG_CACHE_HOME: /tmp/cache
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: e2e-ocp-4-18-arm
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          cd /work && \
-          entrypoint \
-          make test.e2e.ocp"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
-- as: e2e-next-ocp-4-19
-  optional: true
-  steps:
-    cluster_profile: ossm-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:target
-      RELEASE_IMAGE_LATEST: release:target
-    env:
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:master-561a5364527219539f8e4c1ac768d6cf1dd5d799
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      XDG_CACHE_HOME: /tmp/cache
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-      timeout: 10m0s
-    - as: e2e-next-ocp-4-19
+    - as: e2e-ocp
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -260,6 +146,59 @@ tests:
         requests:
           cpu: 200m
           memory: 200Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: e2e-ocp-arm
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.24-7d1c19cf1d83ca3cfdb7cc7b90dd807fe41653da
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      OCP_ARCH: arm64
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: e2e-ocp-arm
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          export VERSIONS_YAML_FILE=versions.yaml && \
+          cd /work && \
+          entrypoint \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen test.e2e.ocp"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
 - as: scorecard
@@ -311,6 +250,7 @@ tests:
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
-  branch: main
+  branch: release-3.0
   org: openshift-service-mesh
   repo: sail-operator
+  variant: ocp-4.18
