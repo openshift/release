@@ -1,12 +1,12 @@
 base_images:
-  ubi_minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   opendatahub-tests:
     name: opendatahub-tests
     namespace: ci
     tag: latest
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -61,12 +61,22 @@ tests:
 - as: run-opendatahub-tests
   skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
   steps:
-    cluster_profile: xxxx
+    cluster_profile: aws-opendatahub
     env:
-      TEST_MARKER: "smoke"
+      ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
+      API_HOST: stage
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+      OPERATOR1_CONFIG: name=servicemeshoperator
+      OPERATOR2_CONFIG: name=serverless-operator;namespace=openshift-serverless
+      OPERATOR3_CONFIG: name=authorino
+      OPERATOR4_CONFIG: name=rhods-operator;namespace=redhat-ods-operator
+      TEST_MARKERS: minio
     test:
-      - ref: rhoai-opendatahub-tests
-    workflow: xxxx
+    - ref: rhoai-opendatahub-tests
+    workflow: rhoai-opendatahub-tests
 zz_generated_metadata:
   branch: incubating
   org: opendatahub-io
