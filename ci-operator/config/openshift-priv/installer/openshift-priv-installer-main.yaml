@@ -647,6 +647,15 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-metal-ovn-two-node-arbiter
+  cluster: build05
+  optional: true
+  run_if_changed: (baremetal|metal3|ironic)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-arbiter
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn
   cluster: build05
   optional: true
@@ -841,13 +850,23 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-multi-network
+- as: e2e-vsphere-ovn-multi-network-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["VSphereMultiNetworks=true"]'
       FEATURE_SET: CustomNoUpgrade
+      MULTI_NIC_IPI: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-multi-network
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
       MULTI_NIC_IPI: "true"
     observers:
       enable:

@@ -65,22 +65,25 @@ function check_failed_operator(){
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
     echo -e "\n# Generating the Junit for upgrade"
+    local upg_report="${ARTIFACT_DIR}/junit_upgrade.xml"
     if (( FRC == 0 )); then
-        cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
+        cat >"${upg_report}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="cluster upgrade" tests="1" failures="0">
   <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}"/>
 </testsuite>
 EOF
     else
-        cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="cluster upgrade" tests="1" failures="1">
-  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}">
-    <failure message="openshift cluster upgrade failed at ${UPGRADE_FAILURE_TYPE}"></failure>
-  </testcase>
-</testsuite>
-EOF
+        local failures
+        IFS=" " read -r -a failures <<< "${UPGRADE_FAILURE_TYPE}"
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > "${upg_report}"
+        echo "<testsuite name=\"cluster upgrade\" tests=\"${#failures[@]}\" failures=\"${#failures[@]}\">" >> "${upg_report}"
+        for failure in "${failures[@]}"; do
+            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${failure}\">" >> "${upg_report}"
+            echo "    <failure message=\"openshift cluster upgrade failed at ${failure}\"></failure>" >> "${upg_report}"
+            echo "  </testcase>" >> "${upg_report}"
+        done
+        echo '</testsuite>' >> "${upg_report}"
     fi
 }
 
@@ -588,7 +591,7 @@ function wait_mcp_continous_success() {
         echo "Debug: current mcp output is:"
         oc get machineconfigpools
         # Explicitly set failure to mco
-        export UPGRADE_FAILURE_TYPE="mco"
+        export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     else
         echo "All mcp status check PASSED"
