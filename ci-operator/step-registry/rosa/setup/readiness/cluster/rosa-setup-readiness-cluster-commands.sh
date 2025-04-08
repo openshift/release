@@ -7,6 +7,8 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-60}
+CLUSTER_TIMEOUT_M="${CLUSTER_TIMEOUT}m"
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
@@ -80,7 +82,7 @@ cluster_info_json=$(mktemp)
 record_cluster "timers" "status" "claim"
 
 rosatest --ginkgo.v --ginkgo.no-color \
-  --ginkgo.timeout "60m" \
+  --ginkgo.timeout $CLUSTER_TIMEOUT_M \
   --ginkgo.label-filter "day1-readiness" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 
 # Output
