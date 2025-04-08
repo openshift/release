@@ -117,6 +117,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-metal-assisted-single-node
+  cluster: build05
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -125,8 +126,9 @@ tests:
         SERVICE_BASE_REF=assisted-version-placeholder
         NUM_MASTERS=1
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-day2
+  cluster: build05
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -135,9 +137,10 @@ tests:
         SERVICE_BASE_REF=assisted-version-placeholder
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: true
   as: e2e-metal-assisted
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -145,8 +148,9 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=assisted-version-placeholder
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-static-ip-suite
+  cluster: build05
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -155,8 +159,9 @@ tests:
         SERVICE_BASE_REF=assisted-version-placeholder
         STATIC_IPS=true
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-cnv
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -173,8 +178,9 @@ tests:
         MASTER_DISK_COUNT=2
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-ipv4v6
+  cluster: build05
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -184,9 +190,10 @@ tests:
         IPv6=yes
         IPv4=yes
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: true
   as: e2e-metal-assisted-lvm
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -200,9 +207,10 @@ tests:
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: true
   as: e2e-metal-assisted-odf
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -213,9 +221,10 @@ tests:
         SERVICE_BASE_REF=assisted-version-placeholder
         OLM_OPERATORS=odf
         OPENSHIFT_VERSION=ocp-version-placeholder
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-mtv
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-mt
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/mtv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -232,8 +241,9 @@ tests:
         MASTER_DISK_COUNT=2
         WORKER_DISK_COUNT=2
         WORKER_CPU=6
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-osc
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -250,7 +260,7 @@ tests:
         WORKER_MEMORY=10240
         WORKER_CPU=3
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-vsphere-assisted
   run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
   steps:
@@ -279,6 +289,7 @@ tests:
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-metal-assisted-none
+  cluster: build05
   run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -287,8 +298,9 @@ tests:
         SERVICE_BASE_REF=assisted-version-placeholder
         PLATFORM=none
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-external
+  cluster: build05
   run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -297,7 +309,7 @@ tests:
         SERVICE_BASE_REF=assisted-version-placeholder
         PLATFORM=external
         OPENSHIFT_VERSION=ocp-version-placeholder
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: assisted-version-placeholder
   org: openshift

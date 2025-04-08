@@ -56,7 +56,7 @@ EOF
       echo
       echo "[ERROR]. Something fails upon trying to exec the script on the OCP cluster!!!"
       echo
-      exit 1
+      return 1
     fi
   else
     pn="\${pod_name}-\$(date +%s%N)"
@@ -94,9 +94,9 @@ function wait_until_command_is_ok {
   echo \${exit_non_ok_message:="[Fail] The exit condition was not met"}
   if [[ "\${TENTATIVE_CREATION:="no"}" == "yes" ]] ; then
     echo "However, since it was set as tentative creation, this failure won't cause the job to stop."
-    exit 0
+    return 0
   else
-    exit 1
+    return 1
   fi
 }
 

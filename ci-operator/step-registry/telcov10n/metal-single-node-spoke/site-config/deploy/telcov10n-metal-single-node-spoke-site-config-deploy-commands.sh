@@ -265,7 +265,15 @@ GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push
 EOF
 
   gitea_project="${GITEA_NAMESPACE}"
-  run_script_on_ocp_cluster ${run_script} ${gitea_project}
+
+  for ((attempts = 0 ; attempts <  ${max_attempts:=3} ; attempts++)); do
+    { run_script_on_ocp_cluster ${run_script} ${gitea_project} ; } && return 0
+  done
+
+  echo
+  echo "[FAIL] Push attempt failed..."
+  echo
+  return 1
 }
 
 function get_openshift_baremetal_install_tool {

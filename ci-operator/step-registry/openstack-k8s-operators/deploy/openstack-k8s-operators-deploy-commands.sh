@@ -68,6 +68,8 @@ if [ ! -d "${BASE_DIR}/install_yamls" ]; then
 fi
 
 cd ${BASE_DIR}/install_yamls
+# set slow etcd profile
+make set_slower_etcd_profile
 # Create/enable openstack namespace
 make namespace
 # Creates storage
