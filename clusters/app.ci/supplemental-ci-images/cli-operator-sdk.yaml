@@ -156,3 +156,33 @@ items:
       type: Docker
     triggers:
       - type: ConfigChange
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: ocp
+    name: cli-operator-sdk-v1.39.2
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cli-operator-sdk:v1.39.2
+    source:
+      dockerfile: |
+        FROM ocp/4.17:cli
+        ARG OPERATOR_SDK_VERSION=1.39.2
+        ARG ARCH=amd64
+        RUN curl -Lo /usr/local/bin/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_linux_${ARCH} && \
+            chmod 755 /usr/local/bin/operator-sdk
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: 4.18:cli
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+      - type: ConfigChange
