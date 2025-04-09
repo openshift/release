@@ -88,7 +88,9 @@ tests:
     test:
     - as: e2e-graph
       cli: latest
-      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh graph
+      commands: |-
+        export GITHUB_SHA=stable
+        ./test/scripts/openshift-ci/run-e2e-tests.sh graph
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
@@ -241,6 +243,28 @@ tests:
       SOURCE_IMAGE_REF: kserve-storage-initializer
     env:
       IMAGE_REPO: kserve-storage-initializer
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-success-200-isvc
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: success-200-isvc
+    env:
+      IMAGE_REPO: success-200-isvc
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-error-404-isvc
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: error-404-isvc
+    env:
+      IMAGE_REPO: error-404-isvc
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
