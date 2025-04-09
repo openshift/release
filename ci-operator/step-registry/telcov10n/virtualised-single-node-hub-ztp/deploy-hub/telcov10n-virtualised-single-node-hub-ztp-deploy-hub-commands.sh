@@ -431,7 +431,10 @@ function generate_pull_secret {
 
 function install_virtualised_hub_cluster {
 
-    ansible-playbook -i ${inventory_file} playbooks/deploy-virtualised-hub.yml -vvv
+  set -x
+  ansible-playbook -i ${inventory_file} playbooks/deploy-virtualised-hub.yml \
+    $(cat "${bastion_settings}/ansible_verbosity" || echo -n)
+  set +x
 }
 
 function verify_virtualised_hub_cluster_installed {
