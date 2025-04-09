@@ -404,6 +404,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
+  cluster: build05
   run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -411,8 +412,8 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal-operator-ztp
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-periodic
   cluster: build05
@@ -428,6 +429,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-3masters
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -437,10 +439,11 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-4masters
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -452,7 +455,7 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=4
         SPOKE_WORKER_AGENTS=0
       NUM_EXTRA_WORKERS: "4"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-4masters-periodic
   cluster: build05
@@ -472,6 +475,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-5masters
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -483,7 +487,7 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=5
         SPOKE_WORKER_AGENTS=0
       NUM_EXTRA_WORKERS: "5"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters-periodic
   cluster: build05
@@ -501,6 +505,7 @@ tests:
     workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected
+  cluster: build05
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -508,9 +513,10 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      CLUSTERTYPE: assisted_medium_el9
       DISCONNECTED: "true"
       IP_STACK: v6
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected-periodic
   cluster: build05
@@ -528,6 +534,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-compact-day2-workers
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -539,10 +546,11 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
         NUMBER_OF_DAY2_HOSTS=2
       NUM_EXTRA_WORKERS: "5"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-compact-day2-masters
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -555,10 +563,11 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "4"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -570,7 +579,7 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
   cluster: build05
@@ -611,6 +620,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-node-labels
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -627,10 +637,11 @@ tests:
         MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
         TEST_TO_RUN='node-labels'
       NUM_EXTRA_WORKERS: "6"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -643,7 +654,7 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_LATE_BINDING=True
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
   cluster: build05
@@ -664,6 +675,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -676,10 +688,11 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         BAREMETALHOSTS_IGNITION_OVERRIDE='{"ignition":{"version":"3.2.0"},"storage":{"disks":[{"device":"/dev/sda","partitions":[{"label":"root","number":4,"resize":true,"sizeMiB":61440},{"label":"lso_1G_1","sizeMiB":1024},{"label":"lso_1G_2","sizeMiB":1024},{"label":"lso_1G_3","sizeMiB":1024}],"wipeTable":false}]}}'
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-masters
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -692,9 +705,10 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi
+  cluster: build05
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -706,7 +720,7 @@ tests:
     env:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-    workflow: assisted-baremetal-operator-capi
+    workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi-periodic
   cluster: build05
@@ -725,6 +739,7 @@ tests:
     workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
 - as: e2e-ai-operator-disconnected-capi
+  cluster: build05
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -739,7 +754,7 @@ tests:
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
       DISCONNECTED: "true"
       IP_STACK: v6
-    workflow: assisted-baremetal-operator-capi
+    workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
 - as: e2e-ai-operator-disconnected-capi-periodic
   cluster: build05
@@ -762,6 +777,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-3masters-ocp
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -772,10 +788,11 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-sno-ocp
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -786,21 +803,7 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-ai-operator-ztp-hypershift-zero-nodes
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-    workflow: assisted-baremetal-operator-hypershift
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-remove-node-periodic
   cluster: build05
@@ -823,6 +826,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-remove-node
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -837,10 +841,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
       NUM_EXTRA_WORKERS: "5"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-metal-assisted-tpmv2-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -849,9 +854,10 @@ tests:
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-tang-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -860,9 +866,10 @@ tests:
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tang
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-ipv6-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -871,9 +878,10 @@ tests:
         IPv6=yes
         IPv4=no
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-ipv4v6-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -882,8 +890,9 @@ tests:
         IPv6=yes
         IPv4=yes
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-none-4-19
+  cluster: build05
   run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -891,9 +900,10 @@ tests:
       ASSISTED_CONFIG: |
         PLATFORM=none
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-sno-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -901,9 +911,10 @@ tests:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-static-ip-suite-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -911,9 +922,10 @@ tests:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-bond-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -921,9 +933,10 @@ tests:
       ASSISTED_CONFIG: |
         IS_BONDED=true
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-net-suite-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -938,17 +951,19 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
         WORKER_DISK=40000000000
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-4-19
+  cluster: build05
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-onprem-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -956,9 +971,10 @@ tests:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-static-ip-suite-4-14
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -969,10 +985,11 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_networking
         OPENSHIFT_VERSION=4.14
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-bond-4-14
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -983,10 +1000,11 @@ tests:
         IS_BONDED=true
         TEST_FUNC=test_networking
         OPENSHIFT_VERSION=4.14
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-14
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -994,9 +1012,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-15
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1004,9 +1023,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-16
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1014,9 +1034,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.16
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-17
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -1024,8 +1045,9 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.17
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-cnv-4-18
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1041,8 +1063,9 @@ tests:
         MASTER_DISK_COUNT=2
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-mtv-4-18
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/mtv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1058,8 +1081,9 @@ tests:
         MASTER_DISK_COUNT=2
         WORKER_DISK_COUNT=2
         WORKER_CPU=6
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-lvm-4-19
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1072,8 +1096,9 @@ tests:
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-odf-4-18
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1083,10 +1108,11 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
         OPENSHIFT_VERSION=4.18
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-osc-sno-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1100,8 +1126,9 @@ tests:
         MASTER_MEMORY=18432
         MASTER_CPU=10
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-osc-4-19
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1117,9 +1144,10 @@ tests:
         WORKER_MEMORY=10240
         WORKER_CPU=3
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-k8s-nmstate-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1131,9 +1159,10 @@ tests:
         NUM_MASTERS=3
         NUM_WORKERS=1
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-day2-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1141,9 +1170,10 @@ tests:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-day2-sno-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1153,9 +1183,10 @@ tests:
         NUM_WORKERS=0
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-binding-sno-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1167,16 +1198,17 @@ tests:
         WORKER_CPU=3
         WORKER_MEMORY=10240
         OPENSHIFT_VERSION=4.19
-      PACKET_PLAN: m3.large.x86
+      CLUSTERTYPE: assisted_large_el9
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         export MASTER_CPU=5
         export MASTER_MEMORY=18432
         make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-unbinding-sno-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1191,9 +1223,10 @@ tests:
         export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-upgrade-agent-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1202,7 +1235,7 @@ tests:
         TEST=./src/tests/test_upgrade_agent.py
         TEST_FUNC=test_upgrade_agent
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-day2-arm-workers-4-19
   optional: true
@@ -1291,6 +1324,7 @@ tests:
         OCI_CONTROL_PLANE_SHAPE="BM.Standard3.64"
     workflow: assisted-oci
 - as: e2e-metal-assisted-external-4-19
+  cluster: build05
   run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1298,9 +1332,10 @@ tests:
       ASSISTED_CONFIG: |
         PLATFORM=external
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-5-control-planes-4-19
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1308,9 +1343,10 @@ tests:
         NUM_MASTERS=5
         NUM_WORKERS=0
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-control-planes-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1319,9 +1355,10 @@ tests:
         NUM_MASTERS=4
         NUM_WORKERS=1
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-masters-none-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1330,9 +1367,10 @@ tests:
         PLATFORM=none
         NUM_MASTERS=4
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-umlb-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1340,9 +1378,10 @@ tests:
       ASSISTED_CONFIG: |
         LOAD_BALANCER_TYPE=user-managed
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-umlb-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1354,7 +1393,7 @@ tests:
         LOAD_BALANCER_TYPE=user-managed
         IPv4=true
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-vsphere-assisted-umlb-4-19
   optional: true
@@ -1369,6 +1408,7 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere-external-lb
 - as: e2e-metal-assisted-nho-snr-far-4-19
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1378,8 +1418,9 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-nmo-4-19
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/nodemaintenance/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1389,8 +1430,9 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=node-maintenance
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-kdo-4-19
+  cluster: build05
   run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/kubedescheduler/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -1400,7 +1442,7 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=kube-descheduler
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift
