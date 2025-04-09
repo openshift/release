@@ -72,7 +72,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-azure-ovn
   optional: true
@@ -256,14 +256,11 @@ tests:
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS: NonHyperShiftHOST
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
       TEST_SCENARIOS: Cluster_Infrastructure MAPI
       TEST_TIMEOUT: "35"
     test:
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: openshift-extended-test
-    - ref: cucushift-e2e
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 7h0m0s
 - as: security

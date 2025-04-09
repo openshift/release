@@ -391,14 +391,14 @@ tests:
   as: e2e-aws-upi-proxy
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-vpc-custom-security-groups
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -419,7 +419,7 @@ tests:
   as: e2e-aws-ovn-custom-iam-profile
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -443,7 +443,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -459,7 +459,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones
@@ -469,7 +469,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
@@ -478,14 +478,14 @@ tests:
   as: e2e-aws-ovn-edge-zones-manifest-validation
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 3h0m0s
 - as: e2e-aws-ovn-imdsv2
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       AWS_METADATA_SERVICE_AUTH: Required
@@ -605,13 +605,13 @@ tests:
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws-latestinstaller
   timeout: 6h0m0s
 - as: e2e-aws-ovn-upi
   run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-upi
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-upi
@@ -648,6 +648,15 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-metal-ovn-two-node-arbiter
+  cluster: build05
+  optional: true
+  run_if_changed: (baremetal|metal3|ironic)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-arbiter
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn
   cluster: build05
   optional: true
@@ -842,13 +851,23 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-multi-network
+- as: e2e-vsphere-ovn-multi-network-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["VSphereMultiNetworks=true"]'
       FEATURE_SET: CustomNoUpgrade
+      MULTI_NIC_IPI: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-multi-network
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
       MULTI_NIC_IPI: "true"
     observers:
       enable:
@@ -914,17 +933,18 @@ tests:
     workflow: openshift-e2e-gcp-crc
   timeout: 6h0m0s
 - as: e2e-metal-assisted
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
   timeout: 6h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
 - as: e2e-metal-single-node-live-iso
@@ -938,7 +958,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -1124,7 +1144,7 @@ tests:
   optional: true
   run_if_changed: /aws/subnet.go
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
 - always_run: false
@@ -1187,7 +1207,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
