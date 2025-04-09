@@ -161,7 +161,8 @@ function load_env {
   # export VM_CONTROL_PLANE_0_CIDR_IPv6
 
   #### Hub cluster
-  HUB_CLUSTER_NAME="hub-${OCP_HUB_VERSION//./-}"
+  # HUB_CLUSTER_NAME="hub-${OCP_HUB_VERSION//./-}"
+  HUB_CLUSTER_NAME="${NAMESPACE}"
   export HUB_CLUSTER_NAME
 
   HUB_CLUSTER_VERSION="stable"
@@ -292,9 +293,9 @@ all:
           kcli_wrp_dnsmasq:
             use_nm_plugin: true
             drop_in_files:
-              - path: /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}.conf
+              - path: /etc/NetworkManager/dnsmasq.d/70-sno-hub-with-mac_${VM_CONTROL_PLANE_0_MAC//:/-}.${NETWORK_BRIDGE_BASE_DOMAIN}.conf
                 content: |
-                  # /etc/NetworkManager/dnsmasq.d/70-{{ lookup('ansible.builtin.env', 'HUB_CLUSTER_NAME') }}.${NETWORK_BRIDGE_BASE_DOMAIN}.conf
+                  # /etc/NetworkManager/dnsmasq.d/70-sno-spoke-with-mac_${VM_CONTROL_PLANE_0_MAC//:/-}.${NETWORK_BRIDGE_BASE_DOMAIN}.conf
 
                   domain=${NETWORK_BRIDGE_BASE_DOMAIN}
                   domain-needed
