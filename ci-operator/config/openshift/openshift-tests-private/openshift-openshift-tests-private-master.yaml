@@ -3,18 +3,18 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
-  ci_tests-private-base_4.19:
+  ci_tests-private-base_latest:
     name: tests-private-base
     namespace: ci
-    tag: "4.19"
-  ci_tests-private-baseui_4.19:
+    tag: latest
+  ci_tests-private-baseui_latest:
     name: tests-private-baseui
     namespace: ci
-    tag: "4.18"
-  ci_tests-private-builder_4.18:
+    tag: latest
+  ci_tests-private-builder_latest:
     name: tests-private-builder
     namespace: ci
-    tag: "4.18"
+    tag: latest
   cli:
     name: "4.19"
     namespace: ocp
@@ -35,30 +35,30 @@ build_root:
     tag: rhel-9-golang-1.23-openshift-4.19
 images:
 - dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.19
+  from: ci_tests-private-base_latest
   inputs:
     ci_rosa-aws-cli_latest:
       as:
       - registry.ci.openshift.org/ci/rosa-aws-cli:latest
-    ci_tests-private-builder_4.18:
+    ci_tests-private-builder_latest:
       as:
-      - registry.ci.openshift.org/ci/tests-private-builder:4.18
+      - registry.ci.openshift.org/ci/tests-private-builder:latest
     netobserv_network-observability-cli_ci:
       as:
       - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.19
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:latest
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
         yum install -y ./google-chrome-stable_current_*.rpm && \
         mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
   inputs:
-    ci_tests-private-baseui_4.19:
+    ci_tests-private-baseui_latest:
       as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.19
+      - registry.ci.openshift.org/ci/tests-private-baseui:latest
     src:
       as:
       - src
@@ -66,7 +66,7 @@ images:
 - dockerfile_literal: |
     FROM bin AS builder
     FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
-    FROM registry.ci.openshift.org/ci/tests-private-base:4.19
+    FROM registry.ci.openshift.org/ci/tests-private-base:latest
     RUN mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     COPY --from=netobservcli /oc-netobserv /usr/bin/
@@ -77,9 +77,9 @@ images:
     bin:
       as:
       - bin
-    ci_tests-private-base_4.19:
+    ci_tests-private-base_latest:
       as:
-      - registry.ci.openshift.org/ci/tests-private-base:4.19
+      - registry.ci.openshift.org/ci/tests-private-base:latest
     netobserv_network-observability-cli_ci:
       as:
       - registry.ci.openshift.org/netobserv/network-observability-cli:ci
