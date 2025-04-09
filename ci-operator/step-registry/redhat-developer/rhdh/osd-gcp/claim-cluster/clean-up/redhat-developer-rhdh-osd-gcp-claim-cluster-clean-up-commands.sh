@@ -32,18 +32,17 @@ while true; do
     CURRENT_TIME=$(date +%s)
     ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
     
-    if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
-        echo "Timeout reached after 30 minutes"
-        break
-    fi
-
     REMAINING_CLUSTERS=$(ocm list clusters | awk '$2 ~ /^osd-job-/ {print $1}' | wc -l)
     
     if [ "$REMAINING_CLUSTERS" -eq 0 ]; then
         echo "All clusters with prefix 'osd-job-' have been deleted"
         break
-    else
-        echo "Found $REMAINING_CLUSTERS clusters still being deleted. Waiting 3 minutes before next check..."
-        sleep $INTERVAL
     fi
+    
+    if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
+        echo "ERROR: Timeout reached after 30 minutes and $REMAINING_CLUSTERS clusters still exist"
+        exit 1
+    fi
+    echo "Found $REMAINING_CLUSTERS clusters still being deleted. Waiting 3 minutes before next check..."
+    sleep $INTERVAL
 done
