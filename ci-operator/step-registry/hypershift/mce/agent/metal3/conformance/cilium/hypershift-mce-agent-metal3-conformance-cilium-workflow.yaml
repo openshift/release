@@ -16,13 +16,20 @@ workflow:
     - ref: hypershift-mce-agent-info
     - chain: hypershift-conformance
     pre:
-    - chain: baremetalds-ipi-pre
+    - ref: baremetalds-packet-setup
+    - ref: cilium-conf
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-proxy
+    - ref: ipi-install-hosted-loki
+    - ref: baremetalds-devscripts-setup
+    - ref: cilium-dump
     - ref: enable-qe-catalogsource
     - chain: hypershift-mce-agent-lvm
     - ref: hypershift-mce-install
     - chain: hypershift-mce-agent-metal3-create-cilium
     env:
       HYPERSHIFT_NETWORK_TYPE: "Other"
+      CILIUM_VERSION: "1.15.1"
       TEST_SKIPS: >-
         etcd leader changes are not excessive\|
         check registry.redhat.io is available and samples operator can import sample imagestreams
@@ -33,8 +40,9 @@ workflow:
       PACKET_OS: rocky_9
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
+        NETWORK_TYPE=Cilium
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
+        ENABLE_LOCAL_REGISTRY=
