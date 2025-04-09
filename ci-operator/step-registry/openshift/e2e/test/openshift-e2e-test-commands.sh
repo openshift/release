@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if ! oc get kubeapiservers.operator.openshift.io cluster -o json |jq .spec.observedConfig.servingInfo | grep VersionTLS13; then
+    echo "Not TLS 1.3 profile, applying Modern TLS 1.3 profile ..." > "$SHARED_DIR/apiserver.log"
+    oc patch apiservers/cluster --type=merge -p '{"spec": {"tlsSecurityProfile":{"modern":{},"type":"Modern"}}}'
+    sleep 3m
+    oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
+    oc get apiservers/cluster -oyaml > "$SHARED_DIR"/apiserver.config
+fi
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json

@@ -8,6 +8,9 @@ cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 out=${SHARED_DIR}/install-config.yaml
 
+export RELEASE_IMAGE_LATEST="registry.build06.ci.openshift.org/ci-ln-b5scfx2/release:latest"
+echo "$RELEASE_IMAGE_LATEST"
+
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
