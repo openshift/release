@@ -1,6 +1,10 @@
 base_images:
+  ansible:
+    name: "4.15"
+    namespace: ocp
+    tag: ansible
   cli:
-    name: "4.17"
+    name: "4.15"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -11,24 +15,36 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.17"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
   tests-private-ui:
     name: tests-private-ui
     namespace: ci
     tag: "4.17"
   tools:
-    name: "4.17"
+    name: "4.15"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.17"
+    name: "4.15"
     namespace: ocp
     tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
 releases:
   latest:
     release:
-      architecture: multi
+      architecture: arm64
       channel: candidate
-      version: "4.17"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -37,20 +53,15 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-proxy-sts-mixarch-f7-logging
-  cron: 10 15 * * 2
+- as: azure-ipi-oidc-arm-f28-logging
+  cron: 29 22 28 * *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: azure-qe
     env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FILTERS_ADDITIONAL: ""
+      FORCE_SUCCESS_EXIT: "true"
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.1
       OCP_ARCH: arm64
       OPERATORS: |
@@ -60,21 +71,17 @@ tests:
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
-      TEST_ADDITIONAL: ""
-      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
-      TEST_IMPORTANCE: ""
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~Splunk&;~AWSSTS&;~GCL&;~AZMonitor&;~PodDisruptionBudget&;~pico&
       TEST_PARALLEL: "3"
-      TEST_ROSA_LOGIN_ENV: ""
       TEST_SCENARIOS: sig-openshift-logging
-      TEST_TIMEOUT: "15"
+      TEST_TIMEOUT: "30"
     test:
-    - ref: ipi-install-heterogeneous
     - ref: enable-qe-catalogsource-logging
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
 zz_generated_metadata:
-  branch: release-4.17
+  branch: release-4.15
   org: openshift
   repo: openshift-tests-private
-  variant: multi-stable-openshift-logging-6.1
+  variant: arm64-stable-openshift-logging-6.1
