@@ -200,8 +200,8 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
     run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}"
     run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
-    #subnet cidr for int service is hard code, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
-    bastion_subnet_cidr="10.0.99.0/24"
+    #subnet cidr for int service is xx.xx.99.0/24, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
+    bastion_subnet_cidr=$(echo ${AZURE_VNET_ADDRESS_PREFIXES%/*} | awk -F'.' '{print $1"."$2".99.0/24"}')
     if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
         # for ash wwt, the parameter name get changed
         vnet_subnet_address_parameter="--address-prefix ${bastion_subnet_cidr}"
