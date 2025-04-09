@@ -8,6 +8,88 @@ echo "************ Fix container user ************"
 # Fix user IDs in a container
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
+
+function select_vhub_to_use {
+
+  echo "************ telcov10n Selecting virtualised SNO Hub cluster to use ************"
+
+  local cnt_fname
+  cnt_fname=${1} ; shift
+  local max_vhubs
+  max_vhubs=${1} ; shift
+
+  echo
+  set -x
+  local prev_cnt
+  prev_cnt=$(timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" cat ${cnt_fname} || echo "0")
+  next_hub_count="$(( (${prev_cnt} + 1) % ${max_vhubs} ))"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+    "${next_hub_count}" "${cnt_fname}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+echo "${1}" >| ${2}
+EOF
+
+  hub_append=$(( 4 * ${next_hub_count} ))
+  set +x
+  echo
+}
+
+function select_virtualised_sno_hub {
+
+  echo "************ telcov10n Locking virtualised SNO Hub selection ************"
+
+  local ssh_key
+  ssh_key="${1}" ; shift
+
+  setup_aux_host_ssh_access "${ssh_key}"
+
+  local ts
+
+  local last_selected_vhub_filename
+  last_selected_vhub_filename="/var/run/lock/ztp-virtualised-hub-pool/last-virtualised-hub-selected-count.txt"
+
+  local lock_filename
+  lock_filename="${last_selected_vhub_filename}.lock"
+
+  max_vhubs=$(cat ${bastion_settings}/max_available_virtualised_sno_hubs)
+  for ((attempts = 0 ; attempts < ${max_attempts:=5} ; attempts++)); do
+    ts=$(date -u +%s%N)
+    echo "Locking ${lock_filename} shared file... [${attempts/${max_attempts}}]"
+    try_to_lock_host "${AUX_HOST}" "${lock_filename}" "${ts}" "${lock_timeout:="120"}"
+    if [[ "$(check_the_host_was_locked "${AUX_HOST}" "${lock_filename}" "${ts}")" == "locked" ]] ; then
+      select_vhub_to_use "${last_selected_vhub_filename}" "${max_vhubs}"
+      return 0
+    fi
+    set -x
+    sleep 1m
+    set +x
+  done
+
+  echo
+  echo "[FATAL] Dead-Lock condition while trying to install a new virtualised Hub cluster!!!"
+  echo "For manual clean up, check out /var/run/lock/ztp-virtualised-hub-pool/*.lock folder in your bastion host"
+  echo "and remove the ${lock_filename} file"
+  echo
+  exit 1
+}
+
+function generate_mac_addresses {
+
+  network_ipv4_subnet="$(cat ${bastion_settings}/network_ipv4_subnet)"
+
+  oct_net="$(echo ${network_ipv4_subnet} | cut -d'.' -f3)"
+  hex_net="$(printf '%02x:%01x' ${oct_net} ${hub_append})"
+
+  VM_BOOTSTRAP_MAC="7e:1c:0b:10:${hex_net}1"
+  export VM_BOOTSTRAP_MAC
+
+  VM_CONTROL_PLANE_0_MAC="7e:1c:0b:10:${hex_net}2"
+  export VM_CONTROL_PLANE_0_MAC
+}
+
 function load_env {
 
   bastion_settings="/var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com"
@@ -19,6 +101,8 @@ function load_env {
   export BASTION_VHUB_HOST_SSH_PRI_KEY_FILE="${PWD}/remote-hypervisor-ssh-privkey"
   cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
   chmod 600 ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
+
+  select_virtualised_sno_hub "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}"
 
   #### SSH Public key
   CLUSTER_SSH_PUB_KEY="$(cat /var/run/telcov10n/ansible-group-all/ssh_public_key)"
@@ -43,12 +127,13 @@ function load_env {
   NETWORK_IPv4_SUBNET="$(cat ${bastion_settings}/network_ipv4_subnet)"
   export NETWORK_IPv4_SUBNET
 
+  ipv4_offset="20"
   ipv6_offset="$(cat ${bastion_settings}/network_ipv6_offset)"
   NETWORK_IPv6_SUBNET="$(cat ${bastion_settings}/network_ipv6_subnet)"
   export NETWORK_IPv6_SUBNET
 
   # shellcheck disable=SC2089
-  NETWORK_BRIDGE_CIDR_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('20') }}"
+  NETWORK_BRIDGE_CIDR_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('$ipv4_offset') }}"
   # shellcheck disable=SC2090
   export NETWORK_BRIDGE_CIDR_IPv4
   # shellcheck disable=SC2089
@@ -57,7 +142,7 @@ function load_env {
   export NETWORK_BRIDGE_CIDR_IPv6
 
   # shellcheck disable=SC2089
-  NETWORK_BRIDGE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('20') | ansible.utils.ipv4('address') }}"
+  NETWORK_BRIDGE_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('$ipv4_offset') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export NETWORK_BRIDGE_IPv4
   # shellcheck disable=SC2089
@@ -125,44 +210,27 @@ function load_env {
   export VM_PASSWD
 
   # shellcheck disable=SC2089
-  VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('21') | ansible.utils.ipv4('address') }}"
+  VM_BOOTSTRAP_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('$(($ipv4_offset + 1 + $hub_append))') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export VM_BOOTSTRAP_IPv4
   # shellcheck disable=SC2089
-  VM_BOOTSTRAP_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 33))') | ansible.utils.ipv6('address') }}"
+  VM_BOOTSTRAP_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 33 + $hub_append))') | ansible.utils.ipv6('address') }}"
   # shellcheck disable=SC2090
   export VM_BOOTSTRAP_IPv6
 
   # shellcheck disable=SC2089
-  VM_CONTROL_PLANE_0_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('22') | ansible.utils.ipv4('address') }}"
+  VM_CONTROL_PLANE_0_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('$(($ipv4_offset + 2 + $hub_append))') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export VM_CONTROL_PLANE_0_IPv4
   # shellcheck disable=SC2089
-  VM_CONTROL_PLANE_0_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 34))') | ansible.utils.ipv6('address') }}"
+  VM_CONTROL_PLANE_0_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 34 + $hub_append))') | ansible.utils.ipv6('address') }}"
   # shellcheck disable=SC2090
   export VM_CONTROL_PLANE_0_IPv6
 
-  oct_net="$(echo ${NETWORK_IPv4_SUBNET} | cut -d'.' -f3)"
-  hex_net="$(printf '%x' ${oct_net})"
-  VM_BOOTSTRAP_MAC="7e:1c:0b:10:${hex_net}:01"
-  export VM_BOOTSTRAP_MAC
-
-  VM_CONTROL_PLANE_0_MAC="7e:1c:0b:10:${hex_net}:02"
-  export VM_CONTROL_PLANE_0_MAC
-
-  # # shellcheck disable=SC2089
-  # VM_BOOTSTRAP_CIDR_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 33))') }}"
-  # # shellcheck disable=SC2090
-  # export VM_BOOTSTRAP_CIDR_IPv6
-
-  # # shellcheck disable=SC2089
-  # VM_CONTROL_PLANE_0_CIDR_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 34))') }}"
-  # # shellcheck disable=SC2090
-  # export VM_CONTROL_PLANE_0_CIDR_IPv6
+  generate_mac_addresses
 
   #### Hub cluster
-  # HUB_CLUSTER_NAME="hub-${OCP_HUB_VERSION//./-}"
-  HUB_CLUSTER_NAME="${NAMESPACE}"
+  HUB_CLUSTER_NAME="sno-vhub-${next_hub_count}"
   export HUB_CLUSTER_NAME
 
   HUB_CLUSTER_VERSION="stable"
@@ -175,11 +243,11 @@ function load_env {
   export CLUSTER_BASE_DOMAIN
 
   # shellcheck disable=SC2089
-  HUB_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('23') | ansible.utils.ipv4('address') }}"
+  HUB_CLUSTER_API_IPv4="{{ lookup('ansible.builtin.env', 'NETWORK_IPv4_SUBNET') | ansible.utils.ipaddr('$(($ipv4_offset + 3 + $hub_append))') | ansible.utils.ipv4('address') }}"
   # shellcheck disable=SC2090
   export HUB_CLUSTER_API_IPv4
   # shellcheck disable=SC2089
-  HUB_CLUSTER_API_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 35))') | ansible.utils.ipv6('address') }}"
+  HUB_CLUSTER_API_IPv6="{{ lookup('ansible.builtin.env', 'NETWORK_IPv6_SUBNET') | ansible.utils.ipaddr('$(($ipv6_offset + 35 + $hub_append))') | ansible.utils.ipv6('address') }}"
   # shellcheck disable=SC2090
   export HUB_CLUSTER_API_IPv6
 
@@ -432,9 +500,11 @@ function generate_pull_secret {
 
 function install_virtualised_hub_cluster {
 
+  local ansible_verbosity
+
   set -x
-  ansible-playbook -i ${inventory_file} playbooks/deploy-virtualised-hub.yml \
-    $(cat "${bastion_settings}/ansible_verbosity" || echo -n)
+  ansible_verbosity="$(cat "${bastion_settings}/ansible_verbosity" || echo -n)"
+  ansible-playbook -i ${inventory_file} playbooks/deploy-virtualised-hub.yml ${ansible_verbosity}
   set +x
 }
 
@@ -473,7 +543,8 @@ function pr_debug_mode_waiting {
 
   ext_code=$? ; [ $ext_code -eq 0 ] && return
 
-  cp -v $inventory_file "${SHARED_DIR}/$(basename ${inventory_file})"
+  [ -n "${inventory_file:-}" ] && \
+    cp -v $inventory_file "${SHARED_DIR}/$(basename ${inventory_file})"
   env > "${SHARED_DIR}/$(basename ${inventory_file}).env"
 
   echo "################################################################################"
