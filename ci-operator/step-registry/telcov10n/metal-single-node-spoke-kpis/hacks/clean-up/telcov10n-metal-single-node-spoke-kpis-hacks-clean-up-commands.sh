@@ -7,20 +7,7 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-function setup_aux_host_ssh_access {
-
-  echo "************ telcov10n Setup AUX_HOST SSH access ************"
-
-  SSHOPTS=(
-    -o 'ConnectTimeout=5'
-    -o 'StrictHostKeyChecking=no'
-    -o 'UserKnownHostsFile=/dev/null'
-    -o 'ServerAliveInterval=90'
-    -o LogLevel=ERROR
-    -i "${CLUSTER_PROFILE_DIR}/ssh-key"
-  )
-
-}
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
 function release_locked_host {
 

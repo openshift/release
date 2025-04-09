@@ -7,6 +7,8 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
+
 function define_spoke_cluster_name {
 
   #### Spoke cluster
@@ -23,21 +25,6 @@ function load_env {
   BAREMETAL_SPOKE_IPv4="$(cat ${baremetal_host_path}/network_spoke_ipv4_address)"
   # shellcheck disable=SC2089
   BAREMETAL_SPOKE_IPv6="$(cat ${baremetal_host_path}/network_spoke_ipv6_address)"
-}
-
-function setup_aux_host_ssh_access {
-
-  echo "************ telcov10n Setup AUX_HOST SSH access ************"
-
-  SSHOPTS=(
-    -o 'ConnectTimeout=5'
-    -o 'StrictHostKeyChecking=no'
-    -o 'UserKnownHostsFile=/dev/null'
-    -o 'ServerAliveInterval=90'
-    -o LogLevel=ERROR
-    -i "${CLUSTER_PROFILE_DIR}/ssh-key"
-  )
-
 }
 
 function set_spoke_cluster_kubeconfig {
@@ -70,8 +57,11 @@ function select_baremetal_host_from_pool {
     echo
 
     if [[ "$(cat ${host})" == "baremetal-spokes-kpis" ]];then
-      try_to_lock_host "$(cat ${baremetal_host_path}/network_spoke_mac_address)" "${ts}"
-      [[ "$(check_the_host_was_locked "$(cat ${baremetal_host_path}/network_spoke_mac_address)" "${ts}")" == "locked" ]] &&
+      local network_spoke_mac_address
+      network_spoke_mac_address="$(cat ${baremetal_host_path}/network_spoke_mac_address)"
+      local spoke_lock_filename="/var/run/lock/ztp-baremetal-pool/spoke-baremetal-${network_spoke_mac_address//:/-}.lock"
+      try_to_lock_host "${AUX_HOST}" "${spoke_lock_filename}" "${ts}" "${LOCK_TIMEOUT}"
+      [[ "$(check_the_host_was_locked "${AUX_HOST}" "${spoke_lock_filename}" "${ts}")" == "locked" ]] &&
       {
         update_host_and_master_yaml_files "$(dirname ${host})" ;
         return 0 ;
@@ -85,67 +75,6 @@ function select_baremetal_host_from_pool {
   echo "and remove the lock files that release those baremental host you consider is saved to unlock."
   echo
   exit 1
-}
-
-function try_to_lock_host {
-
-  local network_spoke_mac_address=${1} ; shift
-  local ts=${1}
-  local spoke_lock_filename="/var/run/lock/ztp-baremetal-pool/spoke-baremetal-${network_spoke_mac_address//:/-}.lock"
-
-  set -x
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s --  \
-    "${spoke_lock_filename}" "${ts}" "${LOCK_TIMEOUT}" << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-lock_fname="${1}"
-ts_now="${2}"
-lock_timeout="${3}"
-
-sudo mkdir -pv $(dirname ${lock_fname})
-
-set -x
-if [ -f ${lock_fname} ]; then
-  ts_stored=$(<${lock_fname})
-  time_diff=$(( ts_now - ts_stored ))
-  time_diff=$(( time_diff < 0 ? 0 : time_diff ))
-
-  # Timeout in nanoseconds (lock_timeut is in seconds)
-  lock_timeout_in_ns=$(( lock_timeout * 1000000000 ))
-
-  # Check if the stored timestamp is at least the timeout older
-  if (( time_diff >= lock_timeout_in_ns )); then
-    echo "The stored timestamp is at least the timeout older."
-    sudo echo "${ts_now}" >| ${lock_fname}
-  else
-    echo "The stored timestamp is less than the timeout old."
-  fi
-else
-  sudo echo "${ts_now}" >| ${lock_fname}
-fi
-EOF
-
-  set +x
-  echo
-}
-
-function check_the_host_was_locked {
-
-  local network_spoke_mac_address=${1} ; shift
-  local ts=${1}
-  local spoke_lock_filename="/var/run/lock/ztp-baremetal-pool/spoke-baremetal-${network_spoke_mac_address//:/-}.lock"
-
-  set -x
-  local ts_stored
-  ts_stored=$(timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" cat ${spoke_lock_filename})
-  if (( ts == ts_stored )); then
-    echo "locked"
-  else
-    echo "fail"
-  fi
-  set +x
 }
 
 function update_host_and_master_yaml_files {
