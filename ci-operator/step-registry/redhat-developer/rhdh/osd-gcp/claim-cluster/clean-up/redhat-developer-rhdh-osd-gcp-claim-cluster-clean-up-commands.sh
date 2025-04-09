@@ -22,3 +22,28 @@ ocm list clusters | awk '$2 ~ /^osd-job-/ {print $1}' | while read -r CLUSTER_ID
     echo "Deleting cluster $CLUSTER_ID"
     ocm delete "/api/clusters_mgmt/v1/clusters/$CLUSTER_ID"
 done
+
+echo "Waiting for clusters to be fully deleted..."
+MAX_WAIT_TIME=1800  # 30 minutes in seconds
+INTERVAL=180        # 3 minutes in seconds
+START_TIME=$(date +%s)
+
+while true; do
+    CURRENT_TIME=$(date +%s)
+    ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+    
+    if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
+        echo "Timeout reached after 30 minutes"
+        break
+    fi
+
+    REMAINING_CLUSTERS=$(ocm list clusters | awk '$2 ~ /^osd-job-/ {print $1}' | wc -l)
+    
+    if [ "$REMAINING_CLUSTERS" -eq 0 ]; then
+        echo "All clusters with prefix 'osd-job-' have been deleted"
+        break
+    else
+        echo "Found $REMAINING_CLUSTERS clusters still being deleted. Waiting 3 minutes before next check..."
+        sleep $INTERVAL
+    fi
+done
