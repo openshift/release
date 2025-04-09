@@ -10,6 +10,8 @@ echo "************ Fix container user ************"
 
 function load_env {
 
+  bastion_settings="/var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com"
+
   #### Remote Bastion jump host
   export BASTION_VHUB_HOST=${AUX_HOST}
 
@@ -32,17 +34,17 @@ function load_env {
   export BASTION_VHUB_HOST_USER
 
   #### Network setup
-  NETWORK_NIC="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_external_nic)"
+  NETWORK_NIC="$(cat ${bastion_settings}/network_external_nic)"
   export NETWORK_NIC
 
-  NETWORK_BRIDGE_NAME="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_bridge_name)"
+  NETWORK_BRIDGE_NAME="$(cat ${bastion_settings}/network_bridge_name)"
   export NETWORK_BRIDGE_NAME
 
-  NETWORK_IPv4_SUBNET="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv4_subnet)"
+  NETWORK_IPv4_SUBNET="$(cat ${bastion_settings}/network_ipv4_subnet)"
   export NETWORK_IPv4_SUBNET
 
-  ipv6_offset="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv6_offset)"
-  NETWORK_IPv6_SUBNET="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv6_subnet)"
+  ipv6_offset="$(cat ${bastion_settings}/network_ipv6_offset)"
+  NETWORK_IPv6_SUBNET="$(cat ${bastion_settings}/network_ipv6_subnet)"
   export NETWORK_IPv6_SUBNET
 
   # shellcheck disable=SC2089
@@ -78,11 +80,11 @@ function load_env {
   export NETWORK_BRIDGE_IPv4_NET_MASK
 
   # shellcheck disable=SC2089
-  NETWORK_BRIDGE_GW_IPv4="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv4_gateway)"
+  NETWORK_BRIDGE_GW_IPv4="$(cat ${bastion_settings}/network_ipv4_gateway)"
   # shellcheck disable=SC2090
   export NETWORK_BRIDGE_GW_IPv4
   # shellcheck disable=SC2089
-  NETWORK_BRIDGE_GW_IPv6="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/network_ipv6_gateway)"
+  NETWORK_BRIDGE_GW_IPv6="$(cat ${bastion_settings}/network_ipv6_gateway)"
   # shellcheck disable=SC2090
   export NETWORK_BRIDGE_GW_IPv6
 
@@ -94,27 +96,27 @@ function load_env {
   export NETWORK_BRIDGE_BASE_DOMAIN
 
   # shellcheck disable=SC2089
-  DNS_SERVER_1="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/dns_server_1)"
+  DNS_SERVER_1="$(cat ${bastion_settings}/dns_server_1)"
   # shellcheck disable=SC2090
   export DNS_SERVER_1
 
   # shellcheck disable=SC2089
-  DNS_SERVER_2="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/dns_server_2)"
+  DNS_SERVER_2="$(cat ${bastion_settings}/dns_server_2)"
   # shellcheck disable=SC2090
   export DNS_SERVER_2
 
   #### VM
-  VM_HUB_ZTP_POOL_PATH="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/libvirt_pool_path)"
+  VM_HUB_ZTP_POOL_PATH="$(cat ${bastion_settings}/libvirt_pool_path)"
   export VM_HUB_ZTP_POOL_PATH
 
   #### Resources details
-  VM_CPUS="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_cpus)"
+  VM_CPUS="$(cat ${bastion_settings}/vm_cpus)"
   export VM_CPUS
 
-  VM_MEM="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_ram)"
+  VM_MEM="$(cat ${bastion_settings}/vm_ram)"
   export VM_MEM
 
-  vm_disk_list="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/vm_disks)"
+  vm_disk_list="$(cat ${bastion_settings}/vm_disks)"
   VM_DISKS="$(echo ${vm_disk_list} | jq --compact-output)"
   export VM_DISKS
 
@@ -168,7 +170,7 @@ function load_env {
   HUB_CLUSTER_TAG="${OCP_HUB_VERSION}"
   export HUB_CLUSTER_TAG
 
-  CLUSTER_BASE_DOMAIN="$(cat /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com/cluster_domain_name)"
+  CLUSTER_BASE_DOMAIN="$(cat ${bastion_settings}/cluster_domain_name)"
   export CLUSTER_BASE_DOMAIN
 
   # shellcheck disable=SC2089
