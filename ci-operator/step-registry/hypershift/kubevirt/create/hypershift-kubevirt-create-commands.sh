@@ -99,7 +99,7 @@ oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p 
   '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
 
-RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
 if [[ "${DISCONNECTED}" == "true" ]];
 then

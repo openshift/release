@@ -328,7 +328,11 @@ echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/proxyip"
 
-PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+if [[ "${CUSTOM_PROXY_CREDENTIAL}" == "true" ]]; then
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/custom_proxy_creds)
+else
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+fi
 PROXY_PUBLIC_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
 PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
 

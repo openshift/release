@@ -80,6 +80,7 @@ yarn install || true
 yarn add --dev typescript || true
 yarn add --dev cypress-failed-log || true
 yarn add --dev @cypress/grep || true
+yarn global add regctl || true
 
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
@@ -117,6 +118,10 @@ export CYPRESS_QUAY_SUPER_USER_TOKEN=${quay_access_token}
 export CYPRESS_OCP_ENDPOINT=${ocp_endpoint}
 export CYPRESS_OCP_PASSWORD=${ocp_kubeadmin_password}
 export CYPRESS_QUAY_PROJECT=quay-enterprise
+
+YARN_PATH=$(yarn global bin)
+NEW_PATH="$PATH:${YARN_PATH}"
+export PATH=${NEW_PATH}
 
 #yarn run cypress run --browser firefox --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags=newui+-nopipeline || true
 NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true

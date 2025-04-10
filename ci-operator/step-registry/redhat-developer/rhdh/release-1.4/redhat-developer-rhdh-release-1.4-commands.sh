@@ -12,7 +12,7 @@ GITHUB_REPOSITORY_NAME="rhdh"
 NAME_SPACE="showcase-1-4-x"
 NAME_SPACE_RBAC="showcase-rbac-1-4-x"
 NAME_SPACE_POSTGRES_DB=postgress-external-db-1-4-x
-QUAY_REPO="rhdh-community/rhdh"
+QUAY_REPO="rhdh/rhdh-hub-rhel9"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
@@ -53,7 +53,6 @@ done
 if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
     echo "Skipping wait for new PR image and proceeding with image tag : 1.4"
     echo "updated image tag : 1.4"
-    QUAY_REPO="rhdh/rhdh-hub-rhel9"
     TAG_NAME="1.4"
 else
     TIMEOUT=3000         # Maximum wait time of 50 mins (3000 seconds)
