@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  yamllint:
+    name: yamllint
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -180,6 +184,23 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+- as: yamllint
+  commands: |
+    cfg="$(mktemp)"
+    cat >"$cfg" <<EOF
+    extends: default
+    rules:
+      document-start: disable
+      line-length: disable
+      indentation:
+        indent-sequences: consistent
+    EOF
+    yamllint -v
+    yamllint --strict -c "$cfg" ./install
+  container:
+    clone: true
+    from: yamllint
+  run_if_changed: install/
 zz_generated_metadata:
   branch: main
   org: openshift
