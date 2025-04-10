@@ -215,6 +215,9 @@ CONFIG = {
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
     },
+    'equinix-edge-enablement-quota-slice': {
+        'default': 40,
+    },
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,
     },
