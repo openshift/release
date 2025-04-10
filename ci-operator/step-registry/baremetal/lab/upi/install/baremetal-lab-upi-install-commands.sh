@@ -334,7 +334,7 @@ done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
-sleep 900
+sleep 1800
 echo "Launching 'wait-for bootstrap-complete' installation step....."
 oinst wait-for bootstrap-complete --log-level=debug 2>&1 &
 if ! wait $!; then
