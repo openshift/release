@@ -38,6 +38,8 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_config=$(jq --raw-output '.config // ""' <<< "$operator_obj")
     operator_iib=$(jq --raw-output '.iib // ""' <<< "$operator_obj")
 
+    IIB_IMAGE="brew.registry.redhat.io/rh-osbs/${operator_iib}"
+
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
         echo "ERROR: name is not defined"
@@ -66,7 +68,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
                 echo "Operator source is ${operator_source}"
                 DEFAULT_OPERATOR_SOURCE="${operator-source}"
                 OADP_CATALOGSOURCE=${DEFAULT_OPERATOR_SOURCE}
-                IIB_IMAGE="brew.registry.redhat.io/rh-osbs/${operator_iib}"
+                # IIB_IMAGE="brew.registry.redhat.io/rh-osbs/${operator_iib}"
             fi
         ##########################################################################
             echo "Selecting '${operator_source}' catalog to install '${operator_name}'"
@@ -107,7 +109,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
                 namespace: openshift-marketplace
             spec:
                 sourceType: grpc
-                image: "${operator_iib}"
+                image: "${IIB_IMAGE}"
                 displayName: Custom Operator Catalog
                 publisher: grpc
 EOF
@@ -181,7 +183,7 @@ EOF
           name: "${operator_name}"
           source: "${OADP_CATALOGSOURCE}"
           sourceNamespace: openshift-marketplace
-          startingCSV: "${STARTING_CSV}"  
+          startingCSV: "${OADP_STARTING_CSV}"  
           installPlanApproval: Automatic
 EOF
 ################################################################
