@@ -363,7 +363,7 @@ for mode in "${TEST_MODES[@]}"; do
   set_events_output_file
 
   temp_status="temp_status_${mode}" # Convert to lowercase for variable naming
-  make functests || declare "$temp_status=$?"
+  make functests; declare "$temp_status=$?"
 
   # Get RTC logs
   print_time

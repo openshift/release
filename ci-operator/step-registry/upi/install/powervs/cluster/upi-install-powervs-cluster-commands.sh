@@ -218,7 +218,7 @@ function cleanup_prior() {
             ibmcloud is instance-delete "${VSI}" --force || true
         done
 
-        echo "Deleting LB in ${SUB}"
+        echo "Deleting LB in ${SUB} - $(date)"
         for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[]?.name')
         do
             ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
@@ -226,10 +226,17 @@ function cleanup_prior() {
         sleep 60
     done
 
-    echo "Cleaning up the Security Groups"
+    echo "Cleaning up the Security Groups - $(date)"
     ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
         | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
-        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+        | xargs -t --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force \
+        || true
+    sleep 120
+
+    echo "Re-Running clean security groups - $(date)"
+    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "${RESOURCE_GROUP}" --output json \
+        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+        | xargs -t --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force \
         || true
 
     # VPC Images
