@@ -43,7 +43,21 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+
+if [[ -n "${USER_METADATA}" ]]; then
+    USER_METADATA=$(echo "$USER_METADATA" | xargs)
+    IFS=',' read -r -a env_array <<< "$USER_METADATA"
+    true > user-metadata.yaml
+    for env_pair in "${env_array[@]}"; do
+      env_pair=$(echo "$env_pair" | xargs)
+      env_key=$(echo "$env_pair" | cut -d'=' -f1)
+      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+      echo "$env_key: \"$env_value\"" >> user-metadata.yaml
+    done
+    EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+fi
 export EXTRA_FLAGS
+export ADDITIONAL_PARAMS
 
 rm -f ${SHARED_DIR}/index.json
 ./run.sh

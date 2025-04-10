@@ -119,15 +119,17 @@ tests:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
 - as: e2e-metal-assisted-4-19
+  cluster: build05
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-deploy-nodes-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -135,7 +137,7 @@ tests:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="deploy_nodes"
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-day2-arm-workers-4-19
   optional: true
@@ -152,6 +154,7 @@ tests:
         OPENSHIFT_VERSION=4.19-multi
     workflow: assisted-equinix
 - as: e2e-ai-operator-ztp
+  cluster: build05
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
@@ -160,8 +163,8 @@ tests:
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal-operator-ztp
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
   as: e2e-oci-assisted-4-19
   optional: true
@@ -173,6 +176,7 @@ tests:
     workflow: assisted-oci
 - always_run: false
   as: e2e-metal-assisted-external-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -180,7 +184,7 @@ tests:
       ASSISTED_CONFIG: |
         PLATFORM=external
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: main
   org: openshift
