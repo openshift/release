@@ -9,6 +9,8 @@ es_index="${POLICIES_GROUP}-$(cat /secret/policy-es-index)"
 export es_index
 PERF_SERVICES_URL="$(cat /secret/perf_services_url)"
 export PERF_SERVICES_URL
+s3_bucket=""
+export s3_bucket
 
 
 account_group="$(cat "/secret/${account_group}")"
@@ -29,10 +31,9 @@ function run_policy() {
         regions=("us-east-1" "us-east-2" "us-west-1" "us-west-2" "ap-south-1" "eu-north-1" "eu-west-3" "eu-west-2"
                  "eu-west-1" "ap-northeast-3" "ap-northeast-2" "ap-northeast-1" "ca-central-1" "sa-east-1"
                  "ap-southeast-1" "ap-southeast-2" "eu-central-1")
-        export s3_bucket
         for region in "${regions[@]}"; do
             export AWS_DEFAULT_REGION="${region}"
-            if [ -n "$s3_bucket" ]; then
+            if [[ -n "$s3_bucket" ]]; then
                 policy_output="s3://${s3_bucket}/${LOGS}/${AWS_DEFAULT_REGION}"
                 export policy_output
             fi
