@@ -541,7 +541,7 @@ images:
   to: serviceaccount-secret-rotation-trigger
 - dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-    RUN microdnf install -y git diffutils && microdnf clean all && rm -rf /var/cache/dnf
+    RUN microdnf install -y git diffutils make which npm go && microdnf clean all && rm -rf /var/cache/dnf
     ADD sippy-config-generator /usr/bin/sippy-config-generator
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["/usr/bin/sippy-config-generator"]
@@ -751,7 +751,9 @@ images:
       - destination_dir: .
         source_path: /usr/local/bin/oc
   to: multi-arch-builder-controller
-- dockerfile_literal: |-
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |-
     FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD ci-scheduling-webhook /usr/bin/ci-scheduling-webhook
     ENTRYPOINT ["/usr/bin/ci-scheduling-webhook"]
@@ -762,7 +764,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/ci-scheduling-webhook
   to: ci-scheduling-webhook
-- context_dir: images/gpu-scheduling-webhook
+- additional_architectures:
+  - arm64
+  context_dir: images/gpu-scheduling-webhook
   from: os
   inputs:
     bin:
@@ -796,31 +800,28 @@ resources:
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  cluster: build10
   commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
   node_architecture: arm64
 - as: codegen
-  cluster: build10
   commands: make verify-gen
   container:
     from: src
   node_architecture: arm64
 - as: format
-  cluster: build10
   commands: make format
   container:
     from: src
   node_architecture: arm64
 - as: integration
-  cluster: build10
   commands: make integration
   container:
     from: test-bin
   node_architecture: arm64
 - always_run: false
   as: e2e
+  cluster: build11
   steps:
     test:
     - as: e2e
@@ -854,6 +855,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo
+  cluster: build11
   optional: true
   pipeline_run_if_changed: pkg/steps/(index|bundle).*.go
   steps:
@@ -886,6 +888,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo-post
+  cluster: build11
   postsubmit: true
   steps:
     test:
@@ -917,10 +920,10 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  cluster: build10
   node_architecture: arm64
   optional: true
   steps:
+    node_architecture: arm64
     test:
     - as: breaking-changes
       commands: |
@@ -937,19 +940,16 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: checkconfig
-  cluster: build10
   commands: make validate-checkconfig
   container:
     from: test-bin
   node_architecture: arm64
 - as: validate-vendor
-  cluster: build10
   commands: make validate-vendor
   container:
     from: src
   node_architecture: arm64
 - as: frontend-checks
-  cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
@@ -983,7 +983,10 @@ tests:
     test:
     - as: konflux-test
       commands: make-placeholder
-      from: konflux-image-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
+      from: konflux-artifacts-placeholder
       resources:
         requests:
           cpu: 100m
@@ -992,12 +995,17 @@ tests:
 - as: konflux-test-aws
   cron: 0 0 1 1 0
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      OCP_ARCH: amd64
     test:
     - as: konflux-test
       cli: latest
       commands: make-placeholder
-      from: konflux-image-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
+      from: konflux-artifacts-placeholder
       resources:
         requests:
           cpu: 100m
@@ -1006,15 +1014,56 @@ tests:
   cron: 0 0 1 1 0
   steps:
     cluster_profile: gcp
+    env:
+      OCP_ARCH: amd64
     test:
     - as: konflux-test
       cli: latest
       commands: make-placeholder
-      from: konflux-image-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
+      from: konflux-artifacts-placeholder
       resources:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: konflux-test-azure
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: azure4
+    env:
+      OCP_ARCH: amd64
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: konflux-operator-placeholder
+      from: konflux-artifacts-placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: konflux-test-bundle
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: bundle-placeholder
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: operator-ns-placeholder
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: make-placeholder
+      from: konflux-artifacts-placeholder
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: security
   optional: true
   steps:

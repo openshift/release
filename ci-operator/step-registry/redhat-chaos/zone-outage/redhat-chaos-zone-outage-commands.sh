@@ -46,5 +46,8 @@ export SUBNET_ID
 
 ./zone-outages/prow_run.sh
 rc=$?
+
+cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+
 echo "Finished running zone outages"
 echo "Return code: $rc"

@@ -50,8 +50,24 @@ function ci_copy_secrets() {
 
     # Set up the pull secret at the expected location
     if [ -e /tmp/pull-secret ] ; then
+        echo "Setting up a pull secret file"
         export PULL_SECRET="${HOME}/.pull-secret.json"
-        cp /tmp/pull-secret "${PULL_SECRET}"
+
+        if [ -e /tmp/registry.stage.redhat.io ] ; then
+            cat > /tmp/pull-secret-stage <<EOF
+{
+    "auths": {
+        "registry.stage.redhat.io": {
+            "auth": "$(cat /tmp/registry.stage.redhat.io)"
+        }
+    }
+}
+EOF
+            # Merge the files and save the result at the expected location
+            jq -s '.[0] * .[1]' /tmp/pull-secret /tmp/pull-secret-stage > "${PULL_SECRET}"
+        else
+            cp /tmp/pull-secret "${PULL_SECRET}"
+        fi
     fi
 
     # Set up the AWS CLI keys at the expected location for accessing the cached data.
@@ -236,7 +252,7 @@ EOF
         p_extra_style=""
         # If there's no junit from Robot Framework execution (i.e. it didn't run), or
         # if junit contains any failures=N, N>0, then make the line red-ish to make it easier to find.
-        if [[ ! -e "${test}/junit.xml" ]] || grep --quiet --extended-regexp 'failures="[1-9][0-9]?"' "${test}/junit.xml"; then
+        if ! find "${test}" -type f -name 'junit*.xml' | grep -q . || find "${test}" -type f -name 'junit*.xml' -exec grep -q -E 'failures="[1-9][0-9]?"' {} +; then
             p_extra_style="color:#FF6666"
         fi
 

@@ -47,7 +47,7 @@ fi
 # All graviton instances have a lower case g in the family part. Using
 # this we avoid adding the full map here.
 ARCH="x86_64"
-if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* ]]; then
+if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .+"g".* ]]; then
   ARCH="arm64"
 fi
 

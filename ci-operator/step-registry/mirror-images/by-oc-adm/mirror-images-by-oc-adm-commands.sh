@@ -18,6 +18,11 @@ if [[ "${MIRROR_BIN}" != "oc-adm" ]]; then
   exit 0
 fi
 
+if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
+  echo "users are going to mirror images from bastion, skip this step."
+  exit 0
+fi
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -71,6 +76,7 @@ echo "target_release_image_repo: $target_release_image_repo"
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+oc registry login --to "${new_pull_secret}"
 
 mirror_crd_type='icsp'
 regex_keyword_1="imageContentSources"

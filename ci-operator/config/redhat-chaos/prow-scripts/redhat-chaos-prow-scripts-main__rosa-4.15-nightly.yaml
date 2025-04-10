@@ -36,8 +36,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: krkn-tests-rosa
-  cron: 0 1 5,19 * *
+- always_run: false
+  as: krkn-tests-rosa
   steps:
     cluster_profile: aws-qe
     env:
@@ -53,8 +53,8 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: rosa-aws-sts
-- as: krkn-tests-rosa-hog
-  cron: 0 4 5,19 * *
+- always_run: false
+  as: krkn-tests-rosa-hog
   steps:
     cluster_profile: aws-qe
     env:
@@ -70,8 +70,8 @@ tests:
     test:
     - chain: redhat-chaos-hog-scenarios
     workflow: rosa-aws-sts
-- as: krkn-tests-rosa-hcp
-  cron: 0 1 6,20 * *
+- always_run: false
+  as: krkn-tests-rosa-hcp
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -83,7 +83,6 @@ tests:
       ENABLE_AUTOSCALING: "false"
       GC: "False"
       HOSTED_CP: "true"
-      ITERATION_MULTIPLIER_ENV: "4"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
       READY_WAIT_TIMEOUT: 30m
@@ -99,19 +98,23 @@ tests:
     - ref: redhat-chaos-service-disruption-regex
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
-- as: krkn-rosa-hcp-hog
-  cron: 0 4 6,20 * *
+- always_run: false
+  as: krkn-rosa-hcp-hog
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "False"
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
+      GC: "False"
       HOSTED_CP: "true"
+      ITERATION_MULTIPLIER_ENV: "10"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
       ZONES_COUNT: "3"
@@ -119,6 +122,7 @@ tests:
       enable:
       - redhat-chaos-cerberus
     test:
+    - ref: openshift-qe-cluster-density-v2
     - chain: redhat-chaos-hog-scenarios
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
@@ -129,11 +133,15 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "False"
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
+      GC: "False"
+      ITERATION_MULTIPLIER_ENV: "10"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
       TELEMETRY_GROUP: prow-rosa-4.16
@@ -141,6 +149,7 @@ tests:
       enable:
       - redhat-chaos-cerberus
     test:
+    - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-node-disruptions-infra-outage
     workflow: rosa-aws-sts
   timeout: 5h0m0s

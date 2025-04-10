@@ -1,3 +1,8 @@
+base_images:
+  microshift-ci-brew:
+    name: brew
+    namespace: microshift
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -32,6 +37,10 @@ tests:
   cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-publish-release-notes
+- as: rebase-on-nightlies
+  cron: 0 4 * * 1,4
+  steps:
+    workflow: openshift-microshift-rebase
 - as: e2e-aws-tests-cache-nightly
   cron: 0 0 * * *
   steps:
@@ -107,7 +116,7 @@ tests:
 - as: e2e-aws-ovn-ocp-conformance-optional-components-arm
   cron: 30 8 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
@@ -129,7 +138,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-footprint-and-performance
+    workflow: openshift-microshift-e2e-bare-metal-tests
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

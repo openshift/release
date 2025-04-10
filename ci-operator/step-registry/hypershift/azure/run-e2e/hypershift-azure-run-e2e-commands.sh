@@ -69,17 +69,17 @@ if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
 fi
 
 MI_ARGS=""
-if [[ "${AUTH_THROUGH_CERTS}" == "true" && "${TECH_PREVIEW_NO_UPGRADE}" == "true" ]]; then
+if [[ "${AUTH_THROUGH_CERTS}" == "true" ]]; then
   MI_ARGS="--e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}"
 fi
 
 DP_ARGS=""
-if [[ "${AUTH_THROUGH_CERTS}" == "true" && "${TECH_PREVIEW_NO_UPGRADE}" == "true" ]]; then
+if [[ "${AUTH_THROUGH_CERTS}" == "true" ]]; then
   DP_ARGS="--e2e.azure-data-plane-identities-file=${AZURE_DATA_PLANE_IDENTITIES_LOCATION}"
 fi
 
 hack/ci-test-e2e.sh -test.v \
-  -test.run='^TestCreateCluster.*|^TestNodePool$|^TestAzureScheduler.*' \
+  -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
   --e2e.platform=Azure \
   --e2e.azure-credentials-file=/etc/hypershift-ci-jobs-azurecreds/credentials.json \

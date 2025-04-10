@@ -9,7 +9,7 @@ unset NAMESPACE
 # Copy the jaeger-operator repo files to a writable directory by kuttl
 git clone https://github.com/IshwarKanse/jaeger-operator.git /tmp/jaeger-tests
 cd /tmp/jaeger-tests
-git checkout integration-tests
+git checkout e2e-tests
 
 #Install kuttl
 ./hack/install/install-kuttl.sh

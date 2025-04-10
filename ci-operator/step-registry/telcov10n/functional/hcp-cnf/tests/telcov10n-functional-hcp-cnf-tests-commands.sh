@@ -22,7 +22,7 @@ export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE=clusters-"${NODEPOOL_NAME}"
 # local variables
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
-NTO_BRANCH="master"
+NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
 GINKGO_LABEL="tier-0 && !openshift"
 GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance"
 
@@ -45,7 +45,7 @@ echo "************ Applying Performance Profile ************"
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/telco-ci/ansible.cfg
 ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_profile.yml -e kubeconfig="${SHARED_DIR}"/mgmt-kubeconfig -c local
 
-# checking to see if a release branch is needed or master
+# checking to see if a release branch is needed or main
 if awk "BEGIN {exit !($T5CI_VERSION < 4.19)}"; then
     NTO_BRANCH="release-${T5CI_VERSION}"
 fi
@@ -80,6 +80,8 @@ go mod tidy
 go mod vendor
 make vet
 
+run_tests_status=0
+
 run_tests() {
     echo "************ Running ${GINKGO_LABEL} tests ************"
     GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
@@ -88,18 +90,15 @@ run_tests() {
 }
 
 if [[ "${T5CI_VERSION}" == "4.17" ]]; then
-    run_tests
-    exit_code=$?
+    run_tests || run_tests_status=$?
 else
     GINKGO_LABEL="(tier-0 || tier-1 || tier-2 || tier-3) && !openshift"
     GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance test/e2e/performanceprofile/functests/2_performance_update test/e2e/performanceprofile/functests/3_performance_status  test/e2e/performanceprofile/functests/7_performance_kubelet_node test/e2e/performanceprofile/functests/8_performance_workloadhints"
-    run_tests
-    exit_code=$?
+    run_tests || run_tests_status=$?
 fi
-
 popd
 
-echo "Ginkgo command failed with exit code: ${exit_code}"
+echo "Ginkgo command failed with exit code: ${run_tests_status}"
 
 python3 -m venv "${SHARED_DIR}"/myenv
 source "${SHARED_DIR}"/myenv/bin/activate
