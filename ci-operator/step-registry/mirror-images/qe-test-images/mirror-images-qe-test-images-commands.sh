@@ -100,6 +100,9 @@ quay.io/openshifttest/uiauto-operators-index:1.2.0=MIRROR_REGISTRY_PLACEHOLDER/o
 quay.io/openshifttest/ui-auto-operators:latest=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/ui-auto-operators:latest
 quay.io/openshifttest/prometheus-example-app:multiarch=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/prometheus-example-app:multiarch
 quay.io/openshifttest/golang:1.22.11=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/golang:1.22.11
+quay.io/openshifttest/helm:3.17.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/helm:3.17.0
+quay.io/openshifttest/vault:1.19.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/vault:1.19.0
+quay.io/openshifttest/letsencrypt-pebble:2.7.0=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/letsencrypt-pebble:2.7.0
 EOF
     # Creating ICSP for quay.io/openshifttest is in enable-qe-catalogsource-disconnected step
     # Set Node CA for Mirror Registry is in enable-qe-catalogsource-disconnected step
