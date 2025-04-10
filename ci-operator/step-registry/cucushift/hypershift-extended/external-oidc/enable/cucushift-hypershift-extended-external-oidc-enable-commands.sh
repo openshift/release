@@ -9,6 +9,8 @@ CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
 CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
 CONSOLE_CLIENT_SECRET_NAME=console-secret
 
+
+
 # Generate the main part of the patch.yaml
 cat <<EOF > /tmp/patch.yaml
 spec:
@@ -24,6 +26,13 @@ spec:
             prefixPolicy: Prefix
             prefix:
               prefixString: 'oidc-user-test:'
+          extra:
+          - key: extratest.openshift.com/foo
+            valueExpression: claims.email
+          - key: extratest.openshift.com/bar
+            valueExpression: '"extra-test-mark"'
+          uid:
+            expression: '"testuid-" + claims.sub + "-uidtest"'
         issuer:
           audiences:
           - ${CLI_CLIENT_ID}
@@ -59,6 +68,19 @@ yq-v4 'select(.kind == "HostedCluster") *= load("/tmp/patch.yaml")' "${SHARED_DI
 
 echo "Applying patched artifacts"
 oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
+# TODO HOSTED_CLUSTER_VERSION is a placeholder for now, how to get its value?
+if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.18)}") == "1"  ]]; then
+   oc get -f "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml -o jsonpath='{.spec.configuration.authentication.oidcProviders[*].claimMappings}' > /tmp/created_claimMappings.json
+   if grep 'extratest.*foo.*claims.email.*bar.*claims.sub.*uidtest' /tmp/created_claimMappings.json; then
+        echo "HostedCluster: External OIDC uid and extra settings are honored."
+   else
+        echo "HostedCluster: External OIDC uid and extra settings are not honored."
+        cat /tmp/created_claimMappings.json
+	exit 1
+   fi
+fi
+
+# TODO: will also check the uid and extra settings are propogated to hosted cluster's authentication CR
 
 echo "Creating the console client secret"
 oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
