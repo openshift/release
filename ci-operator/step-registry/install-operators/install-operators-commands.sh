@@ -19,6 +19,10 @@ DEFAULT_OPERATOR_SOURCE_DISPLAY="Red Hat Operators"
 DEFAULT_OPERATOR_CHANNEL="!default"
 DEFAULT_OPERATOR_INSTALL_NAMESPACE="openshift-operators"
 
+OADP_STARTING_CSV="oadp-operator.v${OADP_VERSION}"
+
+OADP_CATALOGSOURCE="${DEFAULT_OPERATOR_SOURCE}"
+
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 
@@ -32,6 +36,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
     operator_config=$(jq --raw-output '.config // ""' <<< "$operator_obj")
+    operator_iib=$(jq --raw-output '.iib // ""' <<< "$operator_obj")
 
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
@@ -56,6 +61,14 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
                     exit 1
                 fi
             fi
+        #########################################################################
+            if [[ "${operator_source}" == "!prestage-operators" ]]; then
+                echo "Operator source is ${operator_source}"
+                DEFAULT_OPERATOR_SOURCE="${operator-source}"
+                OADP_CATALOGSOURCE=${DEFAULT_OPERATOR_SOURCE}
+                IIB_IMAGE="brew.registry.redhat.io/rh-osbs/${operator_iib}"
+            fi
+        ##########################################################################
             echo "Selecting '${operator_source}' catalog to install '${operator_name}'"
         fi
     fi
@@ -83,6 +96,28 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
             oc get packagemanifest "${operator_name}" || \
               echo "There is not any available packagemanifest for '${operator_name}' operator"
             exit 1
+        ##########################################################################
+        elif [[ "${operator_source}" == "!prestage-operators" ]]; then
+            echo "Channel is ${DEFAULT_OPERATOR_SOURCE}; Create Catalogsrc ${OADP_CATALOGSOURCE} using IIB ${operator_iib}"
+            oc apply -f - <<EOF
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: CatalogSource
+            metadata:
+                name: "${OADP_CATALOGSOURCE}"
+                namespace: openshift-marketplace
+            spec:
+                sourceType: grpc
+                image: "${operator_iib}"
+                displayName: Custom Operator Catalog
+                publisher: grpc
+EOF
+              # Ensure the CatalogSource is ready
+              oc wait pods \
+              --namespace='openshift-marketplace' \
+              --selector="olm.catalogSource=${OADP_CATALOGSOURCE}" \
+              --for=condition='Ready' \
+              --timeout='5m'
+        ##########################################################################
         else
             echo "INFO: Default channel is ${operator_channel}"
         fi
@@ -133,7 +168,24 @@ EOF
 
     echo "Creating subscription for ${operator_name} operator using ${operator_source} source"
     # Subscribe to the operator
-    if [[ -z "$operator_config" ]]; then
+    ###########################################################################
+    if [[ "${operator_channel}" == "!prestage-operators" ]]; then
+        cat <<EOF | oc apply --namespace="${operator_install_namespace}" -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: "${operator_name}"
+          namespace: "${operator_install_namespace}"
+        spec:
+          channel: "${operator_channel}"
+          name: "${operator_name}"
+          source: "${OADP_CATALOGSOURCE}"
+          sourceNamespace: openshift-marketplace
+          startingCSV: "${STARTING_CSV}"  
+          installPlanApproval: Automatic
+EOF
+################################################################
+    elif [[ -z "$operator_config" ]]; then
         cat <<EOF | oc apply -f -
         apiVersion: operators.coreos.com/v1alpha1
         kind: Subscription
