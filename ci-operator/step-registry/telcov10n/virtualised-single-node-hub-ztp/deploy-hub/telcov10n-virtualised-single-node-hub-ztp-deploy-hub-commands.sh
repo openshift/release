@@ -76,7 +76,6 @@ function select_vhub_to_use {
 
   echo
   set -x
-  local prev_cnt
   hub_pool_state=$(
       timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" cat ${cnt_fname} || \
       echo '{
@@ -100,6 +99,7 @@ echo "${1}" >| ${2}
 EOF
 
   hub_append=$(( 4 * ${next_hub_count} ))
+  echo -n "${next_hub_count} ${cnt_fname}" >| ${SHARED_DIR}/hub_pool_info.txt
   set +x
   echo
 }
