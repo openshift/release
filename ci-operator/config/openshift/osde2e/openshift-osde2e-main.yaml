@@ -244,6 +244,20 @@ tests:
     name: osde2e-tekton-copy
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+- as: cleanup-selfservice-aws
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-selfservice-copy"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-selfservice-copy
+    name: osde2e-selfservice-copy
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 - as: cleanup-dev-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-dev"
