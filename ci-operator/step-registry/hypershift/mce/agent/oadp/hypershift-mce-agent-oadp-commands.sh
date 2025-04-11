@@ -166,6 +166,11 @@ spec:
   defaultVolumesToFsBackup: false
   snapshotVolumes: true
 EOF
+oc patch nodepool -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
+oc patch hostedcluster -n local-cluster ${CLUSTER_NAME}  --type json -p '[{"op": "add", "path": "/spec/pausedUntil", "value": "true"}]'
+oc annotate agentcluster -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
+oc annotate agentmachine -n local-cluster-${CLUSTER_NAME} cluster.x-k8s.io/paused=true --all
+
 oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
 oc annotate hostedcluster -n local-cluster ${CLUSTER_NAME} hypershift.openshift.io/skip-delete-hosted-controlplane-namespace=true
 remove_finalizer machine.c "local-cluster-${CLUSTER_NAME}"
