@@ -1,0 +1,19 @@
+workflow:
+  as: redhat-chaos-installer-gcp-ipi-ovn-etcd-encryption-fips
+  steps:
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+      - chain: ipi-conf-gcp
+      - ref: ovn-conf
+      - chain: ipi-install
+      - ref: fips-check-node-scan
+      - ref: etcd-encryption
+      - chain: create-infra-move-ingress-monitoring-registry
+      - ref: redhat-chaos-observer-start
+    post:
+      - ref: redhat-chaos-observer-stop
+      - chain: ipi-deprovision
+  documentation: |-
+    IPI workflow that provisions and deprovisions an OpenShift FIPS-enabled AWS cluster
+    with an OVN network.
