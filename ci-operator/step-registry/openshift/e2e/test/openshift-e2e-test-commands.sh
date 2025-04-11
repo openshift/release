@@ -525,6 +525,43 @@ suite-conformance)
 suite)
     suite
     ;;
+ipsec-suite)
+     # Rollout IPsec Full mode and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full"}}}}}'
+     while true; do
+       if oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes -o json | jq '.status.desiredNumberScheduled == .status.currentNumberScheduled and .status.desiredNumberScheduled == .status.numberReady' | grep -q true; then
+         break
+       fi
+       echo "Waiting for ovn-ipsec-host DaemonSet to be ready"
+       sleep 5
+     done
+     until
+       oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+       oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+       oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+     do
+       sleep 30 && echo "Cluster Operators Degraded=True,Progressing=True,or Available=False";
+     done
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec External mode and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"External"}}}}}'
+     while true; do
+       if ! oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes; then
+         break
+       fi
+       echo "Waiting for ovn-ipsec-host DaemonSet to be deleted"
+       sleep 5
+     done
+     until
+       oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+       oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+       oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+     do
+       sleep 30 && echo "Cluster Operators Degraded=True,Progressing=True,or Available=False";
+     done
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+    ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"
     exit 1
