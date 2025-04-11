@@ -23,6 +23,11 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: agent-installer-utils
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo sudo podman && dnf clean all
+  from: src
+  to: ove-base-src
 promotion:
   to:
   - name: "4.19"
@@ -104,6 +109,26 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: e2e-agent-ove
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    test:
+    - as: iso-builder
+      commands: |
+        export PULL_SECRET_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
+        cd tools/iso_builder
+        ./hack/build-ove-image.sh --release-image-url $RELEASE_IMAGE_LATEST --pull-secret-file $PULL_SECRET_FILE --arch x86_64
+      credentials:
+      - mount_path: /var/secrets/registry-pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: ove-base-src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift
