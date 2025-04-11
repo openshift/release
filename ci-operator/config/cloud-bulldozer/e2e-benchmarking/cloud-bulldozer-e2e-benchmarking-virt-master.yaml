@@ -1,0 +1,51 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-vm-density-single-node
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+      BASTION_CP_INTERFACE: ens7f1
+      CRUCIBLE: "false"
+      JETLAG_BRANCH: main
+      LAB_CLOUD: cloud19
+      LAB_INTERFACE: eno3
+      OCP_BUILD: ga
+      OCP_VERSION: 4.18.5
+      PUBLIC_VLAN: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-cnv
+    - ref: cloud-bulldozer-e2e-benchmarking-virt-density
+zz_generated_metadata:
+  branch: virt-master
+  org: cloud-bulldozer
+  repo: e2e-benchmarking
