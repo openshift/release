@@ -220,13 +220,26 @@ EOF
     subnet_edge=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
       --query "Stacks[0].Outputs[?OutputKey=='PublicSubnetId'].OutputValue" \
       --output text)
+    unmanaged_subnet=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
+      --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnetId'].OutputValue" \
+      --output text)
   else
     subnet_edge=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
       --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnetId'].OutputValue" \
       --output text)
+    unmanaged_subnet=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
+      --query "Stacks[0].Outputs[?OutputKey=='PublicSubnetId'].OutputValue" \
+      --output text)
   fi
+
   SUBNETS_STR=$(jq -c ". + [\"$subnet_edge\"]" <(echo "$SUBNETS_STR"))
   echo_date "Subnets (with edge zones): ${SUBNETS_STR}"
+
+  echo_date "Setting unused subnet with required cluster tag by installer: ${unmanaged_subnet}"
+  aws ec2 create-tags --resources "${unmanaged_subnet}" --tags "Key=kubernetes.io/cluster/unmanaged,Value=true" || \
+    echo_date "WARNING: Failed to tag subnet ${unmanaged_subnet}"
+  aws ec2 describe-subnets --filters Name=vpc-id,Values="${VPC_ID}" \
+    | jq -c '.Subnets[] | {SubnetId, State, AvailabilityZoneId, AvailabilityZone, CidrBlock, Tags}' > ${ARTIFACT_DIR}/vpc-subnets.json || true
 }
 
 function create_edge_subnets() {

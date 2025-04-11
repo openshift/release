@@ -46,7 +46,7 @@ base_images:
 releases:
   latest:
     release:
-      architecture: amd64
+      architecture: arm64
       channel: candidate
       version: "4.16"
 resources:
@@ -57,16 +57,18 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: gcp-ipi-proxy-oidc-amd-f14-logging
+- as: aws-ipi-proxy-sts-arm-f14-logging
   cron: 58 16 4,20 * *
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: aws-qe
     env:
-      COMPUTE_NODE_TYPE: e2-standard-8
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
-      FORCE_SUCCESS_EXIT: "true"
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.1
+      OCP_ARCH: arm64
       OPERATORS: |
         [
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
@@ -75,7 +77,7 @@ tests:
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
-      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~Splunk&;~GCL&;~AZWIF&;~AZMonitor&;~PodDisruptionBudget&
       TEST_IMPORTANCE: ""
       TEST_PARALLEL: "3"
       TEST_ROSA_LOGIN_ENV: ""
@@ -85,9 +87,9 @@ tests:
     - ref: enable-qe-catalogsource-logging
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 zz_generated_metadata:
   branch: release-4.16
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-stable-openshift-logging-6.1
+  variant: arm64-stable-openshift-logging-6.1

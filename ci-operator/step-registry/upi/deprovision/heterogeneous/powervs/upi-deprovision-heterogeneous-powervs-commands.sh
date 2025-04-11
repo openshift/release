@@ -70,14 +70,6 @@ function cleanup_ibmcloud_powervs() {
       sleep 60
     done
 
-    echo "Deleting the Images"
-    for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[].imageID')
-    do
-      echo "Deleting Images ${IMAGE_ID}"
-      ibmcloud pi image delete "${IMAGE_ID}"
-      sleep 60
-    done
-
     if [ -n "$(ibmcloud pi nets 2> /dev/null | grep DHCP)" ]
     then
        curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
