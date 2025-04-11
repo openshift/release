@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export RELEASE_IMAGE_LATEST="registry.build06.ci.openshift.org/ci-ln-lv2b93k/release:latest"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$RELEASE_IMAGE_LATEST"
+
 function set-cluster-version-spec-update-service() {
     local payload_version
     local jsonpath_flag
@@ -841,10 +844,20 @@ set -o errexit
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
+post_install(){
+  echo "Not TLS 1.3 profile, applying Modern TLS 1.3 profile ..." > "$SHARED_DIR/apiserver.log"
+  env KUBECONFIG="${dir}/auth/kubeconfig" oc patch apiservers/cluster --type=merge -p '{"spec": {"tlsSecurityProfile":{"modern":{},"type":"Modern"}}}'
+  sleep 3m
+  env KUBECONFIG="${dir}/auth/kubeconfig" oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
+  env KUBECONFIG="${dir}/auth/kubeconfig" oc get apiservers/cluster -oyaml | tee "$SHARED_DIR"/apiserver.config
+  env KUBECONFIG="${dir}/auth/kubeconfig" oc get openshiftapiservers.operator.openshift.io cluster -o json | tee -a "$SHARED_DIR"/apiserver.config
+}
+
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+  post_install
 fi
 
 exit "$ret"
