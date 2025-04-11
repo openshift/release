@@ -14,7 +14,7 @@ if [[ $INSTALLATION_SOURCE == "Internal" ]]; then
     NOO_BUNDLE_INFO=$(build_info.sh)
 else
     # Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
-    NOO_BUNDLE_INFO="v0.0.0-main"
+    NOO_BUNDLE_INFO="v0.0.0-sha-main"
 fi
 
 export ADDITIONAL_PARAMS="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
