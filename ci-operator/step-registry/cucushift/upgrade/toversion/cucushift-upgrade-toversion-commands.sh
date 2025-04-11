@@ -45,12 +45,11 @@ function check_failed_operator(){
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
             failing_operators="${failing_operator} ${failing_operators}"
         else
-            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || true
-            if [[ -z "${failing_operators}" ]]; then
-                failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting on \K.*'|tr -d ',') || true
-            fi
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || \
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting up to 40 minutes on \K.*'|tr -d ',') || \
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting on \K.*'|tr -d ',') || true
         fi
-        if [[ -n "${failing_operators}" ]]; then
+        if [[ -n "${failing_operators}" && "${failing_operators}" =~ [^[:space:]] ]]; then
             echo "Upgrade stuck, set UPGRADE_FAILURE_TYPE to ${failing_operators}"
             export UPGRADE_FAILURE_TYPE="${failing_operators}"
         fi

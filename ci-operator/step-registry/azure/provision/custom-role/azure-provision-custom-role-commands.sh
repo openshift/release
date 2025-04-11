@@ -281,7 +281,7 @@ ${required_permissions}
     fi
 
     # Starting from 4.19, user-assigned identity created by installer is removed, related permissions are not required any more.
-    if (( ocp_minor_version <=18 && ocp_major_version == 4 )) || [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
+    if (( ocp_minor_version <=18 && ocp_major_version == 4 )); then
         required_permissions="""
 \"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
 \"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
