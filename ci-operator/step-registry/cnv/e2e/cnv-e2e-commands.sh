@@ -29,7 +29,9 @@ START_TIME=$(date "+%s")
 
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
+# TODO: revert to upstream before merging
+curl -L "https://github.com/dollierp/cnv-ci/tarball/arm64" -o /tmp/cnv-ci.tgz
+#curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
 mkdir -p /tmp/cnv-ci
 tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
@@ -81,8 +83,8 @@ else
 fi
 
 if [ "${exit_code:-0}" -ne 0 ]; then
-    echo "deploy_test failed with exit code $exit_code"
+    echo "${MAKEFILE_TARGET} failed with exit code ${exit_code}"
     exit ${exit_code}
 else
-    echo "deploy_test succeeded"
+    echo "${MAKEFILE_TARGET} succeeded"
 fi
