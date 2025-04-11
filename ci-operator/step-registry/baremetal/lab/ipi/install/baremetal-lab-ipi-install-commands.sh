@@ -233,6 +233,24 @@ if ! wait $!; then
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
+if [ "${DISCONNECTED}" == "true" ]; then
+  BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address")"
+  echo -e "\n[INFO] Deleting firewall rules for bootstrap IP"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${BOOTSTRAP_IP}" << 'EOF'
+    set -o nounset
+    set -o errexit
+    BOOTSTRAP_IP="${1}"
+    if [ -n "${BOOTSTRAP_IP}" ]; then
+      rule=$(iptables -S FORWARD | grep "${BOOTSTRAP_IP}"| grep DROP | sed 's/^-A /-D /')
+      read -r -a RULE <<< "${rule}"
+      [[ $RULE =~ D.*$BOOTSTRAP_IP.*DROP ]] && iptables "${RULE[@]}"
+      rule=$(iptables -S FORWARD | grep "${BOOTSTRAP_IP}"| grep ACCEPT | sed 's/^-A /-D /')
+      read -r -a RULE <<< "${rule}"
+      [[ $RULE =~ D.*$BOOTSTRAP_IP.*ACCEPT ]] && iptables "${RULE[@]}"
+    fi
+EOF
+fi
+
 echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
