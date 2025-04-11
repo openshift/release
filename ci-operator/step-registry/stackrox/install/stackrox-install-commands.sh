@@ -262,7 +262,7 @@ function wait_created() {
 }
 
 function wait_deploy() {
-  retry oc -n stackrox rollout status deploy/"$1" --timeout=300s \
+  retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
     || {
       echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
       oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
