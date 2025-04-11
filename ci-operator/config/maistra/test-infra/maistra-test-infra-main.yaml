@@ -27,6 +27,26 @@ tests:
     make lint
   container:
     from: src
+- as: sync-upstream-ztunnel-1.24
+  commands: |
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=ztunnel \
+    --branch=release-1.24 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge" \
+    --modifier=merge_upstream_ztunnel_1.24 \
+    --merge-repository=https://github.com/istio/ztunnel \
+    --merge-branch=release-v1.24 \
+    --merge-failure-notify=@maistra/envoy \
+    --merge-strategy=merge
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
 - as: sync-upstream-envoy-2.3
   commands: |
     ./tools/automator-main.sh \
