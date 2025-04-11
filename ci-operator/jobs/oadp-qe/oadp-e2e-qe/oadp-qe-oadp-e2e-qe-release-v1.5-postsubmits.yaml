@@ -1,31 +1,28 @@
-presubmits:
-  oadp-qe/oadp-qe-automation:
+postsubmits:
+  oadp-qe/oadp-e2e-qe:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^oadp-1\.5$
-    - ^oadp-1\.5-
+    - ^release-v1\.5$
     cluster: build03
-    context: ci/prow/main-ocp4.19-lp-interop-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: main-ocp4.19-lp-interop
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-oadp-qe-oadp-qe-automation-oadp-1.5-main-ocp4.19-lp-interop-images
-    rerun_command: /test main-ocp4.19-lp-interop-images
+    max_concurrency: 1
+    name: branch-ci-oadp-qe-oadp-e2e-qe-release-v1.5-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=main-ocp4.19-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -47,6 +44,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -61,7 +61,9 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )main-ocp4.19-lp-interop-images,?($|\s.*)

@@ -1,22 +1,20 @@
 presubmits:
-  oadp-qe/oadp-qe-automation:
+  oadp-qe/oadp-e2e-qe:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^oadp-1\.5$
-    - ^oadp-1\.5-
+    - ^release-v1\.5$
+    - ^release-v1\.5-
     cluster: build03
-    context: ci/prow/main-ocp4.19-lp-interop-images
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: main-ocp4.19-lp-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-oadp-qe-oadp-qe-automation-oadp-1.5-main-ocp4.19-lp-interop-images
-    rerun_command: /test main-ocp4.19-lp-interop-images
+    name: pull-ci-oadp-qe-oadp-e2e-qe-release-v1.5-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -25,7 +23,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=main-ocp4.19-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -64,4 +61,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )main-ocp4.19-lp-interop-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)

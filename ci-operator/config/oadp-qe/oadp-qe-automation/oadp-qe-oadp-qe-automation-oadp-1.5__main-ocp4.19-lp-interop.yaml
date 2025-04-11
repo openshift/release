@@ -14,12 +14,12 @@ base_images:
   oadp-e2e-qe:
     name: oadp-e2e-qe
     namespace: oadp-qe
-    tag: master
+    tag: release-v1.5
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: konveyor
-    tag: ubi9-v1.23
+    name: release
+    namespace: openshift
+    tag: golang-1.20
 images:
 - context_dir: .
   dockerfile_path: dockerfiles/testing/interop/Dockerfile
@@ -37,18 +37,6 @@ images:
       - destination_dir: oadp-e2e-qe.tar.gz
         source_path: /oadp-e2e-qe.tar.gz
   to: oadp-runner
-- dockerfile_literal: |
-    FROM quay.io/konveyor/oadp-operator:latest
-  from: quay.io/konveyor/oadp-operator:latest
-  to: pipeline:oadp-operator
-operator:
-  bundles:
-  - as: oadp-bundle
-    dockerfile_path: build/Dockerfile.bundle
-    skip_building_index: true
-  substitutions:
-  - pullspec: quay.io/konveyor/oadp-operator:latest
-    with: pipeline:oadp-operator
 releases:
   latest:
     candidate:
@@ -61,21 +49,40 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: oadp-interop-aws
+- as: oadp-interop-aws-fips-talayan
   cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       EXECUTE_KUBEVIRT_TESTS: "false"
-      ODF_STORAGE_CLUSTER_NAME: odf-operator
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "interop-tests-deploy-*", "failure_type": "all", "classification": "CNV Install Failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-s3-*", "failure_type": "all", "classification":  "Infrastructure Provisioning - S3 Buckets", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "oadp-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OADP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","fips","oadp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: talayan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+          {"name": "redhat-oadp-operator", "source": "prestage-operators", "channel": "stable", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group", "iib": "iib:951881"}
+        ]
+      RE_TRIGGER_ON_FAILURE: "false"
+      USER_TAGS: |
+        scenario oadp
     test:
+    - ref: install-operators
     - ref: oadp-execute-tests
-    workflow: optional-operators-ci-aws
+    workflow: oadp-ipi-aws
 zz_generated_metadata:
   branch: oadp-1.5
   org: oadp-qe
