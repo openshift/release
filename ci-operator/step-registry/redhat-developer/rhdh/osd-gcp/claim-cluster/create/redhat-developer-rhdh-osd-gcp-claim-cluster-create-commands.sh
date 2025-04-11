@@ -8,7 +8,7 @@ curl -Lo ocm https://github.com/openshift-online/ocm-cli/releases/latest/downloa
 
 
 job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
-export CLUSTER_NAME="osd-$job_id"
+export CLUSTER_NAME="osd-job-$job_id"
 
 echo "CLUSTER_NAME : $CLUSTER_NAME"
 
