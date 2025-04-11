@@ -10,22 +10,89 @@ echo "************ Fix container user ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+function get_hub_id_and_updated_pool {
+
+  local ts
+  ts=${1} ; shift
+
+  local timeout
+  timeout="$(date -u -d "${MAX_HUB_DEPLOYMENT_TIMEOUT}" +%s%N)"
+
+  set -x
+  # Determine if there is any free slot to deploy a new vhub
+  pool_limit=$(jq -r '.pool_limit' <<<"${hub_pool_state}")
+  pool_count=$(jq -r '.pool | length' <<<"${hub_pool_state}")
+
+  if [ ${pool_count} -lt ${pool_limit} ]; then
+    id=${pool_count}
+    hub_pool_state=$(jq -c '.pool += [
+        {
+          "timeout": "'${timeout}'",
+          "hub_id": "'${id}'",
+          "state": "installing"
+        }
+      ]' <<<"${hub_pool_state}")
+  else
+    # Select the older being installed which timout
+    # has been reached to be reinstalled since
+    # it probably means that the installation
+    # failed.
+    id=$(jq -r --arg ts "${ts}" '
+      [ .pool[]
+      | select(.state == "installing" and (($ts | tonumber) > (.timeout | tonumber))) ]
+      | sort_by(.timeout)
+      | first.hub_id
+      ' <<<"${hub_pool_state}")
+    if [ "${id}" == "null" ]; then
+      # Select the older one to be reinstalled
+      id=$(jq -r '
+        [ .pool[] ]
+        | sort_by(.timeout)
+        | first.hub_id
+        ' <<<"${hub_pool_state}")
+    fi
+
+    hub_pool_state=$(jq -c --arg timeout "${timeout}" --arg id "${id}" '
+      (.pool[] | select(.hub_id == $id))
+      |= (.timeout = $timeout | .state = "installing")
+      ' <<<"${hub_pool_state}")
+  fi
+  set +x
+
+  echo "${id} ${hub_pool_state}"
+  return 0
+}
+
 function select_vhub_to_use {
 
   echo "************ telcov10n Selecting virtualised SNO Hub cluster to use ************"
 
   local cnt_fname
   cnt_fname=${1} ; shift
-  local max_vhubs
-  max_vhubs=${1} ; shift
+  local max_pool_vhubs
+  max_pool_vhubs=${1} ; shift
+  local ts
+  ts=${1} ; shift
 
   echo
   set -x
   local prev_cnt
-  prev_cnt=$(timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" cat ${cnt_fname} || echo "0")
-  next_hub_count="$(( (${prev_cnt} + 1) % ${max_vhubs} ))"
+  hub_pool_state=$(
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" cat ${cnt_fname} || \
+      echo '{
+        "pool_limit": "'${max_pool_vhubs}'",
+        "pool": []
+      }' | jq -c)
+  ret=$(get_hub_id_and_updated_pool ${ts} ${hub_pool_state})
+  next_hub_count=$(echo $ret | cut -d' ' -f1)
+  hub_pool_state=$(echo $ret | cut -d' ' -f2)
+  set +x
+  echo "---------------------"
+  echo ${hub_pool_state} | jq
+  echo "---------------------"
+  set -x
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${next_hub_count}" "${cnt_fname}" << 'EOF'
+    "'${hub_pool_state}'" "${cnt_fname}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -49,18 +116,18 @@ function select_virtualised_sno_hub {
   local ts
 
   local last_selected_vhub_filename
-  last_selected_vhub_filename="/var/run/lock/ztp-virtualised-hub-pool/last-virtualised-hub-selected-count.txt"
+  last_selected_vhub_filename="/var/run/lock/ztp-virtualised-hub-pool/last-virtualised-hub-selected-count.json"
 
   local lock_filename
   lock_filename="${last_selected_vhub_filename}.lock"
 
-  max_vhubs=$(cat ${bastion_settings}/max_available_virtualised_sno_hubs)
+  max_pool_vhubs=$(cat ${bastion_settings}/max_available_virtualised_sno_hubs)
   for ((attempts = 0 ; attempts < ${max_attempts:=5} ; attempts++)); do
     ts=$(date -u +%s%N)
     echo "Locking ${lock_filename} shared file... [${attempts/${max_attempts}}]"
     try_to_lock_host "${AUX_HOST}" "${lock_filename}" "${ts}" "${lock_timeout:="120"}"
     if [[ "$(check_the_host_was_locked "${AUX_HOST}" "${lock_filename}" "${ts}")" == "locked" ]] ; then
-      select_vhub_to_use "${last_selected_vhub_filename}" "${max_vhubs}"
+      select_vhub_to_use "${last_selected_vhub_filename}" "${max_pool_vhubs}" "${ts}"
       return 0
     fi
     set -x
@@ -552,7 +619,7 @@ function pr_debug_mode_waiting {
   echo "################################################################################"
 
   TZ=UTC
-  END_TIME=$(date -d "${TIMEOUT}" +%s)
+  END_TIME=$(date -d "${DEBUGGING_TIMEOUT}" +%s)
   debug_done=/tmp/debug.done
 
   while sleep 1m; do
@@ -581,3 +648,40 @@ function pr_debug_mode_waiting {
 
 trap pr_debug_mode_waiting EXIT
 main
+# exit 0
+
+# max_pool_vhubs=2
+# ts="1744299070915786694"
+
+# hub_pool_state=$(
+#     echo '{
+#       "pool_limit": "'${max_pool_vhubs}'",
+#       "pool": [
+#         {
+#           "ts": "'${ts}'",
+#           "timeout": "'$(date -u -d "${MAX_HUB_DEPLOYMENT_TIMEOUT}" +%s%N)'"
+#           "hub_id": "0",
+#           "state": "installing"
+#         }
+#       ]
+#     }' | jq -c)
+
+# echo "---------------------"
+# echo ${hub_pool_state} | jq
+# echo "---------------------"
+
+
+# for (( idx=0; idx < 2; idx++ ));do
+#   ts=$(date -u +%s%N)
+#   ret=$(get_hub_id_and_updated_pool "${ts}" "${hub_pool_state}")
+#   id=$(echo $ret | cut -d' ' -f1)
+#   hub_pool_state=$(echo $ret | cut -d' ' -f2)
+
+#   echo
+#   echo "RET: ${ret}"
+#   echo
+
+#   echo "---------------------"
+#   echo ${hub_pool_state} | jq
+#   echo "---------------------"
+# done
