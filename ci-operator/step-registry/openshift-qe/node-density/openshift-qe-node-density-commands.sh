@@ -43,7 +43,7 @@ export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
 
-PODS_PER_NODE=50
+PODS_PER_NODE=200
 #POD_READY_THRESHOLD='60s'
 export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}";
 ./run.sh
