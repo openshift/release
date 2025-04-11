@@ -258,6 +258,7 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
 fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
+sleep 10800
 
 # check if the cluster is ready
 oc version --client
