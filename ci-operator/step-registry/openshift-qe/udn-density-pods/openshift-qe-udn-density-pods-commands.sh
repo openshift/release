@@ -48,7 +48,11 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 
 # The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+if [[ -n "$OVERRIDE_ITERATIONS" ]]; then
+  export ITERATIONS=$OVERRIDE_ITERATIONS
+else
+  export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+fi
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
