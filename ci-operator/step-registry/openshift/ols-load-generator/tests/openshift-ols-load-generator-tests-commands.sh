@@ -72,6 +72,7 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   # Deploy controller manager
   pushd lightspeed-operator
   run_or_fail make deploy
+  run_or_fail oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-lightspeed:lightspeed-operator-controller-manager
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager --timeout=600s
   popd
 
@@ -105,8 +106,6 @@ EOF
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
   COMMIT_ID=$(skopeo inspect docker://quay.io/openshift-lightspeed/lightspeed-service-api:latest | jq -r '.Labels."vcs-ref"')
   run_or_fail echo "Possible commit ID under test: $COMMIT_ID"
-  run_or_fail oc logs -f -n openshift-lightspeed deployment/lightspeed-app-server > ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt 2>&1 &
-  LOGS_PID=$!
 
   # Create namespace and kubeconfig secret for load testing
   run_or_fail oc create namespace ols-load-test
@@ -118,6 +117,7 @@ EOF
   run_or_fail oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-lightspeed:lightspeed-app-server
   OLS_TEST_AUTH_TOKEN=$(oc create token lightspeed-app-server -n openshift-lightspeed --duration=4294967296s)
   set -x
+  run_or_fail oc logs -f -n openshift-lightspeed deployment/lightspeed-app-server > ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt 2>&1 &
 
   # Trigger the load test
   run_or_fail cat <<EOF | oc apply -f -
@@ -244,7 +244,6 @@ EOF
   # Clean up
   run_or_fail oc delete namespace ols-load-test
   run_or_fail oc wait --for=delete ns/ols-load-test --timeout=600s
-  run_or_fail kill $LOGS_PID
   run_or_fail cp ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt ${ARTIFACT_DIR}/ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt
 
   pushd lightspeed-operator
