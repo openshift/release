@@ -122,7 +122,7 @@ function getCIR(){
 
 CIRTYPE=host_el9
 #CLUSTERTYPE can be one of "virt", "virt-arm64", "baremetal" or "baremetal-moc"
-[ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster_el9
+[ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster_new
 [ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
 [ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
