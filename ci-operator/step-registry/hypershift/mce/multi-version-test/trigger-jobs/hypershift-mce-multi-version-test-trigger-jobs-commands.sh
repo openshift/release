@@ -12,6 +12,13 @@ declare -A guest_to_job_aws=(
     [4.17]="periodic-ci-openshift-hypershift-release-4.17-periodics-mce-e2e-aws-critical"
     [4.18]="periodic-ci-openshift-hypershift-release-4.18-periodics-mce-e2e-aws-critical"
 )
+declare -A guest_to_job_agent=(
+    [4.14]="periodic-ci-openshift-hypershift-release-4.14-periodics-mce-e2e-agent-critical"
+    [4.15]="periodic-ci-openshift-hypershift-release-4.15-periodics-mce-e2e-agent-critical"
+    [4.16]="periodic-ci-openshift-hypershift-release-4.16-periodics-mce-e2e-agent-critical"
+    [4.17]="periodic-ci-openshift-hypershift-release-4.17-periodics-mce-e2e-agent-critical"
+    [4.18]="periodic-ci-openshift-hypershift-release-4.18-periodics-mce-e2e-agent-critical"
+)
 declare -A mce_to_guest=(
     [2.4]="4.14"
     [2.5]="4.14 4.15"
@@ -20,10 +27,10 @@ declare -A mce_to_guest=(
     [2.8]="4.14 4.15 4.16 4.17 4.18"
 )
 declare -A hub_to_mce=(
-    [4.14]="2.4 2.5 2.6"
-    [4.15]="2.5 2.6 2.7"
-    [4.16]="2.6 2.7 2.8"
-    [4.17]="2.7 2.8"
+    [4.14]="2.6"
+    [4.15]="2.5"
+#    [4.16]="2.6 2.7 2.8"
+#    [4.17]="2.7 2.8"
     [4.18]="2.8"
 )
 
@@ -173,7 +180,11 @@ for hub_version in "${!hub_to_mce[@]}"; do
                     result=$(trigger_prow_job "${guest_to_job_aws[$guest_version]}" "$post_data")
                     ;;
                 agent)
-                    #todo
+                    post_data=$(jq -n --arg mce_version "$mce_version" \
+                        --arg release_image "${payload_list[$hub_version]}" \
+                        --arg lvm_version "stable-$hub_version" \
+                        '{job_execution_type: "1", pod_spec_options: {envs: {MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION: $mce_version, RELEASE_IMAGE_LATEST: $release_image, MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT: "true", MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_SUB_CHANNEL: $lvm_version}}}')
+                    result=$(trigger_prow_job "${guest_to_job_agent[$guest_version]}" "$post_data")
                     ;;
                 *)
                     echo "not support ${HOSTEDCLUSTER_PLATFORM}"
