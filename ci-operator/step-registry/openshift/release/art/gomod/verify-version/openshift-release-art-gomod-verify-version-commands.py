@@ -24,31 +24,29 @@ def get_paths():
     go_mod_entries = data.get("cachito", {}).get("packages", {}).get("gomod", [])
     print(f"gomod entries: {go_mod_entries}")
 
-    paths = []
+    custom_paths = []
     for entry in go_mod_entries:
         for key, value in entry.items():
             if key == "path":
-                paths.append(Path(os.getcwd()).joinpath(f"{value}/go.mod"))
-    return paths
+                custom_paths.append(Path(os.getcwd()).joinpath(f"{value}/go.mod"))
+    return custom_paths
 
 
-gomod_paths = ["."] + get_paths()
-gomod_paths = list(set(gomod_paths))
-print(f"Found paths to check: {gomod_paths}")
+# Check the current directory by default.
+# But also check the custom paths defined in ocp-build-data, eg: https://github.com/openshift-eng/ocp-build-data/blob/openshift-4.20/images/ose-etcd.yml#L5-L16
+paths = list(set(["."] + get_paths()))
+gomod_paths = [path for path in paths if path.exists()]
 
-for gomod_path in gomod_paths:
-    if gomod_path.exists():
-        print(f"go mod file exists at: {gomod_path.absolute()}")
+if gomod_paths:
+    print(f"Checking go.mod files present in paths {gomod_paths}")
+    for gomod_path in gomod_paths:
         with open(gomod_path, "r") as file:
             lines = file.readlines()
-
             for line in lines:
                 if line.startswith("go"):
                     line_content = line.strip()
                     version = line_content.split(" ")[-1]
-
                     if len(version.split(".")) == 2:
                         raise Exception(f"go version should be of format 1.23.2 (major.minor.patch). Found: {line_content}")
-        print("No issues found")
-    else:
-        print(f"go mod file not found at path {gomod_path.absolute()}")
+else:
+    print(f"No go.mod files found in {paths}")
