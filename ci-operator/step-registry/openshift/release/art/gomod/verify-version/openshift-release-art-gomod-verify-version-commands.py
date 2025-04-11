@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+Builds on Konflux do not work if the go version listed in go.mod files is not of format 1.23.2 (major.minor.patch).
+"""
+
 import os
 import yaml
 import requests
