@@ -68,7 +68,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
   name: $CATALOG_NAME
-  namespace: openshift-marketplace
+  namespace: openshift-netobserv-operator
 spec:
   displayName: NetObservMain
   image: $CATALOG_IMAGE
@@ -98,6 +98,54 @@ metadata:
   namespace: openshift-netobserv-operator
 spec:
   upgradeStrategy: Default
+EOF
+}
+
+deploy_idms() {
+  cat <<EOF | oc apply -f -
+---
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: netobserv-image-digest-mirror-set
+spec:
+  imageDigestMirrors:
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-ystream
+      source: registry.redhat.io/network-observability/network-observability-rhel9-operator
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/flowlogs-pipeline-ystream
+      source: registry.redhat.io/network-observability/network-observability-flowlogs-pipeline-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-ystream
+      source: registry.redhat.io/network-observability/network-observability-ebpf-agent-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-ystream
+      source: registry.redhat.io/network-observability/network-observability-console-plugin-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-cli-ystream
+      source: registry.redhat.io/network-observability/network-observability-cli-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-bundle-ystream
+      source: registry.redhat.io/network-observability/network-observability-operator-bundle
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-zstream
+      source: registry.redhat.io/network-observability/network-observability-rhel9-operator
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/flowlogs-pipeline-zstream
+      source: registry.redhat.io/network-observability/network-observability-flowlogs-pipeline-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-zstream
+      source: registry.redhat.io/network-observability/network-observability-ebpf-agent-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-zstream
+      source: registry.redhat.io/network-observability/network-observability-console-plugin-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-cli-zstream
+      source: registry.redhat.io/network-observability/network-observability-cli-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-bundle-zstream
+      source: registry.redhat.io/network-observability/network-observability-operator-bundle
 EOF
 }
 
@@ -143,12 +191,31 @@ patch_csv_images(){
   fi
 }
 
+create_ns
+create_og
+
 if [[ "$CATALOG_SOURCE" == "source" ]]; then
     echo "====> Using upstream catalog bundle with tag: vmain"
     CATALOG_IMAGE="quay.io/netobserv/network-observability-operator-catalog:v0.0.0-main"
     CATALOG_NAME="netobserv-main"
     CHANNEL="latest" # for upstream catalog source "latest" is the channel name.
     deploy_catalog
+
+elif [[ "$CATALOG_SOURCE" == "zstream" ]]; then
+    echo "====> Using downstream zstream catalog bundle with tag: latest"
+    CATALOG_IMAGE="quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-fbc-zstream:latest"
+    CATALOG_NAME="netobserv-zstream"
+    CHANNEL="stable"
+    deploy_catalog
+    deploy_idms
+
+elif [[ "$CATALOG_SOURCE" == "ystream" ]]; then
+    echo "====> Using downstream ystream catalog bundle with tag: latest"
+    CATALOG_IMAGE="quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-fbc-ystream:latest"
+    CATALOG_NAME="netobserv-ystream"
+    CHANNEL="stable"
+    deploy_catalog
+    deploy_idms
 fi
 
 NAMESPACE=netobserv
@@ -159,10 +226,8 @@ oc apply -f https://raw.githubusercontent.com/netobserv/documents/main/examples/
 oc apply -f https://raw.githubusercontent.com/netobserv/documents/main/examples/zero-click-loki/2-loki.yaml -n ${NAMESPACE}
 
 sleep 30
-oc wait --timeout=180s --for=condition=ready pod -l olm.catalogSource=$CATALOG_NAME -n openshift-marketplace
+oc wait --timeout=180s --for=condition=ready pod -l olm.catalogSource=$CATALOG_NAME -n openshift-netobserv-operator
 
-create_ns
-create_og
 subscribe
 
 sleep 60
