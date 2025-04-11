@@ -32,8 +32,8 @@ RUN_COMMAND="uv run pytest tests/model_serving/model_server \
             --pytest-log-file=${ARTIFACT_DIR}/pytest-tests.log"
 
 
-if [ -n "${TEST_MARKER}" ]; then
-    RUN_COMMAND+=" -m ${TEST_MARKER} "
+if [ -n "${TEST_MARKERS}" ]; then
+    RUN_COMMAND+=" -m ${TEST_MARKERS} "
 fi
 
 if [ -n "${TEST_SELECTORS}" ]; then
