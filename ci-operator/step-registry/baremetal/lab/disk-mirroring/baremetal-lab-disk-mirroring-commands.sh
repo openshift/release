@@ -27,7 +27,7 @@ echo "ocp_version: ${ocp_version}"
 butane_version_list=("${ocp_version}.0" "$(echo ${ocp_version} | awk -F. -v OFS=. '{$NF -= 1 ; print}').0")
 echo "butane_version_list:" "${butane_version_list[@]}"
 
-declare -a roles=("master" "worker")
+declare -a roles=("worker")
 ret_code=1
 for butane_version in "${butane_version_list[@]}"; do
   for role in "${roles[@]}"; do
@@ -39,7 +39,7 @@ metadata:
   labels:
     machineconfiguration.openshift.io/role: ${role}
 boot_device:
-  layout: $([[ "${architecture}" == "arm64" ]] && echo -n "aarch64" || echo -n "x86_64")
+  layout: x86_64
   mirror: 
     devices: 
       - /dev/sda
