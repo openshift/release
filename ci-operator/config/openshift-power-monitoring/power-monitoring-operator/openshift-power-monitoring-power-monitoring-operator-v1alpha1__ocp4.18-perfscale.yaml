@@ -45,19 +45,23 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- always_run: false
-  as: power-monitoring-operator-cd-v2
+- as: cdv2-power-monitoring-operator-minimal
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-powermon
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: 00 04 * * 3
   steps:
-    cluster_profile: equinix-ocp-metal
     env:
       ADDITIONAL_PARAMS: '{"layeredProduct": "power-monitoring-operator-minimal"}'
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        NETWORK_TYPE=OVNKubernetes
       ENABLE_LOCAL_INDEX: "true"
-      EXTRA_FLAGS: --churn-duration=20m
+      EXTRA_FLAGS: --churn-duration=20m --metrics-profile=metrics-profiles/kepler/metrics.yaml
       ITERATION_MULTIPLIER_ENV: "9"
-      METRIC_PROFILES: ' --metrics-profile=metrics-profiles/kepler/metrics.yaml'
       PROFILE_TYPE: regular
       USER_METADATA: layeredProduct=power-monitoring-operator-minimal
     test:
@@ -75,7 +79,82 @@ tests:
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
     - chain: openshift-qe-cluster-density-v2
-    workflow: baremetalds-e2e
+    workflow: generic-claim
+- as: nd-heavy-power-monitoring-operator-minimal
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-powermon
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.18"
+  cron: 00 08 * * 3
+  steps:
+    env:
+      ADDITIONAL_PARAMS: '{"layeredProduct": "power-monitoring-operator-minimal"}'
+      ENABLE_LOCAL_INDEX: "true"
+      EXTRA_FLAGS: --metrics-profile=metrics-profiles/kepler/metrics.yaml
+      ITERATIONS_PER_NAMESPACE: "1"
+      NAMESPACED_ITERATIONS: "true"
+      PODS_PER_NODE: "200"
+      PROFILE_TYPE: regular
+      USER_METADATA: layeredProduct=power-monitoring-operator-minimal
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=30m
+      dependencies:
+      - env: OO_BUNDLE
+        name: power-monitoring-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    - ref: openshift-power-monitoring-tests-power-monitoring-operator
+    - chain: openshift-qe-node-density-heavy
+    workflow: generic-claim
+- as: mixed-workload-kepler-minimal
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-powermon
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.18"
+  cron: 00 12 * * 3
+  steps:
+    env:
+      ADDITIONAL_PARAMS: '{"layeredProduct": "kepler-minimal", "mixedWorkload": "true"}'
+      ENABLE_LOCAL_INDEX: "true"
+      EXTRA_FLAGS: --churn-duration=20m --metrics-profile=metrics-profiles/kepler/metrics.yaml
+      ITERATION_MULTIPLIER_ENV: "9"
+      PROFILE_TYPE: regular
+      STRESS_NG_CPU_CORES: "1"
+      STRESS_NG_CPU_LOAD: "25"
+      USER_METADATA: layeredProduct=kepler-minimal,mixedWorkload=true
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=30m
+      dependencies:
+      - env: OO_BUNDLE
+        name: power-monitoring-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    - ref: openshift-power-monitoring-tests-power-monitoring-operator
+    - chain: openshift-qe-stress-ng
+    - chain: openshift-qe-cluster-density-v2
+    workflow: generic-claim
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring

@@ -252,7 +252,7 @@ EOF
         p_extra_style=""
         # If there's no junit from Robot Framework execution (i.e. it didn't run), or
         # if junit contains any failures=N, N>0, then make the line red-ish to make it easier to find.
-        if [[ ! -e "${test}/junit.xml" ]] || grep --quiet --extended-regexp 'failures="[1-9][0-9]?"' "${test}/junit.xml"; then
+        if ! find "${test}" -type f -name 'junit*.xml' | grep -q . || find "${test}" -type f -name 'junit*.xml' -exec grep -q -E 'failures="[1-9][0-9]?"' {} +; then
             p_extra_style="color:#FF6666"
         fi
 

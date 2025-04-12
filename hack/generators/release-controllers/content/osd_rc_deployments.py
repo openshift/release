@@ -245,8 +245,15 @@ def get_oc_prepare_container():
             git config --global user.email test@test.com
             oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json
 
-            FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-stable"][0] // empty')
-            TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-dev-preview"][0] // empty')
+            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)
+            if [[ "$RC_SERVICE_AVAILABLE" -ne 200 ]]
+            then
+                FROM=""
+                TO=""
+            else
+                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-stable"][0] // empty')
+                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-dev-preview"][0] // empty')
+            fi
 
             if [[ -n "$FROM" && -n "$TO" ]]
             then

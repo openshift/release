@@ -44,15 +44,6 @@ oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:defau
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
 oc logout
 
-echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
-
-mkdir -p /tmp/openshift-client
-# Download and Extract the oc binary
-wget -O /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OC_CLIENT_VERSION/openshift-client-linux.tar.gz
-tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz
-export PATH=/tmp/openshift-client:$PATH
-oc version
-
 NAME_SPACE="showcase-operator-nightly"
 NAME_SPACE_RBAC="showcase-op-rbac-nightly"
 export NAME_SPACE NAME_SPACE_RBAC
@@ -65,7 +56,7 @@ GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh"
 
 export QUAY_REPO RELEASE_BRANCH_NAME
-QUAY_REPO="rhdh-community/rhdh"
+QUAY_REPO="rhdh/rhdh-hub-rhel9"
 # Get the base branch name based on job.
 RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
 
@@ -106,12 +97,13 @@ for change in $PR_CHANGESET; do
 done
 
 if [[ "$ONLY_IN_DIRS" == "true" || "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
-    TAG_NAME="next"
-    QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
         TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+    else
+        TAG_NAME="next"
     fi
+
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else

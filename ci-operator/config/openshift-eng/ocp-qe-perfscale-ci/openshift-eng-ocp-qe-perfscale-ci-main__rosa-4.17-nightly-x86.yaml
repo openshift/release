@@ -45,8 +45,8 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     workflow: rosa-aws-sts
   timeout: 8h0m0s
-- as: control-plane-120nodes
-  cron: 0 12 4,18 * *
+- always_run: false
+  as: control-plane-120nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -64,12 +64,13 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 7h0m0s
-- as: control-plane-24nodes
-  cron: 0 18 9,23 * *
+- always_run: false
+  as: control-plane-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "21"
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
@@ -77,16 +78,17 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.17"
       READY_WAIT_TIMEOUT: 30m
-      REPLICAS: "24"
     test:
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: data-path-9nodes
-  cron: 0 5 1,15 * *
+- always_run: false
+  as: data-path-9nodes
   steps:
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "6"
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m5.xlarge
       CONFIG: config/standard-classic-rosa.yml
@@ -94,18 +96,19 @@ tests:
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.17"
-      REPLICAS: "9"
     test:
+    - ref: openshift-qe-workers-scale
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
     workflow: rosa-aws-sts
   timeout: 6h0m0s
-- as: node-density-heavy-24nodes
-  cron: 0 13 5,19 * *
+- always_run: false
+  as: node-density-heavy-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "21"
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
@@ -113,8 +116,8 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.17"
       READY_WAIT_TIMEOUT: 30m
-      REPLICAS: "24"
     test:
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: rosa-aws-sts
 - always_run: false
@@ -123,6 +126,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "21"
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
@@ -130,8 +134,8 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.17"
       READY_WAIT_TIMEOUT: 30m
-      REPLICAS: "24"
     test:
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-cni
     workflow: rosa-aws-sts
 - always_run: false

@@ -11,6 +11,9 @@ set -xeuo pipefail
 
 source /tmp/ci-functions.sh
 ci_subscription_register
+
+download_microshift_scripts
+"\${DNF_RETRY}" "install" "jq"
 ci_copy_secrets "${CACHE_REGION}"
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4

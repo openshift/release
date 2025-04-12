@@ -27,6 +27,13 @@ process_inventory() {
     echo "Processing complete. Check ${dest_file}"
 }
 
+echo "Set CLUSTER_NAME env var"
+if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
+    CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
+fi
+export CLUSTER_NAME=${CLUSTER_NAME}
+echo CLUSTER_NAME=${CLUSTER_NAME}
+
 echo "Create group_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
 
@@ -50,3 +57,7 @@ done
 
 cd /eco-ci-cd
 ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME}"
+
+echo "Store inventory in SHARED_DIR"
+cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* ${SHARED_DIR}/
+cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* ${SHARED_DIR}/

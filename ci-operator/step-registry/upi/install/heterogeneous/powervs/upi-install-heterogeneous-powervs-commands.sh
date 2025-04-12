@@ -114,13 +114,13 @@ function cleanup_prior() {
         done
 
         # Dev Note: avoid deleting the stream9 image
-        echo "Deleting the Images"
-        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | .name? | select(. = "CentOS-Stream-9").imageID')
-        do
-            echo "Deleting Images ${IMAGE_ID}"
-            ibmcloud pi image delete "${IMAGE_ID}"
-            sleep 60
-        done
+        # echo "Deleting the Images"
+        # for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | .name? | select(. = "CentOS-Stream-9").imageID')
+        # do
+        #     echo "Deleting Images ${IMAGE_ID}"
+        #     ibmcloud pi image delete "${IMAGE_ID}"
+        #     sleep 60
+        # done
 
         if [ -n "$(ibmcloud pi network ls 2> /dev/null | grep DHCP || true)" ]
         then
@@ -226,6 +226,24 @@ function setup_powervs_image() {
     else
         echo "Skipping import, CentOS-Stream exists"
     fi
+
+    COUNT=$(ibmcloud pi image ls --json | jq -r '[.images[] | select(.name? == "rhel-coreos").name] | length')
+    if [[ "${COUNT}" == "0" ]]
+    then
+        echo "Creating the RHCOS Image"
+        curl -o /tmp/rhcos.json -L https://raw.githubusercontent.com/openshift/installer/refs/heads/release-4.14/data/data/coreos/rhcos.json
+
+        COREOS_OBJ="$(jq -r '.architectures.ppc64le.artifacts.powervs.formats."ova.gz".disk.location' /tmp/rhcos.json | awk -F '/' '{print $NF}')"
+        echo "FILE: ${COREOS_OBJ}"
+
+        ibmcloud pi image import rhel-coreos --bucket-access public --storage-tier tier1 \
+            --image-file-name "${COREOS_OBJ}" \
+            --bucket rhcos-powervs-images-us-east --region us-east
+
+        echo "Import image status is: $?"
+    else
+        echo "Skipping import, rhel-coreos exists"
+    fi
 }
 
 # run_automation executes the terraform based on automation
@@ -307,6 +325,19 @@ function wait_for_worker_machines() {
 
 # Scales up the intel workers
 function scale_up_intel_workers {
+    echo "Importing the rhcos image again"
+
+    # 1. Find the VPC prefix from the install-config.
+    VPC_PREFIX=$(yq-v4 -r '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+    export VPC_PREFIX
+
+    # 2. Get the VPC Name
+    VPC_NAME=$(ibmcloud is vpcs | grep "${VPC_PREFIX}" | awk '{print $2}')
+    export VPC_NAME
+
+    echo "Image Status: "
+    ibmcloud is images --owner-type user --output json --resource-group-name "${RESOURCE_GROUP}"
+
     echo "Scaling the MachineSet for 2 of the workers/zones"
     for WORKER_MACHINESET in $(oc get machinesets.machine.openshift.io -n openshift-machine-api | grep worker | awk '{print $1}' | head -n 2)
     do
@@ -318,8 +349,8 @@ function scale_up_intel_workers {
     wait_for_worker_machines
 
     echo "Disable mastersSchedulable since we now have a dedicated worker node"
-	oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
-	sleep 10
+    oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
+    sleep 10
 }
 
 ## Main Execution Path
@@ -341,10 +372,11 @@ then
     exit 64
 fi
 
-scale_up_intel_workers
-
 setup_ibmcloud_cli
 login_ibmcloud
+
+scale_up_intel_workers
+
 download_terraform_binary
 download_automation_code
 #cleanup_prior
