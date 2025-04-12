@@ -30,10 +30,9 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-RUN_COMMAND="uv run pytest tests/model_serving/model_server \
-            -s -p no:logging \
+RUN_COMMAND="uv run pytest tests/model_serving/model_server -s \
             --junit-xml=${ARTIFACT_DIR}/xunit_results.xml \
-            --pytest-log-file=${ARTIFACT_DIR}/pytest-tests.log"
+            --log-file=${ARTIFACT_DIR}/pytest-tests.log"
 
 
 if [ -n "${TEST_MARKERS}" ]; then
