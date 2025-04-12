@@ -190,7 +190,7 @@ powervs_bastion_private_ip = "${BASTION_PRIVATE_IP}"
 powervs_machine_cidr = "192.168.200.0/24"
 vpc_skip_ssh_key_create = true
 skip_route_creation = true
-skip_create_security_group = true
+skip_create_security_group = false
 EOF
 
   cp "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars "${SHARED_DIR}"/var-multi-arch-vpc.tfvars
