@@ -28,7 +28,7 @@ def get_paths():
     go_mod_entries = data.get("cachito", {}).get("packages", {}).get("gomod", [])
     print(f"gomod entries: {go_mod_entries}")
 
-    custom_paths = []
+    custom_paths = [Path(os.getcwd()).joinpath("go.mod")]
     for entry in go_mod_entries:
         for key, value in entry.items():
             if key == "path":
