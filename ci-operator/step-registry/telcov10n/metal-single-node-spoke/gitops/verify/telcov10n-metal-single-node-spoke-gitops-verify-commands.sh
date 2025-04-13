@@ -18,8 +18,8 @@ function wait_for_argocd_apps {
 
   echo "************ telcov10n Check Gitops service: Wait for ArgoCD to deploy all their apps components ************"
 
-  wait_until_command_is_ok "oc -n openshift-gitops get apps clusters | grep -w 'Synced'" 10s 50 && \
-  wait_until_command_is_ok "oc -n openshift-gitops get apps policies | grep -w 'Synced'" 10s 50 && \
+  wait_until_command_is_ok "oc -n openshift-gitops get apps clusters | grep -w 'Synced'" 10s 100 && \
+  wait_until_command_is_ok "oc -n openshift-gitops get apps policies | grep -w 'Synced'" 10s 100 && \
   set -x && \
   oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.sync.status}'=Synced --timeout 30m && \
   oc -n openshift-gitops wait apps/clusters --for=jsonpath='{.status.health.status}'=Healthy --timeout 30m && \

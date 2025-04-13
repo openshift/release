@@ -117,6 +117,9 @@ touch \${policies_path}/.ts-$(date -u +%s%N)
 ############## BEGIN of Policy GenTemplate files #####################################################
 $(generate_policy_related_files "\${policies_path}")
 ############## END of Policy GenTemplate files #######################################################
+
+cat \${ztp_repo_dir}/site-configs/kustomization.yaml >| \${ztp_repo_dir}/site-policies/kustomization.yaml
+
 git add .
 git commit -m 'Generated Policy files'
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main || {

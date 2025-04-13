@@ -230,7 +230,7 @@ git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
 mkdir -pv \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest
-mkdir -pv \${ztp_repo_dir}/site-policies/${SPOKE_CLUSTER_NAME}
+mkdir -pv \${ztp_repo_dir}/site-policies
 cat <<EOS > \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/site-config.yaml
 $(cat ${site_config_file})
 EOS
@@ -256,8 +256,6 @@ resources:
   - ${SPOKE_CLUSTER_NAME}
 EOK
 fi
-
-cat \${ztp_repo_dir}/site-configs/kustomization.yaml >| \${ztp_repo_dir}/site-policies/kustomization.yaml
 
 cd \${ztp_repo_dir}
 git add .
