@@ -38,7 +38,7 @@ def get_paths():
 
 # Check the current directory by default.
 # But also check the custom paths defined in ocp-build-data, eg: https://github.com/openshift-eng/ocp-build-data/blob/openshift-4.20/images/ose-etcd.yml#L5-L16
-paths = list(set(["."] + get_paths()))
+paths = list(set([Path(".")] + get_paths()))
 gomod_paths = [path for path in paths if path.exists()]
 
 if gomod_paths:
