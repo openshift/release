@@ -44,7 +44,7 @@ gomod_paths = [path for path in paths if path.exists()]
 if gomod_paths:
     print(f"Checking go.mod files present in paths {gomod_paths}")
     for gomod_path in gomod_paths:
-        with open(gomod_path, "r") as file:
+        with open(gomod_path.absolute(), "r") as file:
             lines = file.readlines()
             for line in lines:
                 if line.startswith("go"):
