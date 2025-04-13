@@ -53,7 +53,7 @@ cd \${ztp_repo_dir}
 touch .${SPOKE_CLUSTER_NAME}-deleted-at-$(date -u +%s%N)
 git add .
 git rm -r site-configs/${SPOKE_CLUSTER_NAME}
-git rm -r site-policies/${SPOKE_CLUSTER_NAME}
+[ -d site-policies/${SPOKE_CLUSTER_NAME} ] && git rm -r site-policies/${SPOKE_CLUSTER_NAME}
 git commit -m 'Delete Related ${SPOKE_CLUSTER_NAME} spoke cluster GitOps files'
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main || {
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git pull -r origin main &&
