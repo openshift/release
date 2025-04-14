@@ -20,6 +20,7 @@ GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh"
 
 export RELEASE_BRANCH_NAME
+export QUAY_REPO="rhdh-community/rhdh"
 # Get the base branch name based on job.
 RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
 
