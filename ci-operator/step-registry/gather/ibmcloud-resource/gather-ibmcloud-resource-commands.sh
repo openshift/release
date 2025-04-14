@@ -205,7 +205,15 @@ ibmcloud_login
 if [ -f ${SHARED_DIR}/metadata.json ]; then
     RESOURCE_GROUP=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
     echo "Resource group: $RESOURCE_GROUP"
+elif [ -s "${SHARED_DIR}/ibmcloud_cluster_resource_group" ]; then
+    RESOURCE_GROUP=$(cat "${ibmcloud_cluster_resource_group}")
+    echo "Resource group: $RESOURCE_GROUP"    
+elif [ -s "${SHARED_DIR}/ibmcloud_resource_group" ]; then
+    RESOURCE_GROUP=$(cat "${ibmcloud_resource_group}")
+    echo "Resource group: $RESOURCE_GROUP"
 fi
+
+provisioned_rg=$(cat "${provisioned_rg_file}")
 
 if [ -f "${CLUSTER_PROFILE_DIR}/ibmcloud-cis" ]; then
     ibmcloud_cis_instance_name="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis")"
