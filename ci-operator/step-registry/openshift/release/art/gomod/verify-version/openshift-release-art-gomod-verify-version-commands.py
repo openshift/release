@@ -10,19 +10,6 @@ import requests
 import subprocess
 from pathlib import Path
 
-
-# Get current working directory
-current_dir = os.getcwd()
-print(f"Current directory: {current_dir}")
-
-# Change directory
-new_dir = "/home/prow/go/src/github.com/openshift/aws-encryption-provider"  # Replace with the actual path
-os.chdir(new_dir)
-
-# Verify the change
-current_dir = os.getcwd()
-print(f"Current directory: {current_dir}")
-
 process = subprocess.run(['ls', '-la'], capture_output=True, text=True)
 print(process.stdout)
 
