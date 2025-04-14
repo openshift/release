@@ -92,11 +92,19 @@ function download_binary {
 }
 
 function get_config_files {
-    local base_parent_dir="/go/src/github.com/openshift/openshift-tests-private/"
-    local util_parent_dir="${base_parent_dir}test/extended/operators/stress/util"
-    local config_parent_dir="${base_parent_dir}test/extended/operators/stress/manifests/config"
-    cp -fr "${util_parent_dir}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner util"; exit_burner $ret_code yes; }
-    cp -fr "${config_parent_dir}/${OPERATION}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner-config"; exit_burner $ret_code yes; }
+
+    local repo_url="https://github.com/kuiwang02/burner-config.git" # will change to the official
+    local git_option="--branch main"
+    rm -fr burner-config metrics-profiles templates || true
+    git clone $repo_url $git_option --depth 1 || { ret_code=$?; FAIL_MESSAGE="cant clone burner-config"; exit_burner $ret_code yes; }
+    cp -fr burner-config/config/${OPERATION}/* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner-config"; exit_burner $ret_code yes; }
+    cp -fr burner-config/util/* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner util"; exit_burner $ret_code yes; }
+
+    # local base_parent_dir="/go/src/github.com/openshift/openshift-tests-private/"
+    # local util_parent_dir="${base_parent_dir}test/extended/operators/stress/util"
+    # local config_parent_dir="${base_parent_dir}test/extended/operators/stress/manifests/config"
+    # cp -fr "${util_parent_dir}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner util"; exit_burner $ret_code yes; }
+    # cp -fr "${config_parent_dir}/${OPERATION}/"* . || { ret_code=$?; FAIL_MESSAGE="cant copy burner-config"; exit_burner $ret_code yes; }
 }
 
 function set_prometheus {
