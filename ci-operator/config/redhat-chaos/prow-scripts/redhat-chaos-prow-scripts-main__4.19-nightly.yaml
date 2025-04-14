@@ -10,12 +10,18 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: krkn.prow
-  to: prow-scripts-419
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
   to: cerberus-main-prow-419
+- dockerfile_path: Dockerfile
+  from: krkn
+  to: prow-scripts
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   initial:
     integration:
@@ -42,17 +48,23 @@ tests:
       BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       USER_TAGS: |
         TicketId 419
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
   timeout: 6h0m0s
 - as: krkn-hub-node-tests
@@ -62,17 +74,23 @@ tests:
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "false"
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      ITERATION_MULTIPLIER_ENV: "11"
+      GC: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
       USER_TAGS: |
         TicketId 419
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
+    - ref: redhat-chaos-start-krkn
     workflow: redhat-chaos-krkn-hub-node-tests
   timeout: 6h0m0s
 - as: gcp-fipsetcd-krkn-hub-tests
@@ -95,12 +113,17 @@ tests:
     cluster_profile: gcp-chaos
     env:
       SPOT_INSTANCES: "false"
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       TELEMETRY_GROUP: prow-ocp-4.19
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
@@ -124,12 +147,18 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CHURN: "False"
-      GC: "False"
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-azure-4.16
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
@@ -144,13 +173,20 @@ tests:
       CHURN: "False"
       COMPUTE_NODE_TYPE: Standard_D8s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
-      GC: "False"
-      ITERATION_MULTIPLIER_ENV: "10"
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
       OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-azure-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
   timeout: 6h0m0s
@@ -162,10 +198,16 @@ tests:
       BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-aws-compact
   timeout: 6h0m0s
@@ -177,10 +219,16 @@ tests:
       BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-node-tests
     workflow: openshift-qe-installer-aws-compact
   timeout: 6h0m0s
@@ -192,12 +240,18 @@ tests:
     env:
       ARO_MASTER_VM_SIZE: Standard_D16s_v3
       ARO_WORKER_VM_SIZE: Standard_D8s_v3
-      CHURN: "false"
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-aro-4.19
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-etcd-tests
     - chain: redhat-chaos-krkn-hub-console-tests
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
@@ -211,13 +265,18 @@ tests:
     env:
       ARO_MASTER_VM_SIZE: Standard_D16s_v3
       ARO_WORKER_VM_SIZE: Standard_D8s_v3
-      CHURN: "false"
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "10"
+      ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-aro-4.19
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
     - ref: redhat-chaos-network-chaos
     - ref: redhat-chaos-pod-network-chaos
     - chain: redhat-chaos-hog-scenarios
