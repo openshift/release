@@ -56,7 +56,7 @@ else:
     print(f"No go.mod files found in {paths}")
 
 import subprocess
-process = subprocess.run(['ls', '-l'], capture_output=True, text=True)
+process = subprocess.run(['ls', '-la'], capture_output=True, text=True)
 print(process.stdout)
 
 process = subprocess.run(['git', 'branch'], capture_output=True, text=True)
