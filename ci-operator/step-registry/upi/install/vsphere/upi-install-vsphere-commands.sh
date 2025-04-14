@@ -72,7 +72,7 @@ function gather_console_and_bootstrap() {
       hostname=${ipath_array[-1]}
 
       # create png of the current console to determine if a virtual machine has a problem
-      echo "$(date -u --rfc-3339=seconds) - capture console image"
+      echo "$(date -u --rfc-3339=seconds) - capture console image for hostname=${hostname-}"
       govc vm.console -vm.ipath="$ipath" -capture "${ARTIFACT_DIR}/${hostname}.png"
 
       # based on the virtual machine name create variable for each
@@ -83,7 +83,7 @@ function gather_console_and_bootstrap() {
       declare "${hostname//-/_}_ip"="$(govc vm.ip -wait=1m -vm.ipath="$ipath" | awk -F',' '{print $1}')"
     done
 
-    GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_0_ip}")
+    GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_ip}")
     GATHER_BOOTSTRAP_ARGS+=('--master' "${control_plane_0_ip}" '--master' "${control_plane_1_ip}" '--master' "${control_plane_2_ip}")
 
     # 4.5 and prior used the terraform.tfstate for gather bootstrap. This causes an error with:
@@ -244,6 +244,11 @@ set +e
 wait "$!"
 ret="$?"
 set -e
+
+  # Attempt to gather bootstrap logs.
+echo "$(date -u --rfc-3339=seconds) - DEBUG FORCING attempting to gather bootstrap logs..."
+gather_console_and_bootstrap
+exit 1
 
 if [ $ret -ne 0 ]; then
   set +e
