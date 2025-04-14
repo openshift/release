@@ -54,3 +54,10 @@ if gomod_paths:
                         raise Exception(f"go version should be of format 1.23.2 (major.minor.patch). Found: {line_content}")
 else:
     print(f"No go.mod files found in {paths}")
+
+import subprocess
+process = subprocess.run(['ls', '-l'], capture_output=True, text=True)
+print(process.stdout)
+
+process = subprocess.run(['git', 'branch'], capture_output=True, text=True)
+print(process.stdout)
