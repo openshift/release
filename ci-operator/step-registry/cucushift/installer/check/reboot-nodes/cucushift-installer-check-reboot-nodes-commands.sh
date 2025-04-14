@@ -58,6 +58,8 @@ function reboot_cluster() {
         reboot_node "${node_ip}"
     done
 
+    sleep 300
+
     total_nodes_count=$(echo ${node_list} | awk '{print NF}')
     try=0
     max_try=30
