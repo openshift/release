@@ -7,6 +7,7 @@ Builds on Konflux do not work if the go version listed in go.mod files is not of
 import os
 import yaml
 import requests
+import subprocess
 from pathlib import Path
 
 def get_paths():
@@ -35,6 +36,14 @@ def get_paths():
                 custom_paths.append(Path(os.getcwd()).joinpath(f"{value}/go.mod"))
     return custom_paths
 
+process = subprocess.run(['cd', '/home/prow/go/src/github.com/openshift/aws-encryption-provider'], capture_output=True, text=True)
+print(process.stdout)
+
+process = subprocess.run(['ls', '-la'], capture_output=True, text=True)
+print(process.stdout)
+
+process = subprocess.run(['git', 'branch'], capture_output=True, text=True)
+print(process.stdout)
 
 # Check the current directory by default.
 # But also check the custom paths defined in ocp-build-data, eg: https://github.com/openshift-eng/ocp-build-data/blob/openshift-4.20/images/ose-etcd.yml#L5-L16
@@ -54,10 +63,3 @@ if gomod_paths:
                         raise Exception(f"go version should be of format 1.23.2 (major.minor.patch). Found: {line_content}")
 else:
     print(f"No go.mod files found in {paths}")
-
-import subprocess
-process = subprocess.run(['ls', '-la'], capture_output=True, text=True)
-print(process.stdout)
-
-process = subprocess.run(['git', 'branch'], capture_output=True, text=True)
-print(process.stdout)
