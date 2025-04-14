@@ -85,7 +85,7 @@ function wait_until_command_is_ok {
   [ \$# -gt 0 ] && exit_non_ok_message=\${1} && shift
   for ((attempts = 0 ; attempts <  \${max_attempts:=10} ; attempts++)); do
     echo "Attempting[\${attempts}/\${max_attempts}]..."
-    set -x
+    [ "\${show_command:="yes"}" == "yes" ] && set -x
     eval "\${cmd}" && { set +x ; return ; }
     sleep \${sleep_for:='1m'}
     set +x
