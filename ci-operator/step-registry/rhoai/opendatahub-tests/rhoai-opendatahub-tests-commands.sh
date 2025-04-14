@@ -10,8 +10,10 @@ if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
   SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
   AWS_SECRET_ACCESS_KEY=$(cat $SECRETS_DIR/aws-secret-access-key)
   AWS_ACCESS_KEY_ID=$(cat $SECRETS_DIR/aws-access-key-id)
-  CI_S3_BUCKET_NAME=$(cat $SECRETS_DIR/ci-s3-bucket-name)
-  MODELS_S3_BUCKET_NAME=$(cat $SECRETS_DIR/models-s3-bucket-name)
+
+  BUCKET_INFO="/tmp/secrets/ci"
+  CI_S3_BUCKET_NAME="$(cat ${BUCKET_INFO}/CI_S3_BUCKET_NAME)"
+  MODELS_S3_BUCKET_NAME="$(cat ${BUCKET_INFO}/MODELS_S3_BUCKET_NAME)"
 
   export AWS_SECRET_ACCESS_KEY
   export AWS_ACCESS_KEY_ID
