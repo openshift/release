@@ -135,7 +135,6 @@ mirror_log="${ARTIFACT_DIR}/oc-mirror-output.log"
 for i in {1..6}; do
     if ! oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" 1>${mirror_log}; then
         log "ERROR Unable to mirror image"
-        exit 1
     fi
 
     # The stdout output of `oc image mirror` is:
@@ -144,6 +143,8 @@ for i in {1..6}; do
     if [[ -n "$(cat ${mirror_log})" ]]; then
         break
     fi
+
+    log "WARN Nothing mirrored: oc image mirror log is empty."
 
     if [[ "${i}" == "6" ]]; then
         log "ERROR failed to complete mirroring"
