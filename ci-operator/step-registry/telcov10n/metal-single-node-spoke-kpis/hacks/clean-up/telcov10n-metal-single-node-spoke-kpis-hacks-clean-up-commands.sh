@@ -48,10 +48,31 @@ function hack_spoke_deployment_clean_up {
   release_locked_host
 }
 
+function server_poweroff {
+
+  echo "************ telcov10n Power Off the server use as SNO Spoke cluster ************"
+
+  post_curl_=$(sed "s@curl@curl -X POST -d '{\"ResetType\": \"ForceOff\"}'@" ${SHARED_DIR}/curl_redfish_base_uri)
+  echo
+  echo "Shutting down the server..."
+  eval "${post_curl_}/Actions/ComputerSystem.Reset"
+  echo
+
+  curl_="$(cat ${SHARED_DIR}/curl_redfish_base_uri)"
+  ${curl_} | jq -r '.PowerState'
+  echo
+  echo "Waiting for the server gets shutdown..."
+  # shellcheck disable=SC2034
+  show_command="no"
+  wait_until_command_is_ok "${curl_} | jq -r '.PowerState' | grep -w 'Off'" 10s 100
+
+}
+
 function main {
 
   setup_aux_host_ssh_access
   hack_spoke_deployment_clean_up
+  server_poweroff
 }
 
 main

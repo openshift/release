@@ -168,6 +168,14 @@ function update_host_and_master_yaml_files {
   bmc_user="$(cat /var/run/telcov10n/ansible-group-all/bmc_user)"
   bmc_pass="$(cat /var/run/telcov10n/ansible-group-all/bmc_password)"
 
+  curl_="curl -sLk \
+      $([ -n "${SOCKS5_PROXY}" ] && echo "-x ${SOCKS5_PROXY}") \
+      -H 'OData-Version: 4.0' \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -u ${bmc_user}:${bmc_pass} \
+      https://${bmc_address}${redfish_base_uri}"
+  echo -n "$curl_" >| ${SHARED_DIR}/curl_redfish_base_uri
+
   cat <<EOF >| ${SHARED_DIR}/hosts.yaml
 - mac: ${mac}
   ip: ${ip:="no-needed-value"}
