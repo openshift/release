@@ -62,7 +62,7 @@ DEPLOYMENT:
 __EOF__
 
 if [[ "${ODF_TEST_PLATFORM}" == "vsphere" ]]; then
-  cat >> "./test.log" << __EOF__
+  cat >> "${LOGS_CONFIG}" << __EOF__
 ENV_DATA:
   platform: 'vsphere'
 __EOF__
