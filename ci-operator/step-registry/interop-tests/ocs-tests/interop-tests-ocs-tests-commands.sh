@@ -65,6 +65,7 @@ if [[ "${ODF_TEST_PLATFORM}" == "vsphere" ]]; then
   cat >> "${LOGS_CONFIG}" << __EOF__
 ENV_DATA:
   platform: 'vsphere'
+  vsphere_user: 'vsphere-connected-2'
 __EOF__
 fi
 
