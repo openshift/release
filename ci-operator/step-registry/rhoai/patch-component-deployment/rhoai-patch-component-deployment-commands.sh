@@ -12,7 +12,7 @@ if [ -n "${ODH_MODEL_CONTROLLER_IMAGE}" ]; then
   oc scale --replicas=0 deployment -n redhat-ods-operator rhods-operator
 
   echo "Updating odh-model-controller deployment image"
-  kubectl set image  -n ${namespace}   deployment/odh-model-controller  manager="${ODH_MODEL_CONTROLLER_IMAGE}"
+  oc set image  -n ${namespace}   deployment/odh-model-controller  manager="${ODH_MODEL_CONTROLLER_IMAGE}"
 
   echo "Wait For Deployment Replica To Be Ready"
 
@@ -22,7 +22,7 @@ if [ -n "${ODH_MODEL_CONTROLLER_IMAGE}" ]; then
       local ns="${1}"
       local pods
 
-      for _ in {1..60}; do
+      for _ in {1..120}; do
           echo "Waiting for pods in '${ns}' in state Running or Completed"
           pods=$(oc get pod -n "${ns}" | grep -v "Running\|Completed" | tail -n +2)
           echo "${pods}"
