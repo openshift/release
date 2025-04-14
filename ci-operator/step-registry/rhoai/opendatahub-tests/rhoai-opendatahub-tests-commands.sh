@@ -11,21 +11,16 @@ if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
   AWS_SECRET_ACCESS_KEY=$(cat $SECRETS_DIR/aws-secret-access-key)
   AWS_ACCESS_KEY_ID=$(cat $SECRETS_DIR/aws-access-key-id)
   CI_S3_BUCKET_NAME=$(cat $SECRETS_DIR/ci-s3-bucket-name)
-  CI_S3_BUCKET_REGION=$(cat $SECRETS_DIR/ci-s3-bucket-region)
-  CI_S3_BUCKET_ENDPOINT=$(cat $SECRETS_DIR/ci-s3-bucket-endpoint)
   MODELS_S3_BUCKET_NAME=$(cat $SECRETS_DIR/models-s3-bucket-name)
-  MODELS_S3_BUCKET_REGION=$(cat $SECRETS_DIR/models-s3-bucket-region)
-  MODELS_S3_BUCKET_ENDPOINT=$(cat $SECRETS_DIR/models-s3-bucket-endpoint)
-
 
   export AWS_SECRET_ACCESS_KEY
   export AWS_ACCESS_KEY_ID
   export CI_S3_BUCKET_NAME
-  export CI_S3_BUCKET_REGION
-  export CI_S3_BUCKET_ENDPOINT
+  export CI_S3_BUCKET_REGION="us-east-1"
+  export CI_S3_BUCKET_ENDPOINT="https://s3.us-east-1.amazonaws.com/"
   export MODELS_S3_BUCKET_NAME
-  export MODELS_S3_BUCKET_REGION
-  export MODELS_S3_BUCKET_ENDPOINT
+  export MODELS_S3_BUCKET_REGION="us-east-2"
+  export MODELS_S3_BUCKET_ENDPOINT="https://s3.us-east-2.amazonaws.com/"
 fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
