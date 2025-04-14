@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo pipefail -x
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -100,6 +100,11 @@ case "${PLATFORM}" in
       ARGS+=( "--multi-arch" )
     fi
 
+    if [[ "${HYPERSHFIT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
+      ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
+    fi
+
+    echo "Creating cluster with the following arguments:"
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"
     ;;
   "powervs")
