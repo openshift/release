@@ -61,11 +61,23 @@ DEPLOYMENT:
   skip_download_client: True
 __EOF__
 
+declare vcenter_usernames
+declare vcenter_passwords
+declare vsphere_datacenter
+declare vsphere_cluster
+
+account_loc=$(($RANDOM % 4))
+vsphere_user="${vcenter_usernames[$account_loc]}"
+vsphere_password="${vcenter_passwords[$account_loc]}"
+
 if [[ "${ODF_TEST_PLATFORM}" == "vsphere" ]]; then
   cat >> "${LOGS_CONFIG}" << __EOF__
 ENV_DATA:
   platform: 'vsphere'
-  vsphere_user: 'vsphere-connected-2'
+  vsphere_user: '${vsphere_user}'
+  vsphere_password: '${vsphere_password}'
+  vsphere_cluster: '${vsphere_cluster}'
+  vsphere_datacenter: '${vsphere_datacenter}'
 __EOF__
 fi
 
