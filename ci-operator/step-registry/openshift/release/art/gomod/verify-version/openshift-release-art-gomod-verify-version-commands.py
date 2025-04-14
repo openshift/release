@@ -10,6 +10,25 @@ import requests
 import subprocess
 from pathlib import Path
 
+
+# Get current working directory
+current_dir = os.getcwd()
+print(f"Current directory: {current_dir}")
+
+# Change directory
+new_dir = "/home/prow/go/src/github.com/openshift/aws-encryption-provider"  # Replace with the actual path
+os.chdir(new_dir)
+
+# Verify the change
+current_dir = os.getcwd()
+print(f"Current directory: {current_dir}")
+
+process = subprocess.run(['ls', '-la'], capture_output=True, text=True)
+print(process.stdout)
+
+process = subprocess.run(['git', 'branch'], capture_output=True, text=True)
+print(process.stdout)
+
 def get_paths():
     ocp_build_data_file_name = os.environ["OCP_BUILD_DATA_FILENAME"]  # Eg: azure-file-csi-driver-operator.yml
     ocp_version = os.environ["OCP_VERSION"]  # Eg: openshift-4.19
@@ -36,14 +55,8 @@ def get_paths():
                 custom_paths.append(Path(os.getcwd()).joinpath(f"{value}/go.mod"))
     return custom_paths
 
-process = subprocess.run(['cd', '/home/prow/go/src/github.com/openshift/aws-encryption-provider'], capture_output=True, text=True)
-print(process.stdout)
 
-process = subprocess.run(['ls', '-la'], capture_output=True, text=True)
-print(process.stdout)
 
-process = subprocess.run(['git', 'branch'], capture_output=True, text=True)
-print(process.stdout)
 
 # Check the current directory by default.
 # But also check the custom paths defined in ocp-build-data, eg: https://github.com/openshift-eng/ocp-build-data/blob/openshift-4.20/images/ose-etcd.yml#L5-L16
