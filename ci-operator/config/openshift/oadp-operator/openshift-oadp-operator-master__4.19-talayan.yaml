@@ -1,0 +1,77 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  oadp-apps-deployer:
+    name: oadp-apps-deployer
+    namespace: oadp-qe
+    tag: master
+  oadp-e2e-qe:
+    name: oadp-e2e-qe
+    namespace: oadp-qe
+    tag: master
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  inputs:
+    oadp-apps-deployer:
+      paths:
+      - destination_dir: oadp-apps-deployer.tar.gz
+        source_path: /oadp-apps-deployer.tar.gz
+    oadp-e2e-qe:
+      paths:
+      - destination_dir: oadp-e2e-qe.tar.gz
+        source_path: /oadp-e2e-qe.tar.gz
+  to: oadp-runner
+operator:
+  bundles:
+  - dockerfile_path: build/Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/konveyor/oadp-operator:latest
+    with: oadp-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- as: oadp-ds-tests-aws-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      EXECUTE_KUBEVIRT_TESTS: "true"
+      FIPS_ENABLED: "true"
+      ODF_STORAGE_CLUSTER_NAME: odf-operator
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        scenario oadp
+    test:
+    - ref: oadp-s3-create
+    - ref: oadp-execute-tests
+    - ref: oadp-s3-destroy
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: oadp-operator
+  variant: 4.19-talayan
