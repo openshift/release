@@ -48,7 +48,7 @@ set -o verbose
 #fi
 
 wget https://bootstrap.pypa.io/get-pip.py
-python get-pip.py
+python3 get-pip.py
 
 export HOME=/go
 git clone https://github.com/opendatahub-io/kserve.git
