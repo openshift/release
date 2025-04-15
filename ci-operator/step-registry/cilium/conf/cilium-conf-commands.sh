@@ -8,7 +8,9 @@ set -x
 cilium_olm_rev="main"
 cv="$CILIUM_VERSION"
 
-sed -i "s/networkType: .*/networkType: Cilium/" "${SHARED_DIR}/install-config.yaml"
+if [[ -f "${SHARED_DIR}/install-config.yaml" ]]; then
+  sed -i "s/networkType: .*/networkType: Cilium/" "${SHARED_DIR}/install-config.yaml"
+fi
 
 cat > "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
 apiVersion: operator.openshift.io/v1
