@@ -6,7 +6,7 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-if [[ -z "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
   echo "Using default value: ${BASE_DOMAIN}"
   AWS_BASE_DOMAIN="${BASE_DOMAIN}"
 else
