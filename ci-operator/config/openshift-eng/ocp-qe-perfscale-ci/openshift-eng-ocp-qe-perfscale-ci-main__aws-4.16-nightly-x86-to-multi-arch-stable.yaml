@@ -1,0 +1,124 @@
+base_images:
+  ansible:
+    name: "4.16"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: 4.16.35
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: upgrade-to-multi-arch-3nodes
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+      ZONES_COUNT: "3"
+    test:
+    - ref: cucushift-upgrade-arch-migration
+    - ref: ipi-install-heterogeneous
+    workflow: openshift-qe-installer-aws
+  timeout: 4h0m0s
+- always_run: false
+  as: loaded-upgrade-to-multi-arch-48nodes
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "12"
+      PPROF: "false"
+      SIZE_VARIANT: large
+      WORKER_REPLICA_COUNT: "48"
+      ZONES_COUNT: "3"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - ref: cucushift-upgrade-arch-migration
+    - ref: ipi-install-heterogeneous
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
+- always_run: false
+  as: loaded-upgrade-to-multi-arch-120nodes
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: r5.16xlarge
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "12"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      TIMEOUT: "480"
+      WORKER_REPLICA_COUNT: "120"
+      ZONES_COUNT: "3"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - ref: cucushift-upgrade-arch-migration
+    - ref: ipi-install-heterogeneous
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: loaded-upgrade-to-multi-arch-300nodes
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: r5.16xlarge
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "12"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.16xlarge
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      TIMEOUT: "800"
+      WORKER_REPLICA_COUNT: "300"
+      ZONES_COUNT: "3"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - ref: cucushift-upgrade-arch-migration
+    - ref: ipi-install-heterogeneous
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.16-nightly-x86-to-multi-arch-stable
