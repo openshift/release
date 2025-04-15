@@ -25,6 +25,9 @@ COMPONENTS="azure-disk azure-file ciro cloud-provider cncc cpo ingress capz"
 declare -A component_to_client_id
 declare -A component_to_cert_name
 
+#debug
+KV_NAME=hypershift-ci-reserved
+SP_NAME_PREFIX="hypershift-preserved-sp"
 for component in $COMPONENTS; do
     name="${SP_NAME_PREFIX}-${component}"
 #    scopes="/subscriptions/$AZURE_AUTH_SUBSCRIPTION_ID/resourceGroups/$RG_HC"
