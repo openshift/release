@@ -139,10 +139,9 @@ images:
     FROM src AS builder
     FROM this-is-ignored-and-not-used
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-        yum install -y ./google-chrome-stable_current_*.rpm && \
-        mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+        yum install -y ./google-chrome-stable_current_*.rpm
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
   from: ci_tests-private-baseui_latest
   inputs:
     src:
@@ -152,11 +151,10 @@ images:
 - dockerfile_literal: |
     FROM bin AS builder
     FROM this-is-ignored-and-not-used
-    RUN mkdir -p /go/src/github.com/openshift
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
         rm -rf /usr/bin/oc /usr/bin/kubectl
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
   from: ci_tests-private-base_latest
   inputs:
     bin:
