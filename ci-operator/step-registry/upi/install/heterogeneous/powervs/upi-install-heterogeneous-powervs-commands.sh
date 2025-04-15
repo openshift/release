@@ -113,15 +113,6 @@ function cleanup_prior() {
             sleep 60
         done
 
-        # Dev Note: avoid deleting the stream9 image
-        # echo "Deleting the Images"
-        # for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | .name? | select(. = "CentOS-Stream-9").imageID')
-        # do
-        #     echo "Deleting Images ${IMAGE_ID}"
-        #     ibmcloud pi image delete "${IMAGE_ID}"
-        #     sleep 60
-        # done
-
         if [ -n "$(ibmcloud pi network ls 2> /dev/null | grep DHCP || true)" ]
         then
             curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
@@ -132,13 +123,9 @@ function cleanup_prior() {
             sleep 60
         fi
 
-        echo "Deleting the Network"
-        for NETWORK_ID in $(ibmcloud pi network ls 2> /dev/null | awk '{print $1}')
-        do
-        echo "Deleting network ${NETWORK_ID}"
-        ibmcloud pi network delete "${NETWORK_ID}" || true
-        sleep 60
-        done
+        echo "Delete network non-'ocp-net' on PowerVS region"
+        ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
+        echo "Done deleting non-'ocp-net' on PowerVS"
     done
 
   echo "Done cleaning up prior runs"
@@ -207,43 +194,6 @@ function configure_automation() {
             ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
         done
     done
-}
-
-# The CentOS-Stream-9 image is stock-image on PowerVS.
-# This image is available across all PowerVS workspaces.
-# The VMs created using this image are used in support of ignition on PowerVS.
-function setup_powervs_image() {
-    echo "PowerVS Target CRN is: ${CRN}"
-    ibmcloud pi workspace target "${CRN}"
-
-    COUNT=$(ibmcloud pi image ls --json | jq -r '[.images[] | select(.name? == "CentOS-Stream-9").name] | length')
-    if [[ "${COUNT}" == "0" ]]
-    then
-        echo "Creating the Centos Stream Image"
-        ibmcloud pi image ls
-        ibmcloud pi image create CentOS-Stream-9 --json
-        echo "Import image status is: $?"
-    else
-        echo "Skipping import, CentOS-Stream exists"
-    fi
-
-    COUNT=$(ibmcloud pi image ls --json | jq -r '[.images[] | select(.name? == "rhel-coreos").name] | length')
-    if [[ "${COUNT}" == "0" ]]
-    then
-        echo "Creating the RHCOS Image"
-        curl -o /tmp/rhcos.json -L https://raw.githubusercontent.com/openshift/installer/refs/heads/release-4.14/data/data/coreos/rhcos.json
-
-        COREOS_OBJ="$(jq -r '.architectures.ppc64le.artifacts.powervs.formats."ova.gz".disk.location' /tmp/rhcos.json | awk -F '/' '{print $NF}')"
-        echo "FILE: ${COREOS_OBJ}"
-
-        ibmcloud pi image import rhel-coreos --bucket-access public --storage-tier tier1 \
-            --image-file-name "${COREOS_OBJ}" \
-            --bucket rhcos-powervs-images-us-east --region us-east
-
-        echo "Import image status is: $?"
-    else
-        echo "Skipping import, rhel-coreos exists"
-    fi
 }
 
 # run_automation executes the terraform based on automation
@@ -374,14 +324,11 @@ fi
 
 setup_ibmcloud_cli
 login_ibmcloud
-
 scale_up_intel_workers
-
 download_terraform_binary
 download_automation_code
-#cleanup_prior
+cleanup_prior
 configure_automation
-setup_powervs_image
 run_automation
 wait_for_additional_nodes_readiness "$((2+${ADDITIONAL_WORKERS}))"
 

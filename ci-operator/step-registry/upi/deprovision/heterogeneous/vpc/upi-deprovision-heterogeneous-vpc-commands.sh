@@ -140,12 +140,10 @@ function destroy_multi_arch_vpc_resources() {
     then
         echo "Starting the delete on the multi-arch VPC resources"
         cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc/ || true
-        "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file var-multi-arch-vpc.tfvars -auto-approve
+        "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file "${SHARED_DIR}"/var-multi-arch-vpc.tfvars -no-color -auto-approve
         rm -rf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc
     fi
 }
-
-
 
 # Main
 if [ "${ADDITIONAL_WORKERS}" == "0" ]
