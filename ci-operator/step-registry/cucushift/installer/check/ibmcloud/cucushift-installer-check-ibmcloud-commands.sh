@@ -118,7 +118,7 @@ function checkIPs() {
             fi
 
             for ip in "${mIPs[@]}"; do
-                if [[ ! " ${vmIPs[*]} " =~ *" ${ip} "* ]]; then
+                if [[ ! " ${vmIPs[*]} " =~ " $ip " ]]; then
                     echo "ERROR: The member target ip [${ip}] of the load balancer $lb pool $pool is not in the reserved IPs!"
                     ret=1
                 fi
