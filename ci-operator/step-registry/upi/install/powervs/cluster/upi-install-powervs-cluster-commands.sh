@@ -249,10 +249,8 @@ function configure_terraform() {
     CLUSTER_DOMAIN="${BASE_DOMAIN}"
     IBMCLOUD_CIS_CRN="${IBMCLOUD_CIS_CRN}"
 
-    echo "IC: coreos"
-    COREOS_URL=$(openshift-install coreos print-stream-json | jq -r '.architectures.ppc64le.artifacts.powervs.formats."ova.gz".disk.location')
-    COREOS_FILE=$(echo "${COREOS_URL}" | sed 's|/| |g' | awk '{print $NF}')
-    COREOS_NAME=$(echo "${COREOS_FILE}" | tr '.' '-' | sed 's|-0-powervs-ppc64le-ova-gz|-0-ppc64le-powervs.ova.gz|g' )
+    # CoreOS Name is fixed
+    COREOS_NAME="rhel-coreos"
 
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
