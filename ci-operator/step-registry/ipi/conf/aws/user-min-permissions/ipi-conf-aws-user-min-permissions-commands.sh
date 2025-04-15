@@ -342,6 +342,8 @@ EOF
 		# Make a copy of the install-config.yaml since the installer will consume it.
 		cp "${SHARED_DIR}/install-config.yaml" ${dir}/
 
+		openshift-install version
+		echo "---Creating permissions policy---"
 		openshift-install create permissions-policy --dir ${dir}
 
 		# Save policy to artifact dir for debugging
