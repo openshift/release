@@ -14,6 +14,6 @@ AWS_SUBNET_IDS=$(cat /usr/local/ci-secrets/konflux-devprod-rosa-credentials/aws-
 ROSA_TOKEN=$(cat /usr/local/ci-secrets/konflux-devprod-rosa-credentials/rosa-token)
 
 cd "$(mktemp -d)"
-git clone --branch main "https://github.com/konflux-ci/konflux-qe-definitions.git" .
+git clone --branch KFLUXDP-234 "https://github.com/psturc/tekton-integration-catalog.git" .
 
 bash ./scripts/rosa/delete-rosa-clusters.sh
