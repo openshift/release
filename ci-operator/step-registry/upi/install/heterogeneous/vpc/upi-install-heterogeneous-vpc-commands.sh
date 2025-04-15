@@ -191,6 +191,7 @@ powervs_machine_cidr = "192.168.200.0/24"
 vpc_skip_ssh_key_create = true
 skip_route_creation = true
 skip_create_security_group = false
+skip_image_creation = true
 EOF
 
   cp "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars "${SHARED_DIR}"/var-multi-arch-vpc.tfvars
@@ -198,7 +199,7 @@ EOF
 
 function create_multi_arch_vpc_resources() {
   cd "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/ || true
-  "${IBMCLOUD_HOME}"/terraform apply -var-file=var-multi-arch-vpc.tfvars -auto-approve -state="${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate
+  "${IBMCLOUD_HOME}"/terraform apply -var-file=var-multi-arch-vpc.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform-multi-arch-vpc.tfstate
 }
 
 # wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
