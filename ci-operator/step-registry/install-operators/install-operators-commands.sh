@@ -169,7 +169,12 @@ EOF
     fi
 
     # Need to allow some time before checking if the operator is installed.
-    sleep 60
+
+    # DEBUG
+    if [[ "$operator_name" == "rhods-operator" ]]; then
+      echo "Debugging RHOAI operator installation..."
+      sleep 1000
+    fi
 
     RETRIES=30
     CSV=
