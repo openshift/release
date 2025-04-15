@@ -34,7 +34,7 @@ CONFIG = {
     },
     'aws-qe-quota-slice': {
         'us-east-1': 25,
-        'ap-northeast-1': 5,
+        'ap-northeast-1': 10,
     },
     'aws-autorelease-qe-quota-slice': {
         'us-east-1': 7,
@@ -221,11 +221,17 @@ CONFIG = {
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-observability-quota-slice': {
+        'us-central1': 30,
+    },
     'gcp-qe-c3-metal-quota-slice': {
         'us-central1': 4,
     },
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 7,
+    },
+    'gcp-sustaining-autorelease-412-quota-slice': {
+        'us-east1': 12,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -282,6 +288,9 @@ CONFIG = {
     },
     'openstack-rhoso-quota-slice': {
         'serval71.lab.eng.tlv2.redhat.com': 1,
+    },
+    'openstack-rhos-ci-quota-slice': {
+        'default': 1,
     },
     'openstack-nfv-quota-slice': {
         'default': 4,

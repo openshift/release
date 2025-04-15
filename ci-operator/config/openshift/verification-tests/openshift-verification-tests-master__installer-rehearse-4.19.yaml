@@ -48,23 +48,32 @@ tests:
       CUSTOM_REGION_LIST: us-east-1 ap-southeast-4
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-aws-cases-all-regions
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-sj2qqdk/release:latest
+      ENABLE_DES_DEFAULT_MACHINE: "true"
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-q2qbqst/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-q2qbqst/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT

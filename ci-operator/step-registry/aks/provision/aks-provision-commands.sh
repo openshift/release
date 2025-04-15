@@ -110,6 +110,8 @@ if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
     az role assignment create --assignee-object-id "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" --role "Key Vault Secrets User" --scope "${RG_ID}" --assignee-principal-type ServicePrincipal
 fi
 
+echo "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" > "${SHARED_DIR}/kv-object-id"
+
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(
     az aks get-credentials

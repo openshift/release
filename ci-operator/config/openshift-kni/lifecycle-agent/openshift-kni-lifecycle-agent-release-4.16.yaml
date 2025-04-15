@@ -44,12 +44,15 @@ tests:
 - as: ci-job
   commands: |
     unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
   container:
     from: src
 - always_run: false
   as: integration
-  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws-telco
     env:
@@ -69,6 +72,9 @@ tests:
     - as: integration
       cli: latest
       commands: |
+        export XDG_CACHE_HOME=/tmp/.cache
+        export XDG_CONFIG_HOME=/tmp/.config
+        export XDG_DATA_HOME=/tmp/.local/share
         make test
       from: src
       resources:
@@ -86,7 +92,7 @@ tests:
 - as: ibu-e2e-flow
   cluster: build02
   optional: true
-  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws
     dependencies:

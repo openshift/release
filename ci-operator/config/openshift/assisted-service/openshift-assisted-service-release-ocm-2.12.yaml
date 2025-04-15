@@ -364,6 +364,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
+  cluster: build05
   run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -371,10 +372,11 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal-operator-ztp
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-periodic
+  cluster: build05
   cron: 00 11 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -382,11 +384,12 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal-operator-ztp
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-3masters
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -396,9 +399,10 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters-periodic
+  cluster: build05
   cron: 00 11 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -408,10 +412,12 @@ tests:
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
+      CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected
+  cluster: build05
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -419,11 +425,13 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      CLUSTERTYPE: assisted_medium_el9
       DISCONNECTED: "true"
       IP_STACK: v6
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected-periodic
+  cluster: build05
   cron: 00 11 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -431,12 +439,14 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      CLUSTERTYPE: assisted_medium_el9
       DISCONNECTED: "true"
       IP_STACK: v6
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-compact-day2-workers
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -448,10 +458,11 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
         NUMBER_OF_DAY2_HOSTS=2
       NUM_EXTRA_WORKERS: "5"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-compact-day2-masters
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -464,10 +475,11 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "4"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -479,9 +491,10 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
+  cluster: build05
   cron: 00 11 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -492,10 +505,12 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=1
         NUMBER_OF_DAY2_HOSTS=1
+      CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-node-labels-periodic
+  cluster: build05
   cron: 00 15 * * 1,4
   steps:
     cluster_profile: packet-assisted
@@ -511,11 +526,13 @@ tests:
         NODE_LABELS='{"ostest-extraworker-3":{"node-role.kubernetes.io/infra":""}, "ostest-extraworker-5":{"node-role.kubernetes.io/infra":""}}'
         MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
         TEST_TO_RUN='node-labels'
+      CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "6"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-node-labels
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -532,10 +549,11 @@ tests:
         MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
         TEST_TO_RUN='node-labels'
       NUM_EXTRA_WORKERS: "6"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -548,9 +566,10 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_LATE_BINDING=True
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
+  cluster: build05
   cron: 00 11 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -562,11 +581,13 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_LATE_BINDING=True
+      CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -579,10 +600,11 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         BAREMETALHOSTS_IGNITION_OVERRIDE='{"ignition":{"version":"3.2.0"},"storage":{"disks":[{"device":"/dev/sda","partitions":[{"label":"root","number":4,"resize":true,"sizeMiB":61440},{"label":"lso_1G_1","sizeMiB":1024},{"label":"lso_1G_2","sizeMiB":1024},{"label":"lso_1G_3","sizeMiB":1024}],"wipeTable":false}]}}'
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-masters
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -595,9 +617,10 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi
+  cluster: build05
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -609,9 +632,10 @@ tests:
     env:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-    workflow: assisted-baremetal-operator-capi
+    workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi-periodic
+  cluster: build05
   cron: 00 11 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -623,9 +647,11 @@ tests:
     env:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-    workflow: assisted-baremetal-operator-capi
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
 - as: e2e-ai-operator-disconnected-capi
+  cluster: build05
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -640,9 +666,10 @@ tests:
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
       DISCONNECTED: "true"
       IP_STACK: v6
-    workflow: assisted-baremetal-operator-capi
+    workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
 - as: e2e-ai-operator-disconnected-capi-periodic
+  cluster: build05
   cron: 00 17 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -655,12 +682,14 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         IP_STACK=v6
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
+      CLUSTERTYPE: assisted_large_el9
       DISCONNECTED: "true"
       IP_STACK: v6
-    workflow: assisted-baremetal-operator-capi
+    workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-3masters-ocp
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -671,10 +700,11 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-sno-ocp
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -685,23 +715,10 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-ai-operator-ztp-hypershift-zero-nodes
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-    workflow: assisted-baremetal-operator-hypershift
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-remove-node-periodic
+  cluster: build05
   cron: 00 19 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -713,10 +730,11 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
         SPOKE_WORKER_AGENTS=2
         REMOVE_SPOKE_NODE=true
+      CLUSTERTYPE: assisted_large_el9
       DEVSCRIPTS_CONFIG: |
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
       NUM_EXTRA_WORKERS: "5"
-    workflow: assisted-baremetal-operator-ztp
+    workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-ocm-2.12

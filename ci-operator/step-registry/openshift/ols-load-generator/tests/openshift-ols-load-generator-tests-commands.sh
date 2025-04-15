@@ -105,6 +105,8 @@ EOF
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
   COMMIT_ID=$(skopeo inspect docker://quay.io/openshift-lightspeed/lightspeed-service-api:latest | jq -r '.Labels."vcs-ref"')
   run_or_fail echo "Possible commit ID under test: $COMMIT_ID"
+  run_or_fail oc logs -f -n openshift-lightspeed deployment/lightspeed-app-server > ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt 2>&1 &
+  LOGS_PID=$!
 
   # Create namespace and kubeconfig secret for load testing
   run_or_fail oc create namespace ols-load-test
@@ -242,6 +244,8 @@ EOF
   # Clean up
   run_or_fail oc delete namespace ols-load-test
   run_or_fail oc wait --for=delete ns/ols-load-test --timeout=600s
+  run_or_fail kill $LOGS_PID
+  run_or_fail cp ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt ${ARTIFACT_DIR}/ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt
 
   pushd lightspeed-operator
   run_or_fail make undeploy

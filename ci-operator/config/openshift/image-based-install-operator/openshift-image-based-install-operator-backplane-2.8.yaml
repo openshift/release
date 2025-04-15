@@ -4,7 +4,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   installer:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: installer
   ocp_4.17_base-rhel9:
@@ -39,7 +39,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -67,7 +67,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.17"
   restrict_network_access: false
   steps:
     allow_best_effort_post_steps: true
@@ -86,16 +86,18 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ibio
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-      SEED_IMAGE_TAG: "4.17"
-    workflow: image-based-install-operator
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.18"
+    workflow: image-based-install-operator-ofcir
 - as: e2e-ibio-periodic
+  cluster: build05
   cron: 00 00 * * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -103,10 +105,10 @@ tests:
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-      SEED_IMAGE_TAG: "4.17"
-    workflow: image-based-install-operator
+      SEED_IMAGE_TAG: "4.18"
+    workflow: image-based-install-operator-ofcir
 - as: ibio-reinstall
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -114,10 +116,11 @@ tests:
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-      SEED_IMAGE_TAG: "4.17"
-    workflow: image-based-install-operator-reinstall
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.18"
+    workflow: image-based-install-operator-ofcir-reinstall
 - as: ibio-reinstall-periodic
+  cluster: build05
   cron: 00 00 * * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -125,9 +128,8 @@ tests:
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-      SEED_IMAGE_TAG: "4.17"
-    workflow: image-based-install-operator-reinstall
+      SEED_IMAGE_TAG: "4.18"
+    workflow: image-based-install-operator-ofcir-reinstall
 - as: publish
   postsubmit: true
   steps:
