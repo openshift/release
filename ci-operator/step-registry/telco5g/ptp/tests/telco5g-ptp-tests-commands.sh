@@ -352,7 +352,17 @@ sleep 300
 # get RTC logs
 print_time
 
-TEST_MODES=("dualfollower" "dualnicbc" "bc" "oc")
+# Only run dual follower tests for versions < 4.19
+version=$(oc version -ojson| jq -r '.openshiftVersion')
+min_required="4.19"
+
+if [[ "$(printf '%s\n' "$version" "$min_required" | sort -V | head -n1)" != "$min_required" ]]; then
+  echo "Version is less than 4.19"
+  TEST_MODES=("dualnicbc" "bc" "oc")
+else
+  echo "Version is 4.19 or greater"
+  TEST_MODES=("dualfollower" "dualnicbc" "bc" "oc")
+fi
 
 # Run tests
 for mode in "${TEST_MODES[@]}"; do
@@ -363,7 +373,7 @@ for mode in "${TEST_MODES[@]}"; do
   set_events_output_file
 
   temp_status="temp_status_${mode}" # Convert to lowercase for variable naming
-  make functests || declare "$temp_status=$?"
+  make functests; declare "$temp_status=$?"
 
   # Get RTC logs
   print_time

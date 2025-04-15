@@ -1,13 +1,13 @@
 base_images:
   base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
-  ocp-golang-builder:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
@@ -18,14 +18,14 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
   inputs:
-    ocp-golang-builder:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
   inputs:
-    ocp-golang-builder:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cert-manager
@@ -37,11 +37,11 @@ operator:
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-controller
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-webhook
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-cainjector
     with: pipeline:cert-manager
 releases:
   initial:
@@ -88,7 +88,7 @@ tests:
     - ref: fips-check-image-scan
 - as: e2e-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -119,7 +119,7 @@ tests:
   optional: true
   run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
