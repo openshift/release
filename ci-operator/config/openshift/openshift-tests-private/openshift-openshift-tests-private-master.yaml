@@ -11,10 +11,6 @@ base_images:
     name: tests-private-baseui
     namespace: ci
     tag: latest
-  ci_tests-private-builder_latest:
-    name: tests-private-builder
-    namespace: ci
-    tag: latest
   cli:
     name: "4.19"
     namespace: ocp
@@ -76,11 +72,6 @@ images:
       - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private-base
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-    RUN echo "it is for go to compile the binary to align with tests-private-base:4.19 from 4.19:tools"
-  from: root
-  to: tests-private-builder
-- dockerfile_literal: |
     FROM this-is-ignored
     ARG YQ_VERSION="v4.30.8"
     ENV ART_DNF_WRAPPER_POLICY=append
@@ -100,20 +91,12 @@ images:
   from: root
   to: tests-private-baseui
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/ci/tests-private-builder:latest AS builder
-    RUN mkdir -p /go/src/github.com/openshift/openshift-tests-private
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-    COPY . .
-    RUN make go-mod-tidy; \
-        make build; \
-        mkdir -p /tmp/build; \
-        cp /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /tmp/build/handleresult.py; \
-        cp /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /tmp/build/extended-platform-tests
+    FROM bin as builder
     FROM registry.ci.openshift.org/ci/rosa-aws-cli:latest as rosacli
 
     FROM registry.ci.openshift.org/ci/tests-private-base:latest
-    COPY --from=builder /tmp/build/extended-platform-tests /usr/bin/
-    COPY --from=builder /tmp/build/handleresult.py /usr/bin/
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
     COPY --from=rosacli /usr/bin/rosa /usr/bin/
 
     RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4 && CLIENTURL=${MIRRORURL}/x86_64/clients/ocp/candidate && \
@@ -145,12 +128,12 @@ images:
         rm -rf /usr/bin/oc /usr/bin/kubectl
   from: ci_tests-private-base_latest
   inputs:
+    bin:
+      as:
+      - bin
     ci_rosa-aws-cli_latest:
       as:
       - registry.ci.openshift.org/ci/rosa-aws-cli:latest
-    ci_tests-private-builder_latest:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-builder:latest
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
