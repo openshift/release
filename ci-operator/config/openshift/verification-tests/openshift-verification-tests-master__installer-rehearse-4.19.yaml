@@ -64,7 +64,7 @@ tests:
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
-      SLEEP_DURATION: 10h
+      SLEEP_DURATION: 10m
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision-check
@@ -76,12 +76,28 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+- as: installer-rehearse-ibmcloud-dis-n
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe-2
+    env:
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
       SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-      SLEEP_DURATION: 10h
+      SLEEP_DURATION: 10m
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
@@ -96,14 +112,14 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       RT_ENABLED: "true"
-      SLEEP_DURATION: 10h
+      SLEEP_DURATION: 10m
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private-deprovision
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
-- as: installer-rehearse-ibmcloud-p
+- as: installer-rehearse-ibmcloud-private-n
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
@@ -111,7 +127,23 @@ tests:
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
-      SLEEP_DURATION: 10h
+      RT_ENABLED: "true"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+- as: installer-rehearse-ibmcloud-n
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 10m
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision-check

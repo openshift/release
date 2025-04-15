@@ -36,10 +36,10 @@ function run_command() {
 }
 
 function checkBootstrapResource() {
-    local sub_command=$1 key_words=$2 additional_options=${3:--q} ret=0
+    local sub_command=$1 key_words=$2 additional_options=${3:--q} ret=0 output
 
     echo -e "\n**********Check bootstrap related resource ${sub_command}**********"
-    local output=$(run_command "${IBMCLOUD_CLI} is ${sub_command} ${additional_options}")
+    output=$(run_command "${IBMCLOUD_CLI} is ${sub_command} ${additional_options}")
     if [[ "$output" == *"$key_words"* ]]; then
         echo -e "ERROR: related resource ${sub_command} is not destroyed.\n${output}"
         ret=1
@@ -87,10 +87,9 @@ function checkCOS() {
 }
 
 function checkIPs() {
-	local ret=0
-    local lb lbp lbpm
-    local vmIPs=("$@")
-    echo "The reserved IPs of vms: ${vmIPs[@]}"
+	local ret=0 vmIPs=("$@")
+    local lbs lb lbps pool ip mIPs
+    echo "The reserved IPs of vms: " "${vmIPs[@]}"
     mapfile -t lbs < <(${IBMCLOUD_CLI} is load-balancers -q | awk '(NR>1) {print $2}')
 	if [ ${#lbs[@]} -eq 0 ]; then
         echo "No load balances found."
@@ -119,8 +118,8 @@ function checkIPs() {
             fi
 
             for ip in "${mIPs[@]}"; do
-                if [[ ! " ${vmIPs[*]} " =~ " ${ip} " ]]; then
-                    echo "ERROR: The member target ip ${ip} of the load balancer $lb pool $pool is not in the reserved IPs!"
+                if [[ ! " ${vmIPs[*]} " =~ *" ${ip} "* ]]; then
+                    echo "ERROR: The member target ip [${ip}] of the load balancer $lb pool $pool is not in the reserved IPs!"
                     ret=1
                 fi
             done
@@ -146,6 +145,7 @@ check_result=0
 
 checkProviderType ||  check_result=1
 
+#==================== check the resources of bootstrap ================================
 ibmcloud_login || check_result=1
 
 infraID=$(jq -r .infraID "${SHARED_DIR}/metadata.json")
@@ -164,6 +164,7 @@ checkCOS "${bootstrap_host_name}-ignition" || check_result=1
 mapfile -t ips < <(${IBMCLOUD_CLI} is instances -q | awk '(NR>1) {print $4}')
 checkIPs "${ips[@]}" || check_result=1
 
+#========================================================================================
 if [[ ${check_result} -eq 0 ]]; then
 	echo "Check PASS"
 else
