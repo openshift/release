@@ -35,13 +35,14 @@ function run_command() {
     eval "${CMD}"
 }
 
+
 function checkBootstrapResource() {
     local sub_command=$1 key_words=$2 additional_options=${3:--q} ret=0 output
 
     echo -e "\n**********Check bootstrap related resource ${sub_command}**********"
     output=$(run_command "${IBMCLOUD_CLI} is ${sub_command} ${additional_options}")
     if [[ "$output" == *"$key_words"* ]]; then
-        echo -e "ERROR: related resource ${sub_command} is not destroyed.\n${output}"
+        echo -e "[ERROR]: related resource ${sub_command} is not destroyed.\n${output}"
         ret=1
     else
         echo "INFO: related resource ${sub_command} is destroyed."
@@ -67,7 +68,7 @@ function checkCOS() {
 
 		output=$(${IBMCLOUD_CLI} cos config crn --list)
 		if [[ "$output" != *"$crn"* ]]; then
-			echo "ERROR: config the crn failed"
+			echo "[ERROR]: config the crn failed"
 			ret=1
 		fi
 		
@@ -75,7 +76,7 @@ function checkCOS() {
 		echo "bucket-laction: $output"
 
 		if [[ "$output" == *"OK"*  ]]; then
-			echo "ERROR: related bucket is not destroyed."
+			echo "[ERROR]: related bucket is not destroyed."
 			ret=1
 		else
 			echo "INFO: related bucket is destroyed."
@@ -90,6 +91,7 @@ function checkIPs() {
 	local ret=0 vmIPs=("$@")
     local lbs lb lbps pool ip mIPs
     echo "The reserved IPs of vms: " "${vmIPs[@]}"
+
     mapfile -t lbs < <(${IBMCLOUD_CLI} is load-balancers -q | awk '(NR>1) {print $2}')
 	if [ ${#lbs[@]} -eq 0 ]; then
         echo "No load balances found."
@@ -102,24 +104,25 @@ function checkIPs() {
 		echo "Processing load balances $lb ..."
         mapfile -t lbps < <(${IBMCLOUD_CLI} is load-balancer-pools $lb -q | awk '(NR>1) {print $1}') 
         if [ ${#lbps[@]} -eq 0 ]; then
-            echo "No load balance pools found in $lb."
+            echo -e "\tNo load balance pools found in $lb."
             ret=1
         else
-            echo "Found ${#lbps[@]} load-balancer pools in $lb."
+            echo -e "\tFound ${#lbps[@]} load-balancer pools in $lb."
         fi
         
         for pool in "${lbps[@]}"; do
             echo -e "\tProcessing pool of load balance $lb: $pool ..."
             mapfile -t mIPs < <(${IBMCLOUD_CLI} is load-balancer-pool-members $lb $pool -q | awk '(NR>1) {print $3}')
             if [ ${#mIPs[@]} -eq 0 ]; then
-                echo "No members of a load balancer $lb pool $pool."
+                echo -e "\t\tNo members of a load balancer $lb pool $pool."
             else
-                echo "Found ${#mIPs[@]} members in load-balancer $lb pool $pool."
+                echo -e "\t\tFound ${#mIPs[@]} members in load-balancer $lb pool $pool."
             fi
 
             for ip in "${mIPs[@]}"; do
-                if [[ ! " ${vmIPs[*]} " =~ " $ip " ]]; then
-                    echo "ERROR: The member target ip [${ip}] of the load balancer $lb pool $pool is not in the reserved IPs!"
+                #shellcheck disable=SC2076
+                if [[ ! " ${vmIPs[*]} " =~ " ${ip} " ]]; then
+                    echo -e "\t\t[ERROR]: The member target ip [${ip}] of the load balancer $lb pool $pool is not in the reserved IPs!"
                     ret=1
                 fi
             done
@@ -128,7 +131,6 @@ function checkIPs() {
 
     return ${ret}
 }
-
 
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
