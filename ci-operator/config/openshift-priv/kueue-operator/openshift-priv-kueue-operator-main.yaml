@@ -223,14 +223,28 @@ tests:
         }
 
         wait_for_kueue_controller_manager() {
+            echo "Waiting for kueue Controller Manager deployment to reach Available status..."
             local namespace="openshift-kueue-operator"
             local deployment="kueue-controller-manager"
-            echo "Waiting for deployment '${deployment}' in namespace '${namespace}'..."
-            if ! oc wait --for=condition=Available deployment/"${deployment}" -n "${namespace}" --timeout=300s; then
-                echo "Timeout waiting for deployment '${deployment}' to become available."
-                exit 1
-            fi
-            echo "Deployment '${deployment}' is available."
+            local timeout=300
+            local interval=10
+            local elapsed=0
+
+            while true; do
+               # Get the 'Available' condition status from the deployment
+               local available_status
+               available_status=$(oc get deployment "${deployment}" -n "${namespace}" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "NotFound")
+               if [ "$available_status" = "True" ]; then
+                    echo "Deployment '${deployment}' in namespace '${namespace}' is available."
+                    break
+               fi
+               if (( elapsed >= timeout )); then
+                    echo "Timeout waiting for deployment '${deployment}' to become available."
+                    exit 1
+               fi
+               sleep "${interval}"
+               elapsed=$(( elapsed + interval ))
+            done
         }
 
         # Main execution flow
