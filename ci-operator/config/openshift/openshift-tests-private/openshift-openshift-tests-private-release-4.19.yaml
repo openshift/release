@@ -34,35 +34,6 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
 images:
-- dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.19
-  inputs:
-    ci_rosa-aws-cli_latest:
-      as:
-      - registry.ci.openshift.org/ci/rosa-aws-cli:latest
-    ci_tests-private-builder_4.18:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-builder:4.18
-    netobserv_network-observability-cli_ci:
-      as:
-      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
-  to: tests-private
-- dockerfile_literal: |
-    FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.19
-    RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-        yum install -y ./google-chrome-stable_current_*.rpm && \
-        mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-  inputs:
-    ci_tests-private-baseui_4.19:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.19
-    src:
-      as:
-      - src
-  to: tests-private-ui
 - dockerfile_literal: |
     FROM bin AS builder
     FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
@@ -86,13 +57,8 @@ images:
   to: tests-private-newpr
 promotion:
   to:
-  - disabled: true
-    excluded_images:
-    - tests-private
-    - tests-private-ui
-    - tests-private-newpr
-    name: "4.19"
-    namespace: ocp
+  - namespace: ci
+    tag: "4.19"
 releases:
   arm64-latest:
     candidate:
