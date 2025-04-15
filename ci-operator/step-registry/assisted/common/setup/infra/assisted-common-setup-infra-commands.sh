@@ -11,6 +11,11 @@ set -euo pipefail
 source /root/config.sh
 
 set -x
+
+echo "----"
+cat /root/config.sh
+echo "----"
+
 cd /home/assisted
 make \${MAKEFILE_SETUP_TARGET:-setup run}
 EOF

@@ -72,3 +72,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
     --command "sudo cp ~/.ssh/authorized_keys /root/.ssh && sudo sed 's;PermitRootLogin no;PermitRootLogin yes;g' -i /etc/ssh/sshd_config && sudo systemctl restart sshd"
 
 ssh "${SSHOPTS[@]}" "root@${IP}" dnf config-manager --set-enabled rhui-codeready-builder-for-rhel-9-x86_64-rhui-rpms
+sleep infinity
