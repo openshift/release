@@ -23,10 +23,6 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: tools
-  upi-installer:
-    name: "4.5"
-    namespace: ocp
-    tag: upi-installer
   verification-tests:
     name: verification-tests
     namespace: ci
@@ -38,6 +34,31 @@ releases:
       product: ocp
       stream: nightly
       version: "4.17"
+  initial:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.1"
+  intermediate42:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.2"
+  intermediate43:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.3"
+  intermediate44:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.4"
+  intermediate45:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.5"
   intermediate46:
     release:
       architecture: amd64
@@ -105,8 +126,8 @@ releases:
   latest:
     release:
       architecture: amd64
-      channel: fast
-      version: "4.5"
+      channel: candidate
+      version: "4.14"
   target:
     candidate:
       architecture: amd64
@@ -119,21 +140,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-f28
-  cron: 1 3 24 * *
+- as: aws-ipi-f999
+  cron: '@yearly'
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       LOKI_ENABLED: "false"
     post:
     - chain: cucushift-installer-rehearse-aws-ipi-deprovision
     pre:
-    - chain: ipi-conf-aws
-    - chain: ipi-install
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws
+    - chain: ipi-install-stableinitial
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE42},${RELEASE_IMAGE_INTERMEDIATE43},${RELEASE_IMAGE_INTERMEDIATE44},${RELEASE_IMAGE_INTERMEDIATE45},${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
       - env: RELEASE_IMAGE_INTERMEDIATE417
@@ -160,6 +185,14 @@ tests:
         name: release:intermediate47
       - env: RELEASE_IMAGE_INTERMEDIATE46
         name: release:intermediate46
+      - env: RELEASE_IMAGE_INTERMEDIATE45
+        name: release:intermediate45
+      - env: RELEASE_IMAGE_INTERMEDIATE44
+        name: release:intermediate44
+      - env: RELEASE_IMAGE_INTERMEDIATE43
+        name: release:intermediate43
+      - env: RELEASE_IMAGE_INTERMEDIATE42
+        name: release:intermediate42
       - env: RELEASE_IMAGE_TARGET
         name: release:target
       from: cli
@@ -174,5 +207,5 @@ tests:
 zz_generated_metadata:
   branch: release-4.18
   org: openshift
-  repo: openshift-tests-private
-  variant: amd64-nightly-4.18-upgrade-from-stable-4.5
+  repo: openshift-tests-private-retired
+  variant: amd64-nightly-4.18-upgrade-from-stable-4.1
