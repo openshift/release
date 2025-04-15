@@ -7,6 +7,9 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  GCP_BASE_DOMAIN="qe.devcluster.openshift.com"
+fi
 GCP_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GCP_REGION="${LEASED_RESOURCE}"
 
