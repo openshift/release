@@ -1517,6 +1517,46 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: gcp-ipi-ovn-ipsec-amd-mixarch-f28-compliance
+  cron: 5 22 12 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: gcp-ipi-ovn-ipsec-amd-mixarch-f28-compliance-destructive
+  cron: 56 21 18 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "45"
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
 - as: gcp-ipi-ovn-ipsec-arm-mixarch-f28
   cron: 25 15 21 * *
   steps:
