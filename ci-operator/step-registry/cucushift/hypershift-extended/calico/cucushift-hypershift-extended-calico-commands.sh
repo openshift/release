@@ -46,13 +46,10 @@ wget -qO- "https://github.com/projectcalico/calico/releases/download/v${CALICO_V
 
 # Create namespaces
 find $calico_dir -name "00*" -print0 | xargs -0 -n1 oc apply -f
-# Install Operators
+# Install operator
 find $calico_dir -name "02*" -print0 | xargs -0 -n1 oc apply -f
 
-# Do not manage CRDs by the operator as we can't wait for the
-# Operator to be up and install the CRDs.
 operator_yaml=$(find $calico_dir -name "02-tigera-operator*")
-sed "s/manage-crds=true/manage-crds=false/" "${operator_yaml}" | oc apply -f -
 
 tigera_dir=/tmp/tigera
 mkdir $tigera_dir
@@ -61,9 +58,9 @@ TIGERA_OPERATOR_VERSION=$(yq-v4 '.spec.template.spec.containers[] | select(.name
 wget -qO- "https://github.com/tigera/operator/archive/refs/tags/${TIGERA_OPERATOR_VERSION}.tar.gz" | \
   tar xvz --strip-components=1 -C $tigera_dir
 
-# Install CRDs manually
-find ${tigera_dir}/pkg/crds/operator -name "*.yaml" -print0 | xargs -0 -n1 oc apply -f
-find ${tigera_dir}/pkg/crds/calico -name "*.yaml" -print0 | xargs -0 -n1 oc apply -f
+# Install manually the CRDs that we need immediately
+oc create -f ${tigera_dir}/pkg/crds/operator/operator.tigera.io_installations.yaml || true
+oc create -f ${tigera_dir}/pkg/crds/operator/operator.tigera.io_apiservers.yaml || true
 
 # Install custom resources
 find $calico_dir -name "01*" -print0 | xargs -0 -n1 oc apply -f
