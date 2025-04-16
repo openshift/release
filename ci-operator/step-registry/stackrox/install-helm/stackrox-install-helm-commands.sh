@@ -167,6 +167,7 @@ function install_central_with_helm() {
 
   if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
       installflags+=('--set' 'scannerV4.disable=false')
+      installflags+=('--set' 'scannerV4.indexer.readiness=vulnerability')
   fi
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
