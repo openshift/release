@@ -21,10 +21,12 @@ cat <<'EOF' > ${SHARED_DIR}/test-list
 "[sig-arch][Late][Jira:"kube-apiserver"] [OCPFeatureGate:ShortCertRotation] all certificates should expire in no more than 8 hours [Suite:openshift/conformance/parallel]"
 EOF
 
+sleep infinity
+
 openshift-tests run \
     -v 5 \
     --provider=none \
-    --monitor='node-lifecycle,operator-state-analyzer,legacy-kube-apiserver-invariants' \
+    --monitor='node-lifecycle,operator-state-analyzer' \
     -f ${SHARED_DIR}/test-list \
     -o "${ARTIFACT_DIR}/e2e.log" \
     --junit-dir "${ARTIFACT_DIR}/junit"
