@@ -272,3 +272,9 @@ else
     exit 1
 fi
 cat "${SHARED_DIR}/cluster-config"
+
+is_external=$(rosa describe cluster -c "$CLUSTER_ID" -ojson  | jq -r .external_auth_config.enabled)
+if [[ "$is_external" == "true" ]];then
+  id=$(rosa list external-auth-providers -c "$CLUSTER_ID" -ojson | jq -r '.[].id')
+  rosa delete external-auth-providers $id -c "$CLUSTER_ID" -y 
+fi
