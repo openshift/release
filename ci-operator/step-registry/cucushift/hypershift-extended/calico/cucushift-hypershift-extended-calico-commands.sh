@@ -16,7 +16,7 @@ fi
 platform=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
 if [[ "$platform" == "AWS" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
-  if [[ ${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-} == "true" ]]; then
+  if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-}" == "true" ]]; then
     export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
   fi
   aws configure export-credentials --format env > /tmp/aws_creds
