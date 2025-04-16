@@ -89,23 +89,6 @@ function cleanup_ibmcloud_powervs() {
       ibmcloud pi network delete "${NETWORK_ID}" || true
       sleep 60
     done
-
-    ibmcloud resource service-instance-update "${CRN}" --allow-cleanup true
-    sleep 30
-    ibmcloud resource service-instance-delete "${CRN}" --force --recursive
-    for COUNT in $(seq 0 5)
-    do
-      FIND=$(ibmcloud pi workspace ls 2> /dev/null| grep "${CRN}" || true)
-      echo "FIND: ${FIND}"
-      if [ -z "${FIND}" ]
-      then
-        echo "service-instance is deprovisioned"
-        break
-      fi
-      echo "waiting on service instance to deprovision ${COUNT}"
-      sleep 60
-    done
-    echo "Done Deleting the ${CRN}"
   done
 
   echo "Done cleaning up prior runs"
