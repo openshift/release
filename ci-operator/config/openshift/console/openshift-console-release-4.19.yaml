@@ -33,6 +33,8 @@ images:
 - dockerfile_path: Dockerfile.plugins.demo
   from: nodejs-10
   to: console-plugin-demo
+- from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
+  to: backend-test-bin
 promotion:
   to:
   - additional_images:
@@ -74,9 +76,12 @@ resources:
 test_binary_build_commands: ./build.sh
 tests:
 - as: backend
-  commands: ./test-backend.sh
+  commands: |
+    mkdir -p ${ARTIFACT_DIR}
+    go install -mod= github.com/jstemmer/go-junit-report@latest
+    ./test-backend.sh
   container:
-    from: test-bin
+    from: backend-test-bin
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
