@@ -1,9 +1,8 @@
 #!/bin/bash
 
-set -euo pipefail
 set -o nounset
 set -o errexit
-set -o pipesfail
+set -o pipefail
 
 MAX_PODS="${MAX_PODS:-250}"
 
