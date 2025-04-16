@@ -11,16 +11,10 @@ if [ -n "${ODH_MODEL_CONTROLLER_IMAGE}" ]; then
   echo "Updating odh-model-controller deployment image to ${ODH_MODEL_CONTROLLER_IMAGE}"
 
   echo "Scaling RHOAI operator to 0"
-  CMD="oc scale --replicas=0 deployment/rhods-operator -n redhat-ods-operator"
-  echo "${CMD}"
-  ${CMD}
-  #oc scale --replicas=0 deployment/rhods-operator -n redhat-ods-operator
+  oc scale --replicas=0 deployment/rhods-operator -n redhat-ods-operator
 
   echo "Updating odh-model-controller deployment image to ${ODH_MODEL_CONTROLLER_IMAGE}"
-  CMD="oc set image  -n ${namespace}  deployment/odh-model-controller  manager=${ODH_MODEL_CONTROLLER_IMAGE}"
-  echo "${CMD}"
-  ${CMD}
-  #oc set image  -n ${namespace}  deployment/odh-model-controller  manager="${ODH_MODEL_CONTROLLER_IMAGE}"
+  oc set image  -n ${namespace}  deployment/odh-model-controller  manager="${ODH_MODEL_CONTROLLER_IMAGE}"
 
   echo "Wait For Deployment Replica To Be Ready"
 
