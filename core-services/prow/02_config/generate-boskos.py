@@ -221,6 +221,9 @@ CONFIG = {
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-observability-quota-slice': {
+        'us-central1': 30,
+    },
     'gcp-qe-c3-metal-quota-slice': {
         'us-central1': 4,
     },
@@ -285,6 +288,9 @@ CONFIG = {
     },
     'openstack-rhoso-quota-slice': {
         'serval71.lab.eng.tlv2.redhat.com': 1,
+    },
+    'openstack-rhos-ci-quota-slice': {
+        'default': 1,
     },
     'openstack-nfv-quota-slice': {
         'default': 4,
