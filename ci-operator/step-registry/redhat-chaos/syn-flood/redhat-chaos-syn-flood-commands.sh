@@ -25,7 +25,8 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./syn-flood/prow_run.sh
 rc=$?
-
-cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running syn-flood chaos"
 echo "Return code: $rc"

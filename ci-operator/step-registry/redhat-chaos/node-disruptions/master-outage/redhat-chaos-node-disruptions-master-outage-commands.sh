@@ -70,6 +70,10 @@ fi
 
 ./node-disruptions/prow_run.sh
 rc=$?
-cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
+
 echo "Finished running node disruptions"
 echo "Return code: $rc"
