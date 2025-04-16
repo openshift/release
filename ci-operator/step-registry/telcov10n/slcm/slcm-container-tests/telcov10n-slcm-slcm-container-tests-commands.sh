@@ -58,7 +58,6 @@ SSHOPTS=(
 ## JUMP SERVER
 JUMP_SERVER_ADDRESS="$(cat /var/run/bastion1/jump-server)"
 JUMP_SERVER_USER="$(cat /var/run/telcov10n/ansible_user)"
-BASTION_ADDRESS="$(cat /var/run/bastion1/bastion-address)"
 
 ## INVENTORY
 cat << END_INVENTORY > slcm_inventory.yml
