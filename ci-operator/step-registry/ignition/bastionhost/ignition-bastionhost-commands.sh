@@ -123,7 +123,11 @@ RestartSec=30
 WantedBy=multi-user.target
 EOF
 
-PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
+if [[ "${CUSTOM_PROXY_CREDENTIAL}" == "true" ]]; then
+    PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/custom_proxy_creds_encrypted_apr1)
+else
+    PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
+fi
 PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
 PROXY_CONFIG_CONTENT=$(cat ${workdir}/squid.conf | base64 -w0)
 PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid.service | sed 's/\"/\\"/g')

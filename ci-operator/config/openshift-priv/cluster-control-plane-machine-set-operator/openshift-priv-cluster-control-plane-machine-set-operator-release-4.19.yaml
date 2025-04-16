@@ -111,7 +111,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-operator-techpreview
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -129,7 +129,7 @@ tests:
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     test:
     - as: test
       commands: |
@@ -145,7 +145,7 @@ tests:
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -310,6 +310,40 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
+- as: e2e-vsphere-operator-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-operator-periodic-pre-techpreview
+  optional: true
+  run_if_changed: .*periodic.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
 - as: e2e-openstack-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
@@ -384,7 +418,7 @@ tests:
 - as: e2e-aws-ovn-etcd-scaling
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
   optional: true
@@ -424,7 +458,7 @@ tests:
 - as: regression-clusterinfra-aws-ipi-cpms-allcases
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
       TEST_SCENARIOS: Cluster_Infrastructure

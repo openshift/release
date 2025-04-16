@@ -44,10 +44,14 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      CUSTOM_REGION_LIST: us-east-1 ap-southeast-4
-      OCP_ARCH: arm64
-    workflow: cucushift-installer-rehearse-aws-cases-all-regions
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-b3l4rjk/release:latest
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+    test:
+    - ref: cucushift-installer-check-aws-only-public-subnets
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
@@ -62,18 +66,18 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-q2qbqst/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-q2qbqst/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
