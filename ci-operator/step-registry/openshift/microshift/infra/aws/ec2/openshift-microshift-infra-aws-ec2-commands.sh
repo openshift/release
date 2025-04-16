@@ -33,8 +33,8 @@ declare -A ami_map=(
   [eu-central-1,arm64,rhel-9.2]=ami-07dda6169c6afa927   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.3]=ami-0955dc0147853401b  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.3]=ami-0ea2a765094f230d5   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [eu-central-1,x86_64,rhel-9.4]=ami-089b71495d6cacd26  # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
-  [eu-central-1,arm64,rhel-9.4]=ami-06ce7461a466fec39   # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.4]=ami-06ce7461a466fec39  # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.4]=ami-089b71495d6cacd26   # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
