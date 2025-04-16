@@ -196,3 +196,5 @@ echo "Removing additionalNetworks from network.operator"
 oc patch network.operator cluster --patch '{"spec":{"additionalNetworks": []}}' --type=merge
 
 echo "Successfully ran NFV DPDK tests"
+
+sleep 900
