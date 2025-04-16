@@ -29,6 +29,9 @@ SITE_NAME="$(cat /var/run/project-02/slcm-container/SITE_NAME)"
 DCI_PIPELINE_FILES="$(cat /var/run/project-02/slcm-container/DCI_PIPELINE_FILES)"
 EDU_PTP="$(cat /var/run/project-02/slcm-container/EDU_PTP)"
 
+SLCM_VAULT=/var/run/project-02/vault-data/vault_data
+cp $SLCM_VAULT playbooks/run_slcm_vault
+chmod 0600 playbooks/run_slcm_vault
 
 ## VPN 
 VPN_URL="$(cat /var/run/bastion1/vpn-url)"
