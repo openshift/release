@@ -133,7 +133,7 @@ def _add_origin_resources(gendoc):
                 "namespace": "ci",
             },
             "spec": {
-                "replicas": 1,
+                "replicas": 0,
                 "selector": {
                     "matchLabels": {
                         "app": "release-controller"
