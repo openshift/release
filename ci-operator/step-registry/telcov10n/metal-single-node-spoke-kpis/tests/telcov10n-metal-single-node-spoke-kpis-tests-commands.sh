@@ -191,15 +191,39 @@ function test_spoke_deployment {
   echo
 }
 
+function copy_spoke_kubeconfig_to_bastion_location {
+
+  echo "************ telcov10n Store SPOKE KUBECONFIG file at Bastion location ************"
+
+  local ssh_key
+  ssh_key="$(mktemp)"
+  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${ssh_key}
+  chmod 600 ${ssh_key}
+  setup_aux_host_ssh_access "${ssh_key}"
+
+  local skc
+  skc="/tmp/spoke-kubeconfig"
+  cat ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml >| ${skc}
+  chmod +r ${skc}
+  set -x
+  rsync -avP -e "ssh $(echo "${SSHOPTS[@]}")" "${skc}" "root@${AUX_HOST}:${AUX_HOST_REMOTE_PATH}/$(basename ${skc})"
+  set +x
+  echo
+
+}
+
 function test_kpis {
 
   echo "************ telcov10n Run KPIs tests ************"
 
   # TODO: Run all KPIs testing from this point onward
 
+  copy_spoke_kubeconfig_to_bastion_location
+
   echo
   echo "Running KPIs tests..."
   echo
+
 }
 
 function main {
