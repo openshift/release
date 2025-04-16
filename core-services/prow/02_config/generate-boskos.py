@@ -221,6 +221,9 @@ CONFIG = {
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-observability-quota-slice': {
+        'us-central1': 30,
+    },
     'gcp-qe-c3-metal-quota-slice': {
         'us-central1': 4,
     },

@@ -11,10 +11,6 @@ base_images:
     name: tests-private-baseui
     namespace: ci
     tag: latest
-  ci_tests-private-builder_latest:
-    name: tests-private-builder
-    namespace: ci
-    tag: latest
   cli:
     name: "4.19"
     namespace: ocp
@@ -39,8 +35,11 @@ build_root:
     tag: rhel-9-golang-1.23-openshift-4.19
 images:
 - dockerfile_literal: |
+    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
+
     FROM registry.ci.openshift.org/ocp/4.19:tools
     ENV ART_DNF_WRAPPER_POLICY=append
+    COPY --from=netobservcli /oc-netobserv /usr/bin/
     RUN set -x && \
         sh -c 'echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el7-x86_64\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg\n       https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo' && \
         sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
@@ -67,12 +66,11 @@ images:
         tar zxvf "${KREW}.tar.gz" && \
         ./"${KREW}" install krew && chmod -R 755 /usr/local/krew && cd / && export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" && which kubectl-krew && set +x
   from: ocp_tools
+  inputs:
+    netobserv_network-observability-cli_ci:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private-base
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-    RUN echo "it is for go to compile the binary to align with tests-private-base:4.19 from 4.19:tools"
-  from: root
-  to: tests-private-builder
 - dockerfile_literal: |
     FROM this-is-ignored
     ARG YQ_VERSION="v4.30.8"
@@ -93,23 +91,13 @@ images:
   from: root
   to: tests-private-baseui
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/ci/tests-private-builder:latest AS builder
-    RUN mkdir -p /go/src/github.com/openshift/openshift-tests-private
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-    COPY . .
-    RUN make go-mod-tidy; \
-        make build; \
-        mkdir -p /tmp/build; \
-        cp /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /tmp/build/handleresult.py; \
-        cp /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /tmp/build/extended-platform-tests
+    FROM bin as builder
     FROM registry.ci.openshift.org/ci/rosa-aws-cli:latest as rosacli
-    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
 
     FROM registry.ci.openshift.org/ci/tests-private-base:latest
-    COPY --from=builder /tmp/build/extended-platform-tests /usr/bin/
-    COPY --from=builder /tmp/build/handleresult.py /usr/bin/
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
     COPY --from=rosacli /usr/bin/rosa /usr/bin/
-    COPY --from=netobservcli /oc-netobserv /usr/bin/
 
     RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4 && CLIENTURL=${MIRRORURL}/x86_64/clients/ocp/candidate && \
         curl -s -k -L ${MIRRORURL}/x86_64/clients/ocp/ -o ocp.html && curl -s -k -L ${MIRRORURL}/x86_64/clients/ocp-dev-preview/ -o pre.html && \
@@ -140,57 +128,49 @@ images:
         rm -rf /usr/bin/oc /usr/bin/kubectl
   from: ci_tests-private-base_latest
   inputs:
+    bin:
+      as:
+      - bin
     ci_rosa-aws-cli_latest:
       as:
       - registry.ci.openshift.org/ci/rosa-aws-cli:latest
-    ci_tests-private-builder_latest:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-builder:latest
-    netobserv_network-observability-cli_ci:
-      as:
-      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:latest
+    FROM this-is-ignored-and-not-used
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-        yum install -y ./google-chrome-stable_current_*.rpm && \
-        mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+        yum install -y ./google-chrome-stable_current_*.rpm
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ci_tests-private-baseui_latest
   inputs:
-    ci_tests-private-baseui_latest:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:latest
     src:
       as:
       - src
   to: tests-private-ui
 - dockerfile_literal: |
     FROM bin AS builder
-    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
-    FROM registry.ci.openshift.org/ci/tests-private-base:latest
-    RUN mkdir -p /go/src/github.com/openshift
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    COPY --from=netobservcli /oc-netobserv /usr/bin/
     RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
         rm -rf /usr/bin/oc /usr/bin/kubectl
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  from: ci_tests-private-base_latest
   inputs:
     bin:
       as:
       - bin
-    ci_tests-private-base_latest:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-base:latest
-    netobserv_network-observability-cli_ci:
-      as:
-      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
   to: tests-private-newpr
 promotion:
   to:
-  - namespace: ci
-    tag: latest
+  - excluded_images:
+    - tests-private-base
+    - tests-private-baseui
+    - tests-private
+    - tests-private-ui
+    - tests-private-newpr
+    name: "4.19"
+    namespace: ocp
 releases:
   arm64-latest:
     candidate:
@@ -249,7 +229,7 @@ tests:
   optional: true
   skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test
