@@ -17,6 +17,7 @@ oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --
 cp $KUBECONFIG /tmp/kubeconfig
 export KUBECONFIG=/tmp/kubeconfig
 
+sleep 5400
 # Run tests
 echo "Executing rhsso tests ref"
 
