@@ -173,7 +173,7 @@ tests:
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
 - as: aws-ipi-byo-subnets-only-public-mini-perm-arm-f14
-  cron: 32 8 8,24 * *
+  cron: 53 23 8,22 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -185,6 +185,8 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
       OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+    test:
+    - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-byo-subnets
 - as: aws-ipi-default-mini-perm-arm-f7
   cron: 7 21 4,11,20,27 * *
@@ -228,6 +230,23 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-aws-cases-valid-endpoints
+- as: aws-ipi-only-public-subnets-mini-perm-arm-f14
+  cron: 17 12 2,18 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+    test:
+    - ref: cucushift-installer-check-aws-only-public-subnets
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-proxy-whitelist-arm-f14
   cron: 37 4 3,17 * *
   steps:
