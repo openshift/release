@@ -34,7 +34,7 @@ function exit_handler() {
   set +e
   echo ">>> End ACS install"
   echo "[$(date -u || true)] SECONDS=${SECONDS}"
-  rm -rf "${SCRATCH}"
+  rm -rf "${SCRATCH}" || true
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with helm"
   else
@@ -87,15 +87,16 @@ function fetch_last_nightly_tag() {
 }
 
 function install_helm() {
-  mkdir /tmp/helm
+  mkdir -p /tmp/helm 
   curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz
-  echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz" | sha256sum --check --status
+  echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz" | sha256sum --check --status -
   (cd /tmp/helm && tar xvfpz helm-v3.16.2-linux-amd64.tar.gz)
-  chmod +x /tmp/helm/linux-amd64/helm
+  install -m 755 /tmp/helm/linux-amd64/helm /usr/local/bin/ 
 }
 
 function prepare_helm_templates() {
-  retry oc new-project "${TMP_CI_NAMESPACE}" --skip-config-write=true >/dev/null || true
+  #retry oc new-project "${TMP_CI_NAMESPACE}" --skip-config-write=true >/dev/null || true
+  retry kubectl create namespace "${TMP_CI_NAMESPACE}" --save-config=false >/dev/null || true
 
   cat <<EOF > "${SCRATCH}/roxctl-extract-pod.yaml"
 apiVersion: v1
@@ -140,7 +141,7 @@ EOF
   retry oc cp --namespace "${TMP_CI_NAMESPACE}" --container rh-ubi roxctl-extract-pod:/tmp/helm-templates/secured-cluster-services "${SCRATCH}/secured-cluster-services"
 
   retry oc delete pod --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod
-  retry oc delete project "${TMP_CI_NAMESPACE}"
+  retry oc delete namespace "${TMP_CI_NAMESPACE}"
 }
 
 function install_central_with_helm() {
@@ -149,30 +150,49 @@ function install_central_with_helm() {
   installflags+=('--set' 'imagePullSecrets.allowNone=true')
   SMALL_INSTALL=true
   if [[ "${SMALL_INSTALL}" == "true" ]]; then
-      installflags+=('--set' 'central.resources.requests.memory=1Gi')
-      installflags+=('--set' 'central.resources.requests.cpu=1')
-      installflags+=('--set' 'central.resources.limits.memory=4Gi')
-      installflags+=('--set' 'central.resources.limits.cpu=1')
-      installflags+=('--set' 'central.db.resources.requests.memory=1Gi')
-      installflags+=('--set' 'central.db.resources.requests.cpu=500m')
-      installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
-      installflags+=('--set' 'central.db.resources.limits.cpu=1')
-      installflags+=('--set' 'scanner.autoscaling.disable=true')
-      installflags+=('--set' 'scanner.replicas=1')
-      installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
-      installflags+=('--set' 'scanner.resources.requests.cpu=500m')
-      installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
-      installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+    installflags+=('--set' 'central.resources.requests.memory=1Gi')
+    installflags+=('--set' 'central.resources.requests.cpu=1')
+    installflags+=('--set' 'central.resources.limits.memory=4Gi')
+    installflags+=('--set' 'central.resources.limits.cpu=1')
+    installflags+=('--set' 'central.db.resources.requests.memory=1Gi')
+    installflags+=('--set' 'central.db.resources.requests.cpu=500m')
+    installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
+    installflags+=('--set' 'central.db.resources.limits.cpu=1')
+    installflags+=('--set' 'scanner.autoscaling.disable=true')
+    installflags+=('--set' 'scanner.replicas=1')
+    installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
+    installflags+=('--set' 'scanner.resources.requests.cpu=500m')
+    installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
+    installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
   fi
 
   if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-      installflags+=('--set' 'scannerV4.disable=false')
+    installflags+=('--set' 'scannerV4.disable=false')
+    if [[ "${SMALL_INSTALL}" == "true" ]]; then
+      installflags+=('--set' 'scannerV4.scannerComponent=Enabled')
       installflags+=('--set' 'scannerV4.indexer.readiness=vulnerability')
+      installflags+=('--set' 'scannerV4.indexer.scaling.autoScaling=Disabled')
+      installflags+=('--set' 'scannerV4.indexer.scaling.replicas=1')
+      installflags+=('--set' 'scannerV4.indexer.resources.requests.cpu=600m')
+      installflags+=('--set' 'scannerV4.indexer.resources.requests.memory=1500Mi')
+      installflags+=('--set' 'scannerV4.indexer.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.indexer.resources.limits.memory=2Gi')
+      installflags+=('--set' 'scannerV4.matcher.scaling.autoScaling=Disabled')
+      installflags+=('--set' 'scannerV4.matcher.scaling.replicas=1')
+      installflags+=('--set' 'scannerV4.matcher.resources.requests.cpu=600m')
+      installflags+=('--set' 'scannerV4.matcher.resources.requests.memory=5Gi')
+      installflags+=('--set' 'scannerV4.matcher.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.matcher.resources.limits.memory=5500Mi')
+      installflags+=('--set' 'scannerV4.db.resources.requests.cpu=200m')
+      installflags+=('--set' 'scannerV4.db.resources.requests.memory=2Gi')
+      installflags+=('--set' 'scannerV4.db.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.db.resources.limits.memory=2500Mi')
+    fi
   fi
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
-  /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
+  helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}"
 }
@@ -202,15 +222,25 @@ function curl_central() {
 }
 
 function install_secured_cluster_with_helm() {
-  /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
-  --values "${SCRATCH}/helm-init-bundle-values.yaml" \
-  --set clusterName=remote \
-  --set imagePullSecrets.allowNone=true
+  installflags=()
+  if [[ "${SMALL_INSTALL}" == "true" ]]; then
+    installflags+=('--set' 'admissionControl.resources.requests.memory=100Mi')
+    installflags+=('--set' 'admissionControl.resources.requests.cpu=100m')
+    installflags+=('--set' 'sensor.resources.requests.memory=100Mi')
+    installflags+=('--set' 'sensor.resources.requests.cpu=100m')
+    installflags+=('--set' 'sensor.resources.limits.memory=500Mi')
+    installflags+=('--set' 'sensor.resources.limits.cpu=500m')
+  fi
+  helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
+    --values "${SCRATCH}/helm-init-bundle-values.yaml" \
+    --set clusterName=remote \
+    --set imagePullSecrets.allowNone=true \
+     "${installflags[@]+"${installflags[@]}"}"
 }
 
 fetch_last_nightly_tag
 prepare_helm_templates
-install_helm
+helm version || install_helm
 
 install_central_with_helm
 echo ">>> Wait for 'stackrox-central-services' deployments"
