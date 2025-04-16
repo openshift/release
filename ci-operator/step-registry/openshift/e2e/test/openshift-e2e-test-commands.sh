@@ -448,7 +448,8 @@ fi
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
 # time before we run our e2e tests.
 echo "$(date) - waiting for clusteroperators to finish progressing..."
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+# increase timeout value for OCPBUGS-54873
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=30m
 echo "$(date) - all clusteroperators are done progressing."
 
 # reportedly even the above is not enough for etcd which can still require time to stabilize and rotate certs.
