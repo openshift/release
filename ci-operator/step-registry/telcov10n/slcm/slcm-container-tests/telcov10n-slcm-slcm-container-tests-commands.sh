@@ -62,26 +62,6 @@ JUMP_SERVER_USER="$(cat /var/run/telcov10n/ansible_user)"
 ## INVENTORY
 cat << END_INVENTORY > slcm_inventory.yml
 ---
-all:
-  vars:
-    DCI_REMOTE_CI: "${DCI_REMOTE_CI}"
-    cloud_ran_partner_repo: "${CLOUD_RAN_PARTNER_REPO}"
-    cloud_ran_partner_repo_version: "${CLOUD_RAN_PARTNER_REPO_VERSION}"
-    remote_user: "${REMOTE_USER}"
-    cluster_configs_dir: "${CLUSTER_CONFIGS_DIR}"
-    hub_kubeconfig_path: "${HUB_KUBECONFIG_PATH}"
-    PODMAN_AUTH_PATH: "${PODMAN_AUTH_PATH}"
-    VAULT_PASSWORD: "${VAULT_PASSWORD}"
-    ECO_GOTESTS_CONTAINER: "${ECO_GOTESTS_CONTAINER}"
-    ECO_VALIDATION_CONTAINER: "${ECO_VALIDATION_CONTAINER}" 
-    PROW_PIPELINE_ID: "${BUILD_ID}"
-    SKIP_DCI: "${SKIP_DCI}"
-    STAMP: "${STAMP}"
-    LATENCY_DURATION: "${LATENCY_DURATION}"
-    OCP_VERSION: "${OCP_VERSION}"
-    SITE_NAME: "${SITE_NAME}"
-    DCI_PIPELINE_FILES: "${DCI_PIPELINE_FILES}"
-    EDU_PTP: "${EDU_PTP}"
 ungrouped:
   hosts:
     jump_host:
@@ -104,5 +84,28 @@ all:
       artifacts_dir: "${ARTIFACT_DIR}"
 END_INVENTORY
 
+## VARs
+cat << END_VARS > slcm_vars.yml
+---
+DCI_REMOTE_CI: "${DCI_REMOTE_CI}"
+cloud_ran_partner_repo: "${CLOUD_RAN_PARTNER_REPO}"
+cloud_ran_partner_repo_version: "${CLOUD_RAN_PARTNER_REPO_VERSION}"
+remote_user: "${REMOTE_USER}"
+cluster_configs_dir: "${CLUSTER_CONFIGS_DIR}"
+hub_kubeconfig_path: "${HUB_KUBECONFIG_PATH}"
+PODMAN_AUTH_PATH: "${PODMAN_AUTH_PATH}"
+VAULT_PASSWORD: "${VAULT_PASSWORD}"
+ECO_GOTESTS_CONTAINER: "${ECO_GOTESTS_CONTAINER}"
+ECO_VALIDATION_CONTAINER: "${ECO_VALIDATION_CONTAINER}"
+PROW_PIPELINE_ID: "${BUILD_ID}"
+SKIP_DCI: "${SKIP_DCI}"
+STAMP: "${STAMP}"
+LATENCY_DURATION: "${LATENCY_DURATION}"
+OCP_VERSION: "${OCP_VERSION}"
+SITE_NAME: "${SITE_NAME}"
+DCI_PIPELINE_FILES: "${DCI_PIPELINE_FILES}"
+EDU_PTP: "${EDU_PTP}"
+END_VARS
+
 ansible-galaxy collection install ansible.posix
-ansible-playbook -i slcm_inventory.yml playbooks/run_slcm_container.yml -v | tee  ${ARTIFACT_DIR}/ansible.log
+ansible-playbook -i slcm_inventory.yml playbooks/run_slcm_container.yml -v -e @slcm_vars.yml | tee  ${ARTIFACT_DIR}/ansible.log
