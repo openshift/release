@@ -226,12 +226,19 @@ tests:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
     env:
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      WAIT_DURATION: "800"
       WORKER_REPLICA_COUNT: "10"
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-vsphere-ipi-ovn
   timeout: 5h0m0s
@@ -241,14 +248,20 @@ tests:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
     env:
+      CHURN: "true"
       CLOUD_TYPE: vsphere
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      WAIT_DURATION: "800"
       WORKER_REPLICA_COUNT: "10"
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - chain: workers-scale
-    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
