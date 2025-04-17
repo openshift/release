@@ -28,7 +28,7 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 # set ADDITIONAL_PARAMS for indexing.
-ADDITIONAL_PARAMS_FILE="$SHARED_DIR/addiional_params.json"
+ADDITIONAL_PARAMS_FILE="$SHARED_DIR/additional_params.json"
 if [[ -f $ADDITIONAL_PARAMS_FILE ]]; then
     ADDITIONAL_PARAMS=$(cat "$ADDITIONAL_PARAMS_FILE")
     export ADDITIONAL_PARAMS
