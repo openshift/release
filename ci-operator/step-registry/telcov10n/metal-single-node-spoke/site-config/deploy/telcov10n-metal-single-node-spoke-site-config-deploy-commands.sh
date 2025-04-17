@@ -169,6 +169,7 @@ spec:
       group-du-sno: ""
       common: true
       sites: "${SPOKE_CLUSTER_NAME}"
+      prowId: "${SPOKE_CLUSTER_NAME}"
     clusterNetwork:
       - cidr: "10.128.0.0/14"
         hostPrefix: 23
@@ -412,6 +413,8 @@ function wait_until_assisted_service_is_ready {
     oc -n multicluster-engine wait --for=condition=Available deployment/assisted-service --timeout=30m ;
   } || {
     oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service ;
+    echo ;
     oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
     exit 1 ;
   }
