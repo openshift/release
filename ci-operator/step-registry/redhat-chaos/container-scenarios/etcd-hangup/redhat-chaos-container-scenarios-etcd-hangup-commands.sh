@@ -25,6 +25,8 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./container-scenarios/prow_run.sh
 rc=$?
-cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running container scenarios"
 echo "Return code: $rc"
