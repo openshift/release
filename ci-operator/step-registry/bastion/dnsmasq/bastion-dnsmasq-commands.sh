@@ -80,6 +80,6 @@ run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo chown root:roo
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl unmask dnsmasq && sudo systemctl enable dnsmasq && sudo systemctl start dnsmasq"
 
 #Set dnsmasq as the first DNS server
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee -a /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved "
+run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee -a /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved && resolvectl"
 
 echo "Custom DNS records were configured on the bastion host."
