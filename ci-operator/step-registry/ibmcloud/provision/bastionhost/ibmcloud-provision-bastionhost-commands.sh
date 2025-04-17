@@ -41,7 +41,7 @@ MACHINE_TYPE="bx2-8x32"
 #The default coreos image value is gotten from
 #imgProfile="fedora-coreos.*available.*amd64.*stable.*public"
 #ibmcloud is images --visibility public --owner-type provider --resource-group-name Default | grep -i ${imgProfile}
-IMAGE="ibm-fedora-coreos-36-stable-2"
+IMAGE="ibm-fedora-coreos-41-stable-1"
 workdir=${ARTIFACT_DIR}
 bastion_ignition_file="${SHARED_DIR}/${cluster_name}-bastion.ign"
 
