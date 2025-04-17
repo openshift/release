@@ -133,8 +133,12 @@ if [[ -n $BASELINE_UUID ]]; then
     if [[ $comparison_rc -gt 0 ]]; then
         echo "Comparison with Baseline failed!!!"
     else
-        echo "All metrics are within tolerance limits compared to current baseline, uploading $UUID as new baseline for $WORKLOAD"
-        upload_baseline
+        echo "All metrics are within tolerance limits compared to current baseline."
+        # upload Baselines only for periodic job triggers.
+        if [[ -n $JOB_NAME && $JOB_NAME =~ ^"periodic" ]]; then
+            echo "Uploading $UUID as new baseline for $WORKLOAD"
+            upload_baseline 
+        fi
     fi
 else
     echo "Couldn't fetch baseline UUID for workload $WORKLOAD from ES"
