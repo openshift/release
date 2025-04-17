@@ -61,6 +61,12 @@ run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rpm -q dnsmasq >/de
 #api.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 3.3.3.3
 #apps.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 4.4.4.4
 
+#temporary test
+cat > "${SHARED_DIR}/custom_dns" << EOF
+api.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 3.3.3.3
+apps.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 4.4.4.4
+EOF
+
 if [ ! -f "${SHARED_DIR}/custom_dns" ]; then
     echo "Error: 'custom_dns' file not found." 
     exit 1
