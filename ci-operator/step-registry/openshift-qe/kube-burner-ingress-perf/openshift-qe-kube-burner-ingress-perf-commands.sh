@@ -5,22 +5,6 @@ set -o errexit
 set -o pipefail
 set -x
 
-# get NetObserv metadata 
-NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
-LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
-KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
-opm --help
-if [[ $INSTALLATION_SOURCE == "Internal" ]]; then
-    NOO_BUNDLE_INFO=$(build_info.sh)
-else
-    # Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
-    NOO_BUNDLE_INFO="v0.0.0-sha-main"
-fi
-
-export ADDITIONAL_PARAMS="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
-
-echo "$ADDITIONAL_PARAMS"
-
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
@@ -42,6 +26,13 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+
+# set ADDITIONAL_PARAMS for indexing.
+ADDITIONAL_PARAMS_FILE="$SHARED_DIR/addiional_params.json"
+if [[ -f $ADDITIONAL_PARAMS_FILE ]]; then
+    ADDITIONAL_PARAMS=$(cat "$ADDITIONAL_PARAMS_FILE")
+    export ADDITIONAL_PARAMS
+fi
 
 declare -A WORKLOAD_PIDS
 
