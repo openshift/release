@@ -4,7 +4,7 @@ import subprocess
 
 @click.command()
 def login():
-    """Login command to authenticate the user."""
+    """Login command to authenticate to google cloud."""
 
     try:
         subprocess.run(["gcloud", "auth", "application-default", "login"], check=True)
