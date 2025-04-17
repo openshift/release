@@ -1,0 +1,50 @@
+workflow:
+  as: hypershift-mce-agent-metal3-conformance-calico
+  documentation: |-
+    The HyperShift mce agent conformance (connected) workflow executes
+    tests against a new ephemeral cluster with Tigera Calico CNI installed.
+    The installation method for nodepool is metal3.
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - ref: hypershift-mce-dump
+    - chain: hypershift-mce-agent-destroy
+    - chain: baremetalds-ipi-post
+    test:
+    - ref: hypershift-mce-agent-info
+    - chain: hypershift-conformance
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: calico-conf
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-proxy
+    - ref: ipi-install-hosted-loki
+    - ref: baremetalds-devscripts-setup
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-agent-metal3-create-calico
+    env:
+      TEST_SKIPS: The default cluster RBAC policy should have correct RBAC rules\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should
+        provide named network metrics\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\|\[Feature:tuning\]|\[Feature:bond\]\|\[Feature:vlan\]
+      HYPERSHIFT_NETWORK_TYPE: "Other"
+      CALICO_VERSION: "3.29.3"
+      AGENT_NAMESPACE: hypershift-agents
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      IP_STACK: v4
+      PACKET_OS: rocky_9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=Calico
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        ENABLE_LOCAL_REGISTRY=
