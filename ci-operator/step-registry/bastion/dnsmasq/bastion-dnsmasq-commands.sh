@@ -61,12 +61,6 @@ run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rpm -q dnsmasq >/de
 #api.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 3.3.3.3
 #apps.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 4.4.4.4
 
-#temporary test
-cat > "${SHARED_DIR}/custom_dns" << EOF
-api.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 3.3.3.3
-apps.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 4.4.4.4
-EOF
-
 if [ ! -f "${SHARED_DIR}/custom_dns" ]; then
     echo "Error: 'custom_dns' file not found." 
     exit 1
@@ -86,6 +80,6 @@ run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo chown root:roo
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl unmask dnsmasq && sudo systemctl enable dnsmasq && sudo systemctl start dnsmasq"
 
 #Set dnsmasq as the first DNS server
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved "
+run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee -a /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved "
 
 echo "Custom DNS records were configured on the bastion host."
