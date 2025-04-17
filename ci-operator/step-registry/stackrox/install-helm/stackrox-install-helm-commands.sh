@@ -91,7 +91,11 @@ function install_helm() {
   curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz
   echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz" | sha256sum --check --status -
   (cd /tmp/helm && tar xvfpz helm-v3.16.2-linux-amd64.tar.gz)
-  install -m 755 /tmp/helm/linux-amd64/helm /usr/local/bin/ 
+  echo "$PATH" || true
+  for p in ${PATH//:/ }; do
+    install -m 755 /tmp/helm/linux-amd64/helm "$p" \
+      && { echo $p; break; }
+  done
 }
 
 function prepare_helm_templates() {
