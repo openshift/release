@@ -3,6 +3,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: base-rhel9
+  openstack-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: openstack-installer
   upi-installer:
     name: "4.14"
     namespace: ocp
@@ -231,6 +235,29 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-vsphere
+- as: e2e-openstack
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      HIVE_OSP_RESOURCE: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        # GO_COMPLIANCE_INFO=0 CLOUD=openstack make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-openstack
 zz_generated_metadata:
   branch: master
   org: openshift
