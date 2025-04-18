@@ -1,27 +1,33 @@
 chain:
-  as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-provision
+  as: cucushift-installer-rehearse-aws-ipi-cilium-hypershift-private-provision
   steps:
   - chain: cucushift-installer-rehearse-aws-ipi-ovn-provision
   - chain: cucushift-hypershift-extended-install-private
   - chain: hypershift-aws-create
+  - ref: cucushift-hypershift-extended-enable-routes
   - ref: cucushift-hypershift-extended-metadata
   - chain: aws-provision-bastionhost
   - ref: proxy-config-generate
+  - ref: cucushift-hypershift-extended-cilium
+  - ref: cucushift-hypershift-extended-cilium-health-check
+  - chain: cucushift-hypershift-extended-enable-qe-catalogsource
   env:
   - name: HYPERSHIFT_AWS_REGION
     default: ""
   - name: HYPERSHIFT_HC_ZONES
     default: ""
   - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
-    default: "hypershift-ext.qe.devcluster.openshift.com"
+    default: ""
   - name: HYPERSHIFT_BASE_DOMAIN
-    default: "hypershift-ci.qe.devcluster.openshift.com"
+    default: ""
   - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
     default: "true"
   - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
     default: "HighlyAvailable"
   - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
     default: "HighlyAvailable"
+  - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
+    default: "true"
   - name: ZONES_COUNT
     default: "3"
   - name: ENABLE_ICSP
@@ -33,4 +39,4 @@ chain:
   - name: USAGE_CLUSTER_TYPE
     default: "hypershift-mgmt"
   documentation: |-
-    This chain provisions a fully private hypershift hosted cluster. 
+    This chain provisions a fully private Hypershift hosted cluster. 
