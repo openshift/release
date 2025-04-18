@@ -5,6 +5,9 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+image="$(oc get deployment/odh-model-controller -n redhat-ods-applications -oyaml|grep image)"
+echo "odh-model-controller deployment image is ${image}"
+
 
 if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
   SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
