@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ocp-qe-logging-team
+  annotations:
+    openshift.io/description: Service Accounts for ocp-qe-logging-team
+    openshift.io/display-name: ocp-qe-logging-team CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: periodic-job-bot
+  namespace: ocp-qe-logging-team
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-token-secret
+  namespace: ocp-qe-logging-team
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-owner
+  namespace: ocp-qe-logging-team
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-owner-ocp-qe-logging-team
+  namespace: ocp-qe-logging-team
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ocp-qe-logging-team
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner
