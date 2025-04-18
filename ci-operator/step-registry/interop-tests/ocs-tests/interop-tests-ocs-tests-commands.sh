@@ -61,6 +61,25 @@ DEPLOYMENT:
   skip_download_client: True
 __EOF__
 
+declare vsphere_datacenter
+declare vsphere_datastore
+declare vsphere_cluster
+declare vsphere_url
+
+source "${SHARED_DIR}/govc.sh"
+
+if [[ "${ODF_TEST_PLATFORM}" == "vsphere" ]]; then
+  cat >> "${LOGS_CONFIG}" << __EOF__
+ENV_DATA:
+  platform: 'vsphere'
+  vsphere_server: '${vsphere_url}'
+  vsphere_user: '${GOVC_USERNAME}'
+  vsphere_password: '${GOVC_PASSWORD}'
+  vsphere_cluster: '${vsphere_cluster}'
+  vsphere_datacenter: '${vsphere_datacenter}'
+  vsphere_datastore: '${vsphere_datastore}'
+__EOF__
+fi
 
 set -x
 START_TIME=$(date "+%s")
