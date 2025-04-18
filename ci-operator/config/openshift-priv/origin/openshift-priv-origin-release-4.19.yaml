@@ -110,7 +110,7 @@ tests:
 - as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TELEMETRY_ENABLED: "false"
     observers:
@@ -142,7 +142,7 @@ tests:
 - as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -150,7 +150,7 @@ tests:
 - as: e2e-aws-ovn-kube-apiserver-rollout
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
@@ -197,7 +197,7 @@ tests:
 - as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_REQUIRES_SSH: "yes"
       TEST_SUITE: openshift/disruptive
@@ -226,7 +226,7 @@ tests:
 - as: e2e-aws-jenkins
   run_if_changed: ^(test/extended/builds/pipeline_jenkins_e2e.go)|^(test/extended/testdata/jenkins-plugin)|^(examples/jenkins)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/jenkins-e2e
     workflow: openshift-e2e-aws-jenkins
@@ -238,7 +238,7 @@ tests:
 - as: e2e-aws-ovn-image-registry
   run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/image-registry
     workflow: openshift-e2e-aws-image-registry
@@ -271,7 +271,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_SUITE: ""
       TEST_TYPE: upgrade
@@ -283,7 +283,7 @@ tests:
   optional: true
   run_if_changed: ^(test/e2e/upgrade)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       DELETE_MC: "false"
       TEST_SUITE: ""
@@ -296,7 +296,7 @@ tests:
 - as: e2e-aws-ovn-serial
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -319,14 +319,14 @@ tests:
   as: e2e-aws-ovn-ipsec-serial
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-ipsec-serial
   timeout: 6h0m0s
 - as: e2e-aws-csi
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_CSI_DRIVER_MANIFEST: manifest-aws-ebs.yaml
       TEST_SUITE: openshift/csi
@@ -357,7 +357,7 @@ tests:
 - as: e2e-aws-ovn-fips
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -472,6 +472,8 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
       EXTRA_MG_ARGS: --host-network
       TEST_SKIPS: Services should fallback to local terminating endpoints when there
         are no ready endpoints with externalTrafficPolicy=Local
@@ -490,11 +492,14 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
       EXTRA_MG_ARGS: --host-network
       EXTRA_NETWORK_CONFIG: |
         EXTRA_NETWORK_NAMES="extranet"
         EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
         EXTRANET_NETWORK_SUBNET_V6='fd2e:6f44:5dd8:ca56::/120'
+      NMSTATE_OPERATOR_SUB_SOURCE: qe-app-registry
       TEST_SKIPS: Services should fallback to local terminating endpoints when there
         are no ready endpoints with externalTrafficPolicy=Local\|CPU Partitioning
         cluster platform workloads should be annotated correctly for Deployments
@@ -529,7 +534,7 @@ tests:
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -538,7 +543,7 @@ tests:
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -549,7 +554,7 @@ tests:
   as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -560,7 +565,7 @@ tests:
   as: e2e-aws-ovn-single-node-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -572,7 +577,7 @@ tests:
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_TYPE: upgrade-conformance
     observers:
@@ -608,7 +613,7 @@ tests:
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
 - as: lint
   commands: |
@@ -623,7 +628,7 @@ tests:
 - as: e2e-aws-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
   optional: true
@@ -654,7 +659,7 @@ tests:
   as: e2e-aws-etcd-recovery
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
@@ -694,7 +699,7 @@ tests:
   optional: true
   run_if_changed: ^test/extended/kubevirt/.*
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: hypershift-kubevirt-conformance
 - as: e2e-baremetalds-kubevirt
   optional: true
@@ -717,7 +722,7 @@ tests:
 - as: e2e-aws-ovn-edge-zones
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
 - always_run: false
@@ -771,7 +776,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-microshift-serial
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       MICROSHIFT_OS: rhel-9.4
       SRC_FROM_GIT: "true"
