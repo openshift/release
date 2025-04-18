@@ -70,14 +70,6 @@ function cleanup_ibmcloud_powervs() {
       sleep 60
     done
 
-    echo "Deleting the Images"
-    for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[].imageID')
-    do
-      echo "Deleting Images ${IMAGE_ID}"
-      ibmcloud pi image delete "${IMAGE_ID}"
-      sleep 60
-    done
-
     if [ -n "$(ibmcloud pi nets 2> /dev/null | grep DHCP)" ]
     then
        curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
@@ -97,23 +89,6 @@ function cleanup_ibmcloud_powervs() {
       ibmcloud pi network delete "${NETWORK_ID}" || true
       sleep 60
     done
-
-    ibmcloud resource service-instance-update "${CRN}" --allow-cleanup true
-    sleep 30
-    ibmcloud resource service-instance-delete "${CRN}" --force --recursive
-    for COUNT in $(seq 0 5)
-    do
-      FIND=$(ibmcloud pi workspace ls 2> /dev/null| grep "${CRN}" || true)
-      echo "FIND: ${FIND}"
-      if [ -z "${FIND}" ]
-      then
-        echo "service-instance is deprovisioned"
-        break
-      fi
-      echo "waiting on service instance to deprovision ${COUNT}"
-      sleep 60
-    done
-    echo "Done Deleting the ${CRN}"
   done
 
   echo "Done cleaning up prior runs"
