@@ -80,15 +80,22 @@ if os.environ["VCENTER_VERSION"] == "7":
 else:
     vcenter_version="VC8.0.2.00100-22617221-ESXi8.0u2c"
 
-r = ansible_runner.run_command(
-    executable_cmd='ansible-playbook',
-    cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=%s' %vcenter_version,'-vvvv', '-k'],
-    input_fd=sys.stdin,
-    output_fd=sys.stdout,
-    error_fd=sys.stdout,
-    )
+try:
+    r = ansible_runner.run_command(
+        executable_cmd='ansible-playbook',
+        cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=%s' %vcenter_version,'-vvvvvv', '-k'],
+        input_fd=sys.stdin,
+        output_fd=sys.stdout,
+        error_fd=sys.stdout,
+        )
 
-print(r)
+    print(r)
+
+finally:
+    # Copy ara's sqlite db to artifacts
+    ara_sql = f"{home}/.ara/server/ansible.sqlite"
+    shutil.copy2(ara_sql, ara_dir)
+
 
 with open(os.path.join(shared_dir, "vips.txt"), "r") as vip_file:
     vips = vip_file.readlines()
@@ -141,8 +148,4 @@ with open(os.path.join(shared_dir, "platform.yaml"), "w") as platform_yaml_file:
 with open(os.path.join(shared_dir, "install-config.yaml"), "w") as install_config_file:
     yaml.dump(install_config, install_config_file)
 
-
-# Copy ara's sqlite db to artifacts
-ara_sql = f"{home}/.ara/server/ansible.sqlite"
-shutil.copy2(ara_sql, ara_dir)
 
