@@ -11,7 +11,7 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
-  ocp_tools:
+  tools:
     name: "4.12"
     namespace: ocp
     tag: tools
@@ -27,13 +27,19 @@ build_root:
     tag: rhel-8-golang-1.19-openshift-4.12
 images:
 - dockerfile_literal: |
+    FROM src AS builder
     FROM this-is-ignored-and-not-used
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
+    COPY --from=quay.io/hypershift/hypershift-operator:latest usr/bin/hypershift /usr/bin/hypershift
+    COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
+    COPY --from=quay.io/openshifttest/openshift4-tools:v2 /tmp/OpenShift4-tools.tar /tmp/OpenShift4-tools.tar
     RUN set -x && \
         yum update -y && \
         PACKAGES="git gzip httpd-tools java-11-openjdk-headless openssh-clients skopeo util-linux zip" && \
         yum -y install --setopt=tsflags=nodocs $PACKAGES && \
         git config --system user.name openshift-tests-private && \
         git config --system user.email openshift-tests-private@redhat.com && \
+        tar -C /opt -xf /tmp/OpenShift4-tools.tar && \
         pip3 install --upgrade setuptools pip && pip3 install dotmap minio python-openstackclient pyyaml requests && \
         sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=0\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo' && \
         yum -y install --setopt=tsflags=nodocs --enablerepo=azure-cli azure-cli && \
@@ -45,9 +51,26 @@ images:
         unzip -q awscliv2.zip && ./aws/install -b /bin && \
         rm -rf ./aws awscliv2.zip && \
         chmod g+w /etc/passwd && \
+        MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
+        curl -skL ${MIRRORURL}/ocp/stable-4.12/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
+        tar -C /usr/bin/ -xzvf openshift-client-linux.tar.gz && rm -f openshift-client-linux.tar.gz && \
+        curl -skL ${MIRRORURL}/ocp/stable-4.12/opm-linux.tar.gz -o opm-linux.tar.gz  && \
+        tar -C /usr/bin/ -xzvf opm-linux.tar.gz && rm -f opm-linux.tar.gz && \
+        curl -skL ${MIRRORURL}/ocp/stable-4.12/oc-mirror.tar.gz -o oc-mirror.tar.gz && \
+        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
+        curl -skL ${MIRRORURL}/operator-sdk/latest/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
+        tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
+        curl -skL ${MIRRORURL}/rosa/latest/rosa-linux.tar.gz -o rosa.tar.gz && \
+        tar -C /usr/bin/ -xf rosa.tar.gz && chmod 755 /usr/bin/rosa && rosa version && rm -f rosa.tar.gz && \
+        curl -skL https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o govc_Linux_x86_64.tar.gz && \
+        tar -C /usr/bin/ -xvf govc_Linux_x86_64.tar.gz govc && rm -f govc_Linux_x86_64.tar.gz && \
         yum clean all && \
-        rm -rf /root/.config/gcloud /var/cache/yum/* /tmp/*
-  from: ocp_tools
+        rm -rf /usr/bin/oc /usr/bin/kubectl /root/.config/gcloud /var/cache/yum/* /tmp/*
+  from: tools
+  inputs:
+    src:
+      as:
+      - src
   to: tests-private-base
 - dockerfile_literal: |
     FROM this-is-ignored-and-not-used
@@ -67,32 +90,12 @@ images:
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
         yum install -y ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
         yum clean all && rm -rf /var/cache/yum/* /tmp/*
-  from: ocp_tools
+  from: tools
   to: tests-private-baseui
 - dockerfile_literal: |
     FROM bin AS bin
     FROM this-is-ignored-and-not-used
     COPY --from=bin /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
-    COPY --from=bin /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
-    COPY --from=quay.io/hypershift/hypershift-operator:latest usr/bin/hypershift /usr/bin/hypershift
-    COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
-    COPY --from=quay.io/openshifttest/openshift4-tools:v2 /tmp/OpenShift4-tools.tar /tmp/OpenShift4-tools.tar
-    RUN set -x && \
-        MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
-        curl -skL ${MIRRORURL}/ocp/stable-4.12/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
-        tar -C /usr/bin/ -xzvf openshift-client-linux.tar.gz && rm -f openshift-client-linux.tar.gz && \
-        curl -skL ${MIRRORURL}/ocp/stable-4.12/opm-linux.tar.gz -o opm-linux.tar.gz  && \
-        tar -C /usr/bin/ -xzvf opm-linux.tar.gz && rm -f opm-linux.tar.gz && \
-        curl -skL ${MIRRORURL}/ocp/stable-4.12/oc-mirror.tar.gz -o oc-mirror.tar.gz && \
-        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
-        curl -skL ${MIRRORURL}/operator-sdk/latest/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
-        tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
-        curl -skL ${MIRRORURL}/rosa/latest/rosa-linux.tar.gz -o rosa.tar.gz && \
-        tar -C /usr/bin/ -xf rosa.tar.gz && chmod 755 /usr/bin/rosa && rosa version && rm -f rosa.tar.gz && \
-        curl -skL https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o govc_Linux_x86_64.tar.gz && \
-        tar -C /usr/bin/ -xvf govc_Linux_x86_64.tar.gz govc && rm -f govc_Linux_x86_64.tar.gz && \
-        tar -C /opt -xf /tmp/OpenShift4-tools.tar && \
-        rm -rf /usr/bin/oc /usr/bin/kubectl
   from: ci_tests-private-base
   inputs:
     bin:
@@ -116,8 +119,9 @@ images:
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+        cp --force /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/ && \
         rm -rf /usr/bin/oc /usr/bin/kubectl
-  from: tests-private
+  from: ci_tests-private-base
   inputs:
     bin:
       as:
