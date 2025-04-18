@@ -26,20 +26,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 REGION="${LEASED_RESOURCE}"
 
 az_file="${SHARED_DIR}/availability_zones"
-additional_az_file="${SHARED_DIR}/additional_availability_zones"
-
 pub_subnets_file="${SHARED_DIR}/private_subnet_ids"
 priv_subnets_file="${SHARED_DIR}/public_subnet_ids"
-pub_additional_file="${SHARED_DIR}/public_additional_ids"
-priv_additional_file="${SHARED_DIR}/private_additional_ids"
-
-function additional_subnets()
-{
-  if [ -f ${pub_additional_file} ]; then
-    return 0
-  fi
-  return 1
-}
 
 if [ ! -f "${pub_subnets_file}" ] || [ ! -f "${priv_subnets_file}" ] || [ ! -f "${az_file}" ]; then
   echo "File ${pub_subnets_file} or ${priv_subnets_file} or ${az_file} does not exist."
@@ -47,17 +35,10 @@ if [ ! -f "${pub_subnets_file}" ] || [ ! -f "${priv_subnets_file}" ] || [ ! -f "
 fi
 
 ZONE_COUNT=$(cat "${az_file}" | jq '.|length')
-ZONE_ADDITIONAL_COUNT=$(cat "${additional_az_file}" | jq '.|length')
 
 echo -e "public subnets: $(cat ${pub_subnets_file})"
 echo -e "private subnets: $(cat ${priv_subnets_file})"
 echo -e "AZs: $(cat ${az_file})"
-
-if additional_subnets; then
-  echo -e "additional public subnets: $(cat ${pub_additional_file})"
-  echo -e "additional private subnets: $(cat ${priv_additional_file})"
-  echo -e "additional AZs: $(cat ${additional_az_file})"
-fi
 
 
 function public_only()
@@ -150,28 +131,41 @@ else
     role_file=/tmp/subnet_roles_file
     echo ${SUBNET_ROLES} | jq . > ${role_file}
 
-    for idx in $(seq 0 $((ZONE_COUNT-1)));
+    vpc_info_json=${SHARED_DIR}/vpc_info.json
+    az_zone_count=$(jq '.subnets | map(select(.idx == "0") | .az) | sort | unique | length ' ${vpc_info_json})
+    additional_az_zone_count=$(jq '.subnets | map(select(.idx == "1") | .az) | sort | unique | length ' ${vpc_info_json})
+    for i in $(seq 0 $((az_zone_count-1)));
     do
+
+      pub_subnet="$(jq -r --argjson i $i '.subnets | map(select(.idx == "0" and .attr == "public") | .id)[$i]' ${vpc_info_json})"
+      pub_roles="$(jq -r --argjson i ${i} '.[$i][0] | .pub' "${role_file}")"
+      priv_subnet=$(jq -r --argjson i $i '.subnets | map(select(.idx == "0" and .attr == "private") | .id)[$i]' ${vpc_info_json})
+      priv_roles=$(jq -r --argjson i ${i} '.[$i][0] | .priv' "${role_file}")
+
       if public_only; then
-        patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${pub_subnets_file}") $(jq -r --argjson i ${idx} '.[$i][0] | .pub' "${role_file}")
+        patch_new_subnet_with_roles ${CONFIG} ${pub_subnet} ${pub_roles}
       elif private_cluster; then
-        patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${priv_subnets_file}") $(jq -r --argjson i ${idx} '.[$i][0] | .priv' "${role_file}")
+        patch_new_subnet_with_roles ${CONFIG} ${priv_subnet} ${priv_roles}
       else
-        patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${pub_subnets_file}") $(jq -r --argjson i ${idx} '.[$i][0] | .pub' "${role_file}")
-        patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${priv_subnets_file}") $(jq -r --argjson i ${idx} '.[$i][0] | .priv' "${role_file}")
+        patch_new_subnet_with_roles ${CONFIG} ${pub_subnet} ${pub_roles}
+        patch_new_subnet_with_roles ${CONFIG} ${priv_subnet} ${priv_roles}
       fi
     done
-
-    if additional_subnets; then
-      for idx in $(seq 0 $((ZONE_ADDITIONAL_COUNT-1)));
+    if (( additional_az_zone_count > 0 )); then
+      for i in $(seq 0 $((additional_az_zone_count-1)));
       do
+        pub_subnet="$(jq -r --argjson i ${i} '.subnets | map(select(.idx == "1" and .attr == "public") | .id)[$i]' ${vpc_info_json})"
+        pub_roles="$(jq -r --argjson i ${i} '.[$i][1] | .pub' "${role_file}")"
+        priv_subnet="$(jq -r --argjson i ${i} '.subnets | map(select(.idx == "1" and .attr == "private") | .id)[$i]' ${vpc_info_json})"
+        priv_roles="$(jq -r --argjson i ${i} '.[$i][1] | .priv' "${role_file}")"
+        
         if public_only; then
-          patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${pub_additional_file}") $(jq -r --argjson i ${idx} '.[$i][1] | .pub' "${role_file}")
+          patch_new_subnet_with_roles ${CONFIG} ${pub_subnet} ${pub_roles}
         elif private_cluster; then
-          patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${priv_additional_file}") $(jq -r --argjson i ${idx} '.[$i][1] | .priv' "${role_file}")
+          patch_new_subnet_with_roles ${CONFIG} ${priv_subnet} ${priv_roles}
         else
-          patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${pub_additional_file}") $(jq -r --argjson i ${idx} '.[$i][1] | .pub' "${role_file}")
-          patch_new_subnet_with_roles ${CONFIG} $(jq -r --argjson i ${idx} '.[$i]' "${priv_additional_file}") $(jq -r --argjson i ${idx} '.[$i][1] | .priv' "${role_file}")
+          patch_new_subnet_with_roles ${CONFIG} ${pub_subnet} ${pub_roles}
+        patch_new_subnet_with_roles ${CONFIG} ${priv_subnet} ${priv_roles}
         fi
       done
     fi

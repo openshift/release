@@ -541,20 +541,6 @@ Outputs:
         ",",
         [!If [DoAz1PrivateSubnet, !Ref PrivateSubnet, !Ref "AWS::NoValue"], !If [DoAz2PrivateSubnet, !Ref PrivateSubnet2, !Ref "AWS::NoValue"], !If [DoAz3PrivateSubnet, !Ref PrivateSubnet3, !Ref "AWS::NoValue"]]
       ]
-  PublicAdditionalIds:
-    Description: Additional Subnet IDs of the public subnets.
-    Value:
-      !Join [
-        ",",
-        [!If [DoAdditionalAz, !Ref PublicSubnet1a, !Ref "AWS::NoValue"]]
-      ]
-  PrivateAdditionalIds:
-    Description: Additional Subnet IDs of the public subnets.
-    Value:
-      !Join [
-        ",",
-        [!If [DoAz1aPrivateSubnet, !Ref PrivateSubnet1a, !Ref "AWS::NoValue"]]
-      ]
   PublicRouteTableId:
     Description: Public Route table ID
     Value: !Ref PublicRouteTable
@@ -699,9 +685,6 @@ if [[ -n "${VPC_CIDR}" ]]; then
 fi
 
 if [[ "${ADDITIONAL_ZONES_COUNT}" -gt 0 ]]; then
-  if [[ "${ADDITIONAL_ZONES_COUNT}" -gt 1 ]]; then
-    ADDITIONAL_ZONES_COUNT=1
-  fi
   aws_add_param_to_json "AdditionalAvailabilityZoneCount" ${ADDITIONAL_ZONES_COUNT} "$vpc_params"
 fi
 
@@ -763,24 +746,6 @@ all_ids=$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds"
 AvailabilityZones=$(aws --region "${REGION}" ec2 describe-subnets --subnet-ids ${all_ids} | jq -c '[.Subnets[].AvailabilityZone] | unique | sort')
 echo "$AvailabilityZones" > "${SHARED_DIR}/availability_zones"
 echo "AvailabilityZones: ${AvailabilityZones}"
-
-# additional subnets
-if [[ "${ADDITIONAL_ZONES_COUNT}" -gt 0 ]]; then
-  
-  PublicAdditionalIds="$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey=="PublicAdditionalIds") | .OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
-  echo "PublicAdditionalIds: ${PublicAdditionalIds}"
-  echo "$PublicAdditionalIds" > "${SHARED_DIR}/public_additional_ids"
-
-  PrivateAdditionalIds="$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey=="PrivateAdditionalIds") | .OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
-  echo "PrivateAdditionalIds: ${PrivateAdditionalIds}"
-  echo "$PrivateAdditionalIds" > "${SHARED_DIR}/private_additional_ids"
-
-  all_additional_ids=$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("AdditionalIds")).OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | jq -r '. | join(" ")')
-  AdditionalAvailabilityZones=$(aws --region "${REGION}" ec2 describe-subnets --subnet-ids ${all_additional_ids} | jq -c '[.Subnets[].AvailabilityZone] | unique | sort')
-  echo "$AdditionalAvailabilityZones" > "${SHARED_DIR}/additional_availability_zones"
-  echo "AdditionalAvailabilityZones: ${AdditionalAvailabilityZones}"
-
-fi
 
 # ***********************
 # Route table ids are generally used by Local Zone and Wavelength Zone
@@ -844,7 +809,7 @@ fi
 #     ]
 # }
 
-vpc_info_json=${ARTIFACT_DIR}/vpc_info.json
+vpc_info_json=${SHARED_DIR}/vpc_info.json
 all_subnets_info=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="AllSubnetsInfo") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
 
 echo '{}' > ${vpc_info_json}
@@ -861,6 +826,7 @@ do
   idx=$(echo $s | cut -d":" -f4)
   cat <<< "$(jq  --arg az "$az" --arg attr "$attr" --arg id "$id" --arg idx "$idx" '. += [{"az":$az, "attr":$attr, "id":$id, "idx":$idx}]' "$t")" > "$t"
 done
-cat <<< "$(jq --argjson t "$(jq -c . $t)" '.subnets = $t' ${vpc_info_json})" > ${vpc_info_json}
+cat <<< "$(jq --argjson t "$(jq -c '. | sort_by(.idx, .az, .attr)' $t)" '.subnets = $t' ${vpc_info_json})" > ${vpc_info_json}
 
+cp ${vpc_info_json} ${ARTIFACT_DIR}/
 echo "Saved ${vpc_info_json}"
