@@ -1,23 +1,27 @@
 postsubmits:
-  openshift/osd-network-verifier:
+  openshift/verification-tests:
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
-    cluster: build11
+    cluster: build03
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-osd-network-verifier-main-publish-coverage
+    name: branch-ci-openshift-verification-tests-main-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/osd-network-verifier-codecov-token
-        - --target=publish-coverage
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -33,11 +37,11 @@ postsubmits:
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
-        - mountPath: /secrets/osd-network-verifier-codecov-token
-          name: osd-network-verifier-codecov-token
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
           readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
@@ -47,12 +51,12 @@ postsubmits:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
-      - name: osd-network-verifier-codecov-token
-        secret:
-          secretName: osd-network-verifier-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
