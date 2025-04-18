@@ -18,6 +18,8 @@ if [[ -z "${HOSTNAME}" ]]; then
   echo "Couldn't retrieve hostname from lease config"
   exit 1
 fi
+echo "Adding sleep for debugging"
+sleep 1800s
 
 REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
