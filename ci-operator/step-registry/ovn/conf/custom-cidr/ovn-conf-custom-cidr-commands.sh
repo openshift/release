@@ -6,16 +6,26 @@ set -o pipefail
 
 CLUSTER_NETWORK_CIDR=${CLUSTER_NETWORK_CIDR:-10.128.0.0/20}
 CLUSTER_NETWORK_HOST_PREFIX=${CLUSTER_NETWORK_HOST_PREFIX:-23}
+CLUSTER_NETWORK_SEC_CIDR=${CLUSTER_NETWORK_SEC_CIDR:-no}
+CLUSTER_NETWORK_SEC_HOST_PREFIX=${CLUSTER_NETWORK_SEC_HOST_PREFIX:-no}
+
+if [[ ${CLUSTER_NETWORK_SEC_CIDR} != "no" && ${CLUSTER_NETWORK_SEC_HOST_PREFIX} != "no" ]]; then
+    CLUSTER_CIDRS="- cidr: $CLUSTER_NETWORK_CIDR
+    hostPrefix: $CLUSTER_NETWORK_HOST_PREFIX
+  - cidr: $CLUSTER_NETWORK_SEC_CIDR
+    hostPrefix: ${CLUSTER_NETWORK_SEC_HOST_PREFIX}"
+else
+    CLUSTER_CIDRS="- cidr: $CLUSTER_NETWORK_CIDR
+    hostPrefix: $CLUSTER_NETWORK_HOST_PREFIX"
+fi
 
 echo "default is to update cidr to 20 w/ hostPrefix of 23 so that max nodes num is 8"
 echo "\nsee below for actual values used\n--------------------------------\n"
-
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 networking:
   networkType: OVNKubernetes
   clusterNetwork:
-  - cidr: $CLUSTER_NETWORK_CIDR
-    hostPrefix: $CLUSTER_NETWORK_HOST_PREFIX
+  ${CLUSTER_CIDRS}
 EOF
 
 cat "${SHARED_DIR}/install-config.yaml"
