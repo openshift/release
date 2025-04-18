@@ -134,6 +134,8 @@ for aws_region in "${regions[@]}"; do
       exit 0
   fi
   save_stack_events_to_shared
+  # Get reason for creation failure and print for quicker debugging
+  jq -r '.StackEvents[] | select (.ResourceStatus == "CREATE_FAILED" and .ResourceStatusReason != "Resource creation cancelled") | { timestamp: .Timestamp, reason: .ResourceStatusReason }' "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
 done
 
 echo "Unable to create stack in any of the regions."
