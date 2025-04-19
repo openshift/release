@@ -90,6 +90,12 @@ Parameters:
     Default: ""
     Description: "ResourceSharePrincipals"
     Type: String
+  AdditionalAvailabilityZoneCount:
+    Description: "If yes, an additional pub/priv subnets will be created in the same AZ."
+    MinValue: 0
+    MaxValue: 1
+    Default: 0
+    Type: Number
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -121,6 +127,8 @@ Conditions:
   DoAz3PrivateSubnet: !And [ !Not [Condition: DoOnlyPublicSubnets], Condition: DoAz3 ]
   AzRestriction: !Not [ !Equals [!Join ['', !Ref AllowedAvailabilityZoneList], ''] ]
   ShareSubnets: !Not [ !Equals ['', !Ref ResourceSharePrincipals] ]
+  DoAdditionalAz: !Equals [1, !Ref AdditionalAvailabilityZoneCount]
+  DoAz1aPrivateSubnet: !And [ Condition: DoAz1PrivateSubnet, Condition: DoAdditionalAz ]
 
 Resources:
   VPC:
@@ -142,7 +150,25 @@ Resources:
               "false"
             ]
       VpcId: !Ref VPC
-      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [0, !Ref AllowedAvailabilityZoneList ],
+              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
+  PublicSubnet1a:
+    Type: "AWS::EC2::Subnet"
+    Condition: DoAdditionalAz
+    Properties:
+      MapPublicIpOnLaunch:
+        !If [
+              "DoOnlyPublicSubnets",
+              "true",
+              "false"
+            ]
+      VpcId: !Ref VPC
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -160,7 +186,7 @@ Resources:
               "false"
             ]
       VpcId: !Ref VPC
-      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -178,7 +204,7 @@ Resources:
               "false"
             ]
       VpcId: !Ref VPC
-      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -208,6 +234,12 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
+  PublicSubnetRouteTableAssociation1a:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Condition: DoAdditionalAz
+    Properties:
+      SubnetId: !Ref PublicSubnet1a
+      RouteTableId: !Ref PublicRouteTable
   PublicSubnetRouteTableAssociation2:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Condition: DoAz2
@@ -225,7 +257,7 @@ Resources:
     Condition: DoAz1PrivateSubnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -268,12 +300,60 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId:
         Ref: NAT
+  PrivateSubnet1a:
+    Type: "AWS::EC2::Subnet"
+    Condition: DoAz1aPrivateSubnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
+      AvailabilityZone:
+        !If [
+              "AzRestriction",
+              !Select [0, !Ref AllowedAvailabilityZoneList ],
+              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
+            ]
+  PrivateRouteTable1a:
+    Condition: DoAz1aPrivateSubnet
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  PrivateSubnetRouteTableAssociation1a:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Condition: DoAz1aPrivateSubnet
+    Properties:
+      SubnetId: !Ref PrivateSubnet1a
+      RouteTableId: !Ref PrivateRouteTable1a
+  NAT1a:
+    DependsOn:
+    - GatewayToInternet
+    Type: "AWS::EC2::NatGateway"
+    Condition: DoAz1aPrivateSubnet
+    Properties:
+      AllocationId:
+        "Fn::GetAtt":
+        - EIP1a
+        - AllocationId
+      SubnetId: !Ref PublicSubnet1a
+  EIP1a:
+    Type: "AWS::EC2::EIP"
+    Condition: DoAz1aPrivateSubnet
+    Properties:
+      Domain: vpc
+  Route1a:
+    Type: "AWS::EC2::Route"
+    Condition: DoAz1aPrivateSubnet
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1a
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NAT1a
   PrivateSubnet2:
     Type: "AWS::EC2::Subnet"
     Condition: DoAz2PrivateSubnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      CidrBlock: !Select [6, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -321,7 +401,7 @@ Resources:
     Condition: DoAz3PrivateSubnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      CidrBlock: !Select [7, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -381,6 +461,7 @@ Resources:
       - !If [DoAz1PrivateSubnet, !Ref PrivateRouteTable, !Ref "AWS::NoValue"]
       - !If [DoAz2PrivateSubnet, !Ref PrivateRouteTable2, !Ref "AWS::NoValue"]
       - !If [DoAz3PrivateSubnet, !Ref PrivateRouteTable3, !Ref "AWS::NoValue"]
+      - !If [DoAz1aPrivateSubnet, !Ref PrivateRouteTable1a, !Ref "AWS::NoValue"]
       ServiceName: !Join
       - ''
       - - com.amazonaws.
@@ -495,6 +576,81 @@ Outputs:
           ]
         ]
       ]
+  AllSubnetsInfo:
+    Value:
+      !Join [
+              ",",
+              [
+                !If [
+                      "AzRestriction",
+                      !Join [":", [!Select [0, !Ref AllowedAvailabilityZoneList], "public", !Ref PublicSubnet, 0]],
+                      !Join [":", [!Select [0, "Fn::GetAZs": !Ref "AWS::Region"], "public", !Ref PublicSubnet, 0]],
+                    ],
+                !If [
+                      DoAz2,
+                      !If [
+                            "AzRestriction",
+                            !Join [":", [!Select [1, !Ref AllowedAvailabilityZoneList], "public", !Ref PublicSubnet2, 0]],
+                            !Join [":", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], "public", !Ref PublicSubnet2, 0]],
+                          ],
+                      !Ref "AWS::NoValue"
+                    ],
+                !If [
+                      DoAz3,
+                      !If [
+                            "AzRestriction",
+                            !Join [":", [!Select [2, !Ref AllowedAvailabilityZoneList], "public", !Ref PublicSubnet3, 0]],
+                            !Join [":", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], "public", !Ref PublicSubnet3, 0]],
+                          ],
+                      !Ref "AWS::NoValue"
+                    ],
+                !If [
+                      DoAz1PrivateSubnet,
+                      !If [
+                            "AzRestriction",
+                            !Join [":", [!Select [0, !Ref AllowedAvailabilityZoneList], "private", !Ref PrivateSubnet, 0]],
+                            !Join [":", [!Select [0, "Fn::GetAZs": !Ref "AWS::Region"], "private", !Ref PrivateSubnet, 0]],
+                          ],
+                      !Ref "AWS::NoValue"
+                    ],
+                !If [
+                      DoAz2PrivateSubnet,
+                      !If [
+                            "AzRestriction",
+                            !Join [":", [!Select [1, !Ref AllowedAvailabilityZoneList], "private", !Ref PrivateSubnet2, 0]],
+                            !Join [":", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], "private", !Ref PrivateSubnet2, 0]],
+                          ],
+                      !Ref "AWS::NoValue"
+                    ],
+                !If [
+                      DoAz3PrivateSubnet,
+                      !If [
+                            "AzRestriction",
+                            !Join [":", [!Select [2, !Ref AllowedAvailabilityZoneList], "private", !Ref PrivateSubnet3, 0]],
+                            !Join [":", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], "private", !Ref PrivateSubnet3, 0]],
+                          ],
+                      !Ref "AWS::NoValue"
+                    ],
+                !If [
+                      DoAdditionalAz,
+                      !If [
+                            "AzRestriction",
+                            !Join [":", [!Select [0, !Ref AllowedAvailabilityZoneList], "public", !Ref PublicSubnet1a, 1]],
+                            !Join [":", [!Select [0, "Fn::GetAZs": !Ref "AWS::Region"], "public", !Ref PublicSubnet1a, 1]],
+                          ],
+                      !Ref "AWS::NoValue"
+                    ],
+                !If [
+                      DoAz1aPrivateSubnet,
+                      !If [
+                            "AzRestriction",
+                            !Join [":", [!Select [0, !Ref AllowedAvailabilityZoneList], "private", !Ref PrivateSubnet1a, 1]],
+                            !Join [":", [!Select [0, "Fn::GetAZs": !Ref "AWS::Region"], "private", !Ref PrivateSubnet1a, 1]],
+                          ],
+                      !Ref "AWS::NoValue"
+                    ]
+                ]
+            ]
 EOF
 
 MAX_ZONES_COUNT=$(aws --region "${REGION}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq '.AvailabilityZones | length')
@@ -526,6 +682,10 @@ fi
 
 if [[ -n "${VPC_CIDR}" ]]; then
      aws_add_param_to_json "VpcCidr" ${VPC_CIDR} "$vpc_params"
+fi
+
+if [[ "${ADDITIONAL_ZONES_COUNT}" -gt 0 ]]; then
+  aws_add_param_to_json "AdditionalAvailabilityZoneCount" ${ADDITIONAL_ZONES_COUNT} "$vpc_params"
 fi
 
 if [[ ${ZONES_LIST} != "" ]]; then
@@ -602,3 +762,71 @@ if [[ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY}" != "true" ]]; then
     echo "$PrivateRouteTableId" > "${SHARED_DIR}/private_route_table_id"
     echo "PrivateRouteTableId: ${PrivateRouteTableId}"
 fi
+
+
+# New VPC resources output vpc_info.json
+#
+# {
+#     "vpc_id": "vpc-1",
+#     "subnets":
+#     [
+#         {
+#             "az": "us-east-1a",
+#             "attr": "public",
+#             "id": "subnet-us-east-1a-public-0",
+#             "idx": 0
+#         },
+#         {
+#             "az": "us-east-1a",
+#             "attr": "private",
+#             "id": "subnet-us-east-1a-private-0",
+#             "idx": 0
+#         },
+#         {
+#             "az": "us-east-1a",
+#             "attr": "public",
+#             "id": "subnet-us-east-1a-public-1",
+#             "idx": 1
+#         },
+#         {
+#             "az": "us-east-1a",
+#             "attr": "private",
+#             "id": "subnet-us-east-1a-private-1",
+#             "idx": 1
+#         },
+#         {
+#             "az": "us-east-1b",
+#             "attr": "public",
+#             "id": "subnet-us-east-1b-public-0",
+#             "idx": 0
+#         },
+#         {
+#             "az": "us-east-1b",
+#             "attr": "private",
+#             "id": "subnet-us-east-1b-private-0",
+#             "idx": 0
+#         }
+#     ]
+# }
+
+vpc_info_json=${SHARED_DIR}/vpc_info.json
+all_subnets_info=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="AllSubnetsInfo") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
+
+echo '{}' > ${vpc_info_json}
+# vpc_id
+cat <<< "$(jq --arg v $VpcId '.vpc_id = $v' ${vpc_info_json})" > ${vpc_info_json}
+# subnet
+t=$(mktemp)
+echo '[]' > $t
+for s in $(echo ${all_subnets_info} | sed 's/,/ /g');
+do
+  az=$(echo $s | cut -d":" -f1)
+  attr=$(echo $s | cut -d":" -f2)
+  id=$(echo $s | cut -d":" -f3)
+  idx=$(echo $s | cut -d":" -f4)
+  cat <<< "$(jq  --arg az "$az" --arg attr "$attr" --arg id "$id" --arg idx "$idx" '. += [{"az":$az, "attr":$attr, "id":$id, "idx":$idx}]' "$t")" > "$t"
+done
+cat <<< "$(jq --argjson t "$(jq -c '. | sort_by(.idx, .az, .attr)' $t)" '.subnets = $t' ${vpc_info_json})" > ${vpc_info_json}
+
+cp ${vpc_info_json} ${ARTIFACT_DIR}/
+echo "Saved ${vpc_info_json}"
