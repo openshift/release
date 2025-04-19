@@ -1,15 +1,45 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
+images:
+- dockerfile_literal: |
+    FROM this-is-ignored
+    RUN dnf install -y git
+    COPY oc /usr/bin/oc
+    WORKDIR /go/src/github.com/openshift-kni/commatrix
+    RUN mkdir -p /go/src/github.com/openshift-kni/commatrix/vendor && \
+        chmod -R a+w /go/src/github.com/openshift-kni/commatrix
+    COPY app/ .
+  from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    src:
+      paths:
+      - destination_dir: app
+        source_path: /go/src/github.com/openshift-kni/commatrix/.
+  optional: true
+  to: cli-with-git
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -38,8 +68,26 @@ tests:
         ci-org-name openshift-kni
     test:
     - as: commatrix-e2e-tests
-      commands: go mod vendor && make e2e-test
-      from: src
+      commands: |
+        # Install krew
+        OS="$(uname | tr '[:upper:]' '[:lower:]')"
+        ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/' -e 's/armv7l/arm/')"
+        KREW="krew-${OS}_${ARCH}"
+
+        mkdir -p /tmp
+        curl -fsSL "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" -o /tmp/${KREW}.tar.gz
+        mkdir -p /tmp/krew
+        tar -xvzf /tmp/${KREW}.tar.gz -C /tmp/krew
+
+        /tmp/krew/${KREW} install krew
+        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+
+        # Install the commatrix krew plugin
+        oc krew install --manifest=cmd/commatrix-krew.yaml
+
+        # run the make e2e-test
+        go mod vendor && make e2e-test
+      from: cli-with-git
       resources:
         requests:
           cpu: 100m
