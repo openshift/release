@@ -452,7 +452,7 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
     echo -e "The http_proxy, and https_proxy URLs are mandatory when specifying use of proxy."
     exit 1
   fi
-  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url}"
+  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --no-proxy quay.io"
 
   trust_bundle_file="${SHARED_DIR}/bundle_file"
   if [[ -f "${trust_bundle_file}" ]]; then
