@@ -5,15 +5,10 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-image="$(oc get deployment/odh-model-controller -n redhat-ods-applications -oyaml|grep image)"
-echo "odh-model-controller deployment image is ${image}"
-
 
 if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
-  SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
-  AWS_SECRET_ACCESS_KEY=$(cat $SECRETS_DIR/aws-secret-access-key)
-  AWS_ACCESS_KEY_ID=$(cat $SECRETS_DIR/aws-access-key-id)
-
+  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
   BUCKET_INFO="/tmp/secrets/ci"
   CI_S3_BUCKET_NAME="$(cat ${BUCKET_INFO}/CI_S3_BUCKET_NAME)"
   MODELS_S3_BUCKET_NAME="$(cat ${BUCKET_INFO}/MODELS_S3_BUCKET_NAME)"
@@ -35,6 +30,13 @@ RUN_COMMAND="uv run pytest tests/model_serving/model_server \
             --junit-xml=${ARTIFACT_DIR}/xunit_results.xml \
             --log-file=${ARTIFACT_DIR}/pytest-tests.log"
 
+if [ "${SKIP_CLUSTER_SANITY_CHECK}" = "true" ]; then
+  RUN_COMMAND+=" --cluster-sanity-skip-check "
+fi
+
+if [ "${SKIP_RHOAI_SANITY_CHECK}" = "true" ]; then
+  RUN_COMMAND+=" --cluster-sanity-skip-rhoai-check "
+fi
 
 if [ -n "${TEST_MARKERS}" ]; then
     RUN_COMMAND+=" -m ${TEST_MARKERS} "
