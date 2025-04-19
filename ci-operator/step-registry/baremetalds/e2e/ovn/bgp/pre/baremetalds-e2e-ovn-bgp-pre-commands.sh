@@ -245,12 +245,16 @@ done
 # set up BGP peering of the cluster with the external FRR instance container
 # peer is setup on the default VRF and also on each extra network VRF
 for network in "${!vrf_neighbors[@]}"; do
+  label="network: ${network}"
   [ "default" = "$network" ] && {
     name=receive-filtered
     vrf=
     ip=192.168.111.3
     ip6=fd2e:6f44:5dd8:c956::3
-    label='k8s.ovn.org/default-network: ""'
+    network_selector=$(cat <<EOF
+    - networkSelectionType: DefaultNetwork  
+EOF
+)
   } || {
     subnet_v4_var=${network^^}_NETWORK_SUBNET_V4
     subnet_v6_var=${network^^}_NETWORK_SUBNET_V6
@@ -258,7 +262,14 @@ for network in "${!vrf_neighbors[@]}"; do
     ip6=${!subnet_v6_var/::\/*/::3}
     name=receive-filtered-$network
     vrf="vrf: ${network}"
-    label="network: ${network}"
+    network_selector=$(cat <<EOF
+    - networkSelectionType: ClusterUserDefinedNetworks
+      clusterUserDefinedNetworkSelector:
+        networkSelector:
+          matchLabels:
+            ${label}
+EOF
+)
   }
 
   oc apply -f - <<EOF
@@ -300,9 +311,9 @@ kind: RouteAdvertisements
 metadata:
   name: ${network}
 spec:
-  networkSelector:
-    matchLabels:
-      ${label}
+  nodeSelector: {}
+  networkSelectors:
+${network_selector}
   frrConfigurationSelector:
     matchLabels:
       ${label}
