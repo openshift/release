@@ -51,8 +51,8 @@ boot_device:
   layout: $(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
   mirror: 
     devices: 
-      - /dev/sda
-      - /dev/sdb
+      - /dev/disk/by-path/pci-0000:65:00.0-scsi-0:3:111:0 
+      - /dev/disk/by-path/pci-0000:65:00.0-scsi-0:3:110:0 
 openshift:
   fips: false 
 EOF
