@@ -4,6 +4,31 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
+
+wait_mcp_for_updated()
+{
+    local mcp_updated="false"
+
+    sleep 30
+
+    for i in {1..60}
+    do
+      echo_debug "Attempt ${i}/60"
+      sleep 30
+      if oc wait mcp --all --for condition=updated --timeout=1m; then
+        echo_debug "MCP is Updated"
+        mcp_updated="true"
+        break
+      fi
+    done
+
+    if [[ "$mcp_updated" == "false" ]]; then
+      echo_debug "Error: MCP didn't get Updated!!"
+      exit 1
+    fi
+}
+
 # Set the cluster proxy configuration, if its present.
 if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
     echo "setting the proxy"
@@ -32,9 +57,112 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
     operator_config=$(jq --raw-output '.config // ""' <<< "$operator_obj")
+    operator_iib=$(jq --raw-output '.iib // ""' <<< "$operator_obj")
 
+
+#############################################################################################
+    echo("sleep to debug stuff ")
+    sleep 7200
+    if [[ -n "${operator_iib}" ]]; then
+        echo "Install from IIB"
+        echo "Installing OADp from ${operator_channel} into ${operator_install_namespace}"
+
+        # create the install namespace
+        oc apply -f - <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: "${operator_install_namespace}"
+EOF
+
+        # deploy new operator group
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: "oadp-operator-group"
+          namespace: "${operator_install_namespace}"
+        spec:
+          targetNamespaces:
+          - "${operator_install_namespace}"
+EOF
+        # create catalog source
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: "${operator_source}-operators"
+          namespace: openshift-marketplace
+        spec:
+          sourceType: grpc
+          image: "brew.registry.redhat.io/rh-osbs/${operator_iib}"
+          displayName: Custom Operator Catalog
+          publisher: grpc
+EOF
+
+        #pause mcp 
+        oc patch --type=merge --patch='{"spec":{"paused": true}}' "$(oc get mcp -o name)"
+
+        #apply mcp
+        oc create -f - <<EOF
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: brew-registry-1
+        spec:
+          imageDigestMirrors:
+          - mirrors:
+              - brew.registry.redhat.io
+              source: registry.stage.redhat.io
+          - mirrors:
+              - brew.registry.redhat.io
+              source: registry-proxy.engineering.redhat.com
+          - mirrors:
+              - brew.registry.redhat.io
+              source: registry.redhat.io
+EOF
+
+        #resume mcp
+        oc patch --type=merge --patch='{"spec":{"paused": false}}' "$(oc get mcp -o name)" 
+
+        #wait mcp updated
+        wait_mcp_for_updated
+
+        # subscribe to the operator
+        oc create -f - <<EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+            name: "${operator_name}"
+        spec:
+            channel: "${operator_channel}"
+            name: "${operator_name}"
+            source: "${operator_source}-operators"
+            sourceNamespace: openshift-marketplace
+            startingCSV: oadp-operator.v1.5.0  
+            installPlanApproval: Automatic
+EOF
+        
+        install_plan=$(
+        oc get installplan -n "${}" \
+        -ojsonpath="{.items[?(@.metadata.ownerReferences[*].name==\"${operator_name}\")]}" | \
+        jq -r " . | select(.spec.clusterServiceVersionNames[0] | contains(\"oadp-operator.v1.5.0\")) | \
+        .metadata.name" | \
+        head -1
+        )
+
+        # Wait for operator to be installed
+        oc wait installplan "${install_plan}" \
+        --namespace="${operator_install_namespace}" \
+        --for=condition='Installed' \
+        --timeout='15m'
+        
+
+        echo "OADP is deployed successfully"
+
+###### change the if below from elif to if ##################################################
     # If name not defined, exit.
-    if [[ -z "${operator_name}" ]]; then
+    elif [[ -z "${operator_name}" ]]; then
         echo "ERROR: name is not defined"
         exit 1
     fi
