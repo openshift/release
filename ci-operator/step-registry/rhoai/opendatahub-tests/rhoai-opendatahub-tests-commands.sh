@@ -5,9 +5,6 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-image="$(oc get deployment/odh-model-controller -n redhat-ods-applications -oyaml|grep image)"
-echo "odh-model-controller deployment image is ${image}"
-
 
 if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
   AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
