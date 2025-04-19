@@ -5,7 +5,7 @@ set -o pipefail
 set -x
 
 pushd /tmp
-curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz
+curl -sSL External link: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux-amd64-rhel8.tar.gz | tar xz
 unset VERSION
 export HOME=/tmp
 export PATH=${PATH}:/tmp
