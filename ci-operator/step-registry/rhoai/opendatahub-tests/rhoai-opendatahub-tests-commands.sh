@@ -7,10 +7,8 @@ set -o verbose
 
 
 if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
-  SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
-  AWS_SECRET_ACCESS_KEY=$(cat $SECRETS_DIR/aws-secret-access-key)
-  AWS_ACCESS_KEY_ID=$(cat $SECRETS_DIR/aws-access-key-id)
-
+  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
   BUCKET_INFO="/tmp/secrets/ci"
   CI_S3_BUCKET_NAME="$(cat ${BUCKET_INFO}/CI_S3_BUCKET_NAME)"
   MODELS_S3_BUCKET_NAME="$(cat ${BUCKET_INFO}/MODELS_S3_BUCKET_NAME)"
