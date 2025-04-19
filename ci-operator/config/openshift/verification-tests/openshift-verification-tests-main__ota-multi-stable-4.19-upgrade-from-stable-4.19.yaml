@@ -40,12 +40,12 @@ releases:
     release:
       architecture: multi
       channel: candidate
-      version: 4.19.0-ec.0
+      version: 4.19.0-ec.1
   latest:
     release:
       architecture: multi
-      channel: fast
-      version: "4.18"
+      channel: candidate
+      version: 4.19.0-ec.0
   target:
     release:
       architecture: multi
@@ -57,43 +57,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-amd-tolatest-f28
-  cron: 13 13 8 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      ENABLE_OTA_TEST: OCP-23799
-    test:
-    - ref: cucushift-upgrade-setchannel
-    - ref: cucushift-ota-preupgrade
-    - ref: cucushift-upgrade-toversion
-    - ref: cucushift-ota-postupgrade
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: azure-ipi-amd-mixarch-f28
-  cron: 9 0 26 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      ENABLE_OTA_TEST: OCP-53907
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: cucushift-installer-check-cluster-health
-    - ref: cucushift-upgrade-setchannel
-    - ref: cucushift-ota-preupgrade
-    - ref: cucushift-upgrade-toversion
-    - ref: cucushift-upgrade-healthcheck
-    - ref: cucushift-ota-postupgrade
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetal-ipi-retarget-f28
   capabilities:
   - intranet
-  cron: 35 18 15 * *
+  cron: 38 15 22 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -120,4 +87,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: verification-tests
-  variant: ota-multi-stable-4.19-upgrade-from-stable-4.18
+  variant: ota-multi-stable-4.19-upgrade-from-stable-4.19

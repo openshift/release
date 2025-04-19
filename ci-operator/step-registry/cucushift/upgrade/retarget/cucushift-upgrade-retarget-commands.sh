@@ -125,60 +125,6 @@ function extract_ccoctl(){
     export PATH="$PATH"
 }
 
-function update_cloud_credentials_oidc(){
-    local platform preCredsDir tobeCredsDir tmp_ret
-
-    platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
-    preCredsDir="/tmp/pre-include-creds"
-    tobeCredsDir="/tmp/tobe-include-creds"
-    mkdir "${preCredsDir}" "${tobeCredsDir}"
-    # Extract all CRs from live cluster with --included
-    if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
-        echo "Failed to extract CRs from live cluster!"
-        export UPGRADE_FAILURE_TYPE="oc_update"
-        return 1
-    fi
-    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
-        echo "Failed to extract CRs from tobe upgrade release payload!"
-        export UPGRADE_FAILURE_TYPE="oc_update"
-        return 1
-    fi
-
-    # TODO: add gcp and azure
-    # Update iam role with ccoctl based on tobeCredsDir
-    tmp_ret=0
-    diff -r "${preCredsDir}" "${tobeCredsDir}" || tmp_ret=1
-    if [[ ${tmp_ret} != 0 ]]; then
-        toManifests="/tmp/to-manifests"
-        mkdir "${toManifests}"
-        case "${platform}" in
-        "AWS")
-            if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
-		echo "No aws_oidc_provider_arn file in SHARED_DIR"
-		return 1
-            else
-                export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-                infra_name=${NAMESPACE}-${UNIQUE_HASH}
-                oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
-                extract_ccoctl || { export UPGRADE_FAILURE_TYPE="cloud-credential"; return 1; }
-                if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
-		    echo "Failed to update iam role!"
-		    export UPGRADE_FAILURE_TYPE="cloud-credential"
-		    return 1
-                fi
-                if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
-                    echo "Apply the new credential secrets."
-                    oc apply -f "${toManifests}/manifests"
-                fi
-            fi
-            ;;
-        *)
-	   echo "to be supported platform: ${platform}"
-           ;;
-        esac
-    fi
-}
-
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual or the case in OCPQE-19413
 function cco_annotation(){
     local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
@@ -236,34 +182,6 @@ function run_command() {
     eval "${CMD}"
 }
 
-# Check if a build is signed
-function check_signed() {
-    local digest algorithm hash_value response try max_retries payload="${1}"
-    if [[ "${payload}" =~ "@sha256:" ]]; then
-        digest="$(echo "${payload}" | cut -f2 -d@)"
-        echo "The target image is using digest pullspec, its digest is ${digest}"
-    else
-        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
-        echo "The target image is using tagname pullspec, its digest is ${digest}"
-    fi
-    algorithm="$(echo "${digest}" | cut -f1 -d:)"
-    hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    try=0
-    max_retries=3
-    response=0
-    while (( try < max_retries && response != 200 )); do
-        echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
-        (( try += 1 ))
-        sleep 60
-    done
-    if (( response == 200 )); then
-        echo "${payload} is signed" && return 0
-    else
-        echo "Seem like ${payload} is not signed" && return 1
-    fi
-}
-
 # Check if admin ack is required before upgrade
 function admin_ack() {
     local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
@@ -313,28 +231,6 @@ function admin_ack() {
         export UPGRADE_FAILURE_TYPE="admin_ack"
         return 1
     fi
-}
-
-# Check if the cluster hit the image validation error, which caused by image signature
-function error_check_invalid_image() {
-    local try=0 max_retries=5 tmp_log cmd expected_msg
-    tmp_log=$(mktemp)
-    while (( try < max_retries )); do
-        echo "Trying #${try}"
-        cmd="oc adm upgrade"
-        expected_msg="failure=The update cannot be verified:"
-        run_command "${cmd} 2>&1 | tee ${tmp_log}"
-        if grep -q "${expected_msg}" "${tmp_log}"; then
-            echo "Found the expected validation error message"
-            break
-        fi
-        (( try += 1 ))
-        sleep 60
-    done
-    if (( ${try} >= ${max_retries} )); then
-        echo >&2 "Timed out catching image invalid error message..." && return 1
-    fi
-
 }
 
 function clear_upgrade() {
@@ -388,41 +284,164 @@ function wait_upgrade_start(){
 
 # Upgrade the cluster to target release
 function upgrade() {
-    local log_file history_len cluster_src_ver
-    if check_ota_case_enabled "OCP-21588"; then
-        log_file=$(mktemp)
-        echo "Testing --allow-explicit-upgrade option"
-        run_command "oc adm upgrade --to-image=${TARGET} --force=${FORCE_UPDATE} 2>&1 | tee ${log_file}" || true
-        if grep -q 'specify --allow-explicit-upgrade to continue' "${log_file}"; then
-            echo "--allow-explicit-upgrade prompt message is shown"
+    # As https://issues.redhat.com/browse/OTA-861 required, we can re-target to a z version when an upgrade is processing.
+    # For example, there is one upgrade is in progress A -> B (no matter it is a y stream or a z stream upgrade)
+    # Then:
+    # 1. we can retarget to a version which has same minor version with B
+    # 2. we can NOT retarget to a version which minor version is great than B
+    # *******************
+    # Nightly build is not applicable for z stream retarget tests
+    # *******************
+    # No matter y stream or z stream retarget, the TARGET always the final version we want to upgrade to
+    # To make OCP-25473 not block the whole pipeline, the upgrade orders are:
+    #  if the minor version in ${SHARED_DIR}/upgrade-edge great than target, then
+    #       initial -> target -> ${SHARED_DIR}/upgrade-edge
+    #  if the minor version in ${SHARED_DIR}/upgrade-edge equal to target, then
+    #       1. we find a target+1 version as third target upgrade version
+    #       2. initial -> ${SHARED_DIR}/upgrade-edge -> target -> third target version
+    #  this case not allow ${SHARED_DIR}/upgrade-edge less than target
+
+    # INTERMEDIATE_MINOR_VERSIONT is the minor version in ${SHARED_DIR}/upgrade-edge
+    local retry=0 intermediate_image INTERMEDIATE_MINOR_VERSIONT FIRST_MINOR_VERSION SECOND_MINOR_VERSION block_second first_upgrade_to_image second_upgrade_to_image third_upgrade_to_image output latest_minor_version
+    intermediate_image="$(< "${SHARED_DIR}/upgrade-edge")"
+    if [[ -z "${intermediate_image:-}" ]]; then
+        echo "Error: The intermediate image is not given, break the job"
+        return 1
+    fi
+    
+    echo "Prepare test data"
+    INTERMEDIATE_MINOR_VERSIONT="$(oc adm release info -ojson "$intermediate_image" | jq -r '.metadata.version' | cut -f2 -d.)"
+    if [[ "$INTERMEDIATE_MINOR_VERSIONT" -gt "$TARGET_MINOR_VERSION" ]]; then
+        # This is y stream retarget upgrade, e.g.: 4.y -> (4.y | 4.y+1) -> (4.y+1 | 4.y+2)
+        first_upgrade_to_image=${TARGET}
+        second_upgrade_to_image=${intermediate_image}
+        block_second=true
+    else
+        if [[ "$INTERMEDIATE_MINOR_VERSIONT" == "$TARGET_MINOR_VERSION" ]]; then
+            # This is z stream retarget upgrade, e.g.: 4.y -> (4.y | 4.y+1) -> (4.y | 4.y+1)
+            first_upgrade_to_image=${intermediate_image}
+            second_upgrade_to_image=${TARGET}
+            
+            if oc adm release info -o jsonpath='{.digest}' quay.io/openshift-release-dev/ocp-release:4.$((TARGET_MINOR_VERSION+1)).0-ec.0-x86_64 2>&1; then
+                # if third_upgrade_to_image not empty, we will retarget to it, but it will always be blocked
+                # this can make sure we always have z and y stream retarget in one job
+                latest_minor_version=$(( TARGET_MINOR_VERSION+1 ))
+                third_upgrade_to_image="$( oc adm release info -o jsonpath='{.digest}' quay.io/openshift-release-dev/ocp-release:4.${latest_minor_version}.0-ec.0-x86_64 )"
+                third_upgrade_to_image="quay.io/openshift-release-dev/ocp-release@${third_upgrade_to_image}"
+            fi
+
+            block_second=false
         else
-            echo "--allow-explicit-upgrade prompt message is NOT shown!"
-            exit 1
-        fi
-        history_len=$(oc get clusterversion -o json | jq '.items[0].status.history | length')
-        if [[ "${history_len}" != 1 ]]; then
-            echo "seem like there are more than 1 hisotry in CVO, sounds some unexpected update happened!"
-            exit 1
+            # If INTERMEDIATE_MINOR_VERSIONT < TARGET_MINOR_VERSION, then we will naver be able to upgrade to TARGET_MINOR_VERSION
+            # So do not put a small version in upgrade-edge
+            echo "Error: OCP-25473 do not cover rollback, break the job"
+            return 1
         fi
     fi
-    if check_ota_case_enabled "OCP-24663"; then
-        cluster_src_ver=$(oc version -o json | jq -r '.openshiftVersion')
-        if [[ -z "${cluster_src_ver}" ]]; then
-            echo "Did not get cluster version at this moment"
-            exit 1
-        else
-            echo "Current cluster is on ${cluster_src_ver}"
+
+    local first_version second_version
+    first_version="$(oc adm release info -ojson "$intermediate_image" | jq -r '.metadata.version')"
+    FIRST_MINOR_VERSION="$(echo "$first_version" | cut -f2 -d.)"
+    second_version="$(oc adm release info -ojson "$intermediate_image" | jq -r '.metadata.version')"
+    SECOND_MINOR_VERSION="$(echo "$second_version" | cut -f2 -d.)"
+
+    # first_upgrade_to_image can be both nightly build or stable build
+    if ! check_signed "${first_upgrade_to_image}"; then
+        FORCE_UPDATE="true"
+    else
+        FORCE_UPDATE="false"
+        # if the first upgade is y stream upgrade and upgrade to a stable version,
+        # we run cco_annotation and admin_ack
+        if [[ "$FIRST_MINOR_VERSION" -gt "$SOURCE_MINOR_VERSION" ]]; then
+            cco_annotation "${SOURCE_VERSION}" "${first_version}"
+            admin_ack "${SOURCE_VERSION}" "${first_version}"
         fi
-        echo "Negative Testing: upgrade to an unsigned image without --force option"
-        admin_ack
-        cco_annotation
-        run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade"
-        error_check_invalid_image
-        clear_upgrade
-        check_upgrade_status "${cluster_src_ver}"
     fi
-    run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
-    echo "Upgrading cluster to ${TARGET} gets started..."
+    run_command "oc adm upgrade --to-image=${first_upgrade_to_image} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
+    wait_upgrade_start
+
+    echo "OCP-25473: Upgrade to new target without --allow-upgrade-with-warnings"
+    # second_upgrade_to_image must be ***stable*** build
+    output="$(oc adm upgrade --to-image="${second_upgrade_to_image}" --allow-explicit-upgrade 2>&1 || true)"
+    if [[ ! "${output}" =~ "error: the cluster is already upgrading" ]] || [[ ! "${output}" =~ "If you want to upgrade anyway, use --allow-upgrade-with-warnings" ]]; then
+        echo "Error: OCP-25473: Re-upgrade should not started and raise error when there is already an upgrade is processing"
+        echo "The output of 'oc adm upgrade' is:"
+        echo "$output"
+        exit 1
+    fi
+    
+    echo "OCP-25473: Upgrade to new target again with --allow-upgrade-with-warnings"
+    # if second version is greater than the first version we run cco_annotation (second version always stable version for OCP-25473)
+    # because the first upgrade has not finished, so we don't need to run admin_ack
+    if [[ "$SECOND_MINOR_VERSION" -gt "$FIRST_MINOR_VERSION" ]]; then
+        cco_annotation "${first_version}" "${second_version}"
+    fi
+    run_command "oc adm upgrade --to-image=${second_upgrade_to_image} --allow-explicit-upgrade --allow-upgrade-with-warnings=true"
+    sleep 1m
+    if $block_second; then
+        echo "This is re-targeting to a y version, this upgrade should be blocked"
+        output="$(oc get clusterversion version -ojson)"
+        if [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Progressing").status')" != "True" ]] \
+            || [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Upgradeable").status')" != "False" ]] \
+            || [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").status')" != "False" ]] \
+            || ! [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").message')" =~ ${second_upgrade_to_image} ]]; then
+            echo "Error: OCP-25473: Retarget to a y stream version should be blocked, but actually not"
+            return 1
+        fi
+        run_command "oc adm upgrade --clear"
+        sleep 1m
+        output="$(oc get clusterversion version -ojson)"
+        if [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Progressing").status')" != "True" ]] \
+            || [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Upgradeable").status')" != "False" ]] \
+            || [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").status')" != "True" ]]; then
+            echo "Error: OCP-25473: After clearing the upgrade, Progressing/Upgradeable/ReleaseAccepted not all correct"
+            return 1
+        fi
+
+        # for OCPBUGS-42880
+        oc -n openshift-config-managed patch configmap admin-gates \
+            --type json \
+            -p '[{"op": "add", "path": "/data", "value": {"ack-4.'"${SOURCE_MINOR_VERSION}"'-testing": "gate-testing"}}]'
+        sleep 1m
+        output="$(oc adm upgrade)"
+        if ! [[ "$output" =~ "gate-testing" ]] \
+            || ! [[ "$output" =~ "Upgradeable=False" ]]; then
+            echo "Error: OCP-25473: After patch admin-gates, the message is not correct, the observed output is:"
+            echo "$output"
+            return 1
+        fi
+    else
+        echo "This is re-targeting to a z version, upgrade should switch to new target"
+        retry=0
+        while [[ retry -lt 5 ]]; do
+            output="$(oc get clusterversion version -ojson)"
+            if [[ "$(echo "$output" | jq -r '.status.desired.image')" == "${second_upgrade_to_image}" ]] \
+                && [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").status')" == "True" ]]; then
+                echo "OCP-25473: Upgrade to new version"
+                return 0
+            fi
+            retry=$(( retry+1 ))
+            sleep 1m
+        done
+        echo "Error: OCP-25473: Retarget to a z stream version should be success, but actually not, break the job"
+        return 1
+    fi
+
+    if [[ -n ${third_upgrade_to_image:-} ]]; then
+        run_command "oc adm upgrade --to-image=${third_upgrade_to_image} --allow-explicit-upgrade --allow-upgrade-with-warnings=true"
+        echo "This is re-targeting to a y version after a z version retarget, this upgrade should be blocked"
+        output="$(oc get clusterversion version -ojson)"
+        if [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Progressing").status')" != "True" ]] \
+            || [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "Upgradeable").status')" != "False" ]] \
+            || [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").status')" != "False" ]] \
+            || ! [[ "$(echo "$output" | jq -r '.status.conditions[] | select(.type == "ReleaseAccepted").message')" =~ ${third_upgrade_to_image} ]]; then
+            echo "Error: OCP-25473: Retarget to a y stream version should be blocked, but actually not"
+            return 1
+        fi
+        run_command "oc adm upgrade --clear"
+        sleep 1m
+    fi
+    return
 }
 
 # https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-73352
@@ -460,11 +479,7 @@ function check_upgrade_recommend_when_upgrade_inprogress() {
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n' start_time end_time
-    if [[ -n "${1:-}" ]]; then
-        cluster_version="$1"
-    else
-        cluster_version="${TARGET_VERSION}"
-    fi
+    cluster_version="${TARGET_VERSION}"
     echo -e "Upgrade checking start at $(date "+%F %T")\n"
     start_time=$(date "+%s")
 
@@ -512,11 +527,6 @@ function check_upgrade_status() {
                 echo "OCP-73352: failed"
                 return 1
             fi
-        fi
-        if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
-            UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
-            echo -e "Upgrade stuck at updating RHEL worker, need to run the RHEL worker upgrade later...\n\n"
-            return 0
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
@@ -608,12 +618,6 @@ if [[ "${FORCE_UPDATE}" == "false" ]]; then
     admin_ack "${SOURCE_VERSION}" "${TARGET_VERSION}"
     cco_annotation "${SOURCE_VERSION}" "${TARGET_VERSION}"
 fi
-if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
-    update_cloud_credentials_oidc
-fi
+
 upgrade
 check_upgrade_status
-
-if [[ "$UPGRADE_RHEL_WORKER_BEFOREHAND" != "triggered" ]]; then
-    check_history
-fi
