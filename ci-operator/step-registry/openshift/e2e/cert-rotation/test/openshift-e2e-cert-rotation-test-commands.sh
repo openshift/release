@@ -11,12 +11,6 @@ echo "************ post cert-rotation test command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-collect_artifacts() {
-    echo "### Fetching results"
-    ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
-}
-trap collect_artifacts EXIT TERM
-
 # Copy test binaries on packet server
 echo "### Copying test binaries"
 scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
