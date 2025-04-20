@@ -81,6 +81,8 @@ function reformat_report {
       mv ${ReportFileName}_v1.xml  ${ReportFileName}.xml
 }
 
+sleep 28800
+
 # Install Dependcies defined in packages.json
 yarn install || true
 yarn add --dev typescript || true
