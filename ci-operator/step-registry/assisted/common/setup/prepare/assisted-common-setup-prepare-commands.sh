@@ -167,7 +167,7 @@ cat > run_test_playbook.yaml <<-"EOF"
     POST_INSTALL_COMMANDS: "{{ lookup('env', 'POST_INSTALL_COMMANDS') }}"
     ASSISTED_CONFIG: "{{ lookup('env', 'ASSISTED_CONFIG') }}"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
-    CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
+    CLUSTERTYPE: "{{ lookup('env', 'CLUSTERTYPE')}}"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
     CLUSTER_PROFILE_PULL_SECRET: "{{ lookup('file', '{{ CLUSTER_PROFILE_DIR }}/pull-secret') }}"
     BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
@@ -251,27 +251,17 @@ cat > run_test_playbook.yaml <<-"EOF"
         path: "{{ REPO_DIR }}"
         state: directory
     - debug:
-        var: CLUSTER_TYPE
-    - name: Customize equinix machine
-      block:
-      - name: Fetch equinix metadata
-        ansible.builtin.uri:
-          url: "https://metadata.platformequinix.com/metadata"
-          return_content: yes
-        register: equinix_metadata
-        until: equinix_metadata.status == 200
-        retries: 5
-        delay: 5
-      - name: Setup working directory for machine type m3.large.x86
-        ansible.builtin.shell: |
-          # Get disk where / is mounted
-          ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
+        var: CLUSTERTYPE
+    - name: Setup working directory for large machines
+      ansible.builtin.shell: |
+        # Get disk where / is mounted
+        ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
 
-          # Use the largest disk available for assisted
-          DATA_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
-          mkfs.xfs -f "${DATA_DISK}"
-          mount "${DATA_DISK}" {{ REPO_DIR }}
-        when: "equinix_metadata.json.plan == 'm3.large.x86'"
+        # Use the largest disk available for assisted
+        DATA_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
+        mkfs.xfs -f "${DATA_DISK}"
+        mount "${DATA_DISK}" {{ REPO_DIR }}
+      when: '"large" in CLUSTERTYPE'
     - name: Create {{ MINIKUBE_HOME }} directory if it does not exist
       ansible.builtin.file:
         path: "{{ MINIKUBE_HOME }}"
