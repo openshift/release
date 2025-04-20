@@ -73,3 +73,5 @@ cd /eco-ci-cd/
 export ANSIBLE_REMOTE_TEMP="/tmp"
 ansible-playbook ./playbooks/cnf/switch-config.yaml -i ./inventories/cnf/switch-config.yaml \
     --extra-vars "cluster_name=$CLUSTER_NAME artifact_dest_dir=$SHARED_DIR ocp_nic=$OCP_NIC secondary_nic=$SECONDARY_NIC"
+
+cp ${ECO_CI_CD_INVENTORY_PATH}/host_vars/switch ${SHARED_DIR}/
