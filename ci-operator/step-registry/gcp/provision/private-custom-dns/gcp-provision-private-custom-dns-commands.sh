@@ -36,7 +36,7 @@ fi
 INFRA_ID="$(jq -r .infraID ${SHARED_DIR}/metadata.json)"
 
 #Getting the IP address of the internal API LB
-INTERNAL_API_LB_IP=$(gcloud compute forwarding-rules describe "${INFRA_ID}-api-internal" --region ${GCP_REGION} --format json | jq -r .IPAddress)
+INTERNAL_API_LB_IP=$(gcloud compute forwarding-rules describe "${INFRA_ID}-api-internal" --project=$GCP_PROJECT --region ${GCP_REGION} --format json | jq -r .IPAddress)
 if [[ -z "${INTERNAL_API_LB_IP}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to find the internal API server IP address, abort."
   exit 1
