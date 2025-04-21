@@ -85,17 +85,17 @@ tests:
 - as: e2e-aws-ovn-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     test:
     - as: test
       commands: |
@@ -104,7 +104,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-aws
+  timeout: 6h0m0s
 - as: e2e-aws-operator-techpreview
   steps:
     cluster_profile: aws
@@ -134,13 +136,14 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: ipi-aws
+  timeout: 6h0m0s
 - as: e2e-aws-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -167,7 +170,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-azure
+  timeout: 6h0m0s
 - as: e2e-azure-periodic-pre
   optional: true
   run_if_changed: .*periodic.*|.*azure.*
@@ -181,8 +186,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: ipi-azure
+  timeout: 6h0m0s
 - as: e2e-azure-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*|.*azure.*
@@ -214,7 +220,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
+  timeout: 6h0m0s
 - as: e2e-gcp-periodic-pre
   optional: true
   run_if_changed: .*periodic.*|.*gcp.*
@@ -228,8 +236,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: ipi-gcp
+  timeout: 6h0m0s
 - as: e2e-gcp-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*|.*gcp.*
@@ -261,7 +270,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
 - as: e2e-vsphere-multi-zone-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
@@ -275,7 +286,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: openshift-e2e-vsphere-zones
+  timeout: 6h0m0s
 - as: e2e-vsphere-multi-vcenter-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
@@ -292,7 +305,43 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: openshift-e2e-vsphere-multi-vcenter
+  timeout: 6h0m0s
+- as: e2e-vsphere-operator-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-operator-periodic-pre-techpreview
+  optional: true
+  run_if_changed: .*periodic.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
 - as: e2e-openstack-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
@@ -307,7 +356,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
 - as: e2e-openstack-operator-zone
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
@@ -323,7 +374,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
 - as: e2e-openstack-periodic-pre
   optional: true
   run_if_changed: .*periodic.*|.*openstack.*
@@ -338,8 +391,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
 - as: e2e-openstack-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*|.*openstack.*
@@ -396,7 +450,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-nutanix
+  timeout: 6h0m0s
 - as: regression-clusterinfra-aws-ipi-cpms-allcases
   optional: true
   steps:

@@ -6,9 +6,8 @@ WORKSPACE=$(pwd)
 
 curl -Lo ocm https://github.com/openshift-online/ocm-cli/releases/latest/download/ocm-linux-amd64
 
-
-job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
-export CLUSTER_NAME="osd-$job_id"
+export CLUSTER_NAME
+CLUSTER_NAME="osd-$(date +%s)"
 
 echo "CLUSTER_NAME : $CLUSTER_NAME"
 
