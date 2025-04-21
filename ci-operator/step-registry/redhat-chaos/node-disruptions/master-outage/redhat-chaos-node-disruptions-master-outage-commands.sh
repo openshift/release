@@ -67,9 +67,6 @@ elif [ "$platform" = "IBMCloud" ]; then
     export TIMEOUT=320
 elif [ "$platform" = "VSphere" ]; then
     export CLOUD_TYPE="vsphere"
-    # MASTER_MACHINE=$(oc get machines -A | grep master | head -n 1 | awk '{print $2}')
-    # VSPHERE_IP=$(oc get machine $MASTER_MACHINE -n openshift-machine-api -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}' | awk '{print $1}')
-    # export VSPHERE_IP
     VSPHERE_IP=$(oc get infrastructures.config.openshift.io cluster -o jsonpath='{.spec.platformSpec.vsphere.vcenters[0].server}')
     export VSPHERE_IP
     VSPHERE_IP_WITHOUTDOT=$(echo "$VSPHERE_IP" | sed 's/\./\\./g')
@@ -79,17 +76,6 @@ elif [ "$platform" = "VSphere" ]; then
     export VSPHERE_USERNAME
     VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
     export VSPHERE_PASSWORD
-    response=$(curl -k -v -s -o /dev/null -w "%{http_code}" -u "$VSPHERE_USERNAME:$VSPHERE_PASSWORD" https://$VSPHERE_IP)
-    # Check the response code
-    if [[ "$response" -eq 200 ]]; then
-    echo "Authentication successful."
-    else
-    echo "Authentication failed with response code: $response"
-    fi
-    # vcenter_username_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_username_minimal_permission")
-    # export VSPHERE_USERNAME=$vcenter_username_minimal_permission
-    # vcenter_password_minimal_permission=$(cat "/var/run/vault/devqe-secrets/vcenter_password_minimal_permission")
-    # export VSPHERE_PASSWORD=$vcenter_password_minimal_permission
 fi
 
 ./node-disruptions/prow_run.sh
