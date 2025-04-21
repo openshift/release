@@ -275,7 +275,7 @@ function check_clusteroperators_status() {
 }
 
 case "${CLUSTER_TYPE}" in
-packet|equinix*)
+packet|packet-edge|equinix*)
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/packet-conf.sh"
     # shellcheck source=/dev/null
