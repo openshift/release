@@ -389,6 +389,12 @@ function check_upgrade_recommend_when_upgrade_inprogress() {
         # So far, this is a TP feature in OCP 4.18 and OCP 4.19, so need to enable the gate 
         export OC_ENABLE_CMD_UPGRADE_RECOMMEND=true
     fi
+
+    # https://issues.redhat.com/browse/OCPBUGS-52504
+    # RECOMMEND and PRECHECK command shoudl be able to work together
+    if [[ "${TARGET_MINOR_VERSION}" -eq "19" ]] ; then
+        export OC_ENABLE_CMD_UPGRADE_RECOMMEND_PRECHECK=true
+    fi
     
     local out 
     local info="info: An update is in progress.  You may wish to let this update complete before requesting a new update."
