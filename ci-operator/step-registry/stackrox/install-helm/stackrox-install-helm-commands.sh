@@ -16,7 +16,10 @@ echo ">>> Prepare script environment"
 export SHARED_DIR=${SHARED_DIR:-/tmp}
 echo "SHARED_DIR=${SHARED_DIR}"
 
-export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
+export KUBECONFIG=${KUBECONFIG:-}
+if [[ -z "${KUBECONFIG}" && -e ${SHARED_DIR}/kubeconfig ]]; then
+  export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
 echo "KUBECONFIG=${KUBECONFIG}"
 
 TMP_CI_NAMESPACE="acs-ci-temp"
@@ -25,7 +28,8 @@ echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 ACS_VERSION_TAG=""
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 
-SCRATCH=$(mktemp -d)
+SCRATCH=/tmp/installtmp #$(mktemp -d)
+mkdir -p $SCRATCH
 echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
 
@@ -34,6 +38,7 @@ function exit_handler() {
   set +e
   echo ">>> End ACS install"
   echo "[$(date -u || true)] SECONDS=${SECONDS}"
+  return
   rm -rf "${SCRATCH}" || true
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with helm"
@@ -170,7 +175,6 @@ function install_central_with_helm() {
     installflags+=('--set' 'scannerV4.disable=false')
     if [[ "${SMALL_INSTALL}" == "true" ]]; then
       installflags+=('--set' 'scannerV4.scannerComponent=Enabled')
-      installflags+=('--set' 'scannerV4.indexer.readiness=vulnerability')
       installflags+=('--set' 'scannerV4.indexer.scaling.autoScaling=Disabled')
       installflags+=('--set' 'scannerV4.indexer.scaling.replicas=1')
       installflags+=('--set' 'scannerV4.indexer.resources.requests.cpu=600m')
@@ -192,6 +196,18 @@ function install_central_with_helm() {
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
+  set -x
+
+  if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+    if ! sed -i '/^indexer:/a   readiness: vulnerability' "${SCRATCH}/central-services"/central-services/config-templates/scanner-v4/indexer-config.yaml.tpl; then
+      echo "Failed to set readiness=vulnerability in scanner config template."
+      cat "${SCRATCH}/central-services"/central-services/config-templates/scanner-v4/indexer-config.yaml.tpl || true
+    fi
+  fi
+
+  helm upgrade --dry-run --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
+    --version "${ACS_VERSION_TAG}" \
+     "${installflags[@]+"${installflags[@]}"}"
   helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}"
@@ -253,6 +269,10 @@ wait_deploy central
 get_init_bundle
 install_secured_cluster_with_helm
 echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
+wait_deploy sensor
+wait_deploy admission-control
+
+echo ">>> Wait for 'stackrox scanner' deployments (includes vuln download)"
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-indexer
   wait_deploy scanner-v4-matcher
@@ -260,8 +280,6 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
 fi
 wait_deploy scanner
 wait_deploy scanner-db
-wait_deploy sensor
-wait_deploy admission-control
 
 kubectl get nodes -o json|jq -Cjr '.items[] | .metadata.name," ",.metadata.labels."beta.kubernetes.io/instance-type"," ",.metadata.labels."beta.kubernetes.io/arch", "\n"'|sort -k2 -r|column -t || true
 kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,KERNEL:.status.nodeInfo.kernelVersion,KUBLET:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,RAM:.status.capacity.memory || true
