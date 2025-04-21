@@ -454,17 +454,17 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
   fi
   PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url}"
 
-  trust_bundle_file="${SHARED_DIR}/bundle_file"
-  if [[ -f "${trust_bundle_file}" ]]; then
-    echo -e "Using proxy with requested additional trust bundle"
-    PROXY_SWITCH="${PROXY_SWITCH} --additional-trust-bundle-file ${trust_bundle_file}"
-  fi
+  # trust_bundle_file="${SHARED_DIR}/bundle_file"
+  # if [[ -f "${trust_bundle_file}" ]]; then
+  #   echo -e "Using proxy with requested additional trust bundle"
+  #   PROXY_SWITCH="${PROXY_SWITCH} --additional-trust-bundle-file ${trust_bundle_file}"
+  # fi
   ENABLE_BYOVPC="true"
 
   record_cluster "proxy" "enabled" ${ENABLE_PROXY}
   record_cluster "proxy" "http" $proxy_private_url
   record_cluster "proxy" "https" $proxy_private_url
-  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file
+  #record_cluster "proxy" "trust_bundle_file" $trust_bundle_file
 fi
 
 SUBNET_ID_SWITCH=""

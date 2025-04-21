@@ -144,6 +144,7 @@ if [ "${ENABLE_SHARED_VPC}" == "yes" ]; then
 fi
 
 # Log in
+make -h
 OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 logger "INFO" "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
