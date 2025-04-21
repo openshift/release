@@ -16,12 +16,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -68,8 +68,7 @@ tests:
       cli: latest
       commands: |
         export KUBECTL=oc
-        export REVISION=$(git rev-parse HEAD)
-        export BUNDLE_IMG=quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-bundle:on-pr-${REVISION}
+        export BUNDLE_IMG=quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-bundle:on-pr-${PULL_NUMBER}
 
         # Install tools
         TOOLS_DIR=/tmp/bin
@@ -97,9 +96,11 @@ tests:
         make deploy-nfd-ocp
         make deploy-nvidia-ocp
 
+        mkdir /tmp/oci-image && pushd /tmp/oci-image
         skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
         umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
         oc create -f bundle/rootfs/manifests
+        popd
 
         make test-e2e-ocp
       from: instaslice-base-src
