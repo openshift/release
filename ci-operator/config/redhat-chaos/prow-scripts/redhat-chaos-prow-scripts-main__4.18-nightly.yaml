@@ -60,6 +60,7 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws
@@ -86,33 +87,6 @@ tests:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-aws
-  timeout: 6h0m0s
-- as: krkn-hub-tests
-  cron: 0 4 5 * *
-  steps:
-    cluster_profile: aws-chaos
-    env:
-      BASE_DOMAIN: aws.rhperfscale.org
-      CHURN: "true"
-      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
-      SPOT_INSTANCES: "true"
-      TELEMETRY_GROUP: prow-ocp-4.18
-      USER_TAGS: |
-        TicketId 419
-    observers:
-      enable:
-      - redhat-chaos-cerberus
-      - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    test:
-    - ref: redhat-chaos-start-krkn
-    - chain: redhat-chaos-krkn-hub-tests
   timeout: 6h0m0s
 - as: krkn-hub-node-tests
   cron: 0 4 29 * *
