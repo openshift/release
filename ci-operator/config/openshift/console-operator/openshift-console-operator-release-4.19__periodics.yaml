@@ -25,7 +25,7 @@ releases:
     candidate:
       architecture: amd64
       product: ocp
-      stream: nightly
+      stream: ci
       version: "4.19"
 resources:
   '*':
@@ -34,7 +34,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-techpreview
-  interval: 24h
+  interval: 8h
   steps:
     cluster_profile: aws
     env:
@@ -47,7 +47,38 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 2h0m0s
     workflow: openshift-e2e-aws
+- as: e2e-azure-techpreview
+  interval: 8h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h0m0s
+    workflow: ipi-azure
+- as: e2e-gcp-techpreview
+  interval: 8h
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h0m0s
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.19
   org: openshift
