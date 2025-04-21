@@ -97,6 +97,9 @@ finally:
     shutil.copy2(ara_sql, ara_dir)
 
 
+
+print("HELLO WORLD")
+
 with open(os.path.join(shared_dir, "vips.txt"), "r") as vip_file:
     vips = vip_file.readlines()
 
