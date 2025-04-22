@@ -21,7 +21,7 @@ REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
-pushd workloads/kube-burner-ocp-wrapper
+pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=virt-udn-density
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
@@ -31,7 +31,7 @@ ES_SERVER="" EXTRA_FLAGS="--layer3=${ENABLE_LAYER_3} --iteration=${current_worke
 
 # The measurable run
 ITERATIONS=$((current_worker_count * ITERATIONS_PER_NODE))
-EXTRA_FLAGS="--gc-metrics=true --iteration=$ITERATIONS --layer3=${ENABLE_LAYER_3} --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS="--gc-metrics=true --iteration=$ITERATIONS --layer3=${ENABLE_LAYER_3} --vmi-ready-threshold=${VMI_READY_THRESHOLD} --profile-type=${PROFILE_TYPE}"
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
