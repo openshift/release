@@ -25,7 +25,6 @@ if [[ -z "${KUBECONFIG}" && -e ${SHARED_DIR}/kubeconfig ]]; then
 fi
 echo "KUBECONFIG=${KUBECONFIG}"
 
-SCANNER_V4_INDEXER_READINESS=${SCANNER_V4_INDEXER_READINESS:-}
 SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
 
 TMP_CI_NAMESPACE="acs-ci-temp"
@@ -277,40 +276,38 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo "Wait for vulnerability database to be loaded."
   set -x
   set +e
-  oc get configmap -n stackrox scanner-v4-indexer-config -o yaml \
-    | sed '/^    indexer:/a\      readiness: vulnerability' \
+  oc get configmap -n stackrox scanner-v4-matcher-config -o yaml \
+    | sed '/^    matcher:/a\      readiness: vulnerability' \
     | oc apply -f - -n stackrox --wait=true
-  oc get configmap -n stackrox scanner-v4-indexer-config -o yaml
-  oc -n stackrox set env deploy/scanner-v4-indexer "SCANNER_V4_INDEXER_READINESS=${SCANNER_V4_INDEXER_READINESS}"
+  oc get configmap -n stackrox scanner-v4-matcher-config -o yaml
   oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
-  oc describe deploy -n stackrox scanner-v4-indexer | grep -i readiness
   oc describe deploy -n stackrox scanner-v4-matcher | grep -i readiness
-  oc rollout restart deployment/scanner-v4-indexer
-  oc rollout restart deployment/scanner-v4-matcher
-  oc exec -n stackrox deploy/scanner-v4-indexer -- cat /etc/scanner/config.yaml
-  sleep 30
-  oc logs deploy/scanner-v4-indexer -n stackrox --all-pods --timestamps
+  # If the config is not applied, restart to apply in startup.
+  if oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s; then
+    # status will be ready if readiness was not changed to require vulnerability load
+    oc rollout restart deployment/scanner-v4-matcher
+    oc -n stackrox rollout status deploy/"$1" --timeout=30s
+  fi
+  oc exec -n stackrox deploy/scanner-v4-matcher -- cat /etc/scanner/config.yaml
+  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps
   set -e
   set +x
 fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-db
-  wait_deploy scanner-v4-indexer 600s  # default(300s)=300+9(300s+30s)=54.5m, 600s+9(600s+30s) = 104.5m?
-  wait_deploy scanner-v4-matcher 600s
+  wait_deploy scanner-v4-indexer 
+  wait_deploy scanner-v4-matcher 600s  # default(300s)=300+9(300s+30s)=54.5m, 600s+9(600s+30s) = 104.5m
 fi
-echo ">> and check the indexer logs again..."
-oc logs deploy/scanner-v4-indexer -n stackrox --all-pods --timestamps || true
+echo ">> and check the matcher logs again..."
+oc logs deploy/scanner-v4-matcher -n stackrox --timestamps || true
 
-kubectl get nodes -o json|jq -Cjr '.items[] | .metadata.name," ",.metadata.labels."beta.kubernetes.io/instance-type"," ",.metadata.labels."beta.kubernetes.io/arch", "\n"'|sort -k2 -r|column -t || true
-kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,KERNEL:.status.nodeInfo.kernelVersion,KUBLET:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,RAM:.status.capacity.memory || true
-kubectl get pods -A -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,NODE:.spec.nodeName,HOSTIP:.status.hostIP,PHASE:.status.phase,START_TIME:.metadata.creationTimestamp --sort-by=.metadata.creationTimestamp || true
-retry oc describe nodes || true
-retry oc get pods --namespace stackrox
+kubectl get nodes -o custom-columns='TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,KERNEL:.status.nodeInfo.kernelVersion,KUBLET:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,RAM:.status.capacity.memory' || true
+oc get pods -o wide --namespace stackrox || true
 
 nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
 echo $! > "${SCRATCH}/port_forward_pid"
 
-# Wait for secured cluster to be connect to central.
+# Wait for secured cluster to connect to central.
 max_retry_verify_connected_cluster=30
 for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ ));
 do
