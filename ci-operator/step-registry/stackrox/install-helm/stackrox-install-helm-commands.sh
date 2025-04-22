@@ -210,7 +210,9 @@ function install_central_with_helm() {
 
   helm upgrade --dry-run --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
-     "${installflags[@]+"${installflags[@]}"}"
+     "${installflags[@]+"${installflags[@]}"}" \
+     | tee "${SCRATCH}/tmpchart"
+  grep -C3 readiness "${SCRATCH}/tmpchart" || true
   helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}"
