@@ -270,15 +270,21 @@ echo ">>> Wait for 'stackrox scanner' deployments"
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo "Wait for vulnerability database to be loaded."
   set -x
+  set +e
   oc get configmap -n stackrox scanner-v4-indexer-config -o yaml \
     | sed '/^    indexer:/a\      readiness: vulnerability' \
-    | oc apply -n stackrox --wait=true || true
+    | oc apply -f - -n stackrox --wait=true
   oc get configmap -n stackrox scanner-v4-indexer-config -o yaml
-  oc -n stackrox set env deploy/scanner-v4-indexer "SCANNER_V4_INDEXER_READINESS=${SCANNER_V4_INDEXER_READINESS}" || true
-  oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}" || true
-  oc describe deploy -n stackrox scanner-v4-indexer | grep -i readiness || true
-  oc describe deploy -n stackrox scanner-v4-matcher | grep -i readiness || true
+  oc -n stackrox set env deploy/scanner-v4-indexer "SCANNER_V4_INDEXER_READINESS=${SCANNER_V4_INDEXER_READINESS}"
+  oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
+  oc describe deploy -n stackrox scanner-v4-indexer | grep -i readiness
+  oc describe deploy -n stackrox scanner-v4-matcher | grep -i readiness
+  oc rollout restart deployment/scanner-v4-indexer
+  oc rollout restart deployment/scanner-v4-matcher
+  oc exec -n stackrox deploy/scanner-v4-indexer -- cat /etc/scanner/config.yaml
   sleep 30
+  oc logs deploy/scanner-v4-indexer -n stackrox --all-pods --timestamps
+  set -e
   set +x
 fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
@@ -288,6 +294,8 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
 fi
 wait_deploy scanner
 wait_deploy scanner-db
+echo ">> and check the indexer logs again..."
+oc logs deploy/scanner-v4-indexer -n stackrox --all-pods --timestamps || true
 
 kubectl get nodes -o json|jq -Cjr '.items[] | .metadata.name," ",.metadata.labels."beta.kubernetes.io/instance-type"," ",.metadata.labels."beta.kubernetes.io/arch", "\n"'|sort -k2 -r|column -t || true
 kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,KERNEL:.status.nodeInfo.kernelVersion,KUBLET:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,RAM:.status.capacity.memory || true
