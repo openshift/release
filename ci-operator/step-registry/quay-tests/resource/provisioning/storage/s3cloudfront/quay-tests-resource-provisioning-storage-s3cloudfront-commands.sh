@@ -193,5 +193,5 @@ COLUDFRONT_DOMAIN=$(terraform output cloudfront_domain_name | tr -d '""' | tr -d
 echo "${COLUDFRONT_ID}" > "${SHARED_DIR}/QUAY_S3_CLOUDFRONT_ID"
 echo "${COLUDFRONT_DOMAIN}" > "${SHARED_DIR}/QUAY_CLOUDFRONT_DOMAIN"
 
-tar -cvzf terraform.tgz --exclude=".terraform" *
-cp terraform.tgz "${SHARED_DIR}/"
+tar -cvzf terraform.s3cf.tgz --exclude=".terraform" *
+cp terraform.s3cf.tgz "${SHARED_DIR}/"
