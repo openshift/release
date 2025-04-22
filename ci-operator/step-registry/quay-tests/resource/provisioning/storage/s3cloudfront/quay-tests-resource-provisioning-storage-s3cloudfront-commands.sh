@@ -4,12 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# !!origin_path in aws_cloudfront_distribution must match storage_path in config.yaml
+
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 
 random=$RANDOM
 
-#Create AWS S3 Storage Bucket
+#Create AWS S3 Bucket and CloudFront
 QUAY_AWS_S3_CF_BUCKET="quayprowcf$random"
 
 mkdir -p QUAY_S3CloundFront && cd QUAY_S3CloundFront
@@ -30,7 +32,6 @@ EOF
 
 cat >>create_s3_cloudfront.tf <<EOF
 provider "aws" {
-  profile = "default"
   region = var.region
   access_key = "${QUAY_AWS_ACCESS_KEY}"
   secret_key = "${QUAY_AWS_SECRET_KEY}"
