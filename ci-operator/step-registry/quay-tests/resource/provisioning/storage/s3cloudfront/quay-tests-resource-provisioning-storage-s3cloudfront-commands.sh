@@ -60,8 +60,7 @@ resource "aws_s3_bucket_public_access_block" "quayawscf" {
 }
 
 resource "aws_cloudfront_origin_access_control" "quay_oac" {
-  name                              = "${aws_s3_bucket.quayawscf.id}.s3.${var.region}.amazonaws.com"
-#   name                              = "quay-oac"
+  name                              = "\${aws_s3_bucket.quayawscf.id}.s3.\${var.region}.amazonaws.com"
   description                       = "OAC for S3 access"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
@@ -82,10 +81,10 @@ resource "aws_s3_bucket_policy" "allow_cloudfront" {
           "Service": "cloudfront.amazonaws.com"
         }
         "Action" : ["s3:GetObject"],
-        "Resource" : "${aws_s3_bucket.quayawscf.arn}/*",
+        "Resource" : "\${aws_s3_bucket.quayawscf.arn}/*",
         "Condition" : {
           "StringEquals" : {
-            "AWS:SourceArn" : "${aws_cloudfront_distribution.quay_s3_distribution.arn}"
+            "AWS:SourceArn" : "\${aws_cloudfront_distribution.quay_s3_distribution.arn}"
           }
         }
       },
@@ -96,10 +95,10 @@ resource "aws_s3_bucket_policy" "allow_cloudfront" {
               "Service": "cloudfront.amazonaws.com"
           },
           "Action": "s3:ListBucket",
-          "Resource": "${aws_s3_bucket.quayawscf.arn}",
+          "Resource": "\${aws_s3_bucket.quayawscf.arn}",
            "Condition": {
                "StringEquals": {
-                   "AWS:SourceArn": "${aws_cloudfront_distribution.quay_s3_distribution.arn}"
+                   "AWS:SourceArn": "\${aws_cloudfront_distribution.quay_s3_distribution.arn}"
                }
            }
       }
