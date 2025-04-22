@@ -11,6 +11,9 @@ QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
+QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
+QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
+
 # env variables from shared dir for aws cloudfront
 QUAY_AWS_S3_CF_BUCKET=$([ -f "${SHARED_DIR}/QUAY_AWS_S3_CF_BUCKET" ] && cat "${SHARED_DIR}/QUAY_AWS_S3_CF_BUCKET" || echo "")
 QUAY_S3_CLOUDFRONT_ID=$([ -f "${SHARED_DIR}/QUAY_S3_CLOUDFRONT_ID" ] && cat "${SHARED_DIR}/QUAY_S3_CLOUDFRONT_ID" || echo "") 
@@ -86,6 +89,8 @@ DISTRIBUTED_STORAGE_CONFIG:
       cloudfront_distribution_domain: ${QUAY_CLOUDFRONT_DOMAIN}
       cloudfront_key_id: ${QUAY_S3_CLOUDFRONT_ID}
       cloudfront_privatekey_filename: default-cloudfront-signing-key.pem
+      s3_access_key: ${QUAY_AWS_ACCESS_KEY}
+      s3_secret_key: ${QUAY_AWS_SECRET_KEY}
       s3_region: us-east-2
       host: s3.us-east-2.amazonaws.com
 USERFILES_LOCATION: default

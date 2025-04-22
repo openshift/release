@@ -8,7 +8,6 @@ set -o pipefail
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
-
 random=$RANDOM
 
 #Create AWS S3 Bucket and CloudFront
@@ -186,9 +185,13 @@ terraform apply -auto-approve || true
 #Share Terraform Var and Terraform Directory
 echo "$random"  > "${SHARED_DIR}/QUAY_AWS_CF_RANDOM"
 echo "${QUAY_AWS_S3_CF_BUCKET}" > "${SHARED_DIR}/QUAY_AWS_S3_CF_BUCKET"
-terraform output Cloudfront_id  > "${SHARED_DIR}/QUAY_S3_CLOUDFRONT_ID"
-terraform output cloudfront_domain_name  > "${SHARED_DIR}/QUAY_CLOUDFRONT_DOMAIN"
 
+# trim quotes from terraform output
+COLUDFRONT_ID=$(terraform output Cloudfront_id | tr -d '""' | tr -d '\n')
+COLUDFRONT_DOMAIN=$(terraform output cloudfront_domain_name | tr -d '""' | tr -d '\n')
+
+echo "${COLUDFRONT_ID}" > "${SHARED_DIR}/QUAY_S3_CLOUDFRONT_ID"
+echo "${COLUDFRONT_DOMAIN}" > "${SHARED_DIR}/QUAY_CLOUDFRONT_DOMAIN"
 
 tar -cvzf terraform.tgz --exclude=".terraform" *
 cp terraform.tgz "${SHARED_DIR}/"
