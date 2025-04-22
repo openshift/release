@@ -31,7 +31,7 @@ echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 ACS_VERSION_TAG=""
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 
-SCRATCH=/tmp/installtmp #$(mktemp -d)
+SCRATCH=$(mktemp -d)
 mkdir -p $SCRATCH
 echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
@@ -199,20 +199,6 @@ function install_central_with_helm() {
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
-  set -x
-
-  if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-    if ! sed -i '/^indexer:/a   readiness: vulnerability' "${SCRATCH}/central-services"/central-services/config-templates/scanner-v4/indexer-config.yaml.tpl; then
-      echo "Failed to set readiness=vulnerability in scanner config template."
-      cat "${SCRATCH}/central-services"/central-services/config-templates/scanner-v4/indexer-config.yaml.tpl || true
-    fi
-  fi
-
-  helm upgrade --dry-run --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
-    --version "${ACS_VERSION_TAG}" \
-     "${installflags[@]+"${installflags[@]}"}" \
-     | tee "${SCRATCH}/tmpchart"
-  grep -C3 readiness "${SCRATCH}/tmpchart" || true
   helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}"
@@ -277,7 +263,15 @@ echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
 wait_deploy sensor
 wait_deploy admission-control
 
-echo ">>> Wait for 'stackrox scanner' deployments (includes vuln download)"
+echo ">>> Wait for 'stackrox scanner' deployments"
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  echo "Wait for vulnerability database to be loaded."
+  oc get configmap -n stackrox scanner-v4-indexer-config -o yaml \
+    | tee >(cat >&2) \
+    | sed '/^    indexer:/a\      readiness: vulnerability' \
+    | oc apply -n stackrox --wait=true || true
+  sleep 30
+fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-indexer
   wait_deploy scanner-v4-matcher
