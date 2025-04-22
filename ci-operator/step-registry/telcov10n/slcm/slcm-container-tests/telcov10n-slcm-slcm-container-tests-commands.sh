@@ -72,9 +72,6 @@ ungrouped:
       vpn_password: "${VPN_PASSWORD}"
       vpn_url: "${VPN_URL}"
       tun_name: "${IFNAME}"
-infra_hosts:
-  tb1slcm1: "${TB1SLCM1}"
-  tb2slcm1: "${TB2SLCM1}"
 all:
   hosts:
     localhost:
@@ -105,6 +102,9 @@ OCP_VERSION: "${OCP_VERSION}"
 SITE_NAME: "${SITE_NAME}"
 DCI_PIPELINE_FILES: "${DCI_PIPELINE_FILES}"
 EDU_PTP: "${EDU_PTP}"
+infra_hosts:
+  tb1slcm1: "${TB1SLCM1}"
+  tb2slcm1: "${TB2SLCM1}"
 END_VARS
 
 ansible-galaxy collection install ansible.posix
