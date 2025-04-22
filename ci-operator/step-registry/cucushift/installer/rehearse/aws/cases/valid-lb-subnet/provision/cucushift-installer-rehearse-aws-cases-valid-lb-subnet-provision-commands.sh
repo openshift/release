@@ -1421,6 +1421,37 @@ patch_new_subnets $config ${vpc1_priv1}
 create_manifests $install_dir
 expect_regex $install_dir "${desc}" "level=error.*Forbidden: additional subnets.*without tag prefix kubernetes.io/cluster/ are found in vpc vpc-.* of provided subnets. Please add a tag kubernetes.io/cluster/unmanaged to those subnets to exclude them from cluster installation or explicitly assign roles in the install-config to provided subnets.*"
 
+# error msg:
+# level=error msg="failed to fetch Master Machines: failed to load asset \"Install Config\": failed to create install config: platform.aws.vpc.subnets: Forbidden: additional subnets [subnet-009578796497415b2 subnet-013797a79afb77442 subnet-018ab3d120fe468c0 subnet-060dfb034e0a04c3d subnet-0721289c24c0f8f21 subnet-096facc9c8a1b0b07 subnet-0ab35ec555d9ed825 subnet-0aec18801727d06de subnet-0d6bd7b7a83a5bf81 subnet-0da3c7a64a7c88e46 subnet-0e67021e39d4ce8ae] without tag prefix kubernetes.io/cluster/ are found in vpc vpc-0d259b77dfec5f6d6 of provided subnets. Please add a tag kubernetes.io/cluster/unmanaged to those subnets to exclude them from cluster installation or explicitly assign roles in the install-config to provided subnets"
+desc="Reject BYO VPC Installations that Contain Untagged Subnets - public only cluster"
+print_title "${desc}"
+cluster_name=$(gen_cluster_name)
+install_dir=${INSTALL_DIR_BASE}/${cluster_name}
+config=${install_dir}/install-config.yaml
+create_install_config $install_dir $cluster_name External
+for s in $(jq -c -r '.Stacks[].Outputs[] | select(.OutputKey=="PublicSubnetIds") | .OutputValue' "${VPC_1_STACK_OUTPUT}" | sed 's/,/ /g');
+do
+  patch_new_subnets $config ${s}
+done
+export OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY=true
+create_manifests $install_dir
+unset OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY
+expect_regex $install_dir "${desc}" "level=error.*Forbidden: additional subnets.*without tag prefix kubernetes.io/cluster/ are found in vpc vpc-.* of provided subnets. Please add a tag kubernetes.io/cluster/unmanaged to those subnets to exclude them from cluster installation or explicitly assign roles in the install-config to provided subnets.*"
+
+desc="Reject BYO VPC Installations that Contain Untagged Subnets - private cluster"
+print_title "${desc}"
+cluster_name=$(gen_cluster_name)
+install_dir=${INSTALL_DIR_BASE}/${cluster_name}
+config=${install_dir}/install-config.yaml
+create_install_config $install_dir $cluster_name Internal
+for s in $(jq -c -r '.Stacks[].Outputs[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue' "${VPC_1_STACK_OUTPUT}" | sed 's/,/ /g');
+do
+  patch_new_subnets $config ${s}
+done
+create_manifests $install_dir
+expect_regex $install_dir "${desc}" "level=error.*Forbidden: additional subnets.*without tag prefix kubernetes.io/cluster/ are found in vpc vpc-.* of provided subnets. Please add a tag kubernetes.io/cluster/unmanaged to those subnets to exclude them from cluster installation or explicitly assign roles in the install-config to provided subnets.*"
+
+
 # Reject IngressControllers or ControlPlaneLB AZs that do not match ClusterNode AZs
 #
 # error msg:
@@ -1629,7 +1660,7 @@ install_dir=${INSTALL_DIR_BASE}/${cluster_name}
 config=${install_dir}/install-config.yaml
 create_install_config $install_dir $cluster_name External
 patch_new_subnet_with_roles $config ${vpc1_pub1} ControlPlaneExternalLB IngressControllerLB BootstrapNode ClusterNode
-patch_new_subnet_with_roles $config ${vpc1_priv1} ControlPlaneInternalLB
+patch_new_subnet_with_roles $config ${vpc1_pub1a} ControlPlaneInternalLB
 export OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY=true
 create_manifests $install_dir
 unset OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY
