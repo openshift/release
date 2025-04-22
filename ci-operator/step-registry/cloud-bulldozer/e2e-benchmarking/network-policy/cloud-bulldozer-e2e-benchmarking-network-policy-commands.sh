@@ -23,10 +23,7 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     export JOB_TIMEOUT=${JOB_TIMEOUT:=21600}
     current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
     export WORKLOAD=${WORKLOAD:=network-policy}
-    JOB_ITERATIONS=${current_worker_count}
-    echo $JOB_ITERATIONS is JOB_ITERATIONS
-    export JOB_ITERATIONS
-    PPROF=false ./run.sh
+    ITERATIONS=${current_worker_count} PPROF=false ./run.sh
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
 fi
