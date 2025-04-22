@@ -25,6 +25,9 @@ if [[ -z "${KUBECONFIG}" && -e ${SHARED_DIR}/kubeconfig ]]; then
 fi
 echo "KUBECONFIG=${KUBECONFIG}"
 
+SCANNER_V4_INDEXER_READINESS=${SCANNER_V4_INDEXER_READINESS:-}
+SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
+
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 
@@ -271,8 +274,8 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
     | sed '/^    indexer:/a\      readiness: vulnerability' \
     | oc apply -n stackrox --wait=true || true
   oc get configmap -n stackrox scanner-v4-indexer-config -o yaml
-  oc -n stackrox set env deploy/scanner-v4-indexer 'SCANNER_V4_INDEXER_READINESS=vulnerability' || true
-  oc -n stackrox set env deploy/scanner-v4-matcher 'SCANNER_V4_MATCHER_READINESS=vulnerability' || true
+  oc -n stackrox set env deploy/scanner-v4-indexer "SCANNER_V4_INDEXER_READINESS=${SCANNER_V4_INDEXER_READINESS}" || true
+  oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}" || true
   oc describe deploy -n stackrox scanner-v4-indexer | grep -i readiness || true
   oc describe deploy -n stackrox scanner-v4-matcher | grep -i readiness || true
   sleep 30
