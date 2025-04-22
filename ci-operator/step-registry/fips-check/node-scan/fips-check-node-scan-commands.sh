@@ -65,7 +65,7 @@ report="/tmp/fips-check-node-scan.log"
 oc label namespace "$project" security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite=true || true
 cluster_http_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
 cluster_https_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
-oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; export https_proxy=$cluster_https_proxy; podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot quay-proxy.ci.openshift.org/openshift/ci:ci_check-payload_latest scan node --root  /myroot &> $report" || true
+oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; export https_proxy=$cluster_https_proxy; podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan node --root  /myroot &> $report" || true
 out=$(oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $project || true
