@@ -1,4 +1,6 @@
 #!/bin/bash
 set -eu
 
-cat ${CLUSTER_PROFILE_DIR}/cloud_name
+[[ if $(cat ${CLUSTER_PROFILE_DIR}/cloud_name) == "cloud19" ]]; then
+    echo "cool!"
+fi
