@@ -1,12 +1,28 @@
 base_images:
+  ansible:
+    name: "4.16"
+    namespace: ocp
+    tag: ansible
   cli:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: cli
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  openstack-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: openstack-installer
   tests-private:
     name: tests-private
     namespace: ci
@@ -16,26 +32,26 @@ base_images:
     namespace: ci
     tag: "4.14"
   tools:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: upi-installer
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
   latest:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
-  multi-latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.14"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -44,38 +60,38 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: gcp-ipi-sdn-fips-f28-logging
-  cron: 6 22 17 * *
+- as: aws-ipi-f28-logging
+  cron: 21 10 26 * *
   steps:
-    cluster_profile: gcp-observability
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      COMPUTE_NODE_TYPE: e2-standard-8
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@logging5.8'
-      FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
       FORCE_SUCCESS_EXIT: "true"
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.8
+      OCP_ARCH: arm64
       OPERATORS: |
         [
             {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
-      TEST_ADDITIONAL: ""
-      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
-      TEST_IMPORTANCE: ""
+      TEST_FILTERS: ~Loki&;~Disruptive&;~STS&;~WIF&;~Azure&;~Google&
+      TEST_IMPORTANCE: Critical|High
       TEST_PARALLEL: "3"
-      TEST_ROSA_LOGIN_ENV: ""
       TEST_SCENARIOS: sig-openshift-logging
-      TEST_TIMEOUT: "15"
+      TEST_TIMEOUT: "30"
     test:
     - ref: enable-qe-catalogsource-logging
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-sdn
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
-  branch: release-4.14
+  branch: release-4.16
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-openshift-logging-5.8
+  variant: arm64-nightly-openshift-logging-5.8
