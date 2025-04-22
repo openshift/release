@@ -202,6 +202,9 @@ function install_central_with_helm() {
   helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}"
+
+  oc -n stackrox set env deploy/scanner-v4-indexer 'SCANNER_V4_INDEXER_READINESS=vulnerability' || true
+  oc -n stackrox set env deploy/scanner-v4-matcher 'SCANNER_V4_MATCHER_READINESS=vulnerability' || true
 }
 
 function get_init_bundle() {
