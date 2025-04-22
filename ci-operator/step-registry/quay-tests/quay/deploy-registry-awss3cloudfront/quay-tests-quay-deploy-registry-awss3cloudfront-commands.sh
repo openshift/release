@@ -92,6 +92,9 @@ USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 EOF
 
+pwd
+ls 
+
 oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file default-cloudfront-signing-key.pem=./default-cloudfront-signing-key.pem config-bundle-secret
 
 #Deploy Quay registry, here disable monitoring component
