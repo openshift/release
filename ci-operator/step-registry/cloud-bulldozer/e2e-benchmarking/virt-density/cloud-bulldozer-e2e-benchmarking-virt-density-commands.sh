@@ -8,7 +8,6 @@ oc config view
 oc projects
 pushd /tmp
 
-
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
     git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
     pushd ${REPO_NAME}
@@ -17,11 +16,9 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
     git switch ${PULL_NUMBER}
     pushd workloads/kube-burner-ocp-wrapper
-    export WORKLOAD=udn-density-pods
-
-    current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
-
-    ES_SERVER="" EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3}" ITERATIONS=${current_worker_count} CHURN=false ./run.sh
+    export WORKLOAD=virt-density
+    export EXTRA_FLAGS="--vms-per-node=5 --vmi-ready-threshold=1m"
+    ES_SERVER="" PPROF=false ./run.sh
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
 fi
