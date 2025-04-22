@@ -56,9 +56,12 @@ trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
 function retry() {
+  local i
   for (( i = 0; i < 10; i++ )); do
     "$@" && return 0
-    sleep 30
+    if [[ $i -lt 9 ]]; then
+      sleep 30
+    fi
   done
   return 1
 }
@@ -267,6 +270,9 @@ wait_deploy sensor
 wait_deploy admission-control
 
 echo ">>> Wait for 'stackrox scanner' deployments"
+wait_deploy scanner
+wait_deploy scanner-db
+
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo "Wait for vulnerability database to be loaded."
   set -x
@@ -288,12 +294,10 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   set +x
 fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-  wait_deploy scanner-v4-indexer
-  wait_deploy scanner-v4-matcher
   wait_deploy scanner-v4-db
+  wait_deploy scanner-v4-indexer 600s  # default(300s)=300+9(300s+30s)=54.5m, 600s+9(600s+30s) = 104.5m?
+  wait_deploy scanner-v4-matcher 600s
 fi
-wait_deploy scanner
-wait_deploy scanner-db
 echo ">> and check the indexer logs again..."
 oc logs deploy/scanner-v4-indexer -n stackrox --all-pods --timestamps || true
 
