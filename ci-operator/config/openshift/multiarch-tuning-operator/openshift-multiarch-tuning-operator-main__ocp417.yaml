@@ -2,11 +2,11 @@ base_images:
   base:
     name: builder
     namespace: ocp
-    tag: rhel-9-enterprise-base-multi-openshift-4.17
+    tag: rhel-9-enterprise-base-multi-openshift-4.19
   builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -19,6 +19,7 @@ images:
     builder:
       as:
       - golang:1.22
+      - golang:1.23
   to: multiarch-tuning-operator
 - additional_architectures:
   - arm64
@@ -101,7 +102,7 @@ tests:
   - arm64
   cron: 30 10 20 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
@@ -138,7 +139,7 @@ tests:
   postsubmit: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/)konflux\.Dockerfile$)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:

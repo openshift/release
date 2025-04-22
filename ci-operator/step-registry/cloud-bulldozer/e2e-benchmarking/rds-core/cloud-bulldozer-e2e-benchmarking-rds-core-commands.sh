@@ -11,8 +11,8 @@ pushd /tmp
 
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
     if [ ${BAREMETAL} == "true" ]; then
-      SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-      bastion="$(cat /bm/address)"
+      SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+      bastion="$(cat /secret/address)"
       # Copy over the kubeconfig
       if [ ! -f "${SHARED_DIR}/kubeconfig" ]; then
         ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig

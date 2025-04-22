@@ -164,8 +164,8 @@ function fix_user_permissions() {
 }
 
 # Cleanup prior runs
-# VPC: Load Balancers, images, vm instances
-# PowerVS: images, pvm instances
+# VPC: Load Balancers, vm instances
+# PowerVS: pvm instances
 # Not Covered:
 #   COS: bucket, objects
 function cleanup_prior() {
@@ -185,16 +185,7 @@ function cleanup_prior() {
             sleep 5
         done
         sleep 60
-
-        echo "Deleting the Images"
-        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | select(.name | contains("CentOS-Stream-9")| not).imageID')
-        do
-            echo "Deleting Images ${IMAGE_ID}"
-            retry "ibmcloud pi image delete ${IMAGE_ID}"
-            sleep 5
-        done
-        sleep 60
-        echo "Done Deleting the ${CRN}"
+        echo "Done Deleting the PVM Instances for ${CRN}"
     done
 
     # Dev: functions don't work inline with xargs
@@ -238,21 +229,6 @@ function cleanup_prior() {
         | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
         | xargs -t --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force \
         || true
-
-    # VPC Images
-    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "${RESOURCE_GROUP}" --output json | jq -r '.[] | select(.name | contains("ci-op-") | not) .id?')
-    do
-        echo "Removing image with id/details"
-        ibmcloud is image --output json "${RESOURCE_TGT}" > /tmp/image.json
-        cat /tmp/image.json
-        jq -r 'select((.created_at | split(".")[0] | strptime("%Y-%m-%dT%H:%M:%S") | mktime | strftime("%F %X")) < (now - 86400))' /tmp/image.json > /tmp/image_old.json
-        if [ ! -z "$(< /tmp/image_old.json)" ]
-        then
-            echo "Deleting Image"
-            ibmcloud is image-delete "${RESOURCE_TGT}" -f
-        fi
-    done
-
     echo "Done cleaning up prior runs"
 }
 
@@ -273,10 +249,8 @@ function configure_terraform() {
     CLUSTER_DOMAIN="${BASE_DOMAIN}"
     IBMCLOUD_CIS_CRN="${IBMCLOUD_CIS_CRN}"
 
-    echo "IC: coreos"
-    COREOS_URL=$(openshift-install coreos print-stream-json | jq -r '.architectures.ppc64le.artifacts.powervs.formats."ova.gz".disk.location')
-    COREOS_FILE=$(echo "${COREOS_URL}" | sed 's|/| |g' | awk '{print $NF}')
-    COREOS_NAME=$(echo "${COREOS_FILE}" | tr '.' '-' | sed 's|-0-powervs-ppc64le-ova-gz|-0-ppc64le-powervs.ova.gz|g' )
+    # CoreOS Name is fixed
+    COREOS_NAME="rhel-coreos"
 
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
@@ -314,7 +288,7 @@ ibmcloud_region     = "${POWERVS_REGION}"
 service_instance_id = "${POWERVS_SERVICE_INSTANCE_ID}"
 rhel_image_name     = "CentOS-Stream-9"
 rhcos_image_name                = "${COREOS_NAME}"
-rhcos_import_image              = true
+rhcos_import_image              = false
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier0"
 system_type         = "s1022"
@@ -339,8 +313,6 @@ ibm_cloud_cis_crn          = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
 
 dns_forwarders = "161.26.0.10; 161.26.0.11"
-
-override_bastion_storage_pool = "General-Flash-7"
 EOF
 
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars "${SHARED_DIR}"/var-multi-arch-upi.tfvars
