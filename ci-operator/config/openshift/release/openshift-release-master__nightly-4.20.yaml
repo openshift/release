@@ -438,13 +438,18 @@ tests:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
 - as: metal-ovn-network-flow-matrix-bm-single-node
+  cluster: build05
   cron: 0 23 * * 0,2,4,6
   steps:
-    cluster_profile: equinix-edge-enablement
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+      TEST_SUITE: openshift/conformance/serial
     test:
     - ref: network-flow-matrix-tests
-    - ref: baremetalds-sno-test
-    workflow: baremetalds-sno
+    - chain: agent-test-conformance
+    workflow: agent-e2e-generic-conformance
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
