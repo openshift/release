@@ -111,7 +111,7 @@ EOF
 fi
 if [[ "$MTO_OPERATOR_INSTALL_METHOD" == "bundle" ]]; then 
     oc create namespace ${NAMESPACE}
-    OO_BUNDLE=registry.ci.openshift.org/origin/multiarch-tuning-op-bundle:main
+    OO_BUNDLE=quay-proxy.ci.openshift.org/openshift/ci:origin_multiarch-tuning-op-bundle_main
     operator-sdk run bundle --timeout=10m --security-context-config restricted -n $NAMESPACE "${BUNDLE_OVERRIDE:-${OO_BUNDLE}}"
 fi
 echo "Waiting for multiarch-tuning-operator"
