@@ -20,7 +20,7 @@ variable "region" {
   default = "us-east-2"
 }
 
-variable "quay_s3_bucket" {
+variable "aws_bucket" {
   default = "quays3cloudfront"
 }
 
@@ -28,7 +28,6 @@ variable "quay_s3_origin_id" {
 default = "quay_origin_id"
 }
 EOF
-
 
 cat >>create_s3_cloudfront.tf <<EOF
 provider "aws" {
@@ -39,7 +38,7 @@ provider "aws" {
 
 #s3 bucket
 resource "aws_s3_bucket" "quayawscf" {
-  bucket = var.quay_s3_bucket
+  bucket = var.aws_bucket
   force_destroy = true
 }
 
