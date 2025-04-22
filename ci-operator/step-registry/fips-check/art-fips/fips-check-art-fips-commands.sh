@@ -34,7 +34,7 @@ payload_pullspec=$(oc get clusterversion version -o json | jq -r .status.desired
 report="/tmp/fips-check-payload-scan.log"
 
 # REGISTRY_AUTH_FILE use the location of kublets default pull secret
-oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "podman run --privileged -i -v /:/myroot -e REGISTRY_AUTH_FILE=/myroot/var/lib/kubelet/config.json quay-proxy.ci.openshift.org/openshift/ci:ci_check-payload_latest scan payload -V $MAJOR_MINOR --url $payload_pullspec &> $report" || true
+oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "podman run --privileged -i -v /:/myroot -e REGISTRY_AUTH_FILE=/myroot/var/lib/kubelet/config.json registry.ci.openshift.org/ci/check-payload:latest scan payload -V $MAJOR_MINOR --url $payload_pullspec &> $report" || true
 out=$(oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $namespace || true
