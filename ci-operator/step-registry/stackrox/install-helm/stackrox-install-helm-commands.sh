@@ -202,9 +202,6 @@ function install_central_with_helm() {
   helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}"
-
-  oc -n stackrox set env deploy/scanner-v4-indexer 'SCANNER_V4_INDEXER_READINESS=vulnerability' || true
-  oc -n stackrox set env deploy/scanner-v4-matcher 'SCANNER_V4_MATCHER_READINESS=vulnerability' || true
 }
 
 function get_init_bundle() {
@@ -269,11 +266,17 @@ wait_deploy admission-control
 echo ">>> Wait for 'stackrox scanner' deployments"
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo "Wait for vulnerability database to be loaded."
+  set -x
   oc get configmap -n stackrox scanner-v4-indexer-config -o yaml \
-    | tee >(cat >&2) \
     | sed '/^    indexer:/a\      readiness: vulnerability' \
     | oc apply -n stackrox --wait=true || true
+  oc get configmap -n stackrox scanner-v4-indexer-config -o yaml
+  oc -n stackrox set env deploy/scanner-v4-indexer 'SCANNER_V4_INDEXER_READINESS=vulnerability' || true
+  oc -n stackrox set env deploy/scanner-v4-matcher 'SCANNER_V4_MATCHER_READINESS=vulnerability' || true
+  oc describe deploy -n stackrox scanner-v4-indexer | grep -i readiness || true
+  oc describe deploy -n stackrox scanner-v4-matcher | grep -i readiness || true
   sleep 30
+  set +x
 fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-indexer
