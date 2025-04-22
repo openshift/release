@@ -332,8 +332,13 @@ EOF
 }
 
 REGISTRY_PASSWORD_CONTENT=$(cat "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" | base64 -w0)
-REGISTRY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
-REGISTRY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+if [[ "${SELF_MANAGED_REGISTRY_CERT}" == "true" ]]; then
+    REGISTRY_CRT_CONTENT=$(cat "${CLUSTER_PROFILE_DIR}/mirror_registry_server_domain.crt" | base64 -w0)
+    REGISTRY_KEY_CONTENT=$(cat "${CLUSTER_PROFILE_DIR}/mirror_registry_server_domain.pem" | base64 -w0)
+else
+    REGISTRY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
+    REGISTRY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+fi
 
 declare -a registry_ports=("5000" "6001" "6002")
 
