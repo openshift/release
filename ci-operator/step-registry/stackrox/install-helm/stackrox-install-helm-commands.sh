@@ -12,6 +12,9 @@ cat <<EOF
   * Wait for all services minimal running state.
 EOF
 
+exec > >(trap "" INT TERM; sed 's/$/ #notsecret/')
+exec 2> >(trap "" INT TERM; sed 's/$/ (stderr)#notsecret/' >&2)
+
 echo ">>> Prepare script environment"
 export SHARED_DIR=${SHARED_DIR:-/tmp}
 echo "SHARED_DIR=${SHARED_DIR}"
