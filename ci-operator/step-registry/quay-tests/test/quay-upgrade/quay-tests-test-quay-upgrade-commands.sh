@@ -11,6 +11,7 @@ oc version
 export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
 export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
 export QUAYREGISTRY_QUAY_VERSION=${QUAYREGISTRY_QUAY_VERSION}
+export ENABLE_PRINT_EVENT_STDOUT=true
 
 echo "Run extended-platform-tests"
 extended-platform-tests run all --dry-run | grep -E ${QUAY_UPGRADE_TESTCASE} | extended-platform-tests run --timeout 240m --junit-dir="${ARTIFACT_DIR}" -f - || true
