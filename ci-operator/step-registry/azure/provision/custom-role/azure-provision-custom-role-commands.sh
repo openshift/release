@@ -142,6 +142,7 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_identity_user_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
     install_config_identity_user_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
     install_config_identity_user_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
+    install_config_outbound_type=$(yq-go r ${CONFIG} 'platform.azure.outboundType')
 
     required_permissions="""
 \"Microsoft.Authorization/policies/audit/action\",
@@ -281,7 +282,7 @@ ${required_permissions}
     fi
 
     # Starting from 4.19, user-assigned identity created by installer is removed, related permissions are not required any more.
-    if (( ocp_minor_version <=18 && ocp_major_version == 4 )) || [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
+    if (( ocp_minor_version <=18 && ocp_major_version == 4 )); then
         required_permissions="""
 \"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
 \"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
@@ -341,6 +342,17 @@ ${required_permissions}
 \"Microsoft.Network/virtualNetworks/checkIpAddressAvailability/read\",
 ${required_permissions}
 """
+    fi
+
+    # optional permissions when installing fullyprivate cluster and using natgateway as outbound
+    if [[ "${install_config_outbound_type}" == "UserDefinedRouting" ]] && [[ "${OUTBOUND_UDR_TYPE}" == "NAT" ]]; then
+        required_permissions="""
+\"Microsoft.Network/natGateways/join/action\",
+\"Microsoft.Network/natGateways/read\",
+\"Microsoft.Network/natGateways/write\",
+${required_permissions}
+"""
+
     fi
 
     if [[ -n "${install_config_osimage_default}" ]] || [[ -n "${install_config_osimage_master}" ]] || [[ -n "${install_config_osimage_worker}" ]]; then

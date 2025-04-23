@@ -63,24 +63,11 @@ images:
       as:
       - registry.ci.openshift.org/ci/tests-private-base:4.11
   to: tests-private-newpr
-- dockerfile_literal: |
-    FROM bin
-    RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
-        PACKAGES="azure-cli openssh-clients httpd-tools skopeo java-11-openjdk-headless" && \
-        yum update -y && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && yum clean all && rm -rf /var/cache/yum/* && \
-        chmod g+w /etc/passwd
-    RUN pip3 install --upgrade setuptools pip && pip3 install dotmap minio pyyaml==5.4.1 requests python-openstackclient
-    RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip -q awscliv2.zip && ./aws/install -b /bin && rm -rf ./aws awscliv2.zip
-  from: bin
-  optional: true
-  to: tests-private-pr
 promotion:
   to:
   - excluded_images:
     - tests-private
     - tests-private-ui
-    - tests-private-pr
     - tests-private-newpr
     name: "4.11"
     namespace: ocp
@@ -123,7 +110,7 @@ tests:
   optional: true
   skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata)/)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test

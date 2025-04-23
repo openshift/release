@@ -88,6 +88,7 @@ function check_jobs() {
 
         if [ -z "$JOB_ID" ]; then
             job_status="TriggerFailed"
+            job_url=""
         else
             set +x
             for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
@@ -102,6 +103,7 @@ function check_jobs() {
                     if [ "$job_status" == "null" ] || [ -z "$job_status" ]; then
                         job_status="other"
                     fi
+                    job_url=$(jq -r '.job_url' <<< "$json_body")
                     break
                 else
                     echo "[$retry_count/$max_retries] Gangway API not available (HTTP $http_status). Retrying in $retry_interval sec..."
@@ -111,9 +113,10 @@ function check_jobs() {
             set -x
             if [ "$http_status" -ne 200 ]; then
                 job_status="QueryNotFound"
+                job_url=""
             fi
         fi
-        echo "$HUB, $MCE, $HostedCluster, $PLATFORM, $JOB, JOB_ID=${JOB_ID}, JOB_STATUS=${job_status}" >> "${SHARED_DIR}/job_list"
+        echo "$HUB, $MCE, $HostedCluster, $PLATFORM, $JOB, JOB_URL=${job_url}, JOB_STATUS=${job_status}" >> "${SHARED_DIR}/job_list"
     done < "/tmp/job_list"
 }
 
@@ -197,3 +200,4 @@ fi
 
 check_jobs
 generate_junit_xml
+cat "${SHARED_DIR}/job_list" > "$ARTIFACT_DIR/job_list"
