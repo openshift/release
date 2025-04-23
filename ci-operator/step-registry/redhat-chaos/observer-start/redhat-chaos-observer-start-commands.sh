@@ -27,3 +27,5 @@ EOF
 
 
 oc get pods -n $TEST_NAMESPACE
+
+oc cluster-info

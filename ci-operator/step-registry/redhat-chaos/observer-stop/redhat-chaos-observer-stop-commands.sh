@@ -17,6 +17,8 @@ while [[ $output_code == 1 ]]; do
     fi
 done
 
+oc cluster-info
+
 status_bool=$(echo $output | grep '"cerberus":' | sed 's/.*: //; s/[{},]//g')
 
 echo "$status_bool staus bool "

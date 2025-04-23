@@ -23,6 +23,8 @@ function cerberus_cleanup() {
   oc get ns
 
   oc get pods -n $TEST_NAMESPACE
+
+  oc cluster-info
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$c_status'}' >> test.json
