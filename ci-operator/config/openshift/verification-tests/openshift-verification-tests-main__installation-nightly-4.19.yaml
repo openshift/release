@@ -172,19 +172,35 @@ tests:
       ENABLE_BYO_IAM_ROLE_DEFAULT_MACHINE: "false"
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
-- as: aws-ipi-byo-subnets-only-public-mini-perm-arm-f14
+- as: aws-ipi-byo-subnets-role-only-public-mini-perm-arm-f14
   cron: 53 23 8,22 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      ADDITIONAL_SUBNETS_COUNT: "1"
+      ASSIGN_ROLES_TO_SUBNETS: "yes"
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
       OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+      SUBNET_ROLES: |-
+        [
+          [
+            {
+              "private": "",
+              "public": "ControlPlaneInternalLB"
+            },
+            {
+              "private": "",
+              "public": "ControlPlaneExternalLB IngressControllerLB BootstrapNode ClusterNode"
+            }
+          ]
+        ]
+      ZONES_COUNT: "1"
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-byo-subnets
