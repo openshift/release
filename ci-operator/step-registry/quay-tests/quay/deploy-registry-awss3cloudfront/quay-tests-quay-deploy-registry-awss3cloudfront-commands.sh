@@ -21,37 +21,6 @@ QUAY_CLOUDFRONT_DOMAIN=$([ -f "${SHARED_DIR}/QUAY_CLOUDFRONT_DOMAIN" ] && cat "$
 
 echo "Create registry ${QUAYREGISTRY} in ns ${QUAYNAMESPACE}"
 
-cat >>default-cloudfront-signing-key.pem <<EOF
------BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCTTnzfGYxf4lWo
-UuQKJ3grLdlvbvF8mGM09ltvQ/uzoTH9kUP8ehNwsu/d5lISsLbNvLzGoC101k1e
-H+PXRYwaROfFadX6V42yaCtPBBOq91qXxPQ1ZR4LtqS5Td8qKIqh02LNqH0s1ibq
-grU54eZw35ZkIvdh6ZyG9UhI7S0E0rXnAbTen9NxVqfeqaGUFM9emolgFiwOojpU
-ELZ4IA3pbOZMU9MZCgPvaig2P7DaQqiLUKQ9i3TzOCqjZhxbCtABT+/2CdtJEDte
-iTOjb0TDVLKWc7lKThxg7/aF/NGlcm19FPZ+qXhKp4vwseg4zj5yVCkRBEEG6Fwm
-dbYEsI/ZAgMBAAECggEAEMf+PcRBU6MLMxPOWsHIVNLyVFmFNTZ/BseR/wj1oa8Z
-bNOhtR+LG2mnHdZhPzPWf3Wi49XXl9naEoD7iciof02eQcUe1VgoEkz/sg661t06
-+tM7JuIQHDGAboPKipj3whu8w8UQDY2P/WNKlf+AKxetoFbDa+obJNzIkVZDrKrP
-yfXqeR8+vszI3sY5bs1GhWw+dL11rzj66wD1VTXcHIWKp9cDrTxBgx9sgoi3nNhJ
-j9+BmBNKJEzTqSgsN8w8G9cc3VUyXmzfuoDq4B1WXqjw7F4efp4My9gF4yEeQGcI
-80JnEVKTrFiR5mQB+gUc8HmPyIvi55NA/Su1CIEsiQKBgQDgx5nOrjAblQojK6rx
-0f4OQstVD6T5pOpH+4n7/vB7hqIfSk0B2vVngMOHOJCnBWZ2VFJaAThXyg2zYnIi
-0PSNfcdHrAJPO2DoE8W/uuzClG8Uhl9kGOLOSRSKg4T3w8jww4x0PUZhzruUA4/x
-5Fz52PE4yahzk9vkhDMgJGWuzwKBgQCnxDU0mzinrLjh17cEEsfGtUJ8xFdUITWT
-b13pyT5W2PaO3TY4lI8iLgTMZuiAWTfe0arq/ureW5sSTuFGR1hwu4URMpLoKoNu
-Mh87FzQtJamgWX2ATZX6+xhT983eWwAN5LDSOeyeyNuAXNlB5r/kvevPfrZGcEzX
-oLo/DLlA1wKBgFUbfiMBVPm8jqAOcqUo61ae97n3OHHFfWdP2EjvmEJNEaljSpD/
-RJex61aRlkOHCeqXtq6Zc6nZuSJIjgqcr1u7We7LM/yn8OMuSVt0/RwXc4+D6S5P
-NeEBTqO7dGcTXEu83rtMUA/MZL2AM8pUutdmyr7Dq+JHA6UcYPc0kMOFAoGBAIEe
-ufRrIweqIAFyDSHNcoS1LR7p3myZwqpepGEyyg/9nIYIK5sQe7lKwdavvXJLOHz9
-0hZbbFkHGCrXGvsEHkVljdzWl8qoLc+6M98+1KGKwyrutXDyReSNLQQzTPc+AqSu
-xoiGnF75KDd7PptCBZ7/rWZdl9xOwlWTFsU//bSxAoGAAzoQPGMsq1JWkP3KaGxj
-GDkpEPpG/CbKSLrynT2f1cp9fHWQASJUEl89j7BLinTz9Akl1S1mmkvSXCyd0hrx
-7n+ysJQaYdAqqO/vNOC0k8//nPsyuNI1Mml3e0KQ23P4OpvmPwc17sgufHd3YEh/
-1xNDC3+IHi16dMgRo/1br7Y=
------END PRIVATE KEY-----
-EOF
-
 #create secret bundle with aws s3 cloudfront
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
@@ -97,12 +66,40 @@ USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 EOF
 
-pwd
-ls 
+cat >>default-cloudfront-signing-key.pem <<EOF
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCTTnzfGYxf4lWo
+UuQKJ3grLdlvbvF8mGM09ltvQ/uzoTH9kUP8ehNwsu/d5lISsLbNvLzGoC101k1e
+H+PXRYwaROfFadX6V42yaCtPBBOq91qXxPQ1ZR4LtqS5Td8qKIqh02LNqH0s1ibq
+grU54eZw35ZkIvdh6ZyG9UhI7S0E0rXnAbTen9NxVqfeqaGUFM9emolgFiwOojpU
+ELZ4IA3pbOZMU9MZCgPvaig2P7DaQqiLUKQ9i3TzOCqjZhxbCtABT+/2CdtJEDte
+iTOjb0TDVLKWc7lKThxg7/aF/NGlcm19FPZ+qXhKp4vwseg4zj5yVCkRBEEG6Fwm
+dbYEsI/ZAgMBAAECggEAEMf+PcRBU6MLMxPOWsHIVNLyVFmFNTZ/BseR/wj1oa8Z
+bNOhtR+LG2mnHdZhPzPWf3Wi49XXl9naEoD7iciof02eQcUe1VgoEkz/sg661t06
++tM7JuIQHDGAboPKipj3whu8w8UQDY2P/WNKlf+AKxetoFbDa+obJNzIkVZDrKrP
+yfXqeR8+vszI3sY5bs1GhWw+dL11rzj66wD1VTXcHIWKp9cDrTxBgx9sgoi3nNhJ
+j9+BmBNKJEzTqSgsN8w8G9cc3VUyXmzfuoDq4B1WXqjw7F4efp4My9gF4yEeQGcI
+80JnEVKTrFiR5mQB+gUc8HmPyIvi55NA/Su1CIEsiQKBgQDgx5nOrjAblQojK6rx
+0f4OQstVD6T5pOpH+4n7/vB7hqIfSk0B2vVngMOHOJCnBWZ2VFJaAThXyg2zYnIi
+0PSNfcdHrAJPO2DoE8W/uuzClG8Uhl9kGOLOSRSKg4T3w8jww4x0PUZhzruUA4/x
+5Fz52PE4yahzk9vkhDMgJGWuzwKBgQCnxDU0mzinrLjh17cEEsfGtUJ8xFdUITWT
+b13pyT5W2PaO3TY4lI8iLgTMZuiAWTfe0arq/ureW5sSTuFGR1hwu4URMpLoKoNu
+Mh87FzQtJamgWX2ATZX6+xhT983eWwAN5LDSOeyeyNuAXNlB5r/kvevPfrZGcEzX
+oLo/DLlA1wKBgFUbfiMBVPm8jqAOcqUo61ae97n3OHHFfWdP2EjvmEJNEaljSpD/
+RJex61aRlkOHCeqXtq6Zc6nZuSJIjgqcr1u7We7LM/yn8OMuSVt0/RwXc4+D6S5P
+NeEBTqO7dGcTXEu83rtMUA/MZL2AM8pUutdmyr7Dq+JHA6UcYPc0kMOFAoGBAIEe
+ufRrIweqIAFyDSHNcoS1LR7p3myZwqpepGEyyg/9nIYIK5sQe7lKwdavvXJLOHz9
+0hZbbFkHGCrXGvsEHkVljdzWl8qoLc+6M98+1KGKwyrutXDyReSNLQQzTPc+AqSu
+xoiGnF75KDd7PptCBZ7/rWZdl9xOwlWTFsU//bSxAoGAAzoQPGMsq1JWkP3KaGxj
+GDkpEPpG/CbKSLrynT2f1cp9fHWQASJUEl89j7BLinTz9Akl1S1mmkvSXCyd0hrx
+7n+ysJQaYdAqqO/vNOC0k8//nPsyuNI1Mml3e0KQ23P4OpvmPwc17sgufHd3YEh/
+1xNDC3+IHi16dMgRo/1br7Y=
+-----END PRIVATE KEY-----
+EOF
 
 oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file default-cloudfront-signing-key.pem=./default-cloudfront-signing-key.pem config-bundle-secret
 
-#Deploy Quay registry, here disable monitoring component
+#Deploy Quay registry
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1

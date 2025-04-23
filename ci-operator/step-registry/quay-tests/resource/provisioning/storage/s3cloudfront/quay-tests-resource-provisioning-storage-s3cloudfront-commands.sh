@@ -49,6 +49,7 @@ resource "aws_s3_bucket_ownership_controls" "quayawscf" {
   }
 }
 
+#Block public access, data distrbution with cloudFront
 resource "aws_s3_bucket_public_access_block" "quayawscf" {
   bucket = aws_s3_bucket.quayawscf.id
 
@@ -60,7 +61,7 @@ resource "aws_s3_bucket_public_access_block" "quayawscf" {
 
 resource "aws_cloudfront_origin_access_control" "quay_oac" {
   name                              = "\${aws_s3_bucket.quayawscf.id}.s3.\${var.region}.amazonaws.com"
-  description                       = "OAC for S3 access"
+  description                       = "OAC for Quay S3 access"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
@@ -112,7 +113,7 @@ resource "aws_cloudfront_distribution" "quay_s3_distribution" {
     origin_path              = "/cloudfronts3/quayregistry"
     origin_access_control_id = aws_cloudfront_origin_access_control.quay_oac.id
  }
-  comment = "Prown CI CloudFront distribution for Quay S3 bucket"
+  comment = "Quay Prow CI CloudFront distribution for S3 bucket"
   enabled             = true
 
   default_cache_behavior {
