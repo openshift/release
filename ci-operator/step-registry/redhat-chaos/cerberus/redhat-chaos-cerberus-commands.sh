@@ -20,7 +20,9 @@ function cerberus_cleanup() {
   c_status=$(cat /tmp/cerberus_status)
   date
   ls 
-  
+  oc get ns
+
+  oc get pods -n $TEST_NAMESPACE
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$c_status'}' >> test.json

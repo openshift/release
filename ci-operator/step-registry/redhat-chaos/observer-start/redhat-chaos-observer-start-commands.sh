@@ -24,3 +24,6 @@ spec:
   restartPolicy: Always
   dnsPolicy: ClusterFirst
 EOF
+
+
+oc get pods -n $TEST_NAMESPACE
