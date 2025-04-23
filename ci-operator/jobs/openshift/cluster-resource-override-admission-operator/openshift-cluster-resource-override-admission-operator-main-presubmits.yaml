@@ -1,22 +1,21 @@
 presubmits:
-  openshift/assisted-image-service:
+  openshift/cluster-resource-override-admission-operator:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^remove-me$
-    - ^remove-me-
-    cluster: build11
-    context: ci/prow/e2e-oci-assisted-4-18-test-multistage
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/e2e-aws-olm
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: oci-edge
-      ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-image-service-remove-me-e2e-oci-assisted-4-18-test-multistage
-    optional: true
-    rerun_command: /test e2e-oci-assisted-4-18-test-multistage
+    name: pull-ci-openshift-cluster-resource-override-admission-operator-main-e2e-aws-olm
+    rerun_command: /test e2e-aws-olm
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -25,7 +24,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-oci-assisted-4-18-test-multistage
+        - --target=e2e-aws-olm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -73,20 +72,92 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-oci-assisted-4-18-test-multistage,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-olm,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/e2e-aws-operator
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-resource-override-admission-operator-main-e2e-aws-operator
+    rerun_command: /test e2e-aws-operator
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-operator
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^remove-me$
-    - ^remove-me-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-image-service-remove-me-images
+    name: pull-ci-openshift-cluster-resource-override-admission-operator-main-images
     rerun_command: /test images
     spec:
       containers:
@@ -95,6 +166,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -131,25 +203,26 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^remove-me$
-    - ^remove-me-
-    cluster: build11
-    context: ci/prow/lint-first-stage
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/security
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-image-service-remove-me-lint-first-stage
-    rerun_command: /test lint-first-stage
-    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
+    name: pull-ci-openshift-cluster-resource-override-admission-operator-main-security
+    optional: true
+    rerun_command: /test security
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=lint-first-stage
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=security
         command:
         - ci-operator
         image: ci-operator:latest
@@ -159,6 +232,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -173,6 +249,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -182,86 +261,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint-first-stage,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    annotations:
-      pipeline_run_if_changed: ^(data.*|deploy/.*|hack/.*|integration_test/.*|internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|build_deploy\.sh|main\.go|renovate\.json)$
-    branches:
-    - ^remove-me$
-    - ^remove-me-
-    cluster: build11
-    context: ci/prow/lint-second-stage
-    decorate: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-image-service-remove-me-lint-second-stage
-    rerun_command: /test lint-second-stage
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=lint-second-stage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint-second-stage,?($|\s.*)
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^remove-me$
-    - ^remove-me-
-    cluster: build11
-    context: ci/prow/test-first-stage
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/unit
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-image-service-remove-me-test-first-stage
-    rerun_command: /test test-first-stage
-    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
+    name: pull-ci-openshift-cluster-resource-override-admission-operator-main-unit
+    rerun_command: /test unit
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/assisted-image-service-codecov-token
-        - --target=test-first-stage
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -271,9 +292,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/assisted-image-service-codecov-token
-          name: assisted-image-service-codecov-token
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -288,9 +306,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: assisted-image-service-codecov-token
-        secret:
-          secretName: assisted-image-service-codecov-token
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -300,31 +315,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-first-stage,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_run_if_changed: ^(data.*|deploy/.*|hack/.*|integration_test/.*|internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|build_deploy\.sh|main\.go|renovate\.json)$
     branches:
-    - ^remove-me$
-    - ^remove-me-
-    cluster: build11
-    context: ci/prow/test-second-stage
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/verify
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-image-service-remove-me-test-second-stage
-    rerun_command: /test test-second-stage
+    name: pull-ci-openshift-cluster-resource-override-admission-operator-main-verify
+    rerun_command: /test verify
+    skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/assisted-image-service-codecov-token
-        - --target=test-second-stage
+        - --target=verify
         command:
         - ci-operator
         image: ci-operator:latest
@@ -334,9 +346,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/assisted-image-service-codecov-token
-          name: assisted-image-service-codecov-token
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -351,9 +360,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: assisted-image-service-codecov-token
-        secret:
-          secretName: assisted-image-service-codecov-token
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -363,4 +369,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-second-stage,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)
