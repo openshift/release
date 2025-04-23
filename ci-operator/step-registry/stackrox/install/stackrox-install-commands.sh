@@ -266,7 +266,7 @@ function wait_deploy() {
     || {
       echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
       oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
-      exit 1
+      return 1
     }
 }
 

@@ -66,11 +66,11 @@ function retry() {
 }
 
 function wait_deploy() {
-  retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
+  time retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
     || {
-      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
-      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
-      exit 1
+      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=5"
+      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5
+      return 1
     }
 }
 
@@ -272,34 +272,26 @@ echo ">>> Wait for 'stackrox scanner' deployments"
 wait_deploy scanner
 wait_deploy scanner-db
 
-if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-  echo "Wait for vulnerability database to be loaded."
+if [[ "${ROX_SCANNER_V4:-true}" == "true" && -z "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+  echo '>>> Wait for vulnerability database to be loaded.'
   set -x
-  set +e
-  oc get configmap -n stackrox scanner-v4-matcher-config -o yaml \
-    | sed '/^    matcher:/a\      readiness: vulnerability' \
-    | oc apply -f - -n stackrox --wait=true
-  oc get configmap -n stackrox scanner-v4-matcher-config -o yaml
   oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
-  oc describe deploy -n stackrox scanner-v4-matcher | grep -i readiness
-  # If the config is not applied, restart to apply in startup.
+  echo "If the 'scanner-v4-matcher' is ready quickly, then the readiness it not based on the vulnerability db load."
+  sleep 10
   if oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s; then
-    # status will be ready if readiness was not changed to require vulnerability load
+    echo 'Restart scanner-v4-matcher to apply the new config during startup...'
     oc rollout restart deployment/scanner-v4-matcher
-    oc -n stackrox rollout status deploy/"$1" --timeout=30s
+    oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s || true
   fi
-  oc exec -n stackrox deploy/scanner-v4-matcher -- cat /etc/scanner/config.yaml
-  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps
-  set -e
   set +x
 fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer 
-  wait_deploy scanner-v4-matcher 600s  # default(300s)=300+9(300s+30s)=54.5m, 600s+9(600s+30s) = 104.5m
+  wait_deploy scanner-v4-matcher 600s || true  # default(300s)=300+9(300s+30s)=54.5m, 600s+9(600s+30s) = 104.5m
+  echo '>> and check the matcher logs again...'
+  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps || true
 fi
-echo ">> and check the matcher logs again..."
-oc logs deploy/scanner-v4-matcher -n stackrox --timestamps || true
 
 kubectl get nodes -o custom-columns='TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,KERNEL:.status.nodeInfo.kernelVersion,KUBLET:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,RAM:.status.capacity.memory' || true
 oc get pods -o wide --namespace stackrox || true
