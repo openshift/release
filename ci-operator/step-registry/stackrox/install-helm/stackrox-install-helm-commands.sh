@@ -289,6 +289,7 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   oc logs deploy/scanner-v4-matcher -n stackrox --timestamps || true
 fi
 
+oc get nodes -o wide
 kubectl get nodes -o custom-columns='TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,KERNEL:.status.nodeInfo.kernelVersion,KUBLET:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,RAM:.status.capacity.memory' || true
 oc get pods -o wide --namespace stackrox || true
 
