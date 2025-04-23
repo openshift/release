@@ -11,10 +11,6 @@ oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 
-mkdir -p $HOME/.aws
-cat "/secret/telemetry/.awscred" > $HOME/.aws/config
-cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
-
 ES_PASSWORD=$(cat "/secret/es/password" || "")
 ES_USERNAME=$(cat "/secret/es/username" || "")
 
@@ -28,13 +24,17 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 
 # set the secrets from the vault as env vars
 export TELEMETRY_PASSWORD=$telemetry_password
-export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
+
 
 NODE_NAME=$(set +o pipefail; oc get nodes --no-headers | head -n 1 | awk '{print $1}')
 rc=$?
 echo "Node name return code: $rc"
 platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
 if [ "$platform" = "AWS" ]; then
+    mkdir -p $HOME/.aws
+    cat "/secret/telemetry/.awscred" > $HOME/.aws/config
+    cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
+    export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
     VPC_ID=$(aws ec2 describe-instances --filter Name=private-dns-name,Values=$NODE_NAME  --query 'Reservations[*].Instances[*].NetworkInterfaces[*].VpcId' --output text)
     rc=$?
     echo "VPC return code: $rc"
