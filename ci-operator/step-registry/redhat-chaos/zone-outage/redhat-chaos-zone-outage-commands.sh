@@ -33,6 +33,7 @@ export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
 NODE_NAME=$(set +o pipefail; oc get nodes --no-headers | head -n 1 | awk '{print $1}')
 rc=$?
 echo "Node name return code: $rc"
+platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
 if [ "$platform" = "AWS" ]; then
     VPC_ID=$(aws ec2 describe-instances --filter Name=private-dns-name,Values=$NODE_NAME  --query 'Reservations[*].Instances[*].NetworkInterfaces[*].VpcId' --output text)
     rc=$?
@@ -52,6 +53,7 @@ elif [ "$platform" = "GCP" ]; then
     ZONE=$(set +o pipefail; oc get node $NODE_NAME -o json | \
     jq -r '.metadata.labels' | \
     sed 's/,//g' | grep  "topology.kubernetes.io/zone" | awk '{ print $2 }' )
+    export ZONE
 fi
 ./zone-outages/prow_run.sh
 rc=$?
