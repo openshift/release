@@ -73,7 +73,7 @@ function destroy_bootstrap() {
     echo "Destroying bootstrap: removing drop rule for disconnected network..."
     rule=$(iptables -S FORWARD | grep "${ip}" | grep DROP | sed 's/^-A /-D /')
     read -r -a RULE <<< "${rule}"
-    [[ $rule =~ D.*$ip.*DROP ]] && iptables ${RULE[@]}
+    [[ "${rule}" =~ D.*$ip.*DROP ]] && iptables "${RULE[@]}"
   fi
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
   # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
