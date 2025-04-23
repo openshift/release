@@ -272,17 +272,13 @@ echo ">>> Wait for 'stackrox scanner' deployments"
 wait_deploy scanner
 wait_deploy scanner-db
 
-if [[ "${ROX_SCANNER_V4:-true}" == "true" && -z "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
   echo '>>> Wait for vulnerability database to be loaded.'
   set -x
   oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
-  echo "If the 'scanner-v4-matcher' is ready quickly, then the readiness it not based on the vulnerability db load."
-  sleep 10
-  if oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s; then
-    echo 'Restart scanner-v4-matcher to apply the new config during startup...'
-    oc rollout restart deployment/scanner-v4-matcher
-    oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s || true
-  fi
+  echo 'Restart scanner-v4-matcher to apply the new config during startup...'
+  oc rollout restart deployment/scanner-v4-matcher
+  oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s || true
   set +x
 fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
