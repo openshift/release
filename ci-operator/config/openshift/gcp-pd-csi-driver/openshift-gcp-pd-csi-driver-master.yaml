@@ -88,6 +88,26 @@ tests:
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[GKE-PD-CSI\]
     workflow: openshift-e2e-gcp-csi-extended
+- as: e2e-gcp-csi-techpreview-volumeattributesclass
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --run=VolumeAttributesClass
+      TEST_SUITE: all
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- as: periodic-e2e-gcp-csi-techpreview-volumeattributesclass
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --run=VolumeAttributesClass
+      TEST_SUITE: all
+    workflow: openshift-e2e-gcp-csi-custom-worker
 - as: nightly-verify-deps
   cron: 0 */12 * * *
   steps:

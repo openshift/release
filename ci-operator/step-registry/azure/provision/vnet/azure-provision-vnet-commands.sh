@@ -19,19 +19,17 @@ function run_command() {
 }
 
 function vnet_check() {
-    local rg="$1" try=0 retries=15 vnet_list_log="$2"
-    az network vnet list -g ${rg} >"${vnet_list_log}"
-    while [ X"$(cat "${vnet_list_log}" | jq -r ".[].id" | awk -F"/" '{print $NF}')" == X"" ] && [ $try -lt $retries ]; do
+    local rg="$1" try=0 retries=15 
+    while [[ -z "$(az network vnet list -g ${rg} -otsv)" ]] && [ $try -lt $retries ]; do
         echo "Did not find vnet yet, waiting..."
         sleep 30
         try=$(expr $try + 1)
-        az network vnet list -g ${rg} >"${vnet_list_log}"
     done
     if [ X"$try" == X"$retries" ]; then
         echo "!!!!!!!!!!"
         echo "Something wrong"
-        run_command "az network vnet list -g ${rg} -o table"
-        return 4
+        run_command "az network vnet list -g ${rg} -otsv"
+        return 1
     fi
     return 0
 }
@@ -123,43 +121,50 @@ if [ X"$ret" != X"0" ]; then
 fi
 
 VNET_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"
+vnet_name="${VNET_BASE_NAME}-vnet"
+controlPlaneSubnet="${VNET_BASE_NAME}-master-subnet"
+computeSubnet="${VNET_BASE_NAME}-worker-subnet"
+clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 
 # create vnet
+# vnet/subnet addressprefix are hardcoded in 01_vnet.json arm template
+# Use az CLI instead to create vnet/subnet with specified address prefix
+#if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+#    arm_template_folder_name="azurestack"
+#else
+#    arm_template_folder_name="azure"
+#fi
+
+#vnet_arm_template_file="/var/lib/openshift-install/upi/${arm_template_folder_name}/01_vnet.json"
+#run_command "az deployment group create --name ${VNET_BASE_NAME} -g ${RESOURCE_GROUP} --template-file '${vnet_arm_template_file}' --parameters baseName='${VNET_BASE_NAME}'"
+
+run_command "az network nsg create --name ${clusterSubnetSNG} -g ${RESOURCE_GROUP}"
+run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name ${clusterSubnetSNG} -n 'apiserver_in' --priority 101 --access Allow --source-port-ranges '*' --destination-port-ranges 6443"
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-    arm_template_folder_name="azurestack"
-else
-    arm_template_folder_name="azure"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name ${clusterSubnetSNG} -n 'ign_in' --priority 102 --access Allow --source-port-ranges '*' --destination-port-ranges 22623"
 fi
-vnet_arm_template_file="/var/lib/openshift-install/upi/${arm_template_folder_name}/01_vnet.json"
-run_command "az deployment group create --name ${VNET_BASE_NAME} -g ${RESOURCE_GROUP} --template-file '${vnet_arm_template_file}' --parameters baseName='${VNET_BASE_NAME}'"
+
+run_command "az network vnet create --name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefixes ${AZURE_VNET_ADDRESS_PREFIXES}"
+run_command "az network vnet subnet create --name ${controlPlaneSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --network-security-group ${clusterSubnetSNG}"
+run_command "az network vnet subnet create --name ${computeSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_COMPUTE_SUBNET_PREFIX} --network-security-group ${clusterSubnetSNG}"
 
 #Due to sometime frequent vnet list will return empty, so save vnet list output into a local file
-vnet_info_file=$(mktemp)
-vnet_check "${RESOURCE_GROUP}" "${vnet_info_file}" || exit 3
-vnet_name=$(cat "${vnet_info_file}" | jq -r ".[].id" | awk -F"/" '{print $NF}')
-vnet_addressPrefixes=$(cat "${vnet_info_file}" | jq -r ".[].addressSpace.addressPrefixes[]")
-#Copied subnets values from ARM templates
-controlPlaneSubnet=$(cat "${vnet_info_file}" | jq -r ".[].subnets[].name" | grep "master-subnet")
-computeSubnet=$(cat "${vnet_info_file}" | jq -r ".[].subnets[].name" | grep "worker-subnet")
+vnet_check "${RESOURCE_GROUP}"
 
 #workaround for BZ#1822903
-clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'worker-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges 80 443" || exit 3
 #Add port 22 to debug easily and to gather bootstrap log
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'ssh-allow' --priority 1001 --access Allow --source-port-ranges '*' --destination-port-ranges 22" || exit 3
 
 if [[ "${AZURE_CUSTOM_NSG}" == "yes" ]]; then
-    controlPlaneSubnet_addressPrefix=$(cat "${vnet_info_file}" | jq -r '.[].subnets[] | select(.name == "'"${controlPlaneSubnet}"'") | .addressPrefix')
-    computeSubnet_addressPrefix=$(cat "${vnet_info_file}" | jq -r '.[].subnets[] | select(.name == "'"${computeSubnet}"'") | .addressPrefix')
-
     echo "Disable default network security rule AllowInBoundVnet from VirtualNetwork to VirtualNetwork"
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'DenyVnetInbound' --priority 1100 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound"
 
     echo "Create network security rules on specific ports from nodes to nodes"
-    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundTCP' --priority 1010 --access Allow --source-port-ranges '*' --source-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-port-ranges 1936 9000-9999 10250-10259 30000-32767 --direction Inbound --protocol Tcp"
-    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundUDP' --priority 1011 --access Allow --source-port-ranges '*' --source-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} ${computeSubnet_addressPrefix} --destination-port-ranges 4789 6081 9000-9999 500 4500 30000-32767 --direction Inbound --protocol Udp"
-    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowCidr22623InboundTCP' --priority 1012 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} --destination-port-ranges 22623 --direction Inbound --protocol Tcp"
-    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowetcdInboundTCP' --priority 1013 --access Allow --source-port-ranges '*' --source-address-prefixes ${controlPlaneSubnet_addressPrefix} --destination-address-prefixes ${controlPlaneSubnet_addressPrefix} --destination-port-ranges 2379-2380 --direction Inbound --protocol Tcp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundTCP' --priority 1010 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-port-ranges 1936 9000-9999 10250-10259 30000-32767 --direction Inbound --protocol Tcp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundUDP' --priority 1011 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-port-ranges 4789 6081 9000-9999 500 4500 30000-32767 --direction Inbound --protocol Udp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowCidr22623InboundTCP' --priority 1012 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --destination-port-ranges 22623 --direction Inbound --protocol Tcp"
+    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowetcdInboundTCP' --priority 1013 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --destination-port-ranges 2379-2380 --direction Inbound --protocol Tcp"
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowInboundICMP' --priority 1014 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound --protocol Icmp"
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowInboundESP' --priority 1015 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound --protocol Esp"
 fi
@@ -180,7 +185,7 @@ fi
 cat > "${SHARED_DIR}/network_machinecidr.yaml" <<EOF
 networking:
   machineNetwork:
-  - cidr: "${vnet_addressPrefixes}"
+  - cidr: "${AZURE_VNET_ADDRESS_PREFIXES}"
 EOF
 
 cat > "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF

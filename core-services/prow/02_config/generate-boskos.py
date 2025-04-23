@@ -23,6 +23,9 @@ CONFIG = {
     },
     'aws-3-quota-slice': {
         'us-east-1': 40,
+        'us-east-2': 40,
+        'us-west-1': 40,
+        'us-west-1': 40,
     },
     'aws-cspi-qe-quota-slice': {
         'us-east-1': 30,
@@ -215,10 +218,16 @@ CONFIG = {
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
     },
+    'equinix-edge-enablement-quota-slice': {
+        'default': 40,
+    },
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
+        'us-central1': 30,
+    },
+    'gcp-observability-quota-slice': {
         'us-central1': 30,
     },
     'gcp-qe-c3-metal-quota-slice': {
@@ -257,9 +266,7 @@ CONFIG = {
         'libvirt-s390x-0-1': 1
     },
     'libvirt-ppc64le-quota-slice': {},
-    'libvirt-ppc64le-s2s-quota-slice':{
-        'libvirt-ppc64le-s2s-0-0': 1
-    },
+    'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'default': 1000,
@@ -516,6 +523,9 @@ for i in range(3):
 # Reserve one for internal debugging use
 del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-0-3']
 
+for i in range(4):
+    CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-{}'.format(i)] = 1
+
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
@@ -555,7 +565,7 @@ for i in [871,991,1165,1154,1148,1140]:
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
-for i in range(0,100):
+for i in range(0,80):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
 for i in range(4):
