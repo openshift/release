@@ -66,7 +66,9 @@ USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 EOF
 
-oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file default-cloudfront-signing-key.pem=./utility/default-cloudfront-signing-key.pem config-bundle-secret
+ls utility -l
+
+oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml --from-file default-cloudfront-signing-key.pem=utility/default-cloudfront-signing-key.pem config-bundle-secret
 
 #Deploy Quay registry
 echo "Creating Quay registry..." >&2
