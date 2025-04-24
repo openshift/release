@@ -321,7 +321,6 @@ function create_machineset() {
         vsphere)
 		if [[ ${MACHINESET_TYPE} == "infra" ]];then
                    NODE_CPU_COUNT=${OPENSHIFT_INFRA_NODE_CPU_COUNT:-$instance_type}
-                   echo "$NODE_CPU_COUNT ${OPENSHIFT_INFRA_NODE_CPU_COUNT} $instance_type"
                    NODE_CPU_CORE_PER_SOCKET_COUNT=${OPENSHIFT_INFRA_NODE_CPU_CORE_PER_SOCKET_COUNT:-$cpusPerSocket}
                    NODE_MEMORY_SIZE=${OPENSHIFT_INFRA_NODE_MEMORY_SIZE:-$memorySize}
 		elif [[ ${MACHINESET_TYPE} == "workload"  ]];then
