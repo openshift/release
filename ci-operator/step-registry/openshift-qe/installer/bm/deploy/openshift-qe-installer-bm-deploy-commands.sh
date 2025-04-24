@@ -9,6 +9,7 @@ set -x
 
 cat ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key > /tmp/priv_ssh_key
 chmod 400 /tmp/priv_ssh_key
+file /tmp/priv_ssh_key
 SSH_ARGS="-v -i /tmp/priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
