@@ -264,6 +264,7 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc get clusterversion version -o yaml || true
 fi
 
+sleep 28800
 # execute the cases
 function run {
     test_scenarios=""
