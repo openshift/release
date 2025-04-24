@@ -201,6 +201,35 @@ deploy_agnhost_container() {
   $CLI exec $name ip -6 route add default dev eth0 via 2001:db8:2::2
 }
 
+# Set ipForwarding=Global for LGW. This a workaround until OCPBUGS-42993 is fixed.
+local_gateway_mode=$(oc get networks.operator.openshift.io cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}')
+if [ "$local_gateway_mode" = "true" ]; then
+    echo "cluster is in local gateway mode"
+    ip_forwarding=$(oc get networks.operator.openshift.io cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding}')
+    if [ "$ip_forwarding" != "Global" ]; then
+      echo "Setting ip_forwarding to Global..."
+      oc patch Network.operator.openshift.io cluster --type=merge \
+        -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
+
+      echo "Waiting for network operator to start applying changes..."
+      for _ in {1..30}; do
+        if [[ $(oc get co network -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}') == "True" ]]; then
+          echo "Network operator started applying changes"
+          break
+        fi
+        sleep 10
+      done
+      echo "Waiting for network operator to complete changes..."
+      for _ in {1..30}; do
+        if [[ $(oc get co network -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}') == "False" ]]; then
+          echo "Network configuration completed successfully"
+          break
+        fi
+        sleep 10
+      done
+    fi
+fi
+
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
 vrf_neighbors["default"]=$($KCLI get nodes -o jsonpath={.items[*].status.addresses[?\(@.type==\"InternalIP\"\)].address})
