@@ -2,29 +2,29 @@ base_images:
   ubi:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.21
 images:
 - dockerfile_literal: |
     FROM ubi
-    COPY . /opt/app-root/src/
+    COPY . /opt/app-root/src/cincinnati/
     WORKDIR /opt/app-root/src/cincinnati
     USER 0
     ENV HOME="/root"
     ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
     RUN chgrp root /opt/app-root/src/cincinnati && \
         chmod g+w /opt/app-root/src/cincinnati && \
-        dnf install -y jq python38 gcc openssl-devel && \
+        dnf install -y jq gcc openssl-devel && \
         dnf clean all
     # build: Rust stable toolchain
     RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.70.0 -y && \
       rustup install 1.64.0
     # install yamllint
-    RUN pip3 install --user yamllint
+    RUN python3 -m ensurepip --upgrade && pip3 install --user yamllint
     RUN \
       mkdir -p $HOME/.cargo/git/ && \
       find $HOME/. -type d -exec chmod 777 {} \; && \
@@ -32,11 +32,6 @@ images:
     RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
     USER 1001
   from: ubi
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/cincinnati
   to: src-rust
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   to: deploy
@@ -131,7 +126,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.17"
   steps:
     test:
     - as: openshift-e2e-test
