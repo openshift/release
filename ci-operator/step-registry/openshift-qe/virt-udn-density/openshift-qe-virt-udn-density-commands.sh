@@ -27,7 +27,7 @@ export WORKLOAD=virt-udn-density
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--layer3=${ENABLE_LAYER_3} --iteration=${current_worker_count}" CHURN=false ./run.sh
+ES_SERVER="" EXTRA_FLAGS="--layer3=${ENABLE_L3} --iteration=${current_worker_count}" CHURN=false ./run.sh
 
 # The measurable run
 ITERATIONS=$((current_worker_count * ITERATIONS_PER_NODE))
