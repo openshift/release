@@ -7,9 +7,15 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
+file ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key
+ls -l ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key
+sha256sum ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key
+
 cat ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key > /tmp/priv_ssh_key
 chmod 400 /tmp/priv_ssh_key
 file /tmp/priv_ssh_key
+ls -l /tmp/priv_ssh_key
+sha256sum /tmp/priv_ssh_key
 SSH_ARGS="-v -i /tmp/priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
