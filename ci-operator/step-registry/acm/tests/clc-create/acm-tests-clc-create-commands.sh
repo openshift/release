@@ -25,7 +25,26 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-cp ${SECRETS_DIR}/clc-interop/secret-options-yaml ./options.yaml
+cp ${SECRETS_DIR}/clc/secret-options-yaml ./options.yaml
+cp ${SECRETS_DIR}/clc-interop/secret-options-yaml ./options-interop.yaml
+
+echo "ftan"
+echo "=========================================================="
+echo "                cat ./options.yaml"
+echo "=========================================================="
+cat ./options.yaml
+echo "=========================================================="
+echo "=========================================================="
+
+
+echo "=========================================================="
+echo "                cat ./options-interop.yaml"
+echo "=========================================================="
+echo cat ./options-interop.yaml
+echo "=========================================================="
+echo "=========================================================="
+echo "=========================================================="
+echo "ftan"
 
 # Set the dynamic vars based on provisioned hub cluster.
 CYPRESS_BASE_URL=$(oc whoami --show-console)
