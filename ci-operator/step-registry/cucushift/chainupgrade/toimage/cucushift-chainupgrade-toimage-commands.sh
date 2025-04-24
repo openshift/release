@@ -21,7 +21,7 @@ function debug() {
     if (( FRC != 0 )); then
         if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
             echo -e "\n# oc adm upgrade status\n"
-            env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true 
+            env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true
         fi
         echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
         echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
@@ -98,10 +98,10 @@ function extract_ccoctl(){
     local tmp_ccoctl="/tmp/upgtool"
     mkdir -p ${tmp_ccoctl}
     export PATH=/tmp:${PATH}
-                
+
     echo -e "Extracting ccoctl\n"
     payload_image="${TARGET}"
-    set -x          
+    set -x
     image_arch=$(oc adm release info ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o jsonpath='{.config.architecture}')
     if [[ "${image_arch}" == "arm64" ]]; then
         echo "The target payload is arm64 arch, trying to find out a matched version of payload image on amd64"
@@ -111,9 +111,9 @@ function extract_ccoctl(){
         elif env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc get istag "release:target" -n ${NAMESPACE} &>/dev/null; then
             payload_image=$(env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc -n ${NAMESPACE} get istag "release:target" -o jsonpath='{.tag.from.name}')
             echo "Getting target release image from build farm imagestream: ${payload_image}"
-        fi 
-    fi  
-    set +x  
+        fi
+    fi
+    set +x
     cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
     while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
     do
@@ -206,8 +206,8 @@ function cco_annotation(){
     else
         echo "CCO annotation change is not required in ${cco_mode} mode"
         return 0
-    fi  
-        
+    fi
+
     echo "Require CCO annotation change"
     local wait_time_loop_var=0; to_version="$(echo "${TARGET_VERSION}" | cut -f1 -d-)"
     oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${to_version}"'"}}}' --type=merge
@@ -280,7 +280,7 @@ function rhel_repo(){
     command: yum clean all
 EOF
 
-    # current Server version may not be the expected branch when cluster is not fully upgraded 
+    # current Server version may not be the expected branch when cluster is not fully upgraded
     # using TARGET_REPO_VERSION instead directly
     version_info="${TARGET_REPO_VERSION}"
     openshift_ansible_branch='master'
@@ -307,11 +307,11 @@ EOF
 
 # Do sdn migration to ovn since sdn is not supported from 4.17 version
 function sdn2ovn(){
-    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalJoinSubnet": "100.65.0.0/16"}}}}}' 
-    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalTransitSwitchSubnet": "100.85.0.0/16"}}}}}' 
+    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalJoinSubnet": "100.65.0.0/16"}}}}}'
+    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalTransitSwitchSubnet": "100.85.0.0/16"}}}}}'
     oc patch Network.config.openshift.io cluster --type='merge' --patch '{"metadata":{"annotations":{"network.openshift.io/network-type-migration":""}},"spec":{"networkType":"OVNKubernetes"}}'
     timeout 300s bash <<EOT
-    until 
+    until
        oc get network -o yaml | grep NetworkTypeMigrationInProgress > /dev/null
     do
        echo "Migration is not started yet"
@@ -321,7 +321,7 @@ EOT
     echo "Start Live Migration process now"
     # Wait for the live migration to fully complete
     timeout 3600s bash <<EOT
-    until 
+    until
        oc get network -o yaml | grep NetworkTypeMigrationCompleted > /dev/null && \
        for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-transit-switch-port-ifaddr:" | grep "100.85";  done > /dev/null && \
        for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-gateway-router-lrp-ifaddr:" | grep "100.65";  done > /dev/null && \
@@ -404,7 +404,7 @@ function run_command_oc() {
     fi
 
     while (( try < max )); do
-        if ret_val=$(oc "$@" 2>&1); then
+        if ret_val=$(oc "$@" --insecure-skip-tls-verify=true 2>&1); then
             break
         fi
         (( try += 1 ))
@@ -880,7 +880,7 @@ function filter_test_by_proxy() {
     if [[ -n "$proxy" ]] && [[ "$proxy" != 'null' ]] ; then
         export E2E_RUN_TAGS="@proxy and ${E2E_RUN_TAGS}"
     fi
-    echo_e2e_tags 
+    echo_e2e_tags
 }
 
 function filter_test_by_fips() {
@@ -898,7 +898,7 @@ function filter_test_by_sno() {
     if [[ $nodeno -eq 1 ]] ; then
         export E2E_RUN_TAGS="@singlenode and ${E2E_RUN_TAGS}"
     fi
-    echo_e2e_tags 
+    echo_e2e_tags
 }
 
 function filter_test_by_network() {
@@ -924,7 +924,7 @@ function filter_test_by_network() {
     echo_e2e_tags
 }
 
-function filter_test_by_version() { 
+function filter_test_by_version() {
     local xversion yversion
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
     if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
