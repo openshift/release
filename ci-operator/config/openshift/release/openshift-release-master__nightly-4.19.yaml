@@ -710,22 +710,6 @@ tests:
     - chain: ipi-aws-pre-stableinitial
     - ref: fips-check
     workflow: openshift-upgrade-aws-ovn
-- as: e2e-aws-ovn-upgrade-fips-nat-instance
-  interval: 8h
-  steps:
-    cluster_profile: aws
-    env:
-      CI_NAT_REPLACE: "true"
-      FAIL_ON_CORE_DUMP: "true"
-      FIPS_ENABLED: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    pre:
-    - chain: ipi-aws-pre-stableinitial
-    - ref: fips-check
-    workflow: openshift-upgrade-aws-ovn
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -792,27 +776,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
-- as: console-aws-nat-instance
-  interval: 8h
-  steps:
-    cluster_profile: aws-3
-    env:
-      CI_NAT_REPLACE: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - as: e2e-test
-      cli: latest
-      commands: ./test-prow-e2e.sh release
-      from: console-tests
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
 - as: e2e-gcp-ovn-rt
   interval: 168h
   steps:
@@ -834,17 +797,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-ovn-serial
-  timeout: 5h0m0s
-- as: e2e-aws-ovn-serial-nat-instance
-  interval: 8h
-  steps:
-    cluster_profile: aws-2
-    env:
-      CI_NAT_REPLACE: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -1156,14 +1108,6 @@ tests:
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
-- as: e2e-aws-ovn-single-node-one-core-serial-nat-instance
-  interval: 168h
-  steps:
-    cluster_profile: aws-3
-    env:
-      CI_NAT_REPLACE: "true"
-      TEST_SUITE: openshift/conformance/serial
-    workflow: openshift-e2e-aws-single-node-one-core
 - as: e2e-aws-ovn-single-node-4vcpu-compute-serial
   interval: 168h
   steps:
@@ -1183,15 +1127,6 @@ tests:
     cluster_profile: aws
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-aws-shared-vpc-phz
-- as: e2e-aws-ovn-shared-vpc-phz-techpreview-nat-instance
-  interval: 168h
-  steps:
-    cluster_profile: aws-3
-    env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      CI_NAT_REPLACE: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-shared-vpc-phz
 - as: e2e-agent-compact-fips
