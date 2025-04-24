@@ -40,7 +40,6 @@ function generate_assisted_deployment_pull_secret {
 
   echo "************ telcov10n Generate Assited Deployment Pull Secret object ************"
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
 
   if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
@@ -95,6 +94,18 @@ EOF
     set +x
 
   done
+}
+
+function create_spoke_namespace {
+
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
+
+  if [ "${SITE_CONFIG_VERSION}" == "v2" ]; then
+    echo "************ telcov10n Create Spoke Namespace ************"
+    set -x
+    oc create ns ${SPOKE_CLUSTER_NAME} || echo "${SPOKE_CLUSTER_NAME} namespace Already exist..."
+    set +x
+  fi
 }
 
 function checking_installation_progress {
@@ -187,6 +198,7 @@ function get_and_save_kubeconfig_and_creds {
 function main {
   set_hub_cluster_kubeconfig
   generate_cluster_image_set
+  create_spoke_namespace
   generate_assisted_deployment_pull_secret
   generate_baremetal_secret
   checking_installation_progress "${REFRESH_TIME}"

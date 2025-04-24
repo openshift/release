@@ -72,17 +72,23 @@ function generate_policy_related_files {
 
   jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})" | while read -r entry; do
     # Extract the filename and content
-    filename=${policies_path}/$(echo "$entry" | jq -r '.filename')
+    filename=$(echo "$entry" | jq -r '.filename')
     content=$(echo "$entry" | jq -r '.content')
 
     # Create the file and write the content
-    echo "mkdir -pv $(dirname $filename)"
-    echo "cat <<EOPGT >| $filename"
-    echo -e "$content" | \
-      yq eval '. | select(.kind == "Namespace") .metadata.name += "'${ns_tail}'"' | \
-      yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"' | \
-      yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"' | \
-      yq eval '. | select(.metadata.name == "'${CATALOGSOURCE_NAME:-}'") .spec.image = "'${catatlog_index_img}'"'
+    echo "mkdir -pv ${policies_path}/$(dirname $filename)"
+    echo "cat <<EOPGT >| ${policies_path}/$(basename $filename)"
+    if [ "$(echo -e "$content" | yq eval '.kind')" == "PolicyGenTemplate" ]; then
+      echo -e "$content" | \
+        yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"' | \
+        yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"' | \
+        yq eval '(.spec.sourceFiles[] | select(.metadata.name == "'${CATALOGSOURCE_NAME:-}'").spec.image) = "'${catatlog_index_img}'"'
+    else
+      echo -e "$content" | \
+        yq eval '. | select(.kind == "Namespace") .metadata.name += "'${ns_tail}'"' | \
+        yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"' | \
+        yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"'
+    fi
     echo "EOPGT"
 
   done
@@ -115,10 +121,10 @@ policies_path="site-policies/${SPOKE_CLUSTER_NAME}"
 mkdir -pv \${policies_path}
 touch \${policies_path}/.ts-$(date -u +%s%N)
 ############## BEGIN of Policy GenTemplate files #####################################################
-$(generate_policy_related_files "\${policies_path}")
+$(generate_policy_related_files "site-policies/${SPOKE_CLUSTER_NAME}")
 ############## END of Policy GenTemplate files #######################################################
 
-cat \${ztp_repo_dir}/site-configs/kustomization.yaml >| \${ztp_repo_dir}/site-policies/kustomization.yaml
+cat \${ztp_repo_dir}/clusters/kustomization.yaml >| \${ztp_repo_dir}/site-policies/kustomization.yaml
 
 git add .
 git commit -m 'Generated Policy files'
