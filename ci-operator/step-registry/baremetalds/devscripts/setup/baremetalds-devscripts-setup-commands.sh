@@ -375,7 +375,7 @@ then
 fi
 
 if [[ "${ARCHITECTURE}" == "arm64" ]]; then
-  echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> /root/dev-scripts/config_root.sh
+  echo "export OPENSHIFT_RELEASE_IMAGE=registry.build07.ci.openshift.org/ci-ln-7f5mnqb/release:latest" >> /root/dev-scripts/config_root.sh
   ## Look into making the following IRONIC_IMAGE change a default behavior within 'dev-scripts'
   echo "export IRONIC_IMAGE=\\\$(oc adm release info -a /root/dev-scripts/pull_secret.json \
     \\\${OPENSHIFT_RELEASE_IMAGE} --image-for=\"ironic\")" >> /root/dev-scripts/config_root.sh
@@ -383,7 +383,7 @@ if [[ "${ARCHITECTURE}" == "arm64" ]]; then
   echo "export SUSHY_TOOLS_IMAGE=quay.io/multi-arch/sushy-tools:muiltarch" >> /root/dev-scripts/config_root.sh
   echo "export VBMC_IMAGE=quay.io/multi-arch/vbmc:arm" >> /root/dev-scripts/config_root.sh
 else
-  echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
+  echo "export OPENSHIFT_RELEASE_IMAGE=registry.build07.ci.openshift.org/ci-ln-7f5mnqb/release:latest" >> /root/dev-scripts/config_root.sh
 fi
 
 # Inject PR additional configuration, if available
