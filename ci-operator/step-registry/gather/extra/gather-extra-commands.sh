@@ -242,7 +242,7 @@ if [[ -n "${prometheus}" ]]; then
 		fi
 
 		echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s) ..."
-		queue "${ARTIFACT_DIR}/metrics/${FILE_NAME}.tar.gz" oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus .
+		queue "${ARTIFACT_DIR}/metrics/${FILE_NAME}.tar" oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- tar cvf - -C /prometheus .
 
 		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
 		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
