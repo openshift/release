@@ -279,12 +279,16 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:
   echo 'Restart scanner-v4-matcher to apply the new config during startup...'
   oc rollout restart deployment/scanner-v4-matcher || true
   oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s || true
+  oc -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS || true
   set +x
 fi
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer 
-  wait_deploy scanner-v4-matcher 600s || true  # default(300s)=300+9(300s+30s)=54.5m, 600s+9(600s+30s) = 104.5m
+  echo "[$(date -u || true)] SECONDS=${SECONDS}"
+  wait_deploy scanner-v4-matcher \
+    || time oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=90m || true
+  echo "[$(date -u || true)] SECONDS=${SECONDS}"
   echo '>> and check the matcher logs again...'
   oc logs deploy/scanner-v4-matcher -n stackrox --timestamps || true
 fi
