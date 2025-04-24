@@ -11,7 +11,7 @@ chain:
           default: "3"
           documentation: "The number nodes to automatically create and join to the cluster."
         - name: HYPERSHIFT_BASE_DOMAIN
-          default: "origin-ci-int-aws.dev.rhcloud.com"
+          default: "ci.hypershift.devcluster.openshift.com"
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
         - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
           default: "HighlyAvailable"
@@ -98,13 +98,18 @@ chain:
           HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
         fi
         
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        if [[ $HYPERSHIFT_BASE_DOMAIN == "ci.hypershift.devcluster.openshift.com" ]]; then
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+        fi
+        
         CRED_COMMAND=""
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
           echo "MCE version is less than 2.6, use --aws-creds command"
-          CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
+          CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
         else
           set +x
-          export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+          export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
           /tmp/hs-cli/hypershift-no-cgo create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
           aws sts get-session-token --output json > ${SHARED_DIR}/sts-creds.json
@@ -188,6 +193,9 @@ chain:
           namespace: test-credentials
         - mount_path: /var/run/brew-pull-secret
           name: cnv-ci-brew-pull-secret
+          namespace: test-credentials
+        - mount_path: /etc/hypershift-ci-jobs-awscreds
+          name: hypershift-ci-jobs-awscreds
           namespace: test-credentials
       dependencies:
         - name: "release:latest"
