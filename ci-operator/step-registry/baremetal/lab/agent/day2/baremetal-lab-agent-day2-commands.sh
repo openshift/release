@@ -89,6 +89,8 @@ export KUBECONFIG="$SHARED_DIR/kubeconfig"
 day2_pull_secret="${SHARED_DIR}/day2_pull_secret"
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" > "${day2_pull_secret}"
 
+OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.ci.openshift.org/ocp/release:4.19.0-0.nightly-2025-04-17-154552"
+
 echo "Extract the latest oc client... ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "${day2_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=oc --to=/tmp --insecure=true
