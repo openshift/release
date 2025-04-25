@@ -273,7 +273,7 @@ if ! wait "$!"; then
   # TODO: gather logs??
   exit 1
 fi
-update_image_registry
+#update_image_registry
 
 # Used by observer pod
 touch  "${SHARED_DIR}/success"
