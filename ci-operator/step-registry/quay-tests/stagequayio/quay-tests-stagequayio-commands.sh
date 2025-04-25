@@ -6,6 +6,8 @@ QUAY_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-stagequayio-secret/password)
 QUAY_API_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 
+sleep 5m
+
 function copyArtifacts {
     cp -r ./cypress/results/* $ARTIFACT_DIR || true
 }
@@ -13,7 +15,7 @@ function copyArtifacts {
 #Archive the testing report XML file
 trap copyArtifacts EXIT
 
-cd quay-tests/stage-quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results 
+cd stage-quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results 
 yarn install
 
 export CYPRESS_QUAY_API_TOKEN="$QUAY_API_TOKEN"
