@@ -76,8 +76,8 @@ PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
 mkdir -p "${INSTALL_DIR}"
 
-# MULTI_RELEASE_IMAGE="registry.build05.ci.openshift.org/ci-ln-s366fg2/release:latest"
-OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.build05.ci.openshift.org/ci-ln-s366fg2/release:latest"
+# MULTI_RELEASE_IMAGE="registry.build07.ci.openshift.org/ci-ln-hnhmxq2/release:latest"
+OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.build07.ci.openshift.org/ci-ln-hnhmxq2/release:latest"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
