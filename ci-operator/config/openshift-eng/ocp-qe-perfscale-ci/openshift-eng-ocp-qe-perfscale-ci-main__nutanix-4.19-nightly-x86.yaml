@@ -1,0 +1,39 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: node-density-heavy-24nodes
+  capabilities:
+  - sshd-bastion
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe
+    env:
+      COMPUTE_REPLICAS: "3"
+      ITERATIONS_PER_NAMESPACE: "400"
+      PROFILE_TYPE: reporting
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-nutanix
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: nutanix-4.19-nightly-x86
