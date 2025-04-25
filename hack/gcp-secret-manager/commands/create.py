@@ -1,0 +1,143 @@
+import re
+import typing
+
+import click
+from google.api_core.exceptions import AlreadyExists, PermissionDenied
+from google.cloud import secretmanager
+from util import (
+    PROJECT_ID,
+    create_payload,
+    get_secret_name,
+    validate,
+)
+
+# Metadata keys used when creating secrets:
+# - JIRA_LABEL a label to associate the secret with a specific JIRA project.
+JIRA_LABEL = "jira-project"
+
+# - ROTATION_INSTRUCTIONS is an annotation that describes how the secret should be rotated.
+ROTATION_INSTRUCTIONS = "rotation-instructions"
+
+# - REQUEST_INFO is an annotation that describes how the secret was originally requested,
+#   to help trace who to contact in case of problems.
+REQUEST_INFO = "request-information"
+
+
+@click.command("create")
+@click.option(
+    "-c",
+    "--collection",
+    required=True,
+    help="The secret collection to store the secret",
+    type=str,
+)
+@click.option("-n", "--name", required=True, help="Name of the secret", type=str)
+@click.option(
+    "-f",
+    "--from-file",
+    default="",
+    help="Path to file with secret data",
+    type=click.Path(file_okay=True, dir_okay=False, readable=True),
+)
+@click.option(
+    "-l", "--from-literal", default="", help="Secret data as string input", type=str
+)
+def create(collection: str, name: str, from_file: str, from_literal: str):
+    """Create a new secret in the specified collection."""
+
+    validate(collection, name, from_file, from_literal)
+    click.echo(
+        "\nTo help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
+        "If a field does not apply to your case, type 'N/A' to continue.\n"
+    )
+    labels = prompt_for_labels()
+    annotations = prompt_for_annotations()
+
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        secret = client.create_secret(
+            request={
+                "parent": f"projects/{PROJECT_ID}",
+                "secret_id": get_secret_name(collection, name),
+                "secret": {
+                    "replication": {"automatic": {}},
+                    "labels": labels,
+                    "annotations": annotations,
+                },
+            }
+        )
+        client.add_secret_version(
+            parent=secret.name,
+            payload={
+                "data": create_payload(from_file, from_literal),
+            },
+        )
+        click.echo(f"Secret '{name}' successfully created")
+    except AlreadyExists:
+        raise click.ClickException(
+            "Secret '{name}' already exists in collection '{collection}'."
+        )
+    except PermissionDenied:
+        raise click.UsageError(
+            f"Access denied: You do not have permission to create secrets in collection '{collection}'"
+        )
+    except Exception as e:
+        raise click.ClickException(f"Failed to create secret '{name}': {e}")
+
+
+def prompt_for_labels() -> typing.Dict[str, str]:
+    click.echo(
+        "Enter team JIRA project associated with this secret "
+        "(e.g. 'ART' for issues.redhat.com/browse/ART).\n"
+        "Test Platform may open tickets in this project "
+        "to help handle incidents requiring secret rotation.\n"
+    )
+    while True:
+        jira = click.prompt(
+            text="JIRA project",
+            type=str,
+        ).strip()
+        if is_valid_label_value(jira):
+            return {JIRA_LABEL: jira}
+        click.echo(
+            "JIRA project label must be 1-63 characters, lowercase alphanumeric or hyphen, and not start or end with a hyphen."
+        )
+
+
+def is_valid_label_value(value: str) -> bool:
+    if value.lower() == "n/a":
+        return True
+    return bool(re.fullmatch(r"[a-z]([-a-z0-9]*[a-z0-9])?", value)) and (
+        1 <= len(value) <= 63
+    )
+
+
+def prompt_for_annotations() -> typing.Dict[str, str]:
+    annotations = {}
+
+    click.echo(
+        "\nProvide a short description of how this secret can/will be rotated.\n"
+        "This can help future team members support token rotation requirements.\n"
+        "Do not include sensitive information.\n"
+    )
+
+    annotations[ROTATION_INSTRUCTIONS] = prompt_for_annotation(ROTATION_INSTRUCTIONS)
+
+    click.echo(
+        "\nProvide a short description of how this secret was originally requested "
+        "(e.g. links to service now tickets, Jira tickets, documentation).\n"
+        "This can help future team members know who to contact in case of problems.\n"
+        "Do not include sensitive information.\n"
+    )
+    annotations[REQUEST_INFO] = prompt_for_annotation(REQUEST_INFO)
+    return annotations
+
+
+def prompt_for_annotation(msg: str) -> str:
+    while True:
+        value = click.prompt(text=msg, type=str).strip()
+        if value and value.lower() == "n/a":
+            return "N/A"
+        if value:
+            return value
+        click.echo("Input cannot be empty. Please enter a value or 'N/A'.")
