@@ -40,15 +40,17 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 UUID=$(uuidgen)
 
-# Inicialize the environment
-WORKLOAD=web-burner-init EXTRA_FLAGS="--uuid=${UUID} --gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
+# Inicialize the environment, indexing not required
+
+WORKLOAD=web-burner-init EXTRA_FLAGS="--uuid=${UUID} --gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD}" ./run.sh
+
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 # The web-burner node-density or cluster-density run
-EXTRA_FLAGS="--uuid=${UUID} --gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
+EXTRA_FLAGS="--uuid=${UUID} --gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --metrics-profile=${METRICS_PROFILE}" ./run.sh
 
 # Clean up
 oc delete projects -l kube-burner-job=init-served-job
