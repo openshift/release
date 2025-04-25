@@ -6,8 +6,6 @@ QUAY_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-stagequayio-secret/password)
 QUAY_API_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 
-sleep 5m
-
 function copyArtifacts {
     cp -r ./cypress/results/* $ARTIFACT_DIR || true
 }
