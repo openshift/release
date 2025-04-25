@@ -15,6 +15,10 @@ base_images:
     name: prow-scripts
     namespace: chaos
     tag: latest
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -46,6 +50,17 @@ releases:
   latest:
     candidate:
       architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  multi-latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.18"
+  target:
+    candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.19"
@@ -262,6 +277,80 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 8h0m0s
+- always_run: false
+  as: chaos-azure-multi-upgrade-418to419-3nodes-pod-scenarios
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "3"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
+      CUSTOM_AZURE_REGION: eastus
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "1"
+      OCP_ARCH: amd64
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
+      WORKER_REPLICA_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-azure
+  timeout: 8h0m0s
+- always_run: false
+  as: chaos-azure-multi-upgrade-418to419-3nodes-node-scenarios
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "3"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
+      CUSTOM_AZURE_REGION: eastus
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "1"
+      OCP_ARCH: amd64
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
+      WORKER_REPLICA_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-node-disruptions-worker-outage-observer
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-azure
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
