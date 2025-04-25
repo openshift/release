@@ -42,7 +42,7 @@ REPO_URL="https://github.com/SachinNinganure/e2e-benchmarking";
 #LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 #TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 #git clone $REPO_URL $TAG_OPTION --depth 1
-git clone $REPO_URL --branch udnperf
+git clone $REPO_URL --branch layer3-udn
 pushd e2e-benchmarking/workloads/network-perf-v2
 
 # Clean up resources from possible previous tests.
@@ -62,4 +62,4 @@ if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi
-#udnl2 run
+#udnl3 run
