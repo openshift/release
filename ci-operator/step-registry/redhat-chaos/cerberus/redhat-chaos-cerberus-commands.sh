@@ -9,13 +9,8 @@ ls
 
 function cerberus_cleanup() {
 
-  curl -X POST http://0.0.0.0:8080/STOP
-
-  
   echo "killing cerberus observer"
   kill -15 ${cerberus_pid}
-
-
   
   c_status=$(cat /tmp/cerberus_status)
   date
