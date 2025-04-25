@@ -66,7 +66,7 @@ function retry() {
 }
 
 function wait_deploy() {
-  time retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
+  retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
     || {
       echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=5"
       oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5
@@ -299,7 +299,8 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-indexer
   timeout 120s wait "${scanner_readiness_configure_pid}" || true
   wait_deploy scanner-v4-matcher \
-    || time oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=90m || true
+    || oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=90m \
+    || wait_deploy scanner-v4-matcher 600s || true
   echo '>> and check the matcher logs again...'
   oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps || true
 fi
