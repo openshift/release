@@ -42,7 +42,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc=$GC --gc-metrics=$GC_METRICS --profile-type=${PROFILE_TYPE}"
 
 if [[ -n "${USER_METADATA}" ]]; then
     USER_METADATA=$(echo "$USER_METADATA" | xargs)

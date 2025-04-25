@@ -32,7 +32,8 @@ export WORKLOAD=node-density-cni
 ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=2m" ./run.sh
 
 # The measurable run
-export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc=$GC --gc-metrics=$GC_METRICS --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
+export EXTRA_FLAGS
 
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
