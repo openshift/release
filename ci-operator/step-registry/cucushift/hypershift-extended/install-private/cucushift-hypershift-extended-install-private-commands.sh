@@ -18,6 +18,7 @@ fi
 COMMAND=(
     "${HCP_CLI}" install
     --hypershift-image="${OPERATOR_IMAGE}"
+    --platform-monitoring=All
     --wait-until-available
 )
 

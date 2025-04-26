@@ -98,6 +98,15 @@ tests:
 
         oc new-project instaslice-system
 
+        echo "Creating OperatorGroup"
+        oc create -f - <<EOF
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+                name: "instaslice"
+                namespace: "instaslice-system"
+        EOF
+
         mkdir /tmp/oci-image && pushd /tmp/oci-image
         skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
         umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
