@@ -280,7 +280,3 @@ touch  "${SHARED_DIR}/success"
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
-
-echo -e "\nRetrieving user-ca-bundle....."
-
-oc get cm -n openshift-config user-ca-bundle -o yaml > "${ARTIFACT_DIR}/user-ca-bundle.yaml"
