@@ -70,6 +70,7 @@ if [[ -z "$CLUSTER_ID" ]]; then
   fi
 fi
 
+sleep 86400
 echo "Deleting cluster-id: ${CLUSTER_ID}"
 start_time=$(date +"%s")
 rosa delete cluster -c "${CLUSTER_ID}" -y
