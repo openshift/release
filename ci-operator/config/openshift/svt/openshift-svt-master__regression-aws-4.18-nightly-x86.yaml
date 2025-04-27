@@ -9,11 +9,24 @@ build_root:
     namespace: ci
     tag: latest
 releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.18.0-0
+        upper: 4.19.0-0
   latest:
     candidate:
       product: ocp
       stream: nightly
       version: "4.18"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -86,13 +99,16 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_REPLICAS: "12"
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m5.12xlarge
-      ITERATIONS: "400"
-      MAX_UNAVAILABLE: "12"
+      ITERATIONS: "40"
+      MAX_UNAVAILABLE: "2"
     test:
     - ref: openshift-svt-network-mixed-scenario
     - ref: openshift-qe-upgrade
