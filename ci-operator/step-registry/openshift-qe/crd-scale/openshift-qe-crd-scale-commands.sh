@@ -22,8 +22,8 @@ fi
 
 #Support Libvirt Hypershift Cluster
 cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
-hypershift_pods=$(! oc -n hypershift get pods| grep -v NAME ||oc -n hypershift get pods| grep -v NAME |wc -l)
-if [[ $cluster_infra == "BareMetal" && $hypershift_pods -gt 1 ]];then
+hypershift_pods=$(! oc -n hypershift get pods| grep operator >/dev/null ||oc -n hypershift get pods| grep operator |wc -l)
+if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then	
         echo "Executing cluster-density-v2 in hypershift cluster"
         if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
                 echo "Set http proxy for hypershift cluster"
