@@ -121,7 +121,7 @@ tests:
 - as: e2e-aws-ovn-single-node-csi
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -129,7 +129,7 @@ tests:
 - as: e2e-aws-ovn-single-node-workers-serial
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -175,7 +175,7 @@ tests:
 - as: e2e-metal-ovn-single-node-rt-upgrade
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
     observers:
@@ -198,7 +198,7 @@ tests:
 - as: e2e-aws-ovn-single-node-techpreview-serial
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -519,7 +519,7 @@ tests:
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       GATEWAY_MODE: local
     observers:
@@ -685,7 +685,7 @@ tests:
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FIPS_ENABLED: "true"
     observers:
@@ -700,22 +700,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FAIL_ON_CORE_DUMP: "true"
-      FIPS_ENABLED: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    pre:
-    - chain: ipi-aws-pre-stableinitial
-    - ref: fips-check
-    workflow: openshift-upgrade-aws-ovn
-- as: e2e-aws-ovn-upgrade-fips-nat-instance
-  interval: 8h
-  steps:
-    cluster_profile: aws
-    env:
-      CI_NAT_REPLACE: "true"
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
       TEST_TYPE: upgrade-conformance
@@ -776,28 +760,7 @@ tests:
 - as: console-aws
   interval: 168h
   steps:
-    cluster_profile: aws
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - as: e2e-test
-      cli: latest
-      commands: ./test-prow-e2e.sh release
-      from: console-tests
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
-- as: console-aws-nat-instance
-  interval: 8h
-  steps:
-    cluster_profile: aws
-    env:
-      CI_NAT_REPLACE: "true"
+    cluster_profile: aws-2
     observers:
       enable:
       - observers-resource-watch
@@ -839,17 +802,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
-- as: e2e-aws-ovn-serial-nat-instance
-  interval: 8h
-  steps:
-    cluster_profile: aws
-    env:
-      CI_NAT_REPLACE: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-ovn-serial
-  timeout: 5h0m0s
 - as: e2e-aws-csi
   interval: 168h
   steps:
@@ -885,7 +837,7 @@ tests:
 - as: e2e-aws-ovn-cgroupsv2
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     observers:
       enable:
       - observers-resource-watch
@@ -893,7 +845,7 @@ tests:
 - as: e2e-aws-driver-toolkit
   cron: 0 */8 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -1014,7 +966,7 @@ tests:
 - as: aws-ovn-network-flow-matrix-single-node
   cron: 0 23 * * 2,5
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - ref: network-flow-matrix-tests
     - ref: single-node-e2e-test
@@ -1065,7 +1017,7 @@ tests:
 - as: e2e-aws-ovn-upi
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -1156,14 +1108,6 @@ tests:
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
-- as: e2e-aws-ovn-single-node-one-core-serial-nat-instance
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      CI_NAT_REPLACE: "true"
-      TEST_SUITE: openshift/conformance/serial
-    workflow: openshift-e2e-aws-single-node-one-core
 - as: e2e-aws-ovn-single-node-4vcpu-compute-serial
   interval: 168h
   steps:
@@ -1183,15 +1127,6 @@ tests:
     cluster_profile: aws
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-aws-shared-vpc-phz
-- as: e2e-aws-ovn-shared-vpc-phz-techpreview-nat-instance
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      CI_NAT_REPLACE: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-shared-vpc-phz
 - as: e2e-agent-compact-fips
@@ -1594,12 +1529,12 @@ tests:
 - as: e2e-aws-crun-wasm
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-crun-wasm
 - as: e2e-aws-ovn-ha-cert-rotation-suspend-30d
   cron: 0 8 * * Fri
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
         Ingress
@@ -1611,7 +1546,7 @@ tests:
 - as: e2e-aws-ovn-edge-zones
   cron: '@weekly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-vpc-edge-zones
@@ -1653,7 +1588,7 @@ tests:
 - as: fips-payload-scan
   cron: '@yearly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FIPS_ENABLED: "true"
       MAJOR_MINOR: "4.19"
@@ -1664,13 +1599,13 @@ tests:
 - as: e2e-external-aws
   cron: '@weekly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-external-aws
   timeout: 6h0m0s
 - as: e2e-external-aws-ccm
   cron: '@weekly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
@@ -1686,7 +1621,7 @@ tests:
 - as: e2e-aws-ovn-kube-apiserver-rollout
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
@@ -1752,7 +1687,7 @@ tests:
 - as: e2e-aws-ovn-cgroupsv1
   cron: '@daily'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -1784,7 +1719,7 @@ tests:
 - as: e2e-aws-ovn-runc
   cron: '@daily'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     observers:
       enable:
       - observers-resource-watch
@@ -1932,7 +1867,7 @@ tests:
 - as: e2e-aws-ovn-runc-techpreview
   cron: '@daily'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:

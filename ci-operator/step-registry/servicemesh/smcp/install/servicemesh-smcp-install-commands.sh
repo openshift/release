@@ -22,7 +22,11 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
-if [[ "${GATEWAY_API_ENABLED}" = "true" ]]; then
+# check if gateway api crds are already installed
+echo "Checking if gateway api is installed"
+kubectl get crd gateways.gateway.networking.k8s.io && GATEWAY_API_ALREADY_INSTALLED=true || GATEWAY_API_ALREADY_INSTALLED=false
+
+if [ "${GATEWAY_API_ENABLED}" = "true" ] && [ "${GATEWAY_API_ALREADY_INSTALLED}" = "false" ]; then
   if [[ "${SMCP_VERSION}" == "v2.4" || "${SMCP_VERSION}" == "v2.3" ]]; then
     echo 'Installing Gateway API version v0.5.1'
     oc kustomize "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1" | oc apply -f -
