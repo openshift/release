@@ -102,7 +102,7 @@ args=(
 )
 
 echo "Extract the latest /tmp/oc client... ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-/tmp/oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=oc --to=/tmp --insecure=true
 
 run_command "which oc"
