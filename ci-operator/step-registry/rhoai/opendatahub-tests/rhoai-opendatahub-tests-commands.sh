@@ -26,6 +26,7 @@ fi
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 RUN_COMMAND="uv run pytest tests/model_serving/model_server \
+            --tc=use_unprivileged_client:False \
             -s -o log_cli=true \
             --junit-xml=${ARTIFACT_DIR}/xunit_results.xml \
             --log-file=${ARTIFACT_DIR}/pytest-tests.log"
