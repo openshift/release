@@ -26,43 +26,7 @@ function setup_hub_cluster_with_argocd {
 
   echo "Patch the ArgoCD instance in the hub cluster using the ${HOME}/ztp/argocd/deployment/argocd-openshift-gitops-patch.json patch file:"
 
-#   argocd_gitops_patch=$(mktemp --dry-run)
-#   cat <<EOF > ${argocd_gitops_patch}
-# {
-#   "spec": {
-#     "repo": {
-#       "initContainers": [
-#         {
-#           "args": [
-#             "-c",
-#             "mkdir -p /.config/kustomize/plugin/policy.open-cluster-management.io/v1/policygenerator && cp /policy-generator/PolicyGenerator-not-fips-compliant /.config/kustomize/plugin/policy.open-cluster-management.io/v1/policygenerator/PolicyGenerator"
-#           ],
-#           "command": [
-#             "/bin/bash"
-#           ],
-#           "image": "${MULTICLUSTER_HUB_OPERATOR_SUBS}",
-#           "name": "policy-generator-install",
-#           "imagePullPolicy": "Always",
-#           "volumeMounts": [
-#             {
-#               "mountPath": "/.config",
-#               "name": "kustomize"
-#             }
-#           ]
-#         }
-#       ]
-#     }
-#   }
-# }
-# EOF
-
   set -x
-  # jq -s '.[0] * .[1]' \
-  #   ${HOME}/ztp/argocd/deployment/argocd-openshift-gitops-patch.json \
-  #   ${argocd_gitops_patch} \
-  #   > ${argocd_templates_dir}/argocd-openshift-gitops-patch.json
-  # oc patch argocd openshift-gitops -n openshift-gitops --type=merge \
-  #   --patch-file ${argocd_templates_dir}/argocd-openshift-gitops-patch.json
   oc patch argocd openshift-gitops -n openshift-gitops --type=merge \
     --patch-file ${HOME}/ztp/argocd/deployment/argocd-openshift-gitops-patch.json
   set +x
