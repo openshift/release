@@ -123,7 +123,7 @@ then
 fi
 
 # execute the mirror command
-cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} | tee '${mirror_output}'"
+cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} --max-per-registry=1 | tee '${mirror_output}'"
 run_command "$cmd"
 
 line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
