@@ -39,6 +39,14 @@ new_pull_secret="${SHARED_DIR}/new_pull_secret"
 install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
 cluster_mirror_conf_file="${SHARED_DIR}/local_registry_mirror_file.yaml"
 
+RELEASE_IMAGE_INTERMEDIATE1="registry.ci.openshift.org/ocp/release:4.16.0-0.nightly-2025-04-17-181855"
+RELEASE_IMAGE_INTERMEDIATE2="registry.ci.openshift.org/ocp/release:4.17.0-0.nightly-2025-04-26-033346"
+RELEASE_IMAGE_INTERMEDIATE3="registry.ci.openshift.org/ocp/release:4.18.0-0.nightly-2025-04-26-080749"
+RELEASE_IMAGE_TARGET="registry.ci.openshift.org/ocp/release:4.19.0-0.nightly-2025-04-24-005837"
+
+echo "${RELEASE_IMAGE_INTERMEDIATE1},${RELEASE_IMAGE_INTERMEDIATE2},${RELEASE_IMAGE_INTERMEDIATE3},${RELEASE_IMAGE_TARGET}" | tee ${SHARED_DIR}/upgrade-edge
+
+
 # private mirror registry host
 # <public_dns>:<port>
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
