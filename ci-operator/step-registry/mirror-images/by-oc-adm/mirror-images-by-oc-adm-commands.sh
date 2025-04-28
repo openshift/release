@@ -93,6 +93,10 @@ args=(
     --insecure=true
 )
 
+echo "Extract the latest oc client... ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+   --command=oc --to=/bin --insecure=true
+
 run_command "which oc"
 run_command "oc version --client"
 
@@ -122,15 +126,40 @@ then
         source "${SHARED_DIR}/mirror-proxy-conf.sh"
 fi
 
-# execute the mirror command
-cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} --max-per-registry=1 | tee '${mirror_output}'"
-run_command "$cmd"
+# upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
+release_string="$(< "${SHARED_DIR}/upgrade-edge")"
+# shellcheck disable=SC2207
+TARGET_RELEASES=($(echo "$release_string" | tr ',' ' '))
+echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 
-line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
-install_end_line_num=$(expr ${line_num} - 3) &&
-upgrade_start_line_num=$(expr ${line_num} + 2) &&
-sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" > "${install_config_mirror_patch}"
-sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_conf_file}"
+for target in "${TARGET_RELEASES[@]}"; do
 
-run_command "cat '${install_config_mirror_patch}'"
+    readable_version=$(oc adm release info "${target}" -o jsonpath='{.metadata.version}')
+    echo "readable_version: $readable_version"
+
+    # target release
+    target_release_image="${MIRROR_REGISTRY_HOST}/${target#*/}"
+    target_release_image_repo="${target_release_image%:*}"
+    target_release_image_repo="${target_release_image_repo%@sha256*}"
+    # ensure mirror release image by tag name, refer to https://github.com/openshift/oc/pull/1331
+    target_release_image="${target_release_image_repo}:${readable_version}"
+
+    echo "target_release_image: $target_release_image"
+    echo "target_release_image_repo: $target_release_image_repo"
+
+    # execute the mirror command
+    cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} --max-per-registry=4 | tee '${mirror_output}'"
+    run_command "$cmd"
+
+    line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
+    install_end_line_num=$(expr ${line_num} - 3) &&
+    upgrade_start_line_num=$(expr ${line_num} + 2) &&
+    sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" >> "${install_config_mirror_patch}"
+    sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" >> "${cluster_mirror_conf_file}"
+
+    run_command "cat '${install_config_mirror_patch}'"
+
+done
+
+
 rm -f "${new_pull_secret}"
