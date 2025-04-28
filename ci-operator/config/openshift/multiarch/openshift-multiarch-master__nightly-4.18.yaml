@@ -140,7 +140,7 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-ibmcloud-heterogeneous
 - as: ocp-e2e-powervs-ovn-multi-p-px
-  cron: 40 13 * * *
+  cron: 30 5 * * *
   steps:
     cluster_profile: powervs-multi-1
     dependencies:
@@ -171,21 +171,18 @@ tests:
 - as: ocp-e2e-aws-ovn-upgrade-multi-x-ax
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-upgrade-aws-heterogeneous
 - as: ocp-e2e-aws-ovn-multi-x-ax
   cron: 08 11 * * 5
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -201,11 +198,10 @@ tests:
 - as: ocp-e2e-aws-ovn-multi-day-0-x-a
   interval: 24h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -223,11 +219,10 @@ tests:
 - as: ocp-e2e-serial-aws-ovn-multi-x-ax
   cron: 19 23 * * 2
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SKIPS: EgressIPs can be assigned automatically\| OpenShift alerting rules\|
         pods should have the assigned EgressIPs\| only pods matched by the pod selector
         should have the EgressIPs\| Image signature workflow can push a signed image
@@ -238,65 +233,59 @@ tests:
 - as: ocp-e2e-upgrade-aws-ovn-arm64
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: ocp-e2e-upgrade-aws-ovn-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-multi-a-a
   interval: 24h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: ipi-aws-ovn
 - as: ocp-image-ecosystem-aws-ovn-multi-a-a
   interval: 96h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-image-ecosystem
 - as: ocp-e2e-ovn-serial-aws-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-ovn-serial
 - as: ocp-e2e-aws-ovn-arm64
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     observers:
       enable:
@@ -309,17 +298,65 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
+    workflow: openshift-e2e-aws-ovn
+- as: ocp-e2e-aws-ovn-multi-x-x-to-a-x
+  interval: 72h
+  steps:
+    cluster_profile: aws-3
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      MIGRATION_CP_MACHINE_TYPE: m6g.xlarge
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\| control plane machine set operator should
+        not cause an early rollout
+    test:
+    - ref: multiarch-migration-machine-type
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn
+- as: ocp-e2e-aws-ovn-multi-a-a-to-x-a
+  interval: 72h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      MIGRATION_ARCHITECTURE: x86_64
+      MIGRATION_CP_MACHINE_TYPE: m6i.xlarge
+      OCP_ARCH: arm64
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\| control plane machine set operator should
+        not cause an early rollout
+    test:
+    - ref: multiarch-migration-machine-type
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
 - as: ocp-e2e-aws-upi-ovn-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       BOOTSTRAP_INSTANCE_TYPE: m6g.large
       COMPUTE_NODE_TYPE: m6g.xlarge
       MASTER_INSTANCE_TYPE: m6g.xlarge
@@ -329,11 +366,10 @@ tests:
 - as: ocp-e2e-aws-ovn-sno-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     observers:
       enable:
@@ -342,11 +378,10 @@ tests:
 - as: ocp-e2e-aws-ovn-techpreview-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_NODE_TYPE: m6g.xlarge
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
@@ -357,11 +392,10 @@ tests:
 - as: ocp-e2e-aws-ovn-techpreview-serial-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       COMPUTE_NODE_TYPE: m6g.xlarge
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
@@ -370,7 +404,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial
 - as: ocp-e2e-ibmcloud-ovn-multi-x-px
-  cron: 20 13 * * *
+  cron: 0 5 * * *
   steps:
     cluster_profile: ibmcloud-multi-ppc64le
     dependencies:
@@ -383,7 +417,7 @@ tests:
       LOKI_ENABLED: "false"
       OCP_VERSION: "4.18"
       RESOURCE_GROUP: multi-arch-cicd-resource-group
-      SIZE_VARIANT: large
+      SIZE_VARIANT: compact
       TERRAFORM_VERSION: 1.5.5
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
@@ -428,7 +462,8 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 22 * * 1,4
   steps:
     cluster_profile: libvirt-s390x-1
@@ -442,7 +477,8 @@ tests:
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-agent-remote-libvirt-s390x
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 2 * * 0
   steps:
     cluster_profile: libvirt-s390x-1
@@ -458,7 +494,8 @@ tests:
       VOLUME_CAPACITY: 120G
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 22 * * 1,4
   steps:
     cluster_profile: libvirt-s390x-1
@@ -472,7 +509,8 @@ tests:
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-agent-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 2 * * 0
   steps:
     cluster_profile: libvirt-s390x-1
@@ -488,7 +526,8 @@ tests:
       VOLUME_CAPACITY: 120G
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-xz
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 8,20 * * 1-5
   steps:
     cluster_profile: libvirt-s390x-amd64
@@ -501,7 +540,8 @@ tests:
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi-heterogeneous
 - as: ocp-heavy-build-ovn-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 22 * * 3
   steps:
     cluster_profile: libvirt-s390x-1
@@ -515,7 +555,8 @@ tests:
       TEST_TYPE: heavy-build
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 0 * * 0
   steps:
     cluster_profile: libvirt-s390x-1
@@ -528,7 +569,8 @@ tests:
       TEST_TYPE: image-ecosystem
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 1 * * 0
   steps:
     cluster_profile: libvirt-s390x-1
@@ -541,7 +583,8 @@ tests:
       TEST_TYPE: jenkins-e2e-rhel-only
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 0 * * 6
   steps:
     cluster_profile: libvirt-s390x-1
@@ -554,7 +597,8 @@ tests:
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 1 * * 6
   steps:
     cluster_profile: libvirt-s390x-1
@@ -569,7 +613,8 @@ tests:
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt-upi-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-multi-z-z
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 2 * * 6
   steps:
     cluster_profile: libvirt-s390x-1
@@ -584,7 +629,8 @@ tests:
       VOLUME_CAPACITY: 64GB
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-ppc64le
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 22 * * 1,4
   steps:
     cluster_profile: libvirt-ppc64le
@@ -599,7 +645,8 @@ tests:
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 22 * * 1,4
   steps:
     cluster_profile: libvirt-ppc64le
@@ -614,7 +661,8 @@ tests:
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-agent-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 2 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
@@ -631,7 +679,8 @@ tests:
       VOLUME_CAPACITY: 120G
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-ppc64le
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 22 * * 3
   steps:
     cluster_profile: libvirt-ppc64le
@@ -645,7 +694,8 @@ tests:
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 22 * * 3
   steps:
     cluster_profile: libvirt-ppc64le
@@ -659,7 +709,8 @@ tests:
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 0 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
@@ -672,7 +723,8 @@ tests:
       TEST_TYPE: image-ecosystem
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 1 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
@@ -685,7 +737,8 @@ tests:
       TEST_TYPE: jenkins-e2e-rhel-only
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 0 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
@@ -698,7 +751,8 @@ tests:
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 1 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
@@ -712,7 +766,8 @@ tests:
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt-upi-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-multi-p-p
-  cluster: build01
+  capabilities:
+  - sshd-bastion
   cron: 0 2 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
@@ -728,8 +783,9 @@ tests:
       VOLUME_CAPACITY: 64GB
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-powervs-capi-multi-p-p
-  cluster: build01
-  cron: 0 9,21 * * *
+  capabilities:
+  - sshd-bastion
+  cron: 0 8,20 * * *
   steps:
     cluster_profile: powervs-7
     dependencies:
@@ -737,9 +793,7 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.18"
-      CLUSTER_NAME_MODIFIER: capi-417
-      FEATURE_GATES: '["ClusterAPIInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      CLUSTER_NAME_MODIFIER: capi-418
       INSTALLER: powervs
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi

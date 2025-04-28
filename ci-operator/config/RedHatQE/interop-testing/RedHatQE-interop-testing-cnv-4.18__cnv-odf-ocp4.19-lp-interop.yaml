@@ -1,0 +1,121 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- build_args:
+  - name: OCP_VERSION
+    value: "4.19"
+  - name: OC_CLI_VERSION
+    value: latest
+  context_dir: cnv-ci
+  dockerfile_path: Dockerfile
+  to: cnv-ci
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: cnv-odf-tests-aws-ipi-ocp419
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: c5n.metal
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "cucushift-*"           , "failure_type": "all"          , "classification": "Cluster Health Check"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "*deploy-odf"           , "failure_type": "all"          , "classification": "Operator Setup"                        , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests","test-initialization"]                          },
+              {"step": "*ocs-tests"            , "failure_type": "pod_failure"  , "classification": "ODF Storage Tests Execution"           , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"]                          },
+              {"step": "*ocs-tests"            , "failure_type": "test_failure" , "classification": "ODF Storage Tests Failure"             , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "RHSTOR", "jira_assignee": "!default"},
+              {"step": "*cnv-tests-e2e-deploy" , "failure_type": "pod_failure"  , "classification": "CNV Tests Execution"                   , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"]                          },
+              {"step": "*cnv-tests-e2e-deploy" , "failure_type": "test_failure" , "classification": "CNV Tests Failure"                     , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "CNV", "jira_assignee": "!default"}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp", "self-managed-lp", "cnv-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dkeler@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCP_VERSION: "4.19"
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      ODF_VERSION_MAJOR_MINOR: "4.18"
+      RE_TRIGGER_ON_FAILURE: "false"
+      USER_TAGS: |
+        scenario cnv
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-cnv-tests-e2e-deploy
+    - ref: interop-tests-openshift-virtualization-tests
+    workflow: firewatch-ipi-aws
+- as: cnv-odf-tests-aws-ipi-ocp419-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: c5n.metal
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "cucushift-*"           , "failure_type": "all"          , "classification": "Cluster Health Check"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "*deploy-odf"           , "failure_type": "all"          , "classification": "Operator Setup"                        , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests","test-initialization"]                          },
+              {"step": "*ocs-tests"            , "failure_type": "pod_failure"  , "classification": "ODF Storage Tests Execution"           , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"]                          },
+              {"step": "*ocs-tests"            , "failure_type": "test_failure" , "classification": "ODF Storage Tests Failure"             , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "RHSTOR", "jira_assignee": "!default"},
+              {"step": "*cnv-tests-e2e-deploy" , "failure_type": "pod_failure"  , "classification": "CNV Tests Execution"                   , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"]                          },
+              {"step": "*cnv-tests-e2e-deploy" , "failure_type": "test_failure" , "classification": "CNV Tests Failure"                     , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "CNV", "jira_assignee": "!default"}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp", "self-managed-lp","fips",
+        "cnv-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dkeler@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCP_VERSION: "4.19"
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      ODF_VERSION_MAJOR_MINOR: "4.18"
+      RE_TRIGGER_ON_FAILURE: "false"
+      USER_TAGS: |
+        scenario cnv
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-cnv-tests-e2e-deploy
+    - ref: interop-tests-openshift-virtualization-tests
+    workflow: firewatch-ipi-aws
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: cnv-4.18
+  org: RedHatQE
+  repo: interop-testing
+  variant: cnv-odf-ocp4.19-lp-interop

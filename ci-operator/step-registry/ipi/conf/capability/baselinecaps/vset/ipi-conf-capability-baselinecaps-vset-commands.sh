@@ -68,7 +68,7 @@ v415=" ${v414} OperatorLifecycleManager CloudCredential"
 v416=" ${v415} CloudControllerManager Ingress"
 v417=" ${v416}"
 # shellcheck disable=SC2034
-v418=" ${v417}"
+v418=" ${v417} OperatorLifecycleManagerV1"
 latest_version="v418"
 
 # define capability dependency

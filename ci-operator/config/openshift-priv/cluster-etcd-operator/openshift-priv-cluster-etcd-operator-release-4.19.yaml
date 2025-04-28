@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -31,10 +31,10 @@ base_images:
     name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -45,13 +45,14 @@ images:
     ocp_4.18_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cluster-etcd-operator
 promotion:
   to:
-  - name: 4.19-priv
+  - disabled: true
+    name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -87,7 +88,7 @@ tests:
     from: test-bin
 - as: e2e-agnostic-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-agnostic-ovn-upgrade
   steps:
@@ -96,7 +97,7 @@ tests:
 - as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-disruption
 - as: e2e-aws-disruptive-ovn
   optional: true
@@ -115,7 +116,7 @@ tests:
     workflow: openshift-e2e-gcp-disruption-ovn
 - as: e2e-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -131,7 +132,7 @@ tests:
 - as: e2e-operator-fips
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -170,12 +171,13 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-assisted
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-aws-ovn-single-node
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-single-node-live-iso
   optional: true
@@ -185,7 +187,7 @@ tests:
 - as: configmap-scale
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-serial
   steps:
@@ -193,7 +195,7 @@ tests:
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-etcd-scaling
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
   optional: true
@@ -213,7 +215,7 @@ tests:
 - as: e2e-aws-etcd-recovery
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-etcd-recovery
 - as: e2e-aws-etcd-certrotation
   optional: true
@@ -240,7 +242,7 @@ tests:
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-aws-cpms
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       commands: make e2e-periodic

@@ -1,11 +1,11 @@
 presubmits:
   openshift-knative/eventing-hyperfoil-benchmark:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build11
     context: ci/prow/414-images
     decorate: true
     decoration_config:
@@ -16,6 +16,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-414-images
     rerun_command: /test 414-images
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -63,19 +64,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/414-test-kafka-broker-midstr-a0cb886-aws-414
+    cluster: build09
+    context: ci/prow/414-test-kafka-broker-midstream-nightly
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-414-test-kafka-broker-midstr-a0cb886-aws-414
-    rerun_command: /test 414-test-kafka-broker-midstr-a0cb886-aws-414
+    name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-414-test-kafka-broker-midstream-nightly
+    rerun_command: /test 414-test-kafka-broker-midstream-nightly
     spec:
       containers:
       - args:
@@ -84,7 +86,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-kafka-broker-midstr-a0cb886-aws-414
+        - --target=test-kafka-broker-midstream-nightly
         - --variant=414
         command:
         - ci-operator
@@ -133,25 +135,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )414-test-kafka-broker-midstr-a0cb886-aws-414,?($|\s.*)
+    trigger: (?m)^/test( | .* )414-test-kafka-broker-midstream-nightly,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/414-test-kafka-broker-upstre-fbbddbf-aws-414
+    cluster: build09
+    context: ci/prow/414-test-kafka-broker-upstream-nightly
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-414-test-kafka-broker-upstre-fbbddbf-aws-414
-    rerun_command: /test 414-test-kafka-broker-upstre-fbbddbf-aws-414
+    name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-414-test-kafka-broker-upstream-nightly
+    rerun_command: /test 414-test-kafka-broker-upstream-nightly
     spec:
       containers:
       - args:
@@ -160,7 +163,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-kafka-broker-upstre-fbbddbf-aws-414
+        - --target=test-kafka-broker-upstream-nightly
         - --variant=414
         command:
         - ci-operator
@@ -209,4 +212,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )414-test-kafka-broker-upstre-fbbddbf-aws-414,?($|\s.*)
+    trigger: (?m)^/test( | .* )414-test-kafka-broker-upstream-nightly,?($|\s.*)

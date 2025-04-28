@@ -1,24 +1,24 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.21-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.17
+    tag: rhel-8-golang-1.21-openshift-4.18
   tools:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: tools
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.17
+    tag: rhel-8-golang-1.21-openshift-4.18
 releases:
   latest:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -27,7 +27,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay313-ocp417-operator-test
+- as: quay314-ocp418-operator-test-singlens
   cron: 0 12 * * 6
   steps:
     cluster_profile: aws-qe
@@ -35,15 +35,32 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "8"
       COMPUTE_NODE_TYPE: m6a.8xlarge
-      ODF_OPERATOR_CHANNEL: stable-4.16
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:851607
-      QUAY_OPERATOR_CHANNEL: stable-3.13
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:940263
+      QUAY_OPERATOR_CHANNEL: stable-3.14
       QUAY_OPERATOR_TESTCASE: Quay-High|Quay-Medium
-      QUAYREGISTRY_QUAY_VERSION: "3.13"
     test:
-    - ref: quay-tests-provisioning-aws-unmanaged-component
-    - ref: quay-tests-quay-operator-test
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-aws-unmanaged-component
+    - ref: quay-tests-test-quay-operator
     workflow: quay-tests-cucushift-installer-rehearse-aws-ipi-operator
+  timeout: 8h0m0s
+- as: quay314-ocp418-operator-test-allns
+  cron: 0 12 * * 0
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "8"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:940263
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_TESTCASE: Quay-Allns-Medium|Quay-Allns-High
+    test:
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-test-quay-operator
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay

@@ -241,9 +241,15 @@
           {
             alert: 'openshift-mirroring-failures',
             expr: |||
-              increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
+              sum by (job_name) (
+                rate(
+                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[12h]
+                )
+              )
+              * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="image-mirroring",label_ci_openshift_io_area="openshift"}) == 0
             |||,
             'for': '1m',
+            'keep_firing_for': '2h',
             labels: {
               severity: 'critical',
             },

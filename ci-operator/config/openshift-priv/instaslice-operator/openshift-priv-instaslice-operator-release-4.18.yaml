@@ -1,8 +1,3 @@
-base_images:
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.54.2
 build_root:
   image_stream_tag:
     name: release
@@ -11,8 +6,7 @@ build_root:
 canonical_go_repository: github.com/openshift/instaslice-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.18-priv
+  - name: 4.18-priv
     namespace: ocp-private
 releases:
   initial:
@@ -34,15 +28,20 @@ resources:
 tests:
 - as: lint
   commands: |
+    #!/bin/bash
+
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
     clone: true
-    from: golangci-lint
+    from: src
 - as: unit
-  commands: make test
+  commands: |
+    #!/bin/bash
+
+    make test
   container:
     from: src
 zz_generated_metadata:

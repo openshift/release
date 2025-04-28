@@ -1,0 +1,29 @@
+base_images:
+  base:
+    name: "4.18"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ci/telco-runner
+      RUN dnf install -y rsync
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: slcm-lab
+  cluster: build05
+  cron: 00 4 * * 6
+  steps:
+    test:
+    - ref: telcov10n-slcm-oran-o2ims-compliance-tests
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd-private
+  variant: slcm-lab-oran-o2ims-compliance-tests

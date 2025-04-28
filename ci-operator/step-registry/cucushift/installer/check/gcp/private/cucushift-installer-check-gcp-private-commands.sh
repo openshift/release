@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=101
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
+
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 GCP_REGION="${LEASED_RESOURCE}"
 
@@ -38,14 +46,18 @@ else
 fi
 
 echo "INFO: (2/4) Checking if any dns record-sets in the base domain (public zone)..."
-base_domain_zone_name=$(gcloud dns managed-zones list --filter="dnsName=${GCP_BASE_DOMAIN}." --format="table(name)" | grep -v NAME)
-echo "INFO: base domain zone name '${base_domain_zone_name}'"
-# In case of a disconnected network, it's possible to configure record-sets for the mirror registry (within the VPC), so exclude it. 
-gcloud dns record-sets list --zone "${base_domain_zone_name}" | grep -v mirror-registry | grep "${CLUSTER_NAME}" && ret=$(( $ret | 2 ))
-if [ ${ret} -ge 2 ]; then
-    echo "ERROR: Base domain record-sets check failed."
+base_domain_zone_name=$(gcloud dns managed-zones list --filter="visibility=public AND dnsName=${GCP_BASE_DOMAIN}." --format="value(name)")
+if [[ -n "${base_domain_zone_name}" ]]; then
+    echo "INFO: base domain zone name '${base_domain_zone_name}'"
+    # In case of a disconnected network, it's possible to configure record-sets for the mirror registry (within the VPC), so exclude it. 
+    gcloud dns record-sets list --zone "${base_domain_zone_name}" | grep -v mirror-registry | grep "${CLUSTER_NAME}" && ret=$(( $ret | 2 ))
+    if [ ${ret} -ge 2 ]; then
+        echo "ERROR: Base domain record-sets check failed."
+    else
+        echo "INFO: Base domain record-sets check passed."
+    fi
 else
-    echo "INFO: Base domain record-sets check passed."
+    echo "INFO: The base domain seems not existing, skip the check."
 fi
 
 echo "INFO: (3/4) Checking if any external address..."

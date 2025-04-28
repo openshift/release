@@ -23,7 +23,7 @@ scp "${SSHOPTS[@]}" /usr/bin/openshift-tests "root@${IP}:/usr/local/bin"
 cat >"${SHARED_DIR}"/local-mirror.sh <<'EOF'
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
@@ -213,19 +213,31 @@ export OCP_RELEASE=$( oc adm release -a ~/pull-secret info "${RELEASE_IMAGE_LATE
 export LOCAL_REPO='ocp/openshift4'
 
 # Mirror release
-oc adm release mirror -a ~/pull-secret \
-    --from="${RELEASE_IMAGE_LATEST}" \
-    --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
-    --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output
+set +e
+for imagestream in $(seq 1 5)
+do
+    echo "[$(date)] Retrying mirror"
+    oc adm release mirror -a ~/pull-secret \
+        --from="${RELEASE_IMAGE_LATEST}" \
+        --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
+        --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output \
+    && break
+    sleep 15
+done
+set -e
+
+# Copy pull secret for external binary extraction
+mkdir -p /run/secrets/ci.openshift.io/cluster-profile
+cp -rvf ~/pull-secret /run/secrets/ci.openshift.io/cluster-profile
 
 # Mirror test images
 DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
+export KUBECONFIG=/root/.kube/config
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
 oc image mirror -f /tmp/mirror --registry-config ~/pull-secret
 echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
-oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.8  ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
-# until we land k8s 1.28 we need to mirror both the 3.8 (current image) and 3.9 (coming in k8s 1.28)
-oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.9  ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.redhat.io/rhel8/httpd-24:latest ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-12-registry-k8s-io-e2e-test-images-httpd-2-4-38-4-lYFH2l3oSS5xEICa
+
 
 # Build registries.conf
 tail -n 12 /tmp/oc-mirror.output | tee /tmp/icsp.yaml
@@ -251,10 +263,11 @@ cat /tmp/registries.conf
 
 # Create a new CA bundle with registry CA included, restart assisted-service
 kubectl create configmap mirror-registry-ca -n assisted-installer --from-file=ca-bundle.crt=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem --from-file=registries.conf=/tmp/registries.conf
-mkdir -p $HOME/custom_manifests
-cat /etc/pki/ca-trust/source/anchors/ca.pem > $HOME/custom_manifests/ca.pem
-cat /etc/pki/ca-trust/source/anchors/server.pem >> $HOME/custom_manifests/ca.pem
-echo "export REGISTRY_CA_PATH=$HOME/custom_manifests/ca.pem" >> ~/config.sh
+mkdir -p /home/assisted/custom_manifests
+cat /etc/pki/ca-trust/source/anchors/ca.pem > /home/assisted/custom_manifests/ca.pem
+cat /etc/pki/ca-trust/source/anchors/server.pem >> /home/assisted/custom_manifests/ca.pem
+ls -la /home/assisted/custom_manifests/ca.pem
+echo "export REGISTRY_CA_PATH=/home/assisted/custom_manifests/ca.pem" >> ~/config.sh
 
 kubectl patch deployment -n assisted-installer assisted-service --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "mirror-registry-ca", "mountPath": "/etc/pki/tls/certs/ca-bundle.crt", "readOnly": true, "subPath": "mirror_ca.pem"}}]'
 kubectl -n assisted-installer rollout status deploy/assisted-service --timeout=5m
@@ -264,10 +277,13 @@ MIRRORED_RELEASE_IMAGE=$(grep -oP "Update image:\s*\K.+" /tmp/oc-mirror.output)
 MIRRORED_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" -o template --template='{{.digest}}' )
 MUST_GATHER_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=must-gather | cut -f 2 -d '@' )
 MIRRORED_MUST_GATHER_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${MUST_GATHER_DIGEST}"
+HYPERKUBE_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=hyperkube | cut -f 2 -d '@' )
+MIRRORED_HYPERKUBE_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${HYPERKUBE_DIGEST}"
 
 echo "export RELEASE_IMAGE_LATEST=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}" >> ~/config.sh
+echo "export HYPERKUBE_IMAGE=${MIRRORED_HYPERKUBE_IMAGE}" >> ~/config.sh
 #TODO: Fix assisted-test-infra to pass CA bundle in skipper
 echo "export OPENSHIFT_VERSION=4.14" >> ~/config.sh
 
@@ -281,5 +297,6 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
 	/usr/local/bin/local-mirror.sh

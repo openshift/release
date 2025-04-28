@@ -57,9 +57,11 @@ function destroy_bootstrap() {
   . <(yq -P e -I0 -o=p '.[] | select(.name|test("bootstrap"))' "$SHARED_DIR/hosts.yaml" | sed 's/^\(.*\) = \(.*\)$/\1="\2"/')
   # shellcheck disable=SC2154
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${CLUSTER_NAME}" "${mac}"<< 'EOF'
+    "${CLUSTER_NAME}" "${mac}" "${ip}" "${DISCONNECTED}"<< 'EOF'
   BUILD_ID="$1"
   mac="$2"
+  ip="$3"
+  DISCONNECTED="$4"
   echo "Destroying bootstrap: removing the DHCP/PXE config..."
   sed -i "/^$mac/d" /opt/dnsmasq/hosts/hostsdir/"${BUILD_ID}"
   kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
@@ -67,6 +69,11 @@ function destroy_bootstrap() {
   rm -f "/opt/dnsmasq/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
   echo "Destroying bootstrap: removing dns entries..."
   sed -i "/bootstrap.*${BUILD_ID:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
+  if [ "${DISCONNECTED}" == "true" ]; then
+    echo "Destroying bootstrap: removing drop rule for disconnected network..."
+    RULE=$(sed 's/^-A /-D /' <(iptables -S FORWARD | grep "${ip}" | grep DROP))
+    [[ $RULE =~ D.*$ip.*DROP ]] && iptables ${RULE}
+  fi
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
   # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
   # using sed -i leads to creating a new file with a different inode number.
@@ -142,7 +149,9 @@ EOF
   echo "Releasing lock $LOCK_FD ($LOCK)"
   flock -u $LOCK_FD
 EOF
+  echo "Destroying bootstrap: removing the bootstrap node from hosts.yaml..."
   yq --inplace 'del(.[]|select(.name|test("bootstrap")))' "$SHARED_DIR/hosts.yaml"
+  scp "${SSHOPTS[@]}" "$SHARED_DIR/hosts.yaml" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 }
 
 function wait_for_power_down() {

@@ -4,11 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.py' EXIT TERM INT
-
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.py' EXIT TERM INT
 
 JSONER_PY="/tmp/jsoner.py"
+GET_ACTIONS_PY="/tmp/get_actions.py"
+CONFIG=${SHARED_DIR}/install-config.yaml
 
 function create_jsoner_py()
 {
@@ -31,6 +37,30 @@ EOF
 	fi
 }
 
+function create_get_actions_py()
+{
+	if [[ ! -f ${GET_ACTIONS_PY} ]]; then
+		cat <<EOF >"${GET_ACTIONS_PY}"
+import json
+import sys
+p = []
+with open(sys.argv[1], 'r') as f:
+    data = json.load(f)
+    for s in data['Statement']:
+        for a in s['Action']:
+            if a not in p:
+                p.append(a)
+p.sort()
+print('\n'.join(p))
+EOF
+	fi
+}
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
+
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
 	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -52,10 +82,10 @@ if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 	# 
 	USER_POLICY_FILENAME="aws-permissions-policy-creds.json"
 	USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
+	PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
 
 	if ((ocp_major_version < 4 || (ocp_major_version == 4 && ocp_minor_version < 18))); then
 		# There is no installer support for generating permissions prior to 4.18, so we generate one ourselves
-		PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
 
 		cat <<EOF >"${PERMISION_LIST}"
 autoscaling:DescribeAutoScalingGroups
@@ -247,49 +277,98 @@ EOF
 
 		# additional permisions for 4.11+
 		if ((ocp_minor_version >= 11 && ocp_major_version == 4)); then
+			# base
 			echo "ec2:DeletePlacementGroup" >>"${PERMISION_LIST}"
 			echo "s3:GetBucketPolicy" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.14+
 		if ((ocp_minor_version >= 14 && ocp_major_version == 4)); then
+			# base
 			echo "ec2:DescribeSecurityGroupRules" >>"${PERMISION_LIST}"
-
-			# sts:AssumeRole is required for Shared-VPC install https://issues.redhat.com/browse/OCPBUGS-17751
-			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.15+
 		if ((ocp_minor_version >= 15 && ocp_major_version == 4)); then
+			# base
 			echo "iam:TagInstanceProfile" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.16+
 		if ((ocp_minor_version >= 16 && ocp_major_version == 4)); then
-			echo "ec2:DisassociateAddress" >>"${PERMISION_LIST}"
+			# base
 			echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
 			echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"
 		fi
 
-		create_jsoner_py
-		# generate policy file
-		cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
+		# Shared-VPC (4.14+)
+		# https://issues.redhat.com/browse/OCPBUGS-17751
+		# platform.aws.hostedZoneRole
+		if grep -q "hostedZoneRole" "${CONFIG}"; then
+			echo "sts:AssumeRole" >>"${PERMISION_LIST}"
+		fi
+
+		# byo public ipv4 pool (4.16+)
+		# platform.aws.publicIpv4Pool
+		if grep -q "publicIpv4Pool" "${CONFIG}"; then
+			echo "ec2:DisassociateAddress" >>"${PERMISION_LIST}"
+		fi
+
+		# byo IAM Profile (4.17+)
+		# https://issues.redhat.com/browse/OCPBUGS-44848
+		# platform.aws.defaultMachinePlatform.iamProfile
+		# compute[0].platform.aws.iamProfile
+		# controlPlane.platform.aws.iamProfile
+		if grep -q "iamProfile" "${CONFIG}"; then
+			echo "tag:UntagResources" >>"${PERMISION_LIST}"
+			echo "iam:UntagInstanceProfile" >>"${PERMISION_LIST}"
+		fi
+
+		# Shared network
+		# platform.aws.subnets
+		if grep -q "subnets" "${CONFIG}"; then
+			echo "tag:UntagResources" >>"${PERMISION_LIST}"
+		fi
 
 	else
 		dir=/tmp/min_perms/
 
 		mkdir -p ${dir}
 
+		echo "install-config.yaml"
+		echo "-------------------"
+		cat ${SHARED_DIR}/install-config.yaml | grep -vi "password\|username\|pullSecret\|auth"
+
 		# Make a copy of the install-config.yaml since the installer will consume it.
 		cp "${SHARED_DIR}/install-config.yaml" ${dir}/
 
-		openshift-install create permissions-policy --dir ${dir}
+		export INSTALLER_BINARY="openshift-install"
+		if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+		  echo "Extracting installer from ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+		  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to="/tmp" || exit 1
+		  export INSTALLER_BINARY="/tmp/openshift-install"
+		fi
 
-		# Save policy to shared dir so later steps have access to it.
-		mv ${dir}/${USER_POLICY_FILENAME} ${USER_POLICY_FILE}
+		${INSTALLER_BINARY} version
+
+		${INSTALLER_BINARY} create permissions-policy --dir ${dir}
+
+		# Save policy to artifact dir for debugging
+		mv ${dir}/${USER_POLICY_FILENAME} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json
+
+		# AWS: the policy created by permissions-policy may exceed the 6144 limition
+		# https://issues.redhat.com/browse/OCPBUGS-45612
+		# Merge multi-Sid into one Sid
+		create_get_actions_py
+		python3 $GET_ACTIONS_PY ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json > ${PERMISION_LIST}
 
 		rm -rf "${dir}"
 	fi
+
+	create_jsoner_py
+	
+	# generate policy file and save it to shared dir so later steps have access to it.
+	cat "${PERMISION_LIST}" | sort | uniq | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
 
 	# Save policy as a step artifact
 	cp ${USER_POLICY_FILE} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}
@@ -357,7 +436,7 @@ EOF
 
 	create_jsoner_py
 	# generate policy file
-	cat "${PERMISION_LIST}" | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
+	cat "${PERMISION_LIST}" | sort | uniq | python3 ${JSONER_PY} >"${USER_POLICY_FILE}"
 	echo "Created policy profile ${USER_POLICY_FILE}"
 else
 	echo "Custom AWS user with minimal permissions is disabled for ccoctl tool. Using AWS user from cluster profile."

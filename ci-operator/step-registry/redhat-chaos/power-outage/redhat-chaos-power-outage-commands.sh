@@ -4,10 +4,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
-oc config view
-oc projects
-python3 --version
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -41,8 +37,6 @@ elif [ "$platform" = "Azure" ]; then
     AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
     export AZURE_CLIENT_SECRET
 fi
-ls -al /secret/telemetry/
-
 
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")
@@ -61,5 +55,8 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./power-outage/prow_run.sh
 rc=$?
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running power outages"
 echo "Return code: $rc"

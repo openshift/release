@@ -46,6 +46,11 @@ tests:
       cli: latest
       commands: |
         oc create namespace "$INSTALL_NAMESPACE"
+
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-maintenance-operator-controller-manager
       dependencies:

@@ -28,8 +28,17 @@ oc get node -o jsonpath='{range .items[*]}Node: {@.metadata.name}  InternalIP: {
 echo "AgentServiceConfig yaml"
 oc get AgentServiceConfig agent -o yaml
 
+echo "ConfigMap mirror-config yaml"
+oc get ConfigMap mirror-config -n multicluster-engine -o yaml
+
 echo "Agent State"
 oc get agent -A -o jsonpath='{range .items[*]}BMH: {@.metadata.labels.agent-install\.openshift\.io/bmh} Agent: {@.metadata.name} State: {@.status.debugInfo.state}{"\n"}{end}'
+
+echo "HostedCluster"
+oc get hostedcluster -A
+
+echo "HostedCluster yaml"
+oc get hostedcluster -A -o yaml
 
 echo "**Guest cluster**"
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig

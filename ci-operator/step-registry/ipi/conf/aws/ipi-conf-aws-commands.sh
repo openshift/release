@@ -6,6 +6,13 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AWS_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AWS_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
@@ -213,13 +220,14 @@ echo "Using controlPlane node replicas: ${master_replicas}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AWS_BASE_DOMAIN}
 platform:
   aws:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
       clusterName: ${NAMESPACE}-${UNIQUE_HASH}
+      ci-nat-replace: "${CI_NAT_REPLACE:-false}"
 controlPlane:
   architecture: ${CONTROL_ARCH}
   name: master
@@ -374,4 +382,14 @@ platform:
     preserveBootstrapIgnition: true
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_bootstrap_ignition}"
+fi
+
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  patch_user_provisioned_dns="${SHARED_DIR}/install-config-user-provisioned-dns.yaml.patch"
+  cat > "${patch_user_provisioned_dns}" << EOF
+platform:
+  aws:
+    userProvisionedDNS: Enabled
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
 fi

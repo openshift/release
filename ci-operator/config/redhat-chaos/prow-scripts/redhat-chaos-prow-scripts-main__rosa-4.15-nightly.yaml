@@ -3,8 +3,16 @@ base_images:
     name: cerberus
     namespace: chaos
     tag: cerberus-prow
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
   cli-ocm:
     name: cli-ocm
+    namespace: ci
+    tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
   rosa-aws-cli:
@@ -20,6 +28,12 @@ images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
   to: cerberus-prow-rosa-415
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 promotion:
   to:
   - namespace: ci
@@ -36,13 +50,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: krkn-tests-rosa
-  cron: 0 1 5,19 * *
+- always_run: false
+  as: krkn-tests-rosa
   steps:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "true"
       ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
       REPLICAS: "3"
@@ -50,16 +68,22 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     workflow: rosa-aws-sts
-- as: krkn-tests-rosa-hog
-  cron: 0 4 5,19 * *
+- always_run: false
+  as: krkn-tests-rosa-hog
   steps:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "true"
       ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
       REPLICAS: "3"
@@ -67,23 +91,26 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-hog-scenarios
     workflow: rosa-aws-sts
-- as: krkn-tests-rosa-hcp
-  cron: 0 1 6,20 * *
+- always_run: false
+  as: krkn-tests-rosa-hcp
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
-      CHURN: "False"
+      CHURN: "true"
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
-      GC: "False"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
       HOSTED_CP: "true"
-      ITERATION_MULTIPLIER_ENV: "4"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
       READY_WAIT_TIMEOUT: 30m
@@ -92,33 +119,41 @@ tests:
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
     - ref: redhat-chaos-pod-scenarios-random-system-pods
     - ref: redhat-chaos-service-disruption-regex
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
-- as: krkn-rosa-hcp-hog
-  cron: 0 4 6,20 * *
+- always_run: false
+  as: krkn-rosa-hcp-hog
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "true"
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
       HOSTED_CP: "true"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
       ZONES_COUNT: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-hog-scenarios
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
@@ -129,18 +164,25 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
+      CHURN: "true"
       COMPUTE_MACHINE_TYPE: m5.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
       TELEMETRY_GROUP: prow-rosa-4.16
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - ref: redhat-chaos-node-disruptions-infra-outage
     workflow: rosa-aws-sts
   timeout: 5h0m0s

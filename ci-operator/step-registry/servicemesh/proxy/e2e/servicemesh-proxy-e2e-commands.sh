@@ -75,6 +75,8 @@ spec:
     command: ["tail", "-f", "/dev/null"]
     image: ${MAISTRA_BUILDER_IMAGE}
     env:
+    - name: DOCKER_REGISTRY_MIRRORS
+      value: "${DOCKER_REGISTRY_MIRRORS:-}"
     - name: CI
       value: "${CI:-}"
     - name: ARTIFACTS

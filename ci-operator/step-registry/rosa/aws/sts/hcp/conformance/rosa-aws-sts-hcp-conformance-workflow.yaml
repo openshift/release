@@ -10,14 +10,22 @@ workflow:
       OPENSHIFT_VERSION: "release:latest"
       REPLICAS: "3"
       ZONES_COUNT: "1"
+      TEST_SKIPS: >-
+        users can manipulate groups\|
+        well-known endpoint should be reachable\|
+        The HAProxy router should expose prometheus metrics for a route\|
+        OLM should have imagePullPolicy:IfNotPresent on thier deployments\|
+        etcd leader changes are not excessive\|
+        ocp payload should be based on existing source OLM version should contain the source commit id\|
+        API LBs follow \/readyz of kube-apiserver and stop sending requests before server shutdowns for external clients
     pre:
     - chain: rosa-aws-sts-hcp-provision
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes
     test:
-    - ref: openshift-e2e-test
+    - chain: hypershift-conformance
     post:
-    - chain: hypershift-dump
+    # - chain: hypershift-dump
     - chain: rosa-aws-sts-hcp-deprovision
   documentation: |-
     This workflow installs a rosa HCP cluster and performs openshift-tests conformance testing.

@@ -26,28 +26,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: qeindex
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-coo
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.12"
-  cron: 0 8 * * 4
-  steps:
-    env:
-      OPERATORS: |
-        [
-            {"name": "cluster-observability-operator", "source": "qe-app-registry", "channel": "development", "install_namespace": "coo", "target_namespaces": "", "operator_group":"openshift-coo-production-og"}
-        ]
-    test:
-    - ref: enable-qe-catalogsource
-    - ref: install-operators
-    - ref: rhobs-obo-test-harness
-    workflow: generic-claim
 - as: stage
   cluster_claim:
     architecture: amd64
@@ -61,12 +39,13 @@ tests:
   cron: 0 6 1 11 *
   steps:
     env:
+      COO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib@sha256:039fe921150c83a40d4d0f5a80394cef03c3f0fe071595dc368aab56652e8d47
       OPERATORS: |
         [
-            {"name": "cluster-observability-operator", "source": "dt-catalogsource", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
+            {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}
         ]
     test:
-    - ref: enable-stage-catalogsource
+    - ref: rhobs-konflux-catalogsource
     - ref: install-operators
     - ref: rhobs-obo-test-harness
     workflow: generic-claim

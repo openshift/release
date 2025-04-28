@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=101
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
+
 if [ ! -f "${SHARED_DIR}/user_tags_sa.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to find the key file of the IAM service-account for userTags testing on GCP."
   exit 1
@@ -58,9 +66,6 @@ current_tags_file=$(mktemp)
 # User-defined tags validation. It will check if each user-defined tag is applied. 
 # Return non-zero is one or more user-defined tag absent. 
 function validate_user_tags() {
-  echo "$(date -u --rfc-3339=seconds) - Current tags of the resource: "
-  cat "${current_tags_file}"
-
   local cnt=0 a_tag_value
   echo "" > "${validation_result_file}"
   printf '%s' "${USER_TAGS:-}" | while read -r PARENT KEY VALUE || [ -n "${PARENT}" ]
@@ -123,6 +128,8 @@ if version_check "4.17"; then
     name="${line%% *}"
     zone="${line##* }"
     gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/instances/${name} --location=${zone} --effective > "${current_tags_file}"
+    echo "$(date -u --rfc-3339=seconds) - Saving the machine's resource-manager tags..."
+    cp "${current_tags_file}" "${ARTIFACT_DIR}/${name}.machine_user_tags"
     validate_user_tags
     if grep -q "1" "${validation_result_file}"; then
       echo "$(date -u --rfc-3339=seconds) - FAILED for machine '${name}'."
@@ -140,6 +147,8 @@ if version_check "4.17"; then
     zone=$(basename ${zone})
     disk_id=$(gcloud compute disks describe ${name} --zone ${zone} --format json | jq -r -c .id)
     gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/disks/${disk_id} --location=${zone} --effective > "${current_tags_file}"
+    echo "$(date -u --rfc-3339=seconds) - Saving the disk's resource-manager tags..."
+    cp "${current_tags_file}" "${ARTIFACT_DIR}/${name}.disk_user_tags"
     validate_user_tags
     if grep -q "1" "${validation_result_file}"; then
       echo "$(date -u --rfc-3339=seconds) - FAILED for disk '${name}'."
@@ -158,6 +167,8 @@ readarray -t items < <(gsutil ls | grep "${INFRA_ID}-image-registry")
 for line in "${items[@]}"; do
   name=$(basename "${line}")
   gcloud resource-manager tags bindings list --parent=//storage.googleapis.com/projects/_/buckets/${name} --location=${GCP_REGION} --effective > "${current_tags_file}"
+  echo "$(date -u --rfc-3339=seconds) - Saving the bucket's resource-manager tags..."
+  cp "${current_tags_file}" "${ARTIFACT_DIR}/${name}.bucket_user_tags"
   validate_user_tags
   if grep -q "1" "${validation_result_file}"; then
     echo "$(date -u --rfc-3339=seconds) - FAILED for bucket '${name}'."

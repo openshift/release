@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 python3 --version 
 export CLOUDSDK_PYTHON=python3
 
@@ -230,7 +238,7 @@ for yaml_filename in $(ls -p "${creds_requests_dir}"/*.yaml | awk -F'/' '{print 
 
   echo "$(date -u --rfc-3339=seconds) - Creating IAM service account key for '${sa_email}'..."
   cmd="gcloud iam service-accounts keys create ${sa_json_file} --iam-account=${sa_email}"
-  run_command "$cmd"
+  backoff "$cmd"
   if [ -f "$sa_json_file" ]; then
     echo "$(date -u --rfc-3339=seconds) - Creating the credentials manifests file..."
     create_credentials_manifests "${secret_namespace}" "${secret_name}" "$(base64 ${sa_json_file} -w 0)" "${creds_manifests_dir}"

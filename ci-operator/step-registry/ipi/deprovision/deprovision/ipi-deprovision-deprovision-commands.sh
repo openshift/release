@@ -13,7 +13,6 @@ fi
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
-    cp /tmp/installer/metadata.json "${ARTIFACT_DIR}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -32,9 +31,6 @@ export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
-elif [ -f "${SHARED_DIR}/gcp_min_permissions_without_actas.json" ]; then
-  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account, which hasn't the 'iam.serviceAccounts.actAs' permission, for the minimum permissions testing on GCP..."
-  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions_without_actas.json"
 elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
@@ -57,15 +53,22 @@ if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
   export IC_API_KEY
 fi
 if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
-    # all vcenter certificates are in the file below
-    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
+    cp /var/run/vsphere-ibmcloud-ci/vcenter-certificate /tmp/ca-bundle.pem
+    if [ -f "${SHARED_DIR}/additional_ca_cert.pem" ]; then
+      echo "additional CA bundle found, appending it to the bundle from vault"
+      echo -n $'\n' >> /tmp/ca-bundle.pem
+      cat "${SHARED_DIR}/additional_ca_cert.pem" >> /tmp/ca-bundle.pem
+    fi
+    export SSL_CERT_FILE=/tmp/ca-bundle.pem
 fi
 
 echo ${SHARED_DIR}/metadata.json
-
 if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
     echo "Setting AZURE credential with minimal permissions for installer"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+    echo "Setting AZURE credential with Contributor role only for installer"
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
 fi
 
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
@@ -101,10 +104,20 @@ fi
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
     echo "proxy-conf.sh detected, but not reqquired by C2S/SC2S while destroying cluster, skip proxy setting"
+  elif [[ "${CLUSTER_TYPE}" = "azure4" ]]; then
+    # when bastion host is provisioned in cluster resource group, once the bastion is destroyed in the destroy process,
+    # the running destroy process would be interrupted and failed. E.g: azure-ipi-public-to-private jobs.
+    echo "proxy-conf.sh detected, but not required by azure4 clusters while destroying cluster, skip proxy setting"
   else
     echo "Private cluster setting proxy"
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+  fi
+fi
+
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]]; then
+  if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
   fi
 fi
 

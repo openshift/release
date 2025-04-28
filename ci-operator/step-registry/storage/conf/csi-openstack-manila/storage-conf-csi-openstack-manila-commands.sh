@@ -3,7 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ -z "${TEST_CSI_DRIVER_MANIFEST}" && "${TEST_CSI_DRIVER_MANIFEST}" != *"manila"* ]]; then
+if [[ -z "${TEST_CSI_DRIVER_MANIFEST}" || "${TEST_CSI_DRIVER_MANIFEST}" != *"manila"* ]]; then
     echo "TEST_CSI_DRIVER_MANIFEST is empty or doesn't contain manila, skipping the step"
     exit 0
 fi

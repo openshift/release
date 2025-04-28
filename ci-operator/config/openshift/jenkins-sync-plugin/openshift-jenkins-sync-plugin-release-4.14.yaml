@@ -1,16 +1,7 @@
-base_images:
-  origin_4.14_jenkins:
-    name: "4.14"
-    namespace: origin
-    tag: jenkins
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    origin_4.14_jenkins:
-      as:
-      - registry.ci.openshift.org/origin/4.14:jenkins
   to: jenkins
 - dockerfile_literal: |
     FROM quay.io/openshift/origin-jenkins-agent-maven:4.11.0 AS builder
@@ -59,7 +50,7 @@ tests:
 - as: e2e-aws-jenkins-sync-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -67,6 +58,8 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
+      - env: JENKINS_AGENT_BASE_IMAGE
+        name: jenkins-agent-base
       from: src
       resources:
         requests:
@@ -83,6 +76,8 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
+      - env: JENKINS_AGENT_BASE_IMAGE
+        name: jenkins-agent-base
       from: src
       resources:
         requests:

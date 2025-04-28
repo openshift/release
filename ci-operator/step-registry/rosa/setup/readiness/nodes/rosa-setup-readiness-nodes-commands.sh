@@ -93,7 +93,7 @@ function listMachineConfigPoolDetails() {
 
 # List details of machinesets, machines and nodes depending on Classic Rosa or HCP cluster
 function listDetails() {
-  if [ "$is_hcp_cluster" = "false" ]; then
+  if [ "$HOSTED_CP" = "false" ]; then
     echo "Listing machine pool config, machine and node details"
     listMachineConfigPoolDetails
     listMachineAndNodeDetails
@@ -189,8 +189,8 @@ function getDesiredComputeCount {
 # Determine if node count needs to be revised due to day 2 op workaround for medium+ sized clusters
 function fixNodeScaling {
   machine_pool=$(rosa list machinepool -c "$CLUSTER_ID" -o json)
-  if [[ "$HOSTED_CP" == "false" ]] && [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
-    if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    if [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
       if [[ `echo "$machine_pool" | jq -r '.[].autoscaling.min_replicas'` -ne ${MIN_REPLICAS} ]]; then
         rosa edit machinepool -c "$CLUSTER_ID" worker --min-replicas "$MIN_REPLICAS"
       fi
@@ -240,8 +240,8 @@ else
 fi
 
 # Check if this is a HCP cluster
-is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
-log "hypershift.enabled is set to $is_hcp_cluster"
+HOSTED_CP="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
+log "hypershift.enabled is set to $HOSTED_CP"
 
 # Check if we modified the node counts to reduce day 2 op time and fix as necessary
 fixNodeScaling

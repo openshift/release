@@ -3,22 +3,22 @@ base_images:
     name: 4.19-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.18_base-rhel9:
+  ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_4.18_installer-etcd-artifacts:
+  ocp_4.19_installer-etcd-artifacts:
     name: 4.19-priv
     namespace: ocp-private
     tag: installer-etcd-artifacts
-  ocp_4.18_installer-kube-apiserver-artifacts:
+  ocp_4.19_installer-kube-apiserver-artifacts:
     name: 4.19-priv
     namespace: ocp-private
     tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -28,18 +28,18 @@ images:
     value: "true"
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
-    ocp_4.18_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_4.18_installer-etcd-artifacts:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_4.19_installer-etcd-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.18:installer-etcd-artifacts
-    ocp_4.18_installer-kube-apiserver-artifacts:
+      - registry.ci.openshift.org/ocp/4.19:installer-etcd-artifacts
+    ocp_4.19_installer-kube-apiserver-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.18:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.19:installer-kube-apiserver-artifacts
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: installer
 - dockerfile_literal: |
     FROM src
@@ -59,6 +59,7 @@ promotion:
   to:
   - additional_images:
       installer-altinfra: installer
+    disabled: true
     excluded_images:
     - installer
     - src-oc
@@ -88,7 +89,7 @@ tests:
   as: e2e-aws-custom-security-groups
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -113,7 +114,7 @@ tests:
   as: e2e-aws-ovn-fips
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -130,7 +131,7 @@ tests:
   as: e2e-aws-ovn-imdsv2
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_METADATA_SERVICE_AUTH: Required
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -151,7 +152,7 @@ tests:
   as: e2e-aws-ovn-shared-vpc
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -161,7 +162,7 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -171,7 +172,7 @@ tests:
   as: e2e-aws-ovn-localzones
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -182,7 +183,7 @@ tests:
   as: e2e-aws-ovn-wavelengthzones
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -193,7 +194,7 @@ tests:
   as: e2e-aws-ovn-shared-vpc-local-zones
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -360,7 +361,7 @@ tests:
     env:
       FEATURE_GATES: ClusterAPIInstall=true
       FEATURE_SET: CustomNoUpgrade
-    workflow: openshift-e2e-openstack-nfv-cgroupsv1
+    workflow: openshift-e2e-openstack-nfv
   timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-externallb
@@ -453,10 +454,9 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["ClusterAPIInstall=true","VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 zz_generated_metadata:

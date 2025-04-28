@@ -3,11 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
-oc config view
-oc projects
-python3 --version
-
 
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")
@@ -30,5 +25,9 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./io-hog/prow_run.sh
 rc=$?
+
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running io hog scenario"
 echo "Return code: $rc"
