@@ -54,7 +54,6 @@ run_command "oc create -f /tmp/image-digest-mirror-set.yaml"
 
 # Create list of source/mirror destination pairs for all images required to run the Windows e2e test suite
 cat <<EOF > "/tmp/mirror-images-list.yaml"
-mcr.microsoft.com/oss/kubernetes/pause:3.9=MIRROR_REGISTRY_PLACEHOLDER/oss/kubernetes/pause:3.9
 mcr.microsoft.com/powershell:lts-nanoserver-1809=MIRROR_REGISTRY_PLACEHOLDER/powershell:lts-nanoserver-1809
 mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022=MIRROR_REGISTRY_PLACEHOLDER/powershell:lts-nanoserver-ltsc2022
 quay.io/operator-framework/upstream-registry-builder:v1.16.0=MIRROR_REGISTRY_PLACEHOLDER/operator-framework/upstream-registry-builder:v1.16.0
@@ -71,6 +70,13 @@ mcr.microsoft.com/oss/kubernetes-csi/csi-node-driver-registrar:v2.8.0=MIRROR_REG
 registry.redhat.io/rhel8/support-tools:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/support-tools:latest
 registry.redhat.io/rhel9/support-tools:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel9/support-tools:latest
 EOF
+
+if [ -z "${PAUSE_IMAGE_ORG}" ]; then
+    echo "mcr.microsoft.com/oss/kubernetes/pause:3.9=MIRROR_REGISTRY_PLACEHOLDER/oss/kubernetes/pause:3.9" >> /tmp/mirror-images-list.yaml
+else
+    echo "mcr.microsoft.com/oss/kubernetes/pause:3.9=MIRROR_REGISTRY_PLACEHOLDER/${PAUSE_IMAGE_ORG}/oss/kubernetes/pause:3.9" >> /tmp/mirror-images-list.yaml
+fi
+
 
 sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml"
 

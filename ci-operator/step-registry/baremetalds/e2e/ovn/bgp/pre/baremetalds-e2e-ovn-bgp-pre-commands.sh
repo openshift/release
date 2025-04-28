@@ -201,6 +201,35 @@ deploy_agnhost_container() {
   $CLI exec $name ip -6 route add default dev eth0 via 2001:db8:2::2
 }
 
+# Set ipForwarding=Global for LGW. This a workaround until OCPBUGS-42993 is fixed.
+local_gateway_mode=$(oc get networks.operator.openshift.io cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}')
+if [ "$local_gateway_mode" = "true" ]; then
+    echo "cluster is in local gateway mode"
+    ip_forwarding=$(oc get networks.operator.openshift.io cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding}')
+    if [ "$ip_forwarding" != "Global" ]; then
+      echo "Setting ip_forwarding to Global..."
+      oc patch Network.operator.openshift.io cluster --type=merge \
+        -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
+
+      echo "Waiting for network operator to start applying changes..."
+      for _ in {1..30}; do
+        if [[ $(oc get co network -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}') == "True" ]]; then
+          echo "Network operator started applying changes"
+          break
+        fi
+        sleep 10
+      done
+      echo "Waiting for network operator to complete changes..."
+      for _ in {1..30}; do
+        if [[ $(oc get co network -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}') == "False" ]]; then
+          echo "Network configuration completed successfully"
+          break
+        fi
+        sleep 10
+      done
+    fi
+fi
+
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
 vrf_neighbors["default"]=$($KCLI get nodes -o jsonpath={.items[*].status.addresses[?\(@.type==\"InternalIP\"\)].address})
@@ -245,12 +274,16 @@ done
 # set up BGP peering of the cluster with the external FRR instance container
 # peer is setup on the default VRF and also on each extra network VRF
 for network in "${!vrf_neighbors[@]}"; do
+  label="network: ${network}"
   [ "default" = "$network" ] && {
     name=receive-filtered
     vrf=
     ip=192.168.111.3
     ip6=fd2e:6f44:5dd8:c956::3
-    label='k8s.ovn.org/default-network: ""'
+    network_selector=$(cat <<EOF
+    - networkSelectionType: DefaultNetwork  
+EOF
+)
   } || {
     subnet_v4_var=${network^^}_NETWORK_SUBNET_V4
     subnet_v6_var=${network^^}_NETWORK_SUBNET_V6
@@ -258,7 +291,14 @@ for network in "${!vrf_neighbors[@]}"; do
     ip6=${!subnet_v6_var/::\/*/::3}
     name=receive-filtered-$network
     vrf="vrf: ${network}"
-    label="network: ${network}"
+    network_selector=$(cat <<EOF
+    - networkSelectionType: ClusterUserDefinedNetworks
+      clusterUserDefinedNetworkSelector:
+        networkSelector:
+          matchLabels:
+            ${label}
+EOF
+)
   }
 
   oc apply -f - <<EOF
@@ -300,9 +340,9 @@ kind: RouteAdvertisements
 metadata:
   name: ${network}
 spec:
-  networkSelector:
-    matchLabels:
-      ${label}
+  nodeSelector: {}
+  networkSelectors:
+${network_selector}
   frrConfigurationSelector:
     matchLabels:
       ${label}
