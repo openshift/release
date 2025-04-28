@@ -26,7 +26,7 @@ function find_resource_group() {
 function update_volume() {
 
     volume_id=$(ibmcloud is instance $1 --output json | jq -r '.volume_attachments[0].volume.id')
-    ibmcloud is volume-update $volume_id --iops 5000
+    ibmcloud is volume-update $volume_id  --profile $STORAGE_PROFILE
 
     ibmcloud is volume $volume_id
 }
