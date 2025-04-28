@@ -63,16 +63,16 @@ fi
 
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
-echo "Extract the latest /tmp/oc client... ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=oc --to=/tmp --insecure=true
+#echo "Extract the latest oc  client... ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+#oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+#   --command=oc --to=/tmp --insecure=true
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
 unset KUBECONFIG
-/tmp/oc registry login
+oc  registry login
 
-readable_version=$(/tmp/oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
+readable_version=$(oc  adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
 echo "readable_version: $readable_version"
 
 # target release
@@ -88,7 +88,7 @@ echo "target_release_image_repo: $target_release_image_repo"
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
-/tmp/oc registry login --to "${new_pull_secret}"
+oc  registry login --to "${new_pull_secret}"
 
 mirror_crd_type='icsp'
 regex_keyword_1="imageContentSources"
@@ -107,21 +107,21 @@ args=(
 
 
 run_command "which oc"
-run_command "/tmp/oc version --client"
+run_command "oc  version --client"
 
-# check whether the /tmp/oc command supports extra options and add them to the args array.
-if /tmp/oc adm release mirror -h | grep -q -- --keep-manifest-list; then
+# check whether the oc  command supports extra options and add them to the args array.
+if oc  adm release mirror -h | grep -q -- --keep-manifest-list; then
     echo "Adding --keep-manifest-list to the mirror command."
     args+=(--keep-manifest-list=true)
 else
-    echo "This version of /tmp/oc does not support --keep-manifest-list, skip it."
+    echo "This version of oc  does not support --keep-manifest-list, skip it."
 fi
 
-if /tmp/oc adm release mirror -h | grep -q -- --print-mirror-instructions; then
+if oc  adm release mirror -h | grep -q -- --print-mirror-instructions; then
     echo "Adding --print-mirror-instructions to the mirror command."
     args+=(--print-mirror-instructions="${mirror_crd_type}")
 else
-    echo "This version of /tmp/oc does not support --print-mirror-instructions=, skip it."
+    echo "This version of oc  does not support --print-mirror-instructions=, skip it."
 fi
 
 # For disconnected or otherwise unreachable mirrors, we want to
@@ -143,7 +143,7 @@ echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 
 for target in "${TARGET_RELEASES[@]}"; do
 
-    readable_version=$(/tmp/oc adm release info "${target}" -o jsonpath='{.metadata.version}')
+    readable_version=$(oc adm release info "${target}" -o jsonpath='{.metadata.version}')
     echo "readable_version: $readable_version"
 
     # target release
@@ -157,7 +157,7 @@ for target in "${TARGET_RELEASES[@]}"; do
     echo "target_release_image_repo: $target_release_image_repo"
 
     # execute the mirror command
-    cmd="/tmp/oc adm release -a '${new_pull_secret}' mirror ${args[*]} --max-per-registry=4 | tee '${mirror_output}'"
+    cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} --max-per-registry=4 | tee '${mirror_output}'"
     run_command "$cmd"
 
     line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
