@@ -76,10 +76,17 @@ fi
 COMPAT=${COMPAT:-""}
 
 echo "Checking that vendor/ is correct"
-# If .gitignore exists, it can inhibit some files from being checked into /vendor. Remove it before
-# vendoring to ensure there are no rules interfering with vendor/.
+
 go mod tidy $COMPAT
-go mod vendor
+if [[ -f "go.work" && "${GOWORK:-}" != "off" ]]; then
+  echo "Detected go workspace; using go work vendor."
+  go work vendor
+else
+  go mod vendor
+fi
+
+# If .gitignore exists, it can inhibit some files from being checked into /vendor. "--ignored"
+# ensures that .gitignore is NOT honored during comparison.
 CHANGES=$(git status --porcelain --ignored)
 if [ -n "$CHANGES" ] ; then
     echo "ERROR: detected vendor inconsistency after 'go mod tidy $COMPAT; go mod vendor':"
