@@ -75,7 +75,16 @@ function post_actions()
     aws --region ${REGION} cloudformation wait stack-delete-complete --stack-name "${stack_name}" &
     wait "$!"
     echo "Waited for stack ${stack_name}"
+
   done
+
+  if [[ -f "${SHARED_DIR}/security_groups_ids" ]]; then
+    for sg_id in $(cat ${SHARED_DIR}/security_groups_ids); do
+      echo "Deleting sg - ${sg_id}... "
+      aws --region $REGION ec2 delete-security-group --group-id ${sg_id} 
+    done
+  fi
+
 }
 
 function create_stack()
@@ -1826,6 +1835,103 @@ patch_new_subnet_with_roles $config ${wl_public} EdgeNode
 patch_edge_pool $config $wl_zone_name
 create_manifests $install_dir
 expect_regex $install_dir "${desc}" "level=info.*Manifests created in.*"
+
+
+# --------------------------------
+# additionalSecurityGroupIDs
+# --------------------------------
+
+# installconfig.compute.platform.aws.additionalSecurityGroupIDs
+# installconfig.controlPlane.platform.aws.additionalSecurityGroupIDs
+# installconfig.platform.aws.defaultMachinePlatform.additionalSecurityGroupIDs
+function patch_security_group()
+{
+    local config=$1
+    local sg=$2
+    local item=$3
+
+    case "${item}" in
+      compute)
+        export sg
+        yq-v4 eval -i '.compute[0].platform.aws.additionalSecurityGroupIDs += [env(sg)]' ${config}
+        unset sg
+        ;;
+      controlPlane)
+        export sg
+        yq-v4 eval -i '.controlPlane.platform.aws.additionalSecurityGroupIDs += [env(sg)]' ${config}
+        unset sg
+        ;;
+      defaultMachinePlatform)
+        export sg
+        yq-v4 eval -i '.platform.aws.defaultMachinePlatform.additionalSecurityGroupIDs += [env(sg)]' ${config}
+        unset sg
+        ;;
+      *)
+        echo "ERROR: usage: patch_security_group [install-config] [sg-id] [compute|controlPlane|defaultMachinePlatform]"
+        return 1
+        ;;
+    esac
+}
+
+sg_name=${CLUSTER_NAME_PREFIX}-sg
+tag_json=$(mktemp)
+cat << EOF > $tag_json
+[
+  {
+    "ResourceType": "security-group",
+    "Tags": [
+      {
+        "Key": "Name",
+        "Value": "${sg_name}"
+      }
+    ]
+  }
+]
+EOF
+
+sg_id=$(aws ec2 create-security-group --region $REGION --group-name ${sg_name} --vpc-id $vpc1_id \
+    --tag-specifications file://${tag_json} \
+    --description "Prow CI Test: SG for aws-cases-valid-lb-subnet" | jq -r '.GroupId')
+echo $sg_id > ${SHARED_DIR}/security_groups_ids
+
+
+desc="Valid: LB Subnet roles with SG group in compute node"
+print_title "${desc}"
+cluster_name=$(gen_cluster_name)
+install_dir=${INSTALL_DIR_BASE}/${cluster_name}
+config=${install_dir}/install-config.yaml
+create_install_config $install_dir $cluster_name External
+patch_new_subnet_with_roles $config ${vpc1_pub1} IngressControllerLB ControlPlaneExternalLB BootstrapNode
+patch_new_subnet_with_roles $config ${vpc1_priv1} ClusterNode ControlPlaneInternalLB
+patch_security_group $config ${sg_id} compute
+create_manifests $install_dir
+expect_regex $install_dir "${desc}" "level=info.*Manifests created in.*"
+
+desc="Valid: LB Subnet roles with SG group in controlPlane node"
+print_title "${desc}"
+cluster_name=$(gen_cluster_name)
+install_dir=${INSTALL_DIR_BASE}/${cluster_name}
+config=${install_dir}/install-config.yaml
+create_install_config $install_dir $cluster_name External
+patch_new_subnet_with_roles $config ${vpc1_pub1} IngressControllerLB ControlPlaneExternalLB BootstrapNode
+patch_new_subnet_with_roles $config ${vpc1_priv1} ClusterNode ControlPlaneInternalLB
+patch_security_group $config ${sg_id} controlPlane
+create_manifests $install_dir
+expect_regex $install_dir "${desc}" "level=info.*Manifests created in.*"
+
+
+desc="Valid: LB Subnet roles with SG group in defaultMachinePlatform"
+print_title "${desc}"
+cluster_name=$(gen_cluster_name)
+install_dir=${INSTALL_DIR_BASE}/${cluster_name}
+config=${install_dir}/install-config.yaml
+create_install_config $install_dir $cluster_name External
+patch_new_subnet_with_roles $config ${vpc1_pub1} IngressControllerLB ControlPlaneExternalLB BootstrapNode
+patch_new_subnet_with_roles $config ${vpc1_priv1} ClusterNode ControlPlaneInternalLB
+patch_security_group $config ${sg_id} defaultMachinePlatform
+create_manifests $install_dir
+expect_regex $install_dir "${desc}" "level=info.*Manifests created in.*"
+
 
 if [[ "$global_ret" != "0" ]]; then
   echo "FAILED CASES:"
