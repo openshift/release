@@ -818,6 +818,17 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-upi-proxy
+- as: gcp-ipi-confidential-mini-perm-f14
+  cron: 34 19 1,17 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: n2d-standard-2
+      CONTROL_PLANE_NODE_TYPE: c3d-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
 - as: gcp-ipi-proxy-whitelist-mini-perm-arm-f14
   cron: 13 10 6,22 * *
   steps:
@@ -906,20 +917,6 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
-- as: gcp-ipi-user-provisioned-dns-mini-perm-arm-f7
-  cron: 2 10 7,14,21,28 * *
-  steps:
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      OCP_ARCH: arm64
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
 - as: ibmcloud-ipi-default-f28
   cron: 30 0 13 * *
   steps:
