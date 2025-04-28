@@ -298,15 +298,18 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
   timeout 120s wait "${scanner_readiness_configure_pid}" || true
-  wait_deploy scanner-v4-matcher \
-    || oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=90m \
-    || wait_deploy scanner-v4-matcher 600s || true
-  echo '>> and check the matcher logs again...'
+  set -x
   oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps || true
+  wait_deploy scanner-v4-matcher \
+    || oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=45m \
+    || true
+  echo '>> and check the matcher logs again...'
+  oc logs --tail=2000 deploy/scanner-v4-matcher -n stackrox --timestamps | grep initial || true
+  oc logs --tail=100 deploy/scanner-v4-matcher -n stackrox --timestamps || true
+  set +x
 fi
 
-oc get nodes -o wide
-kubectl get nodes -o custom-columns='TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,KERNEL:.status.nodeInfo.kernelVersion,KUBLET:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,RAM:.status.capacity.memory' || true
+oc get nodes -o wide | grep infra
 oc get pods -o wide --namespace stackrox || true
 
 nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
