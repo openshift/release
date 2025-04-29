@@ -143,7 +143,7 @@ echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 
 for target in "${TARGET_RELEASES[@]}"; do
 
-    readable_version=$(oc adm release info "${target}" -o jsonpath='{.metadata.version}')
+    readable_version=$(oc adm release info "${target}" -o jsonpath='{.metadata.version}' -a '${new_pull_secret}')
     echo "readable_version: $readable_version"
 
     # target release
