@@ -33,7 +33,7 @@ die_general() {
     echo "     https://github.com/openshift/golang-crypto/tree/patch_v0.33.openshift.1"
     echo ""
     echo "Job logs show files that have been added or modified by running"
-    echo "\"go mod tidy\" and \"go mod vendor\"".
+    echo "\"go mod tidy\" and \"go mod vendor\" (or \"go work vendor\" for workspaces)."
     echo "You can run these commands locally and check for discrepancies with"
     echo "> git status --porcelain --ignored".
     echo ""
@@ -77,19 +77,23 @@ COMPAT=${COMPAT:-""}
 
 echo "Checking that vendor/ is correct"
 
+echo "Running: go mod tidy $COMPAT"
 go mod tidy $COMPAT
+
+VENDOR_MODE="mod"
 if [[ -f "go.work" && "${GOWORK:-}" != "off" ]]; then
-  echo "Detected go workspace; using go work vendor."
-  go work vendor
-else
-  go mod vendor
+  echo "Detected go workspace; using \"go work vendor\"."
+  VENDOR_MODE="work"
 fi
+
+echo "Running: go ${VENDOR_MODE} vendor"
+go "${VENDOR_MODE}" vendor
 
 # If .gitignore exists, it can inhibit some files from being checked into /vendor. "--ignored"
 # ensures that .gitignore is NOT honored during comparison.
 CHANGES=$(git status --porcelain --ignored)
 if [ -n "$CHANGES" ] ; then
-    echo "ERROR: detected vendor inconsistency after 'go mod tidy $COMPAT; go mod vendor':"
+    echo "ERROR: detected vendor inconsistency after 'go mod tidy $COMPAT; go ${VENDOR_MODE} vendor':"
     echo "$CHANGES"
     die_general
 fi
