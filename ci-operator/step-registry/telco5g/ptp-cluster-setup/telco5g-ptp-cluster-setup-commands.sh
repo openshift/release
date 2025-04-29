@@ -315,3 +315,4 @@ if [[ "$SKIP_OCP_INSTALL" != "true" && "$status" -eq 0 ]]; then
   log_chronyd_status || true
 fi
 exit $status
+

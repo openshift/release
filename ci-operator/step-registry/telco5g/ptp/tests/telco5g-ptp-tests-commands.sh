@@ -84,7 +84,10 @@ spec:
           fi
 
           set -x
-
+          #[dev-ci] use forked dev repo
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/aneeshkp/ptp-operator-k8.git
+          cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
           export LATEST_RELEASE="LATEST_RELEASE_VAL"
@@ -122,6 +125,7 @@ spec:
           readOnly: true
         - name: secret-volume
           mountPath: /root/.docker
+
   volumes:
     - name: secret-volume
       secret:
@@ -232,7 +236,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="main"
+export TEST_BRANCH="ptp-tgm-event"
 
 # run latest release on upstream main branch
 if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
@@ -316,8 +320,8 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-# always run test from latest upstream
-git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+
+git clone https://github.com/aneeshkp/ptp-operator-k8.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
@@ -373,6 +377,7 @@ EOF
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 
+
 export PTP_LOG_LEVEL=debug
 export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
@@ -383,6 +388,19 @@ sleep 300
 
 # get RTC logs
 print_time
+
+
+# Only run dual follower tests for versions < 4.19
+version=$(oc version -ojson| jq -r '.openshiftVersion')
+min_required="4.19"
+
+if [[ "$(printf '%s\n' "$version" "$min_required" | sort -V | head -n1)" != "$min_required" ]]; then
+  echo "Version is less than 4.19"
+  TEST_MODES=("dualnicbc" "bc" "oc")
+else
+  echo "Version is 4.19 or greater"
+  TEST_MODES=("tgm")
+fi
 
 # Run tests
 for mode in "${TEST_MODES[@]}"; do
