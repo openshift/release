@@ -14,7 +14,7 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 function run_command() {
     local CMD="$1"
-    echo "Running Command: ${CMD}"
+    echo "$(date -u --rfc-3339=seconds) Running Command: ${CMD}"
     eval "${CMD}"
 }
 
@@ -22,36 +22,36 @@ function run_command_with_retries()
 {
     local try=0 cmd="$1" retries="${2:-}" ret=0
     [[ -z ${retries} ]] && max="20" || max=${retries}
-    echo "Trying ${max} times max to run '${cmd}'"
+    echo "$(date -u --rfc-3339=seconds) Trying ${max} times max to run '${cmd}'"
 
     eval "${cmd}" || ret=$?
     while [ X"${ret}" != X"0" ] && [ ${try} -lt ${max} ]; do
-        echo "'${cmd}' did not return success, waiting 60 sec....."
+        echo "$(date -u --rfc-3339=seconds) '${cmd}' did not return success, waiting 60 sec....."
         sleep 60
         try=$((try + 1))
         ret=0
         eval "${cmd}" || ret=$?
     done
     if [ ${try} -eq ${max} ]; then
-        echo "Never succeed or Timeout"
+        echo "$(date -u --rfc-3339=seconds) Never succeed or Timeout"
         return 1
     fi
-    echo "Succeed"
+    echo "$(date -u --rfc-3339=seconds) Succeed"
     return 0
 }
 
 function wait_public_dns() {
-    echo "Wait public DNS - $1 take effect"
+    echo "$(date -u --rfc-3339=seconds) Wait public DNS - $1 take effect"
     local try=0 retries=10
 
     while [ X"$(dig +short $1)" == X"" ] && [ $try -lt $retries ]; do
-        echo "$1 does not take effect yet on internet, waiting..."
+        echo "$(date -u --rfc-3339=seconds) $1 does not take effect yet on internet, waiting..."
         sleep 60
         try=$(expr $try + 1)
     done
     if [ X"$try" == X"$retries" ]; then
         echo "!!!!!!!!!!"
-        echo "Something wrong, pls check your dns provider"
+        echo "$(date -u --rfc-3339=seconds) Something wrong, pls check your dns provider"
         return 4
     fi
     return 0
