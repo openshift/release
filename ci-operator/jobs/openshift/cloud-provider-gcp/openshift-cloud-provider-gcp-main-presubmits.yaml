@@ -587,27 +587,27 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-commits,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build09
-    context: ci/prow/verify-deps
+    context: ci/prow/verify-vendor
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cloud-provider-gcp-main-verify-deps
+    name: pull-ci-openshift-cloud-provider-gcp-main-verify-vendor
     path_alias: k8s.io/cloud-provider-gcp
-    rerun_command: /test verify-deps
+    rerun_command: /test verify-vendor
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=verify-deps
+        - --target=verify-vendor
         command:
         - ci-operator
         image: ci-operator:latest
@@ -617,9 +617,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -634,9 +631,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -646,4 +640,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
