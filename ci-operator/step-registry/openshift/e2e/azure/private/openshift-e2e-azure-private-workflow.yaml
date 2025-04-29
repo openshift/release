@@ -1,0 +1,26 @@
+workflow:
+  as: openshift-e2e-azure-private
+  steps:
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - chain: azure-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-provisionednetwork
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - chain: gather-network
+    - chain: gather-core-dump
+    - ref: gather-azure-cli
+    - ref: gather-azure-resource
+    - chain: ipi-deprovision
+    - ref: azure-deprovision-resourcegroup
+    env:
+      PUBLISH: Internal
+      BASTION_BOOT_IMAGE: "azureopenshift:aro4:aro_417:417.94.20240701"
+  documentation: |-
+    The Openshift E2E Azure workflow executes the common end-to-end test suite on Azure in private cluster.
