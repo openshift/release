@@ -4,11 +4,24 @@ set -o nounset
 set -o pipefail
 
 die_general() {
-    echo "ERROR: An discrepancy was found in go dependency metadata. For example:"
-    echo "- go.mod information may be incomplete."
+    echo "ERROR: An discrepancy was found in go dependency metadata or it could not"
+    echo "be checked successfully. Common failures:"
+    echo "- go mod tidy failed to run with the repository's configured \"build root\"."
+    echo "  Errors output like 'go.mod file indicates go 1.21, but maximum supported version is 1.17'"
+    echo "  indicate your go.mod requests 1.21, but your Test Platform build root is based"
+    echo "  on a go 1.17 builder image. The following documentation explains build root configuration:"
+    echo "  https://docs.ci.openshift.org/docs/architecture/images/#controlling-go-versions-in-component-repositories"
+    echo "  Generally, you will want 'build_root.from_repository: true' in your"
+    echo "  ci-operator configuration file and to manage your build root in your component"
+    echo "  repository in .ci-operator.yaml (.ci-operator.yaml is ignored if from_repository: true"
+    echo "  is not set)."
+    echo ""
+    echo "- go.mod information may be incomplete / inaccurate."
+    echo ""
     echo "- /vendor may not contain the versions declared in go.mod or certain"
     echo "  files which should be in /vendor have not been checked in. This can"
     echo "  happen due to .gitignore rules ignoring files in /vendor ."
+    echo ""
     echo "- You may be trying to introduce a code change in vendored content. This"
     echo "  is not permitted. If you must make custom changes to a module,"
     echo "  there are two options:"
@@ -63,10 +76,17 @@ fi
 COMPAT=${COMPAT:-""}
 
 echo "Checking that vendor/ is correct"
-# If .gitignore exists, it can inhibit some files from being checked into /vendor. Remove it before
-# vendoring to ensure there are no rules interfering with vendor/.
+
 go mod tidy $COMPAT
-go mod vendor
+if [[ -f "go.work" && "${GOWORK:-}" != "off" ]]; then
+  echo "Detected go workspace; using go work vendor."
+  go work vendor
+else
+  go mod vendor
+fi
+
+# If .gitignore exists, it can inhibit some files from being checked into /vendor. "--ignored"
+# ensures that .gitignore is NOT honored during comparison.
 CHANGES=$(git status --porcelain --ignored)
 if [ -n "$CHANGES" ] ; then
     echo "ERROR: detected vendor inconsistency after 'go mod tidy $COMPAT; go mod vendor':"
