@@ -21,7 +21,7 @@ function info() {
 
 info "THE LEASED_RESOURCE IS: ${LEASED_RESOURCE}"
 
-if [ ! -z "${LEASED_RESOURCE}"]
+if [ ! -z "${LEASED_RESOURCE}" ]
 then 
     CLUSTER_TYPE=${LEASED_RESOURCE}
 else
