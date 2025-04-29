@@ -126,6 +126,8 @@ if [[ -f "${SHARED_DIR}/mirror-tests-image" ]]; then
     TEST_ARGS+=" --from-repository=$(<"${SHARED_DIR}/mirror-tests-image")"
 fi
 
+TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
+
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
 gcp|gcp-arm64)
