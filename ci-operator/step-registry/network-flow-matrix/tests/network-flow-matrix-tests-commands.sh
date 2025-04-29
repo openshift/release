@@ -1,15 +1,13 @@
 #!/bin/bash
 
-# Extract and format the cluster version to branch
-cluster_version_to_branch() {
+# Extract and format the cluster version
+get_cluster_version() {
   version=$(oc version | grep "Server Version:" | awk '{print $3}')
   major=$(echo "$version" | cut -d '.' -f 1)
   minor=$(echo "$version" | cut -d '.' -f 2)
-  branch="release-$major.$minor"
-  echo "$branch"
+  echo "$major.$minor"
 }
-BRANCH=$(cluster_version_to_branch)
-MAIN_BRANCH="release-4.19"
+cluster_version=$(get_cluster_version)
 
 ADDITIONAL_NFTABLES_RULES_FILE_PATH="${SHARED_DIR}/additional-nftables-rules"
 SUITE=${SUITE:-"all"}
@@ -29,15 +27,20 @@ udp dport 10180 accept
 tcp dport 80 accept
 udp dport 80 accept" > ${ADDITIONAL_NFTABLES_RULES_FILE_PATH}
 
-if [ ${BRANCH} = ${MAIN_BRANCH} ]; then
-  BRANCH="main"
-fi
-
 source $HOME/golang-1.22.4
 echo "Go version: $(go version)"
 git clone https://github.com/openshift-kni/commatrix ${SHARED_DIR}/commatrix
 pushd ${SHARED_DIR}/commatrix || exit
-git checkout ${BRANCH}
+
+latest_release_version="$(git branch -r | grep -oE 'release-[0-9]+\.[0-9]+' | sed 's/release-//' | sort -V | tail -1)"
+testing_branch="release-$cluster_version"
+
+# If cluster's version is greater than latest release version, use main as testing branch.
+if [[ "$(printf "%s\n%s\n" "$cluster_version" "$latest_release_version" | sort -V | tail -1)" == "$cluster_version" && "$cluster_version" != "$latest_release_version" ]]; then
+  testing_branch="main"
+fi
+
+git checkout ${testing_branch}
 go mod vendor
 EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" SUITE="${SUITE}" \
 OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE}" OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT}" make e2e-test
