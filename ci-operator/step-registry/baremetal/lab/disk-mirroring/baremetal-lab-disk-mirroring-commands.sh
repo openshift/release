@@ -29,41 +29,54 @@ echo "ocp_version: ${ocp_version}"
 butane_version_list=("${ocp_version}.0" "$(echo ${ocp_version} | awk -F. -v OFS=. '{$NF -= 1 ; print}').0")
 echo "butane_version_list:" "${butane_version_list[@]}"
 
-declare -a roles=("master" "worker")
+declare -A node_disks=(
+  [master-00]="/dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB07748 /dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB07756"
+  [master-01]="/dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB07726 /dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB10394"
+  [master-02]="/dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB07769 /dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB07807"
+  [worker-00]="/dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB07731 /dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB07732"
+  [worker-01]="/dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB10324 /dev/disk/by-id/nvme-VR000480KXLXF_S711NE0TB10423"
+)
+
 ret_code=1
 
 for butane_version in "${butane_version_list[@]}"; do
   echo "Trying Butane version: ${butane_version}"
   all_success=true
 
-  for role in "${roles[@]}"; do
-    bu_file="${workdir}/${role}_disk_mirroring.bu"
-    yml_file="${workdir}/manifest_${role}_disk_mirroring.yml"
+  for node in "${!node_disks[@]}"; do
+    bu_file="${workdir}/${node}_disk_mirroring.bu"
+    yml_file="${workdir}/manifest_${node}_disk_mirroring.yml"
+    role="${node%%-*}"  # Extract 'master' or 'worker' from node name
+    disk_entries=""
+
+    for disk in ${node_disks[$node]}; do
+      disk_entries+="      - ${disk}"$'\n'
+    done
 
     cat > "$bu_file" << EOF
 variant: openshift
 version: ${butane_version}
 metadata:
-  name: ${role}-disk-mirroring
+  name: ${node}-disk-mirroring
   labels:
     machineconfiguration.openshift.io/role: ${role}
+    custom-group: ${node}
 boot_device:
   layout: $(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
   mirror: 
     devices: 
-      - /dev/sda
-      - /dev/sdb
-openshift:
-  fips: false 
+${disk_entries}
+penshift:
+  fips: false
 EOF
 
     if ! butane "$bu_file" > "$yml_file"; then
-      echo "Butane failed for ${role} using version '${butane_version}' (non-GA?)."
+      echo "Butane failed for ${node} using version '${butane_version}' (non-GA?)."
       all_success=false
       break
     fi
 
-    cp -f "$yml_file" "${SHARED_DIR}/manifest_${role}_disk_mirroring.yml"
+    cp -f "$yml_file" "${SHARED_DIR}/manifest_${node}_disk_mirroring.yml"
   done
 
   if $all_success; then
