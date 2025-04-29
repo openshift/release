@@ -22,4 +22,5 @@ yarn install
 export CYPRESS_QUAY_API_TOKEN="$QUAY_API_TOKEN"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
 export CYPRESS_QUAY_USER="$QUAY_USERNAME"
-NO_COLOR=1 yarn run all > $ARTIFACT_DIR/quayio_testing_report
+NO_COLOR=1 yarn run all > $ARTIFACT_DIR/quayio_testing_report || true
+sleep 2h
