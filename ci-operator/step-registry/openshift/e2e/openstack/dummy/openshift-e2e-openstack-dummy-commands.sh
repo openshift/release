@@ -21,11 +21,6 @@ function info() {
 
 info "THE LEASED_RESOURCE IS: ${LEASED_RESOURCE}"
 
-if [ ! -z "${LEASED_RESOURCE}" ]
-then 
-    CLUSTER_TYPE=${LEASED_RESOURCE}
-else
-    info "LEASED_RESOURCE IS MEPTY. THE CI_OCP_TESTING IS: `cat /var/run/cluster-secrets/${CLUSTER_TYPE}/CI_OCP_TESTING`"
-fi
+[[ "$LEASED_RESOURCE" == openstack* ]] && CLUSTER_TYPE="${LEASED_RESOURCE}"
 
 info "THE CLUSTER TYPE IS: ${CLUSTER_TYPE}"
