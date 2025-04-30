@@ -20,7 +20,7 @@ SSH_ARGS="-v -i /tmp/priv_ssh_key.pem -oStrictHostKeyChecking=no -oUserKnownHost
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
 
-if [[ $(cat ${bastion} ) == "10.6.62.42" ]]; then
+if [[ $(echo $bastion ) == "10.6.62.42" ]]; then
     echo "address is correct"
 else
     echo "wrong address"
