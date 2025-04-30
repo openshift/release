@@ -44,7 +44,7 @@ function exit_handler() {
   set +e
   echo ">>> End ACS install"
   echo "[$(date -u || true)] SECONDS=${SECONDS}"
-  rm -rf "${SCRATCH:?}" || true
+  #rm -rf "${SCRATCH:?}" || true
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with helm"
   else
@@ -201,13 +201,19 @@ function install_central_with_helm() {
       installflags+=('--set' 'scannerV4.db.resources.limits.cpu=1000m')
       installflags+=('--set' 'scannerV4.db.resources.limits.memory=2500Mi')
     fi
+    if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+      installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}")
+    fi
   fi
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
-  helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
+  set -x
+  helm upgrade --debug --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
-     "${installflags[@]+"${installflags[@]}"}"
+     "${installflags[@]+"${installflags[@]}"}" \
+     2>&1 | tee /tmp/helm.up.log
+  set +x
 }
 
 function get_init_bundle() {
@@ -256,6 +262,8 @@ function configure_scanner_readiness() {
   set -x  # log commands; expecting this to run in the background
   set +e  # ignore errors
   wait_deploy scanner-v4-matcher 60s
+  oc describe -n stackrox deploy/scanner-v4-matcher -o yaml \
+    | grep SCANNER_V4_MATCHER_READINESS && { echo 'Already set.'; return; } || true
   oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
   echo 'Restart scanner-v4-matcher to apply the new config during startup...'
   oc rollout restart deploy/scanner-v4-matcher
@@ -301,12 +309,14 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
+  set -x
   if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
     timeout 120s wait "${scanner_readiness_configure_pid:?}" || true
+    oc exec -n stackrox deploy/scanner-v4-matcher -- cat /etc/scanner/config.yaml || true
+    oc get configmap -n stackrox scanner-v4-matcher-config -o yaml || true
   fi
-  set -x
   wait_deploy scanner-v4-matcher || echo 'scanner-v4-matcher is not deployed?'
-  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
+  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial || true
   step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
   for i in {1..20}; do
     if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=${step_wait_time:-30s}; then
