@@ -15,7 +15,16 @@ function save_logs() {
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
 }
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+handle_error() {
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "Error occurred with exit code $EXIT_CODE. Waiting for 15 hours before exiting..."
+        sleep 15h
+    fi
+}
+
+trap 'handle_error; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'save_logs' EXIT TERM
 
 export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini

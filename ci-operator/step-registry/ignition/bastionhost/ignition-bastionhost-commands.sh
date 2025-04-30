@@ -251,9 +251,13 @@ cat > "${rsyncd_ignition_patch}" << EOF
 EOF
 
 # patch rsync setting to ignition
-patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
+if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
+  echo "ignore the rsyncd_ignition_patch in ibmcloud"
+  cat "${rsyncd_ignition_patch}"
+else
+  patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
+fi
 rm -f "${rsyncd_ignition_patch}"
-
 
 ## ----------------------------------------------------------------
 # MIRROR REGISTORY
