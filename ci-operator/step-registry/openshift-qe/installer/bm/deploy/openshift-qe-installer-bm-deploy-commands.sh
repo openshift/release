@@ -19,15 +19,21 @@ file /tmp/priv_ssh_key.pem
 ls -l /tmp/priv_ssh_key.pem
 sha256sum /tmp/priv_ssh_key.pem
 
-exit 1
 
-SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+SSH_ARGS="-v -i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat "/secret/address")
 CRUCIBLE_URL=$(cat "/secret/crucible_url")
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
+
+ssh ${SSH_ARGS} root@${bastion} "
+   hostname
+"
+
+exit 1
+
 
 cat <<EOF >>/tmp/all.yml
 ---
