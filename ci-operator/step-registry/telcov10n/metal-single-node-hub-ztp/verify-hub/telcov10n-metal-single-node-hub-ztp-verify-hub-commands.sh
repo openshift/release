@@ -115,10 +115,6 @@ def test_ztp_namespaces(bash, namespace):
       attempts -= 1
       time.sleep(60)
     assert attempts > 0, f"Not all PODs in {namespace} namespace are ready yet"
-
-# def test_ztp_storageclass(bash):
-#     oc_cmd = f"oc get storageclass --no-headers | grep -w '(default)'"
-#     assert " (default) " in bash.run_script_inline([oc_cmd])
 EOF-PYTEST
 
   run_pytest check_hub_installation

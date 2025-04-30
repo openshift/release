@@ -201,12 +201,12 @@ function copy_spoke_kubeconfig_to_bastion_location {
   chmod 600 ${ssh_key}
   setup_aux_host_ssh_access "${ssh_key}"
 
-  local skc
-  skc="/tmp/spoke-kubeconfig"
-  cat ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml >| ${skc}
-  chmod +r ${skc}
+  local spoke_kubeconfig
+  spoke_kubeconfig="/tmp/spoke-kubeconfig"
+  cat ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml >| ${spoke_kubeconfig}
+  chmod +r ${spoke_kubeconfig}
   set -x
-  rsync -avP -e "ssh $(echo "${SSHOPTS[@]}")" "${skc}" "root@${AUX_HOST}:${AUX_HOST_REMOTE_PATH}/$(basename ${skc})"
+  rsync -avP -e "ssh $(echo "${SSHOPTS[@]}")" "${spoke_kubeconfig}" "root@${AUX_HOST}:${AUX_HOST_REMOTE_PATH}/$(basename ${spoke_kubeconfig})"
   set +x
   echo
 

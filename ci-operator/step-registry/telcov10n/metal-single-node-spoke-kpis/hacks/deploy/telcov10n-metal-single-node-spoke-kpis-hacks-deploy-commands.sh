@@ -40,8 +40,8 @@ function select_baremetal_host_from_pool {
 
   echo "************ telcov10n select a baremetal host from the pool ************"
 
-  local ts
-  ts=$(date -u +%s%N)
+  local host_lock_timestamp
+  host_lock_timestamp=$(date -u +%s%N)
   # shellcheck disable=SC2044
   for host in $( \
     find /var/run/telcov10n/ \
@@ -60,8 +60,8 @@ function select_baremetal_host_from_pool {
       local network_spoke_mac_address
       network_spoke_mac_address="$(cat ${baremetal_host_path}/network_spoke_mac_address)"
       local spoke_lock_filename="/var/run/lock/ztp-baremetal-pool/spoke-baremetal-${network_spoke_mac_address//:/-}.lock"
-      try_to_lock_host "${AUX_HOST}" "${spoke_lock_filename}" "${ts}" "${LOCK_TIMEOUT}"
-      [[ "$(check_the_host_was_locked "${AUX_HOST}" "${spoke_lock_filename}" "${ts}")" == "locked" ]] &&
+      try_to_lock_host "${AUX_HOST}" "${spoke_lock_filename}" "${host_lock_timestamp}" "${LOCK_TIMEOUT}"
+      [[ "$(check_the_host_was_locked "${AUX_HOST}" "${spoke_lock_filename}" "${host_lock_timestamp}")" == "locked" ]] &&
       {
         update_host_and_master_yaml_files "$(dirname ${host})" ;
         return 0 ;
