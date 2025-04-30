@@ -43,8 +43,7 @@ function exit_handler() {
   set +e
   echo ">>> End ACS install"
   echo "[$(date -u || true)] SECONDS=${SECONDS}"
-  return
-  rm -rf "${SCRATCH}" || true
+  rm -rf "${SCRATCH:?}" || true
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with helm"
   else
@@ -69,7 +68,7 @@ function wait_deploy() {
   retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
     || {
       echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=5"
-      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5
+      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5 --all-pods
       return 1
     }
 }
@@ -108,8 +107,9 @@ function install_helm() {
 }
 
 function prepare_helm_templates() {
-  #retry oc new-project "${TMP_CI_NAMESPACE}" --skip-config-write=true >/dev/null || true
-  retry kubectl create namespace "${TMP_CI_NAMESPACE}" --save-config=false >/dev/null || true
+  retry oc new-project "${TMP_CI_NAMESPACE}" --skip-config-write=true >/dev/null \
+    || kubectl create namespace "${TMP_CI_NAMESPACE}" --save-config=false >/dev/null || true
+    # new-project is an oc only command
 
   cat <<EOF > "${SCRATCH}/roxctl-extract-pod.yaml"
 apiVersion: v1
@@ -274,7 +274,9 @@ fi
 
 install_central_with_helm
 
+echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
 if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+  echo "configure readiness"
   configure_scanner_readiness &
   scanner_readiness_configure_pid=$!
 fi
@@ -295,17 +297,17 @@ wait_deploy scanner
 wait_deploy scanner-db
 
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
   timeout 120s wait "${scanner_readiness_configure_pid}" || true
   set -x
-  oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps || true
+  oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods || true
   wait_deploy scanner-v4-matcher \
-    || oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=45m \
+    || oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=5m \
     || true
   echo '>> and check the matcher logs again...'
-  oc logs --tail=2000 deploy/scanner-v4-matcher -n stackrox --timestamps | grep initial || true
-  oc logs --tail=100 deploy/scanner-v4-matcher -n stackrox --timestamps || true
+  oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods || true
   set +x
 fi
 
