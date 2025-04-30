@@ -252,8 +252,8 @@ function install_secured_cluster_with_helm() {
 
 function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
-  set -x
-  set +e
+  set -x  # log commands; expecting this to run in the background
+  set +e  # ignore errors
   wait_deploy scanner-v4-matcher 60s
   oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
   echo 'Restart scanner-v4-matcher to apply the new config during startup...'
@@ -300,11 +300,14 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
-  timeout 120s wait "${scanner_readiness_configure_pid}" || true
+  if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+    timeout 120s wait "${scanner_readiness_configure_pid:?}" || true
+  fi
   set -x
-  wait_deploy scanner-v4-matcher
-  for i in {1..10}; do
-    if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=5m; then
+  wait_deploy scanner-v4-matcher || echo 'scanner-v4-matcher is not deployed?'
+  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
+  for i in {1..20}; do
+    if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=30s; then
       echo '>>> scanner-v4-matcher condition==Ready'
       break
     fi
