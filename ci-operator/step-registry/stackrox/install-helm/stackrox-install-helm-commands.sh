@@ -44,7 +44,7 @@ function exit_handler() {
   set +e
   echo ">>> End ACS install"
   echo "[$(date -u || true)] SECONDS=${SECONDS}"
-  #rm -rf "${SCRATCH:?}" || true
+  rm -rf "${SCRATCH:?}" || true
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with helm"
   else
