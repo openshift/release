@@ -7,10 +7,17 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
-
+echo "BEFORE"
 file /secret/jh_priv_ssh_key
 ls -l /secret/jh_priv_ssh_key
 sha256sum /secret/jh_priv_ssh_key
+
+echo "AFTER"
+cat /secret/jh_priv_ssh_key > /tmp/priv_ssh_key.pem
+chmod 400 /tmp/priv_ssh_key.pem
+file /tmp/priv_ssh_key.pem
+ls -l /tmp/priv_ssh_key.pem
+sha256sum /tmp/priv_ssh_key.pem
 
 exit 1
 
