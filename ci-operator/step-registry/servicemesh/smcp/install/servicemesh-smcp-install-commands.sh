@@ -92,12 +92,8 @@ spec:
     identity:
       type: ${sec_id_type}
   tracing:
-    type: Jaeger
+    type: None
   addons:
-    jaeger:
-      install:
-        storage:
-          type: Memory
     grafana:
       enabled: true
     kiali:
@@ -109,7 +105,8 @@ spec:
       enabled: ${GATEWAY_API_ENABLED}
 EOF
 
-oc wait --for condition=Ready smcp/${smcp_name} -n ${SMCP_NAMESPACE} --timeout=180s
+# if a timeout occurs, describe the CR to determine why it has not become ready in time
+oc wait --for condition=Ready smcp/${smcp_name} -n ${SMCP_NAMESPACE} --timeout=180s || (oc describe -n ${SMCP_NAMESPACE} smcp/${smcp_name}; exit 1)
 
-oc wait --for condition=Successful kiali/kiali -n ${SMCP_NAMESPACE} --timeout=250s
-oc wait --for condition=available deployment/kiali -n ${SMCP_NAMESPACE} --timeout=250s
+oc wait --for condition=Successful kiali/kiali -n ${SMCP_NAMESPACE} --timeout=250s || (oc describe -n ${SMCP_NAMESPACE} kiali/kiali; exit 1)
+oc wait --for condition=available deployment/kiali -n ${SMCP_NAMESPACE} --timeout=250s || (oc describe -n ${SMCP_NAMESPACE} deployment/kiali; exit 1)
