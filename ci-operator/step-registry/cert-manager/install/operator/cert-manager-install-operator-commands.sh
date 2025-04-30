@@ -91,6 +91,7 @@ EOF
         run_command "oc get event -n cert-manager-operator"
         run_command "oc get csv -n cert-manager-operator"
         run_command "oc get subscription openshift-cert-manager-operator -n cert-manager-operator -o=yaml"
+        run_command "oc get event -n openshift-marketplace | grep cert-manager"
         exit 1
     fi
 

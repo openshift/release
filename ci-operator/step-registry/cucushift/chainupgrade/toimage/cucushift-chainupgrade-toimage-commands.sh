@@ -132,7 +132,7 @@ function extract_ccoctl(){
 }
 
 function update_cloud_credentials_oidc(){
-    local platform preCredsDir tobeCredsDir tmp_ret testcase="oc_update"
+    local platform preCredsDir tobeCredsDir tmp_ret testcase="OCP-66839"
 
     platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
@@ -608,6 +608,32 @@ function wait_mcp_continous_success() {
     fi
 }
 
+function wait_node_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria=20 max_retries=80 interval=30
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
+        sleep ${interval}
+        if check_node; then
+            (( continous_successful_check += 1 ))
+        else
+            continous_successful_check=0
+        fi
+        echo "${try} wait and retry..."
+        echo "Continue success time: ${continous_successful_check}"
+        (( try += 1 ))
+    done
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some nodes does not get ready or not stable"
+        echo "Debug: current node output is:"
+        oc get node
+        # Explicitly set failure to node
+        export UPGRADE_FAILURE_TYPE="node"
+        return 1
+    else
+        echo "All node status check PASSED"
+        return 0
+    fi
+}
+
 function check_node() {
     local node_number ready_number testcase="node"
     node_number=$(${OC} get node |grep -vc STATUS)
@@ -689,7 +715,7 @@ function admin_ack() {
     fi
 
     echo "Require admin ack:\n ${out}"
-    local wait_time_loop_var=0 ack_data testcase="admin_ack"
+    local wait_time_loop_var=0 ack_data testcase="OCP-44827"
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     ack_data="$(echo "${out}" | jq -r "keys[]")"
     for ack in ${ack_data};
@@ -800,7 +826,7 @@ function check_upgrade_status() {
 
 # Check version, state in history
 function check_history() {
-    local version state testcase="cvo"
+    local version state testcase="OCP-21588"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
@@ -1109,6 +1135,7 @@ for target in "${TARGET_RELEASES[@]}"; do
     if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
 	    update_cloud_credentials_oidc
     fi
+
     upgrade
     check_upgrade_status
 
@@ -1129,6 +1156,17 @@ for target in "${TARGET_RELEASES[@]}"; do
 	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
 	sdn2ovn
 	health_check
+    fi
+
+    run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode"
+    # From OCP 4.19, we do not support cgroupmode v1
+    # So update the 'cgroupMode' in the 'cluster' object of nodes.config.openshift.io resource type to 'v2'
+    if [[ "${TARGET_MINOR_VERSION}" -eq "18" ]] && [[ "$(oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode)" == "v1" ]]; then
+        run_command "oc patch --type=merge --patch='{\"spec\":{\"cgroupMode\":\"v2\"}}' nodes.config.openshift.io cluster"
+        echo "New cgroupMode:"
+        run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec"
+        wait_node_continous_success
+        wait_mcp_continous_success
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
