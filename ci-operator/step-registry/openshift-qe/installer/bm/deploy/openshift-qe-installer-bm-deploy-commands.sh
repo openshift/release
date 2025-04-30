@@ -7,6 +7,13 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
+
+file /secret/jh_priv_ssh_key
+ls -l /secret/jh_priv_ssh_key
+sha256sum /secret/jh_priv_ssh_key
+
+exit 1
+
 SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat "/secret/address")
 CRUCIBLE_URL=$(cat "/secret/crucible_url")
