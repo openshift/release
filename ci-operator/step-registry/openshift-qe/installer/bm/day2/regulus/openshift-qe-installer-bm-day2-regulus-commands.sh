@@ -20,6 +20,7 @@ if [ ${BAREMETAL} == "true" ]; then
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
   oc --kubeconfig="$KUBECONFIG" config set-cluster bm --proxy-url=socks5://localhost:12345
+  mkdir /tmp/day2-regulus
 fi
 
 oc config view
@@ -27,7 +28,6 @@ oc projects
 
 # Install the Regulus 
 
-mkdir /tmp/day2-regulus
 sleep 10
 
 # Regulus is ready
