@@ -188,19 +188,29 @@ tests:
     workflow: openshift-qe-installer-azure
   timeout: 6h0m0s
 - always_run: false
-  as: krkn-hub-ibm-cloud-api-tests
+  as: krkn-hub-ibm-cloud-node-tests
   steps:
     cluster_profile: ibmcloud-qe
+    env:
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      SET_ENV_BY_PLATFORM: custom
+      WORKERS: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
     test:
     - ref: redhat-chaos-start-krkn
-    - ref: redhat-chaos-node-disruptions-master-outage
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
-- always_run: false
-  as: krkn-hub-tests-aro
+  timeout: 6h0m0s
+- as: krkn-hub-tests-aro
+  cron: 0 8 16 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
