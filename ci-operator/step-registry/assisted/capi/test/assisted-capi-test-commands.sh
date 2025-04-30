@@ -24,4 +24,4 @@ export CONTAINER_TAG
 
 make generate && make manifests && make build-installer
 
-ansible-playbook test/ansible/run_test.yaml -i test/ansible/inventory.yaml
+ANSIBLE_REMOTE_TEMP=/tmp/.ansible-remote ANSIBLE_HOME=/tmp/.ansible ANSIBLE_LOCAL_TEMP=/tmp/.ansible.tmp  XDG_CACHE_HOME=/tmp/.cache ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/.ansible-cache make e2e-test
