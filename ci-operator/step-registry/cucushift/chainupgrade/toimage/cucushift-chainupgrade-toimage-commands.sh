@@ -65,21 +65,27 @@ function check_failed_operator(){
 function createUpgradeJunit() {
     echo -e "\n# Generating the Junit for upgrade"
     local upg_report="${ARTIFACT_DIR}/junit_upgrade.xml"
+    local cases_in_upgrade
     if (( FRC == 0 )); then
-        cat >"${upg_report}" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="cluster upgrade" tests="1" failures="0">
-  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}"/>
-</testsuite>
-EOF
-    else
-        local failures
-        IFS=" " read -r -a failures <<< "${UPGRADE_FAILURE_TYPE}"
+        # The cases are SLOs on the live cluster which may be a possible UPGRADE_FAILURE_TYPE
+        local cases_from_available_operators upgrade_success_cases
+        cases_from_available_operators=$(oc get co --no-headers|awk '{print $1}'|tr '\n' ' ' || true)
+        upgrade_success_cases="${UPGRADE_FAILURE_TYPE} ${cases_from_available_operators} ${IMPLICIT_ENABLED_CASES}"
+        upgrade_success_cases=$(echo ${upgrade_success_cases} | tr ' ' '\n'|sort -u|xargs)
+        IFS=" " read -r -a cases_in_upgrade <<< "${upgrade_success_cases}"
         echo '<?xml version="1.0" encoding="UTF-8"?>' > "${upg_report}"
-        echo "<testsuite name=\"cluster upgrade\" tests=\"${#failures[@]}\" failures=\"${#failures[@]}\">" >> "${upg_report}"
-        for failure in "${failures[@]}"; do
-            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${failure}\">" >> "${upg_report}"
-            echo "    <failure message=\"openshift cluster upgrade failed at ${failure}\"></failure>" >> "${upg_report}"
+        echo "<testsuite name=\"cluster upgrade\" tests=\"${#cases_in_upgrade[@]}\" failures=\"0\">" >> "${upg_report}"
+        for case in "${cases_in_upgrade[@]}"; do
+            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${case}\"/>" >> "${upg_report}"
+        done
+        echo '</testsuite>' >> "${upg_report}"
+    else
+        IFS=" " read -r -a cases_in_upgrade <<< "${UPGRADE_FAILURE_TYPE}"
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > "${upg_report}"
+        echo "<testsuite name=\"cluster upgrade\" tests=\"${#cases_in_upgrade[@]}\" failures=\"${#cases_in_upgrade[@]}\">" >> "${upg_report}"
+        for case in "${cases_in_upgrade[@]}"; do
+            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${case}\">" >> "${upg_report}"
+            echo "    <failure message=\"openshift cluster upgrade failed at ${case}\"></failure>" >> "${upg_report}"
             echo "  </testcase>" >> "${upg_report}"
         done
         echo '</testsuite>' >> "${upg_report}"
@@ -126,21 +132,22 @@ function extract_ccoctl(){
 }
 
 function update_cloud_credentials_oidc(){
-    local platform preCredsDir tobeCredsDir tmp_ret
+    local platform preCredsDir tobeCredsDir tmp_ret testcase="OCP-66839"
 
     platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
     tobeCredsDir="/tmp/tobe-include-creds"
     mkdir "${preCredsDir}" "${tobeCredsDir}"
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     # Extract all CRs from live cluster with --included
     if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
         echo "Failed to extract CRs from live cluster!"
-        export UPGRADE_FAILURE_TYPE="oc_update"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
         return 1
     fi
     if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
         echo "Failed to extract CRs from tobe upgrade release payload!"
-        export UPGRADE_FAILURE_TYPE="oc_update"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
         return 1
     fi
 
@@ -232,13 +239,15 @@ function rhel_repo(){
     echo "Updating RHEL node repo"
     # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
     # to be able to SSH.
+    local testcase="rhel"
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     if ! whoami &> /dev/null; then
         if [[ -w /etc/passwd ]]; then
             echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
         else
             echo "/etc/passwd is not writeable, and user matching this uid is not found."
             # Explicitly set failure to rhel for rhel worker upgrade failure
-            export UPGRADE_FAILURE_TYPE="rhel"
+            export UPGRADE_FAILURE_TYPE="${testcase}"
             exit 1
         fi
     fi
@@ -329,10 +338,11 @@ EOT
 function rhel_upgrade(){
     echo "Upgrading RHEL nodes"
     echo "Validating parsed Ansible inventory"
+    local testcase="rhel"
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     echo -e "\nRunning RHEL worker upgrade"
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv || { export UPGRADE_FAILURE_TYPE="rhel"; return 1; }
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv || { export UPGRADE_FAILURE_TYPE="${testcase}"; return 1; }
 
     if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
         echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
@@ -351,7 +361,7 @@ function rhel_upgrade(){
     else
         echo "RHEL worker has incorrect K8s version"
         # Explicitly set failure to rhel for rhel worker upgrade failure
-        export UPGRADE_FAILURE_TYPE="rhel"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
         exit 1
     fi
     echo -e "oc get node -owide\n$(oc get node -owide)"
@@ -598,10 +608,37 @@ function wait_mcp_continous_success() {
     fi
 }
 
+function wait_node_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria=20 max_retries=80 interval=30
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
+        sleep ${interval}
+        if check_node; then
+            (( continous_successful_check += 1 ))
+        else
+            continous_successful_check=0
+        fi
+        echo "${try} wait and retry..."
+        echo "Continue success time: ${continous_successful_check}"
+        (( try += 1 ))
+    done
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some nodes does not get ready or not stable"
+        echo "Debug: current node output is:"
+        oc get node
+        # Explicitly set failure to node
+        export UPGRADE_FAILURE_TYPE="node"
+        return 1
+    else
+        echo "All node status check PASSED"
+        return 0
+    fi
+}
+
 function check_node() {
-    local node_number ready_number
+    local node_number ready_number testcase="node"
     node_number=$(${OC} get node |grep -vc STATUS)
     ready_number=$(${OC} get node |grep -v STATUS | awk '$2 == "Ready"' | wc -l)
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     if (( node_number == ready_number )); then
         echo "All nodes status check PASSED"
         return 0
@@ -613,7 +650,7 @@ function check_node() {
             oc get node |grep -v STATUS | awk '$2 != "Ready"'
         fi
         # Explicitly set failure to node
-        export UPGRADE_FAILURE_TYPE="node"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
         return 1
     fi
 }
@@ -678,8 +715,8 @@ function admin_ack() {
     fi
 
     echo "Require admin ack:\n ${out}"
-    local wait_time_loop_var=0 ack_data
-
+    local wait_time_loop_var=0 ack_data testcase="OCP-44827"
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     ack_data="$(echo "${out}" | jq -r "keys[]")"
     for ack in ${ack_data};
     do
@@ -707,7 +744,7 @@ function admin_ack() {
     if (( wait_time_loop_var >= 5 )); then
         echo >&2 "Timed out waiting for admin-acks completing, exiting"
         # Explicitly set failure to admin_ack
-        export UPGRADE_FAILURE_TYPE="admin_ack"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
         return 1
     fi
 }
@@ -789,15 +826,16 @@ function check_upgrade_status() {
 
 # Check version, state in history
 function check_history() {
-    local version state
+    local version state testcase="OCP-21588"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now upgraded to ${TARGET_VERSION}" && return 0
     else
         echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting"
 	# Explicitly set failure to cvo
-        export UPGRADE_FAILURE_TYPE="cvo"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
 	return 1
     fi
 }
@@ -1056,6 +1094,9 @@ export OC="run_command_oc"
 # Set genenral upgrade ci failure to overall as default
 export UPGRADE_FAILURE_TYPE="overall"
 
+# The cases are from existing general checkpoints enabled implicitly in upgrade step, which may be a possible UPGRADE_FAILURE_TYPE
+export IMPLICIT_ENABLED_CASES=""
+
 # Target version oc will be extract in the /tmp/client directory, use it first
 mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
@@ -1094,6 +1135,7 @@ for target in "${TARGET_RELEASES[@]}"; do
     if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
 	    update_cloud_credentials_oidc
     fi
+
     upgrade
     check_upgrade_status
 
@@ -1114,6 +1156,17 @@ for target in "${TARGET_RELEASES[@]}"; do
 	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
 	sdn2ovn
 	health_check
+    fi
+
+    run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode"
+    # From OCP 4.19, we do not support cgroupmode v1
+    # So update the 'cgroupMode' in the 'cluster' object of nodes.config.openshift.io resource type to 'v2'
+    if [[ "${TARGET_MINOR_VERSION}" -eq "18" ]] && [[ "$(oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode)" == "v1" ]]; then
+        run_command "oc patch --type=merge --patch='{\"spec\":{\"cgroupMode\":\"v2\"}}' nodes.config.openshift.io cluster"
+        echo "New cgroupMode:"
+        run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec"
+        wait_node_continous_success
+        wait_mcp_continous_success
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
