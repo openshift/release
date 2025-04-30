@@ -18,6 +18,14 @@ ls -l /tmp/priv_ssh_key.pem
 sha256sum /tmp/priv_ssh_key.pem
 SSH_ARGS="-v -i /tmp/priv_ssh_key.pem -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+
+
+if [[ $(cat $bastion) == "10.6.62.42" ]]; then
+    echo "address is correct"
+else
+    echo "wrong address"
+fi
+
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
