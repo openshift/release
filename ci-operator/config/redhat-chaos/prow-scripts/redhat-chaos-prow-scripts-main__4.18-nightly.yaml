@@ -15,6 +15,14 @@ base_images:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -212,6 +220,54 @@ tests:
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 6h0m0s
+- always_run: false
+  as: vsphere-krkn-hub-tests-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      ALERTS_PATH: ./node-disruptions/etcd_warning_slos
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      WORKER_REPLICA_COUNT: "10"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: vsphere-krkn-hub-node-tests-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      ALERTS_PATH: ./node-disruptions/etcd_warning_slos
+      CHURN: "true"
+      CLOUD_TYPE: vsphere
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      WAIT_DURATION: "1000"
+      WORKER_REPLICA_COUNT: "10"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
 - always_run: false
   as: krkn-hub-syn-flood
   steps:
