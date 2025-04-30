@@ -26,6 +26,7 @@ fi
 echo "KUBECONFIG=${KUBECONFIG}"
 
 SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
+SCANNER_V4_MATCHER_READINESS_MAX_WAIT=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:-30m}
 
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
@@ -306,8 +307,9 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   set -x
   wait_deploy scanner-v4-matcher || echo 'scanner-v4-matcher is not deployed?'
   oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
+  step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
   for i in {1..20}; do
-    if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=30s; then
+    if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=${step_wait_time:-30s}; then
       echo '>>> scanner-v4-matcher condition==Ready'
       break
     fi
