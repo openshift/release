@@ -27,6 +27,7 @@ oc projects
 
 # Install the Regulus 
 
+mkdir /tmp/day2-regulus
 sleep 10
 
 # Regulus is ready
