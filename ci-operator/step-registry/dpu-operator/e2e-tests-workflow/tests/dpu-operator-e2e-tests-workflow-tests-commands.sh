@@ -42,7 +42,7 @@ check_pull_number() {
         
         handle_job_status "$check_pull_number_response"
 
-        sleep 300
+        sleep 100
     done
 }
 
