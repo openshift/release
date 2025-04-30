@@ -116,6 +116,9 @@ def generate_app_ci_content(config, git_clone_dir):
     # Release Reimport Controller
     content.add_release_reimport_controller_resources(config, context, namespaces)
 
+    # Release Mirror Cleanup Controller
+    content.add_release_mirror_cleanup_controller_resources(config, context, namespaces)
+
 def make_priv_annotation(pub_annotation):
     priv_annotation = dict(pub_annotation)
     priv_annotation['name'] += '-priv'
