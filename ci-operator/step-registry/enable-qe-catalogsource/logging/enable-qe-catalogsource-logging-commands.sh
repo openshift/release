@@ -224,4 +224,5 @@ sleep 10
 create_icsp_connected
 check_marketplace
 create_catalog_sources
-sleep 14400
+echo "sleep 4 hours for debugging"
+sleep 4h
