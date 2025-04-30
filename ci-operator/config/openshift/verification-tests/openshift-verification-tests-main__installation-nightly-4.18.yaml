@@ -361,14 +361,15 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disktype-disksize
-- as: azure-ipi-disktype-worker-standard-lrs-f14
-  cron: 12 2 10,26 * *
+- as: azure-ipi-disktype-worker-standard-lrs-mcidr-f14
+  cron: 6 21 14,28 * *
   steps:
     cluster_profile: azure-qe
     env:
       AZURE_COMPUTE_DISK_TYPE: Standard_LRS
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       EXIT_ON_INSTALLER_CHECK_FAIL: "no"
+      NETWORK_MACHINECIDR: 10.1.0.0/16
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disktype
@@ -684,20 +685,6 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
-- as: gcp-ipi-user-provisioned-dns-mini-perm-arm-f7
-  cron: 17 20 5,12,19,28 * *
-  steps:
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      OCP_ARCH: arm64
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
 - as: ibmcloud-ipi-default-f28
   cron: 16 4 13 * *
   steps:
