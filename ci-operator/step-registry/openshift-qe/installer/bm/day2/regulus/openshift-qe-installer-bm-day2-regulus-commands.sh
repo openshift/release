@@ -20,8 +20,12 @@ if [ ${BAREMETAL} == "true" ]; then
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
   oc --kubeconfig="$KUBECONFIG" config set-cluster bm --proxy-url=socks5://localhost:12345
-  mkdir /tmp/day2-regulus
 
+  ssh ${SSH_ARGS} root@${bastion} "
+      set -e 
+      set -o pipefail
+      mkdir /tmp/day2-regulus-baremetal
+   "
 else
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
