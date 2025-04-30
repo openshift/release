@@ -3,18 +3,21 @@
 echoerr() { echo "$@" 1>&2; }
 
 check_timeout_status() {
-        curl --resolve "${endpoint_resolve}" -X POST "$queue_url/check_timed_out_job" -H "Content-Type: application/json" -d "{\"pull_pull_sha\": \"${PULL_PULL_SHA}\"}"
+    curl --resolve "${endpoint_resolve}" -X POST "$queue_url/check_timed_out_job" \
+         -H "Content-Type: application/json" \
+         -d "{\"pull_pull_sha\": \"${PULL_PULL_SHA}\", \"job_name\": \"${JOB_NAME}\"}"
 }
 
 trigger_build() {
-	curl --resolve "${endpoint_resolve}" -X POST "$queue_url" -H "Content-Type: application/json" -d "{\"pullnumber\": \"${PULL_NUMBER}\", \"pull_pull_sha\": \"${PULL_PULL_SHA}\"}"
-
+    curl --resolve "${endpoint_resolve}" -X POST "$queue_url" \
+         -H "Content-Type: application/json" \
+         -d "{\"pullnumber\": \"${PULL_NUMBER}\", \"pull_pull_sha\": \"${PULL_PULL_SHA}\", \"job_name\": \"${JOB_NAME}\"}"
 }
-
 
 handle_job_status() {
     local response="$1"
-    
+    echo $response
+
     return_code=$(echo "$response" | jq -r '.return_code')
 
     if [[ "$return_code" == '200' ]] || [[ "$return_code" == '400' ]]; then
@@ -33,16 +36,16 @@ handle_job_status() {
 
 # Main function to check the pull number and handle retries
 check_pull_number() {
-    check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
+    check_job_status_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_job_status" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
 
-    handle_job_status "$check_pull_number_response"
+    handle_job_status "$check_job_status_response"
 
     while true; do
-        check_pull_number_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_pullnumber" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
+        check_job_status_response=$(curl --resolve "${endpoint_resolve}" -X POST "${queue_url}/check_job_status" -H "Content-Type: application/json" -d "{\"uuid\": \"${1}\"}")
         
-        handle_job_status "$check_pull_number_response"
+        handle_job_status "$check_job_status_response"
 
-        sleep 300
+        sleep 30
     done
 }
 
