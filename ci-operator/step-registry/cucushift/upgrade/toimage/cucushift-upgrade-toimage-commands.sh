@@ -132,7 +132,7 @@ function extract_ccoctl(){
 }
 
 function update_cloud_credentials_oidc(){
-    local platform preCredsDir tobeCredsDir tmp_ret testcase="oc_update"
+    local platform preCredsDir tobeCredsDir tmp_ret testcase="OCP-66839"
     platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
     tobeCredsDir="/tmp/tobe-include-creds"
@@ -280,7 +280,7 @@ function admin_ack() {
     fi
 
     echo "Require admin ack:\n ${out}"
-    local wait_time_loop_var=0 ack_data testcase="admin_ack"
+    local wait_time_loop_var=0 ack_data testcase="OCP-44827"
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
 
     ack_data="$(echo "${out}" | jq -r "keys[]")"
@@ -485,7 +485,7 @@ function check_upgrade_status() {
 
 # Check version, state in history
 function check_history() {
-    local version state testcase="cvo"
+    local version state testcase="OCP-21588"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
@@ -507,6 +507,8 @@ function check_ota_case_enabled() {
         # shellcheck disable=SC2076
         if [[ " ${ENABLE_OTA_TEST} " =~ " ${case_id} " ]]; then
             echo "${case_id} is enabled via ENABLE_OTA_TEST on this job."
+            export UPGRADE_FAILURE_TYPE="${case_id}"
+            export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
             return 0
         fi
     done
