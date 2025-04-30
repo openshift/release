@@ -275,17 +275,19 @@ tests:
     - chain: openshift-qe-node-density-cni
     workflow: openshift-qe-installer-aws
 - always_run: false
-  as: aws-ovn-payload-node-density-heavy
+  as: aws-ovn-node-density-heavy-6nodes
   steps:
-    allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
     env:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       CLUSTER_NETWORK_CIDR: 10.128.0.0/14
       CLUSTER_NETWORK_HOST_PREFIX: "20"
-      EXTRA_FLAGS: --pods-per-node=250 --pod-ready-threshold=85s
+      COMPUTE_NODE_TYPE: c6a.16xlarge
+      EXTRA_FLAGS: --pod-ready-threshold=2000s
       ITERATIONS_PER_NAMESPACE: "100"
-      MAX_PODS: "250"
+      MAX_PODS: "2500"
+      PODS_PER_NODE: "2500"
+      PPROF: "false"
       PROFILE_TYPE: both
       ZONES_COUNT: "3"
     post:
@@ -297,7 +299,7 @@ tests:
     - ref: openshift-qe-set-max-pods
     - chain: create-infra-move-ingress-monitoring-registry
     test:
-    - chain: workers-scale
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
