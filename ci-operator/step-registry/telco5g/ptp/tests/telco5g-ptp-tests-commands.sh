@@ -361,7 +361,7 @@ if [[ "$(printf '%s\n' "$version" "$min_required" | sort -V | head -n1)" != "$mi
   TEST_MODES=("dualnicbc" "bc" "oc")
 else
   echo "Version is 4.19 or greater"
-  TEST_MODES=("dualfollower" "dualnicbc" "bc" "oc")
+  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "bc" "oc")
 fi
 
 # Run tests
