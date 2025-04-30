@@ -302,11 +302,16 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-indexer
   timeout 120s wait "${scanner_readiness_configure_pid}" || true
   set -x
-  oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods || true
-  wait_deploy scanner-v4-matcher \
-    || oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=5m \
-    || true
-  echo '>> and check the matcher logs again...'
+  wait_deploy scanner-v4-matcher
+  for i in {1..10}; do
+    if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=5m; then
+      echo '>>> scanner-v4-matcher condition==Ready'
+      break
+    fi
+    oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods || true
+    oc get pods -o wide --namespace stackrox || true
+  done
+  echo '>>> check the matcher logs again...'
   oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods || true
   set +x
 fi
