@@ -42,8 +42,9 @@ function install_jq() {
   echo "Downloading jq binary from ${url}"
   curl -Ls -o ./jq "${url}"
   chmod u+x ./jq
+  jq --version
 }
-jq --version || get_jq
+jq --version || install_jq
 
 ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d')
 ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"

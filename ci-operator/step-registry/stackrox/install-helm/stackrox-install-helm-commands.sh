@@ -39,8 +39,20 @@ function install_jq() {
   echo "Downloading jq binary from ${url}"
   curl -Ls -o ./jq "${url}"
   chmod u+x ./jq
+  jq --version
 }
-jq --version || get_jq
+jq --version || install_jq
+
+function install_helm() {
+  mkdir -p /tmp/helminstall
+  curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helminstall/helm.tar.gz
+  echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb /tmp/helminstall/helm.tar.gz" \
+    | sha256sum --check --status -
+  (cd /tmp/helminstall && tar xvfpz helm.tar.gz)
+  install -m 755 /tmp/helminstall/linux-amd64/helm "$PWD"
+  helm version
+}
+helm version || install_helm
 
 ACS_VERSION_TAG=""
 ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"
@@ -107,14 +119,6 @@ function fetch_last_nightly_tag() {
     exit 1
   fi
   echo "ACS_VERSION_TAG=${ACS_VERSION_TAG}"
-}
-
-function install_helm() {
-  mkdir -p /tmp/helminstall
-  curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helminstall/helm-v3.16.2-linux-amd64.tar.gz
-  echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb /tmp/helminstall/helm-v3.16.2-linux-amd64.tar.gz" | sha256sum --check --status -
-  (cd /tmp/helminstall && tar xvfpz helm-v3.16.2-linux-amd64.tar.gz)
-  install -m 755 /tmp/helminstall/linux-amd64/helm "$PWD"
 }
 
 function prepare_helm_templates() {
@@ -293,7 +297,6 @@ function configure_scanner_readiness() {
 
 fetch_last_nightly_tag
 prepare_helm_templates
-helm version || install_helm
 
 install_central_with_helm
 
