@@ -103,6 +103,7 @@ function init-regulus {
     set -o pipefail
     cd ${regulus_repo}
     cp ../lab.config .
+    cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
     source bootstrap.sh
     make init-lab 
     make init-jobs 
