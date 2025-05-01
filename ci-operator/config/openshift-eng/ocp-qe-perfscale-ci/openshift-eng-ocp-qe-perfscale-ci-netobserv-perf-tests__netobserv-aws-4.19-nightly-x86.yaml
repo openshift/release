@@ -3,38 +3,22 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: cli
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
+  netobserv-perfscale:
+    name: netobserv-perfscale
+    namespace: ci
+    tag: latest
   ocp-qe-perfscale-ci:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
-  opm-builder:
-    name: opm-builder
-    namespace: ci
-    tag: latest
-build_root:
-  image_stream_tag:
-    name: ci-tools-build-root
-    namespace: ci
-    tag: latest
-images:
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    COPY opm /usr/bin/opm
-    COPY scripts scripts
-    ENV HOME=/home/user
-    RUN mkdir -p /home/user && curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && unzip awscli-bundle.zip && awscli-bundle/install -b $HOME/bin/aws
-    ENV PATH="$PATH:$HOME/bin"
-  from: ocp-qe-perfscale-ci
-  inputs:
-    opm-builder:
-      paths:
-      - destination_dir: .
-        source_path: /bin/opm
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-eng/ocp-qe-perfscale-ci/scripts
-  to: netobserv-perfscale
 releases:
   latest:
     candidate:
