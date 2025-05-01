@@ -25,14 +25,25 @@ if [[ -z "${KUBECONFIG}" && -e ${SHARED_DIR}/kubeconfig ]]; then
 fi
 echo "KUBECONFIG=${KUBECONFIG}"
 
+export PATH="${PATH}:${PWD}"
+
 SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
 SCANNER_V4_MATCHER_READINESS_MAX_WAIT=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:-30m}
 
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 
+function install_jq() {
+  local url
+  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+  echo "Downloading jq binary from ${url}"
+  curl -Ls -o ./jq "${url}"
+  chmod u+x ./jq
+}
+jq --version || get_jq
+
 ACS_VERSION_TAG=""
-ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"
 
 SCRATCH=$(mktemp -d)
 echo "SCRATCH=${SCRATCH}"
@@ -221,7 +232,8 @@ function get_init_bundle() {
   function init_bundle() {
     oc -n stackrox exec deploy/central -- \
       roxctl central init-bundles generate my-test-bundle \
-        --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output - > "${SCRATCH}/helm-init-bundle-values.yaml"
+        --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output - \
+        > "${SCRATCH}/helm-init-bundle-values.yaml"
   }
   retry init_bundle
 }
@@ -281,10 +293,7 @@ function configure_scanner_readiness() {
 
 fetch_last_nightly_tag
 prepare_helm_templates
-if ! helm version; then
-  install_helm /tmp/
-  export PATH="${PATH}:/tmp/"
-fi
+helm version || install_helm
 
 install_central_with_helm
 
@@ -338,7 +347,7 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   set -e
 fi
 
-oc get nodes -o wide | grep infra
+oc get nodes -o wide | grep infra || true
 oc get pods -o wide --namespace stackrox || true
 
 nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
@@ -346,8 +355,7 @@ echo $! > "${SCRATCH}/port_forward_pid"
 
 # Wait for secured cluster to connect to central.
 max_retry_verify_connected_cluster=30
-for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ ));
-do
+for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ )); do
   echo "Verify connected cluster(s) (try ${retry_count}/${max_retry_verify_connected_cluster})"
   connected_clusters_count=$(curl_central /v1/clusters | jq '.clusters | length')
   if (( connected_clusters_count >= 1 )); then

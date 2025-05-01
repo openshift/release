@@ -16,22 +16,48 @@ cat <<EOF
   * Wait for all services minimal running state.
 EOF
 
+exec > >(trap "" INT TERM; sed 's/$/ #notsecret/')
+exec 2> >(trap "" INT TERM; sed 's/$/ (stderr)#notsecret/' >&2)
+
 echo ">>> Prepare script environment"
 export SHARED_DIR=${SHARED_DIR:-/tmp}
-export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
+
+export KUBECONFIG=${KUBECONFIG:-}
+if [[ -z "${KUBECONFIG}" && -e ${SHARED_DIR}/kubeconfig ]]; then
+  export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
 echo "KUBECONFIG=${KUBECONFIG}"
+
+export PATH="${PATH}:${PWD}"
+
+SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
+SCANNER_V4_MATCHER_READINESS_MAX_WAIT=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:-30m}
 
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
+function install_jq() {
+  local url
+  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+  echo "Downloading jq binary from ${url}"
+  curl -Ls -o ./jq "${url}"
+  chmod u+x ./jq
+}
+jq --version || get_jq
+
+ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d')
+ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"
+
 SCRATCH=$(mktemp -d)
+echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
+
 function exit_handler() {
   exitcode=$?
   set +e
   echo ">>> End ACS install"
   echo "[$(date -u)] SECONDS=${SECONDS}"
-  rm -rf "${SCRATCH}"
+  rm -rf "${SCRATCH:?}"
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with ${OPERATOR_VERSION}"
   else
@@ -41,19 +67,36 @@ function exit_handler() {
 trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
-
-function get_jq() {
-  local url
-  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
-  echo "Downloading jq binary from ${url}"
-  curl -Ls -o ./jq "${url}"
-  chmod u+x ./jq
-  export PATH=${PATH}:${PWD}
+function retry() {
+  local i
+  for (( i = 0; i < 10; i++ )); do
+    "$@" && return 0
+    if [[ $i -lt 9 ]]; then
+      sleep 30
+    fi
+  done
+  return 1
 }
-jq --version || get_jq
 
-ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d') \
-  || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+function wait_created() {
+  retry oc wait --for condition=established --timeout=120s "${@}"
+}
+
+function wait_deploy() {
+  retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
+    || {
+      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=5"
+      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5 --all-pods
+      return 1;
+    }
+}
+
+function wait_pods_running() {
+  retry oc get pods "${@}" --field-selector="status.phase==Running" \
+    -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1 \
+    || { oc get pods "${@}"; return 1; }
+}
+
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
 cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
@@ -236,14 +279,6 @@ function create_cr() {
   retry oc apply -f "${app}-cr.yaml" --timeout=30s
 }
 
-function retry() {
-  for (( i = 0; i < 10; i++ )); do
-    "$@" && return 0
-    sleep 30
-  done
-  return 1
-}
-
 function get_init_bundle() {
   echo ">>> Get init-bundle and save as a cluster secret"
   oc -n stackrox get secret collector-tls >/dev/null 2>&1 \
@@ -257,23 +292,38 @@ function get_init_bundle() {
   retry init_bundle
 }
 
-function wait_created() {
-  retry oc wait --for condition=established --timeout=120s "${@}"
+# Taken from: tests/roxctl/slim-collector.sh
+# Use built-in echo to not expose $2 in the process list.
+function curl_cfg() {
+  echo -n "$1 = \"${2//[\"\\]/\\&}\""
 }
 
-function wait_deploy() {
-  retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
-    || {
-      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
-      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
-      return 1
-    }
+function curl_central() {
+  # Trim leading '/'
+  local url="${1#/}"
+
+  [[ -n "${url}" ]] || die "No URL specified"
+  curl --retry 5 --retry-connrefused -Sskf --config <(curl_cfg user "admin:${ROX_PASSWORD}") "https://localhost:8443/${url}"
 }
 
-function wait_pods_running() {
-  retry oc get pods "${@}" --field-selector="status.phase==Running" \
-    -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1 \
-    || { oc get pods "${@}"; return 1; }
+function configure_scanner_readiness() {
+  echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
+  set -x  # log commands; expecting this to run in the background
+  set +e  # ignore errors
+  wait_deploy scanner-v4-matcher 120s
+  if oc describe -n stackrox deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS; then
+    echo 'The scanner-v4-matcher readiness is set.'
+    return
+  fi
+  echo 'The scanner-v4-match readiness env var is not set. Add it to the deployment and restart.'
+  oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
+  echo 'Restart scanner-v4-matcher to apply the new config during startup...'
+  oc rollout restart deploy/scanner-v4-matcher
+  oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s
+  oc -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS
+  echo ">>> Finished scanner-v4-matcher configuration readiness=${SCANNER_V4_MATCHER_READINESS:-}."
+  set -e
+  set +x
 }
 
 
@@ -283,6 +333,14 @@ wait_created crd centrals.platform.stackrox.io
 
 oc new-project stackrox >/dev/null || true
 create_cr central
+
+echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
+if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+  echo "configure readiness"
+  configure_scanner_readiness &
+  scanner_readiness_configure_pid=$!
+fi
+
 echo ">>> Wait for 'stackrox-central-services' deployments"
 wait_deploy central-db
 wait_deploy central
@@ -291,15 +349,65 @@ get_init_bundle
 wait_created crd securedclusters.platform.stackrox.io
 create_cr secured-cluster
 echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
-if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-  wait_deploy scanner-v4-indexer
-  wait_deploy scanner-v4-matcher
-  wait_deploy scanner-v4-db
-fi
-wait_deploy scanner
-wait_deploy scanner-db
 wait_deploy sensor
 wait_deploy admission-control
 
-retry oc get deployments -n stackrox
-retry oc get pods --namespace stackrox
+echo ">>> Wait for 'stackrox scanner' deployments"
+wait_deploy scanner
+wait_deploy scanner-db
+
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  echo ">>> Wait for 'stackrox scanner-v4' deployments"
+  wait_deploy scanner-v4-db
+  wait_deploy scanner-v4-indexer
+  set -x
+  set +e
+  if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+    timeout 300s wait "${scanner_readiness_configure_pid:?}"
+    oc exec -n stackrox deploy/scanner-v4-matcher -- cat /etc/scanner/config.yaml
+    oc get configmap -n stackrox scanner-v4-matcher-config -o yaml
+  fi
+  wait_deploy scanner-v4-matcher || echo 'scanner-v4-matcher is not deployed?'
+  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
+  step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
+  for i in {1..20}; do
+    if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=${step_wait_time:-30s}; then
+      echo '>>> scanner-v4-matcher condition==Ready'
+      break
+    fi
+    oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+    oc get pods -o wide --namespace stackrox
+  done
+  echo '>>> check the matcher logs again...'
+  oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+  set +x
+  set -e
+fi
+
+oc get nodes -o wide | grep infra || true
+oc get pods -o wide --namespace stackrox || true
+
+nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
+echo $! > "${SCRATCH}/port_forward_pid"
+
+# Wait for secured cluster to connect to central.
+max_retry_verify_connected_cluster=30
+for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ )); do
+  echo "Verify connected cluster(s) (try ${retry_count}/${max_retry_verify_connected_cluster})"
+  connected_clusters_count=$(curl_central /v1/clusters | jq '.clusters | length')
+  if (( connected_clusters_count >= 1 )); then
+    echo "Found '${connected_clusters_count}' connected cluster(s)"
+    break
+  fi
+
+  if (( retry_count == max_retry_verify_connected_cluster )); then
+    echo "Error: Waiting for sensor connection reached max retries"
+    exit 1
+  fi
+
+  sleep 3
+done
+
+# Cleanup nohup
+kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
+rm "${SCRATCH}/port_forward_pid"
