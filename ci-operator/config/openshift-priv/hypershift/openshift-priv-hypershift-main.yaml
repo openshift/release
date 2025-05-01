@@ -151,6 +151,19 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-aws-minimal
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+    env:
+      CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-external
 - as: e2e-aws-techpreview
   optional: true
   steps:
@@ -376,6 +389,12 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     workflow: hypershift-aws-e2e-cluster
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv
