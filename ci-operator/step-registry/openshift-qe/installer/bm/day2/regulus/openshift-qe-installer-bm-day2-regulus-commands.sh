@@ -102,6 +102,7 @@ function init-regulus {
     set -e
     set -o pipefail
     cd ${regulus_repo}
+    cp ../lab.config .
     source bootstrap.sh
     make init-lab 
     make init-jobs 
