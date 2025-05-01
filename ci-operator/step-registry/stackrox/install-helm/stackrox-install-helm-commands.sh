@@ -35,7 +35,6 @@ ACS_VERSION_TAG=""
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 
 SCRATCH=$(mktemp -d)
-mkdir -p $SCRATCH
 echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
 
@@ -43,8 +42,8 @@ function exit_handler() {
   exitcode=$?
   set +e
   echo ">>> End ACS install"
-  echo "[$(date -u || true)] SECONDS=${SECONDS}"
-  rm -rf "${SCRATCH:?}" || true
+  echo "[$(date -u)] SECONDS=${SECONDS}"
+  rm -rf "${SCRATCH:?}"
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with helm"
   else
@@ -70,7 +69,7 @@ function wait_deploy() {
     || {
       echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=5"
       oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5 --all-pods
-      return 1
+      return 1;
     }
 }
 
@@ -155,7 +154,8 @@ EOF
   retry oc cp --namespace "${TMP_CI_NAMESPACE}" --container rh-ubi roxctl-extract-pod:/tmp/helm-templates/secured-cluster-services "${SCRATCH}/secured-cluster-services"
 
   retry oc delete pod --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod
-  retry oc delete namespace "${TMP_CI_NAMESPACE}"
+  retry oc delete project "${TMP_CI_NAMESPACE}" \
+    || kubectl delete namespace "${TMP_CI_NAMESPACE}"
 }
 
 function install_central_with_helm() {
@@ -209,7 +209,7 @@ function install_central_with_helm() {
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
   set -x
-  helm upgrade --debug --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
+  helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}" \
      2>&1 | tee /tmp/helm.up.log
@@ -250,20 +250,25 @@ function install_secured_cluster_with_helm() {
     installflags+=('--set' 'sensor.resources.limits.memory=500Mi')
     installflags+=('--set' 'sensor.resources.limits.cpu=500m')
   fi
+  set -x
   helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
     --values "${SCRATCH}/helm-init-bundle-values.yaml" \
     --set clusterName=remote \
     --set imagePullSecrets.allowNone=true \
      "${installflags[@]+"${installflags[@]}"}"
+  set +x
 }
 
 function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
   set -x  # log commands; expecting this to run in the background
   set +e  # ignore errors
-  wait_deploy scanner-v4-matcher 60s
-  oc describe -n stackrox deploy/scanner-v4-matcher -o yaml \
-    | grep SCANNER_V4_MATCHER_READINESS && { echo 'Already set.'; return; } || true
+  wait_deploy scanner-v4-matcher 120s
+  if oc describe -n stackrox deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS; then
+    echo 'The scanner-v4-matcher readiness is set.'
+    return
+  fi
+  echo 'The scanner-v4-match readiness env var is not set. Add it to the deployment and restart.'
   oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
   echo 'Restart scanner-v4-matcher to apply the new config during startup...'
   oc rollout restart deploy/scanner-v4-matcher
@@ -310,25 +315,27 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
   set -x
+  set +e
   if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
-    timeout 120s wait "${scanner_readiness_configure_pid:?}" || true
-    oc exec -n stackrox deploy/scanner-v4-matcher -- cat /etc/scanner/config.yaml || true
-    oc get configmap -n stackrox scanner-v4-matcher-config -o yaml || true
+    timeout 300s wait "${scanner_readiness_configure_pid:?}"
+    oc exec -n stackrox deploy/scanner-v4-matcher -- cat /etc/scanner/config.yaml
+    oc get configmap -n stackrox scanner-v4-matcher-config -o yaml
   fi
   wait_deploy scanner-v4-matcher || echo 'scanner-v4-matcher is not deployed?'
-  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial || true
+  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
   step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
   for i in {1..20}; do
     if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=${step_wait_time:-30s}; then
       echo '>>> scanner-v4-matcher condition==Ready'
       break
     fi
-    oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods || true
-    oc get pods -o wide --namespace stackrox || true
+    oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+    oc get pods -o wide --namespace stackrox
   done
   echo '>>> check the matcher logs again...'
-  oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods || true
+  oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
   set +x
+  set -e
 fi
 
 oc get nodes -o wide | grep infra
