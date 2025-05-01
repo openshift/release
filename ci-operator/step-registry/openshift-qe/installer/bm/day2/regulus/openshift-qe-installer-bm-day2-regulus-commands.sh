@@ -40,9 +40,6 @@ function clone-regulus {
      git switch ${PULL_NUMBER}
     fi
     git branch
-    source bootstrap.sh
-    make init-lab 
-    #make init-jobs 
   "
 }
 
