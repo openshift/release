@@ -6,9 +6,13 @@ set -x
 
 LAB_CLOUD="${LAB_CLOUD:-}"
 
+if [ -z "${RUNLOCAL:-}" ]; then
+    ~/fix_uid.sh
+fi
+
 SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 if [ -z "${RUNLOCAL:-}" ]; then
-  bastion=$(cat "/bm/address")
+  bastion=$(cat "/secret/address")
 else
   #bastion=localhost
   bastion=m42-h01-000-r760.rdu3.labs.perfscale.redhat.com
