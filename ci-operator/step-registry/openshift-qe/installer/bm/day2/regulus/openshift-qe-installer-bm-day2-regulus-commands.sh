@@ -90,9 +90,10 @@ for v in "${vars[@]}"; do
   else
     val="${!v:-}"
   fi
-  # Expand ~ (tilda) to $HOME if present at the start
-  if [[ $val == ~* ]]; then
-    val="$(eval echo "$val")"
+
+  # Force ~ at start to become /root/
+  if [[ "$val" == ~* ]]; then
+    val="${val/#\~\//\/root}"
   fi
 
   # Escape any embedded double-quotes
