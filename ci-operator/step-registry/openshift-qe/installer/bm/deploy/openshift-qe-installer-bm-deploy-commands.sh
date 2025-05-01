@@ -7,25 +7,8 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
-file ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key
-ls -l ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key
-sha256sum ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key
-
-cat ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key > /tmp/priv_ssh_key.pem
-chmod 400 /tmp/priv_ssh_key.pem
-file /tmp/priv_ssh_key.pem
-ls -l /tmp/priv_ssh_key.pem
-sha256sum /tmp/priv_ssh_key.pem
-SSH_ARGS="-v -i /tmp/priv_ssh_key.pem -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
-
-
-if [[ $(echo $bastion ) == "10.6.62.42" ]]; then
-    echo "address is correct"
-else
-    echo "wrong address"
-fi
-
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
