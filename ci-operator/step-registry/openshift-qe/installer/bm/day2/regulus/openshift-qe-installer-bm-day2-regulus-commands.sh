@@ -5,6 +5,7 @@ set -o pipefail
 set -x
 
 LAB_CLOUD="${LAB_CLOUD:-}"
+#RUNLOCAL="${RUNLOCAL:-1}"
 
 SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 if [ -z "${RUNLOCAL:-}" ]; then
