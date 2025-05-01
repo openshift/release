@@ -3,13 +3,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-# Fix UID issue (from Telco QE Team)
 
 LAB_CLOUD="${LAB_CLOUD:-}"
 
 SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 if [ -z "${RUNLOCAL:-}" ]; then
-  bastion=$(cat "/secret/address")
+  bastion=$(cat "/bm/address")
 else
   #bastion=localhost
   bastion=m42-h01-000-r760.rdu3.labs.perfscale.redhat.com
