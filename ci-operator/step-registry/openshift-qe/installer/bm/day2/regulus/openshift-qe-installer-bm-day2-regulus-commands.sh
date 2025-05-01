@@ -85,7 +85,11 @@ cat > /tmp/lab.config <<EOF
 EOF
 for v in "${vars[@]}"; do
   # "${!v}" expands the variable whose name is in $v
-  val="${!v:-}"
+  if [[ "$v" == "KUBECONFIG" ]]; then
+    val=$KUBECONFIG_PATH  # Force override. idk why KUBECONFIG is wrong.
+  else
+    val="${!v:-}"
+  fi
   # Escape any embedded double-quotes
   safe_val=${val//\"/\\\"}
   printf '%s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
@@ -102,8 +106,9 @@ function init-regulus {
     set -e
     set -o pipefail
     cd ${regulus_repo}
-    cp ../lab.config .
-    cat ${KUBECONFIG_PATH} > /tmp/kubeconfig
+    #cp lab.config lab.config.build
+    #cp ../lab.config .
+    #cat ${KUBECONFIG_PATH} > /tmp/kubeconfig
     source bootstrap.sh
     make init-lab 
     make init-jobs 
