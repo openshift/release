@@ -353,7 +353,7 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
         break
       fi
       oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
-      oc get pods -o wide --namespace stackrox
+      oc get deployment -n stackrox scanner-v4-matcher
     done
     echo '>>> List scanner-v4-matcher deployment events'
     oc get deployment -n stackrox scanner-v4-matcher
