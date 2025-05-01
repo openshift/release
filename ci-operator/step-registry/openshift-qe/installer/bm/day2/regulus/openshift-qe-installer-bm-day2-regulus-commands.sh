@@ -90,6 +90,11 @@ for v in "${vars[@]}"; do
   else
     val="${!v:-}"
   fi
+  # Expand ~ (tilda) to $HOME if present at the start
+  if [[ $val == ~* ]]; then
+    val="$(eval echo "$val")"
+  fi
+
   # Escape any embedded double-quotes
   safe_val=${val//\"/\\\"}
   printf '%s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
