@@ -3,7 +3,7 @@
 set -eou pipefail
 
 cat <<EOF
->>> Install ACS using helm into a single cluster [$(date -u || true)].
+>>> Install ACS using helm into a single cluster [$(date -u)].
 * Run roxctl image to create helm template with it
 * Install central from generated helm template
   * Wait for Central to start.
@@ -11,9 +11,6 @@ cat <<EOF
   * Create secured-cluster custom resource with init-bundle.
   * Wait for all services minimal running state.
 EOF
-
-exec > >(trap "" INT TERM; sed 's/$/ #notsecret/')
-exec 2> >(trap "" INT TERM; sed 's/$/ (stderr)#notsecret/' >&2)
 
 echo ">>> Prepare script environment"
 export SHARED_DIR=${SHARED_DIR:-/tmp}
@@ -25,34 +22,13 @@ if [[ -z "${KUBECONFIG}" && -e ${SHARED_DIR}/kubeconfig ]]; then
 fi
 echo "KUBECONFIG=${KUBECONFIG}"
 
-export PATH="${PATH}:${PWD}"
-
 SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
 SCANNER_V4_MATCHER_READINESS_MAX_WAIT=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:-30m}
+echo "ROX_SCANNER_V4:${ROX_SCANNER_V4:-}"
+echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
 
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
-
-function install_jq() {
-  local url
-  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
-  echo "Downloading jq binary from ${url}"
-  curl -Ls -o ./jq "${url}"
-  chmod u+x ./jq
-  jq --version
-}
-jq --version || install_jq
-
-function install_helm() {
-  mkdir -p /tmp/helminstall
-  curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helminstall/helm.tar.gz
-  echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb /tmp/helminstall/helm.tar.gz" \
-    | sha256sum --check --status -
-  (cd /tmp/helminstall && tar xvfpz helm.tar.gz)
-  install -m 755 /tmp/helminstall/linux-amd64/helm "$PWD"
-  helm version
-}
-helm version || install_helm
 
 ACS_VERSION_TAG=""
 ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"
@@ -60,6 +36,7 @@ ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | he
 SCRATCH=$(mktemp -d)
 echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
+export PATH="${PATH}:${SCRATCH}"
 
 function exit_handler() {
   exitcode=$?
@@ -75,6 +52,37 @@ function exit_handler() {
 }
 trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
+
+# ARCH/OS discovery copied from https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+ARCH=$(uname -m)
+case $ARCH in
+  armv5*) ARCH="armv5";;
+  armv6*) ARCH="armv6";;
+  armv7*) ARCH="arm";;
+  aarch64) ARCH="arm64";;
+  x86) ARCH="386";;
+  x86_64) ARCH="amd64";;
+  i686) ARCH="386";;
+  i386) ARCH="386";;
+esac
+OS=$(echo `uname`|tr '[:upper:]' '[:lower:]')
+
+function install_jq() {
+  local url
+  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-${OS//darwin/macos}-${ARCH}
+  curl -v -Ls -o ./jq "${url}"
+  chmod u+x ./jq
+  jq --version
+}
+jq --version || install_jq
+
+function install_helm() {
+  curl -v -L https://get.helm.sh/helm-v3.16.2-${OS}-${ARCH}.tar.gz \
+    | tar xzvf - --strip-components 1 "${OS}-${ARCH}/helm"
+  chmod u+x ./helm
+  helm version
+}
+helm version || install_helm
 
 function retry() {
   local i
@@ -122,7 +130,7 @@ function fetch_last_nightly_tag() {
 }
 
 function prepare_helm_templates() {
-  retry oc new-project "${TMP_CI_NAMESPACE}" --skip-config-write=true >/dev/null \
+  oc new-project "${TMP_CI_NAMESPACE}" --skip-config-write=true >/dev/null \
     || kubectl create namespace "${TMP_CI_NAMESPACE}" --save-config=false >/dev/null || true
     # new-project is an oc only command
 
@@ -158,7 +166,7 @@ EOF
   cat "${SCRATCH}/roxctl-extract-pod.yaml"
 
   retry oc apply --namespace "${TMP_CI_NAMESPACE}" --filename "${SCRATCH}/roxctl-extract-pod.yaml"
-  retry oc wait --namespace "${TMP_CI_NAMESPACE}" --for=condition=Ready --timeout=60s pod/roxctl-extract-pod
+  retry oc wait --namespace "${TMP_CI_NAMESPACE}" --for=condition=Available --timeout=60s pod/roxctl-extract-pod
 
   retry oc exec --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod --container main -- roxctl helm output central-services --image-defaults opensource --output-dir /tmp/helm-templates/central-services
   retry oc exec --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod --container main -- roxctl helm output secured-cluster-services --image-defaults opensource --output-dir /tmp/helm-templates/secured-cluster-services
@@ -169,7 +177,7 @@ EOF
   retry oc cp --namespace "${TMP_CI_NAMESPACE}" --container rh-ubi roxctl-extract-pod:/tmp/helm-templates/secured-cluster-services "${SCRATCH}/secured-cluster-services"
 
   retry oc delete pod --namespace "${TMP_CI_NAMESPACE}" roxctl-extract-pod
-  retry oc delete project "${TMP_CI_NAMESPACE}" \
+  oc delete project "${TMP_CI_NAMESPACE}" \
     || kubectl delete namespace "${TMP_CI_NAMESPACE}"
 }
 
@@ -226,8 +234,7 @@ function install_central_with_helm() {
   set -x
   helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
     --version "${ACS_VERSION_TAG}" \
-     "${installflags[@]+"${installflags[@]}"}" \
-     2>&1 | tee /tmp/helm.up.log
+     "${installflags[@]+"${installflags[@]}"}"
   set +x
 }
 
@@ -279,14 +286,14 @@ function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
   set -x  # log commands; expecting this to run in the background
   set +e  # ignore errors
-  wait_deploy scanner-v4-matcher 120s
+  wait_deploy scanner-v4-matcher 300s
   if oc describe -n stackrox deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS; then
     echo 'The scanner-v4-matcher readiness is set.'
     return
   fi
-  echo 'The scanner-v4-match readiness env var is not set. Add it to the deployment and restart.'
+  echo 'The scanner-v4-matcher readiness env var is not set. Adding it to the deployment...'
   oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
-  echo 'Restart scanner-v4-matcher to apply the new config during startup...'
+  echo 'Restarting scanner-v4-matcher to apply the new config during startup...'
   oc rollout restart deploy/scanner-v4-matcher
   oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s
   oc -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS
@@ -295,12 +302,14 @@ function configure_scanner_readiness() {
   set +x
 }
 
+# __main__
+echo '>>> Begin setup'
+set -x
 fetch_last_nightly_tag
 prepare_helm_templates
 
 install_central_with_helm
 
-echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
 if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
   echo "configure readiness"
   configure_scanner_readiness &
@@ -322,41 +331,45 @@ echo ">>> Wait for 'stackrox scanner' deployments"
 wait_deploy scanner
 wait_deploy scanner-db
 
+set +e  # only specific exits
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
-  set -x
-  set +e
   if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
     timeout 300s wait "${scanner_readiness_configure_pid:?}"
-    oc exec -n stackrox deploy/scanner-v4-matcher -- cat /etc/scanner/config.yaml
-    oc get configmap -n stackrox scanner-v4-matcher-config -o yaml
+    kubectl describe pod -A --selector 'app=scanner-v4-matcher'
   fi
-  wait_deploy scanner-v4-matcher || echo 'scanner-v4-matcher is not deployed?'
-  oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
-  step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
-  for i in {1..20}; do
-    if oc wait --namespace stackrox --for=condition=Ready deploy/scanner-v4-matcher --timeout=${step_wait_time:-30s}; then
-      echo '>>> scanner-v4-matcher condition==Ready'
-      break
+  if ! wait_deploy scanner-v4-matcher; then
+    echo 'scanner-v4-matcher is not deployed?'
+    if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+      echo '>>> Check for matcher readiness log entries:'
+      oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
     fi
-    oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
-    oc get pods -o wide --namespace stackrox
-  done
-  echo '>>> check the matcher logs again...'
-  oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
-  set +x
-  set -e
+    step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
+    for i in {1..20}; do
+      if oc wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${step_wait_time:-30s}; then
+        echo '>>> scanner-v4-matcher condition==Ready'
+        break
+      fi
+      oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+      oc get pods -o wide --namespace stackrox
+    done
+    echo '>>> List scanner-v4-matcher deployment events'
+    oc get deployment -n stackrox scanner-v4-matcher
+    kubectl describe pod -A --selector 'app=scanner-v4-matcher'
+    oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+  fi
 fi
 
 oc get nodes -o wide | grep infra || true
 oc get pods -o wide --namespace stackrox || true
 
-nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
+set +x  # reduce logging for connection check
+nohup oc port-forward --namespace stackrox svc/central "8443:443" 1>/dev/null 2>&1 &
 echo $! > "${SCRATCH}/port_forward_pid"
 
-# Wait for secured cluster to connect to central.
+echo '>>> Wait for secured cluster to connect to central.'
 max_retry_verify_connected_cluster=30
 for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ )); do
   echo "Verify connected cluster(s) (try ${retry_count}/${max_retry_verify_connected_cluster})"
