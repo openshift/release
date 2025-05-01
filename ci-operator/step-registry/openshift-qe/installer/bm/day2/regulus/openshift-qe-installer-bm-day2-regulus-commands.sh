@@ -17,7 +17,6 @@ fi
 
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
-KUBECONFIG_SRC=""
 
 #regulus_repo=/tmp/regulus-${LAB_CLOUD}-$(date +%s)
 regulus_repo=/tmp/regulus-${LAB_CLOUD}
