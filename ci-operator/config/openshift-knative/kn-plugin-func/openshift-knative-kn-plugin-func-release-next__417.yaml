@@ -26,16 +26,62 @@ build_root:
       RUN GOFLAGS='' go install github.com/mikefarah/yq/v3@latest
       RUN GOFLAGS='' go install -tags="exclude_graphdriver_btrfs containers_image_openpgp" github.com/containers/skopeo/cmd/skopeo@v1.16.1
       RUN rm -rf $GOPATH/.cache
-  tag: gobuilder
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/func-util/Dockerfile
+- dockerfile_literal: |
+    ARG GO_BUILDER=registry.access.redhat.com/ubi8/ubi
+    ARG GO_RUNTIME=registry.access.redhat.com/ubi8/ubi-minimal
+
+    FROM registry.access.redhat.com/ubi8/ubi as builder
+    ENV GO_VERSION=1.24.2
+    RUN rm -rf /usr/local/go && \
+       curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+    ENV PATH="/usr/local/go/bin:$PATH"
+    RUN yum install git
+
+    WORKDIR /workspace
+    COPY . .
+
+    ENV CGO_ENABLED=1
+    ENV GOEXPERIMENT=strictfipsruntime
+    ENV GOFLAGS=''
+
+    RUN go build -tags strictfipsruntime,exclude_graphdriver_btrfs -o /usr/bin/main ./cmd/func-util
+
+    FROM $GO_RUNTIME
+
+    ARG VERSION=knative-nightly
+
+    RUN microdnf install socat tar
+
+    COPY --from=builder /usr/bin/main /usr/bin/func-util
+    COPY LICENSE /licenses/
+
+    RUN ln -s /usr/bin/func-util /usr/local/bin/deploy && \
+    ln -s /usr/bin/func-util /usr/local/bin/scaffold && \
+    ln -s /usr/bin/func-util /usr/local/bin/s2i
+
+    USER 65532
+
+    LABEL \
+    com.redhat.component="openshift-serverless-1-kn-plugin-func-func-util-rhel8-container" \
+    name="openshift-serverless-1/kn-plugin-func-func-util-rhel8" \
+    version=$VERSION \
+    summary="Red Hat OpenShift Serverless 1 Kn Plugin Func Func Util" \
+    maintainer="serverless-support@redhat.com" \
+    description="Red Hat OpenShift Serverless 1 Kn Plugin Func Func Util" \
+    io.k8s.display-name="Red Hat OpenShift Serverless 1 Kn Plugin Func Func Util" \
+    io.k8s.description="Red Hat OpenShift Serverless Kn Plugin Func Func Util" \
+    io.openshift.tags="func-util"
+
+    ENTRYPOINT ["/usr/bin/bash"]
+
   inputs:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+      as:
+      - $GO_BUILDER
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    gobuilder:
-      as:
-      - $GO_BUILDER
   to: knative-kn-plugin-func-func-util
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
