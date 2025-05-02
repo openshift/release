@@ -3,13 +3,13 @@
 set -eou pipefail
 
 cat <<EOF
->>> Install ACS using helm into a single cluster [$(date -u)].
-* Run roxctl image to create helm template with it
-* Install central from generated helm template
+>>> Install stackrox/ACS using helm into a single cluster [$(date -u)].
+* Run roxctl image to create helm template.
+* Install central from generated helm template.
   * Wait for Central to start.
-  * Request init-bundle from Central.
-  * Create secured-cluster custom resource with init-bundle.
-  * Wait for all services minimal running state.
+  * Request helm values init-bundle from Central.
+* Install secured-cluster from helm template and init-bundle.
+* Wait for all services minimal running state.
 EOF
 
 echo ">>> Prepare script environment"
@@ -30,10 +30,12 @@ echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 
-ACS_VERSION_TAG=""
+ROX_VERSION_TAG="${ROX_VERSION_TAG:-}"
+ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d' || true)
 ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"
 
 set -x
+
 SCRATCH=$(mktemp -d)
 echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
@@ -113,20 +115,20 @@ function fetch_last_nightly_tag() {
   for days_in_past in {1..14};
   do
     acs_tag_suffix="$(date -d "-${days_in_past} day" +"%Y%m%d" || gdate -d "-${days_in_past} day" +"%Y%m%d")"
-    echo "acs_tag_suffix=${acs_tag_suffix}"
+    echo "acs_tag_suffix=${acs_tag_suffix}" >&2
 
     # Quay API info: https://docs.quay.io/api/swagger/#!/tag/listRepoTags
-    ACS_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-nightly-${acs_tag_suffix}" | jq '.tags[0].name' --raw-output)
-    if [[ "${ACS_VERSION_TAG}" != "" && "${ACS_VERSION_TAG}" != "null" ]]; then
+    ROX_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-nightly-${acs_tag_suffix}" | jq '.tags[0].name' --raw-output)
+    if [[ "${ROX_VERSION_TAG}" != "" && "${ROX_VERSION_TAG}" != "null" ]]; then
       break
     fi
   done
+  echo "${ROX_VERSION_TAG}"
 
-  if [[ "${ACS_VERSION_TAG}" == "" || "${ACS_VERSION_TAG}" == "null" ]]; then
-    echo "Error: Unable to fetch the last nightly tag"
+  if [[ "${ROX_VERSION_TAG}" == "" || "${ROX_VERSION_TAG}" == "null" ]]; then
+    echo "Error: Unable to fetch the last nightly tag" >&2
     exit 1
   fi
-  echo "ACS_VERSION_TAG=${ACS_VERSION_TAG}"
 }
 
 function prepare_helm_templates() {
@@ -145,7 +147,7 @@ spec:
       type: RuntimeDefault
   containers:
   - name: main
-    image: quay.io/stackrox-io/main:${ACS_VERSION_TAG}
+    image: quay.io/stackrox-io/main:${ROX_VERSION_TAG}
     command: ["tail", "-f", "/dev/null"]
     volumeMounts:
     - mountPath: "/tmp/helm-templates"
@@ -225,17 +227,20 @@ function install_central_with_helm() {
       installflags+=('--set' 'scannerV4.db.resources.limits.memory=2500Mi')
     fi
     if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+      # stackrox helm template _metadata.tpl parses 'customize' into values for target matching:
+      # https://github.com/stackrox/stackrox/blob/ae87894195796f9a88295af39a83451dbbb96c51/image/templates/helm/shared/templates/_metadata.tpl#L160-L181
+      # matched for "scanner-v4-matcher" in matcher deployment template:
+      # https://github.com/stackrox/stackrox/blob/62c5f12ba8c3acc0c3d92a71c79221edf25a765f/image/templates/helm/shared/templates/02-scanner-v4-07-matcher-deployment.yaml#L80C9-L80C103
+      # `{{ define "srox._envVars" }}` -> `{{- include "srox.envVars" (list . "deployment" "scanner-v4-matcher" "matcher") | nindent 8 }}`
       installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}")
     fi
   fi
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
 
-  set -x
   helm upgrade --install --namespace stackrox --create-namespace stackrox-central-services "${SCRATCH}/central-services" \
-    --version "${ACS_VERSION_TAG}" \
+    --version "${ROX_VERSION_TAG}" \
      "${installflags[@]+"${installflags[@]}"}"
-  set +x
 }
 
 function get_init_bundle() {
@@ -273,18 +278,15 @@ function install_secured_cluster_with_helm() {
     installflags+=('--set' 'sensor.resources.limits.memory=500Mi')
     installflags+=('--set' 'sensor.resources.limits.cpu=500m')
   fi
-  set -x
   helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
     --values "${SCRATCH}/helm-init-bundle-values.yaml" \
     --set clusterName=remote \
     --set imagePullSecrets.allowNone=true \
      "${installflags[@]+"${installflags[@]}"}"
-  set +x
 }
 
 function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
-  set -x  # log commands; expecting this to run in the background
   set +e  # ignore errors
   wait_deploy scanner-v4-matcher 300s
   if oc describe -n stackrox deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS; then
@@ -299,13 +301,11 @@ function configure_scanner_readiness() {
   oc -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS
   echo ">>> Finished scanner-v4-matcher configuration readiness=${SCANNER_V4_MATCHER_READINESS:-}."
   set -e
-  set +x
 }
 
 # __main__
 echo '>>> Begin setup'
-set -x
-fetch_last_nightly_tag
+echo "ROX_VERSION_TAG:${ROX_VERSION_TAG:=$(fetch_last_nightly_tag)}"
 prepare_helm_templates
 
 install_central_with_helm
@@ -328,10 +328,9 @@ wait_deploy sensor
 wait_deploy admission-control
 
 function secured_cluster_connection_test() {
-  set +x  # reduce logging for connection check
   nohup oc port-forward --namespace stackrox svc/central "8443:443" 1>/dev/null 2>&1 &
   echo $! > "${SCRATCH}/port_forward_pid"
-  
+
   echo '>>> Wait for secured cluster to connect to central.'
   max_retry_verify_connected_cluster=30
   for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ )); do
@@ -341,21 +340,20 @@ function secured_cluster_connection_test() {
       echo "Found '${connected_clusters_count}' connected cluster(s)"
       break
     fi
-  
+
     if (( retry_count == max_retry_verify_connected_cluster )); then
       echo "Error: Waiting for sensor connection reached max retries"
       exit 1
     fi
-  
+
     sleep 3
   done
-  
+
   # Cleanup nohup
   kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
   rm "${SCRATCH}/port_forward_pid"
-  set -x
 }
-secured_cluster_connection_test
+set +x  # reduce logging for connection check
 
 echo ">>> Wait for 'stackrox scanner' deployments"
 wait_deploy scanner
