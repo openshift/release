@@ -33,10 +33,11 @@ echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 ACS_VERSION_TAG=""
 ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"
 
+set -x
 SCRATCH=$(mktemp -d)
 echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
-export PATH="${PATH}:${SCRATCH}"
+export PATH="${PATH:-}:${SCRATCH}"
 
 function exit_handler() {
   exitcode=$?
@@ -98,7 +99,6 @@ function retry() {
 function wait_deploy() {
   retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
     || {
-      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=5"
       oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5 --all-pods
       return 1;
     }
@@ -327,66 +327,70 @@ echo ">>> Wait for 'stackrox-secured-cluster-services' deployments"
 wait_deploy sensor
 wait_deploy admission-control
 
+function secured_cluster_connection_test() {
+  set +x  # reduce logging for connection check
+  nohup oc port-forward --namespace stackrox svc/central "8443:443" 1>/dev/null 2>&1 &
+  echo $! > "${SCRATCH}/port_forward_pid"
+  
+  echo '>>> Wait for secured cluster to connect to central.'
+  max_retry_verify_connected_cluster=30
+  for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ )); do
+    echo "Verify connected cluster(s) (try ${retry_count}/${max_retry_verify_connected_cluster})"
+    connected_clusters_count=$(curl_central /v1/clusters | jq '.clusters | length')
+    if (( connected_clusters_count >= 1 )); then
+      echo "Found '${connected_clusters_count}' connected cluster(s)"
+      break
+    fi
+  
+    if (( retry_count == max_retry_verify_connected_cluster )); then
+      echo "Error: Waiting for sensor connection reached max retries"
+      exit 1
+    fi
+  
+    sleep 3
+  done
+  
+  # Cleanup nohup
+  kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
+  rm "${SCRATCH}/port_forward_pid"
+  set -x
+}
+secured_cluster_connection_test
+
 echo ">>> Wait for 'stackrox scanner' deployments"
 wait_deploy scanner
 wait_deploy scanner-db
 
-set +e  # only specific exits
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
+  step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
   if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
-    timeout 300s wait "${scanner_readiness_configure_pid:?}"
-    kubectl describe pod -A --selector 'app=scanner-v4-matcher'
-  fi
-  if ! wait_deploy scanner-v4-matcher; then
-    echo 'scanner-v4-matcher is not deployed?'
-    if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+    timeout 600s wait "${scanner_readiness_configure_pid:?}" || true
+    if oc wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=0; then
+      echo 'scanner-v4-matcher is not deployed?'
       echo '>>> Check for matcher readiness log entries:'
       oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
+      for i in {1..10}; do
+        if oc wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${step_wait_time:-30s}; then
+          echo '>>> scanner-v4-matcher condition==Ready'
+          break
+        fi
+        oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+        if [[ $i == 10 ]]; then
+          echo '>>> scanner-v4-matcher not ready after max wait time. Log details and continue...'
+          echo '>>> List scanner-v4-matcher deployment events'
+          oc get deployment -n stackrox scanner-v4-matcher
+          kubectl describe pod -A --selector 'app=scanner-v4-matcher'
+          oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+        fi
+      done
     fi
-    step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
-    for i in {1..20}; do
-      if oc wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${step_wait_time:-30s}; then
-        echo '>>> scanner-v4-matcher condition==Ready'
-        break
-      fi
-      oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
-      oc get deployment -n stackrox scanner-v4-matcher
-    done
-    echo '>>> List scanner-v4-matcher deployment events'
-    oc get deployment -n stackrox scanner-v4-matcher
-    kubectl describe pod -A --selector 'app=scanner-v4-matcher'
-    oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+  else
+    wait_deploy scanner-v4-matcher "${step_wait_time}" || true
   fi
 fi
 
-oc get nodes -o wide | grep infra || true
-oc get pods -o wide --namespace stackrox || true
-
-set +x  # reduce logging for connection check
-nohup oc port-forward --namespace stackrox svc/central "8443:443" 1>/dev/null 2>&1 &
-echo $! > "${SCRATCH}/port_forward_pid"
-
-echo '>>> Wait for secured cluster to connect to central.'
-max_retry_verify_connected_cluster=30
-for (( retry_count=1; retry_count <= max_retry_verify_connected_cluster; retry_count++ )); do
-  echo "Verify connected cluster(s) (try ${retry_count}/${max_retry_verify_connected_cluster})"
-  connected_clusters_count=$(curl_central /v1/clusters | jq '.clusters | length')
-  if (( connected_clusters_count >= 1 )); then
-    echo "Found '${connected_clusters_count}' connected cluster(s)"
-    break
-  fi
-
-  if (( retry_count == max_retry_verify_connected_cluster )); then
-    echo "Error: Waiting for sensor connection reached max retries"
-    exit 1
-  fi
-
-  sleep 3
-done
-
-# Cleanup nohup
-kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
-rm "${SCRATCH}/port_forward_pid"
+oc get nodes -o wide
+oc get pods -o wide --namespace stackrox
