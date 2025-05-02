@@ -93,7 +93,7 @@ for v in "${vars[@]}"; do
 
   # Force ~ at start to become /root/
   if [[ "$val" == ~* ]]; then
-    val="${val/#\~\//\/root}"
+    val="${val/#\~\//\/root/}"
   fi
 
   # Escape any embedded double-quotes
