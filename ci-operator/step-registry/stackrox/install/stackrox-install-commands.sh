@@ -68,7 +68,7 @@ case $ARCH in
   i686) ARCH="386";;
   i386) ARCH="386";;
 esac
-OS=$(echo `uname`|tr '[:upper:]' '[:lower:]')
+OS=$(echo "$(uname)"|tr '[:upper:]' '[:lower:]')
 
 function install_jq() {
   local url
