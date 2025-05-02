@@ -1,0 +1,91 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-419
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: krkn-hub-tests-metal
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CHURN: "true"
+      DISRUPTION_COUNT: "2"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      LAB_CLOUD: cloud31
+      TELEMETRY_GROUP: prow-ocp-4.18
+      TYPE: mno
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-load-kubeconfig
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-tests
+  timeout: 7h0m0s
+- always_run: false
+  as: krkn-hub-node-tests-metal
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      LAB_CLOUD: cloud31
+      TELEMETRY_GROUP: prow-ocp-4.18
+      TYPE: mno
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-load-kubeconfig
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-node-tests
+  timeout: 7h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: metal-4.19-nightly-x86
