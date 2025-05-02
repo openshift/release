@@ -28,8 +28,7 @@ images:
   to: cluster-storage-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -211,6 +210,20 @@ tests:
     env:
       PROJECT_NAME: cluster-storage-operator
     workflow: openshift-ci-security
+- as: e2e-aws-selinux-alpha
+  interval: 24h
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_GATES: '[''SELinuxMount=true'']'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_ARGS: --run=sig-storage.*SELinux
+      TEST_SKIPS: Disruptive\|disruptive\|SELinuxMountReadWriteOncePodOnly
+      TEST_SUITE: all
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-csi
 - as: hypershift-e2e-aks
   steps:
     cluster_profile: hypershift
