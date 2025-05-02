@@ -102,7 +102,7 @@ done
 # Init Regulus and execute test suite. See jobs.config of $REG_BRANCH
 # ───────────────────────────────────────────────────────────────────────────
 
-function init-regulus {
+function run-regulus {
   echo scp -q ${SSH_ARGS} /tmp/lab.config  root@${bastion}:${regulus_repo}/ 
   scp -q ${SSH_ARGS} /tmp/lab.config  root@${bastion}:${regulus_repo}/ 
   ssh ${SSH_ARGS} root@${bastion} "
