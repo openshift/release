@@ -2,8 +2,6 @@
 
 set -eou pipefail
 
-set -x
-
 exec > >(trap "" INT TERM; sed 's/$/ #notsecret/')
 exec 2> >(trap "" INT TERM; sed 's/$/ (stderr)#notsecret/' >&2)
 
@@ -38,8 +36,10 @@ echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
 
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
-ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d')
+ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d' || true)
 ROX_PASSWORD="${ROX_PASSWORD:-$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)}"
+
+set -x
 
 SCRATCH=$(mktemp -d)
 echo "SCRATCH=${SCRATCH}"
