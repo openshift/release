@@ -2,6 +2,11 @@
 
 set -eou pipefail
 
+set -x
+
+exec > >(trap "" INT TERM; sed 's/$/ #notsecret/')
+exec 2> >(trap "" INT TERM; sed 's/$/ (stderr)#notsecret/' >&2)
+
 OPERATOR_VERSION=${OPERATOR_VERSION:-}
 OPERATOR_CHANNEL=${OPERATOR_CHANNEL:-stable}
 
