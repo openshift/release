@@ -16,16 +16,16 @@ CONFIG = {
         'us-east-1': 5,
     },
     'aws-2-quota-slice': {
-        'us-east-1': 60,
-        'us-east-2': 60,
-        'us-west-1': 55,
-        'us-west-2': 60,
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-3-quota-slice': {
-        'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 40,
-        'us-west-1': 40,
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-cspi-qe-quota-slice': {
         'us-east-1': 30,
@@ -210,13 +210,16 @@ CONFIG = {
         'eastus': 10,
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 70,
+        'default': 90,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
     },
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
+    },
+    'equinix-edge-enablement-quota-slice': {
+        'default': 40,
     },
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,

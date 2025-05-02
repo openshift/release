@@ -46,6 +46,7 @@ cluster_groups:
   openshift_config_pull_secret:
   - build01
   - build02
+  - build03
   - build06
   - build07
   - build09
@@ -54,7 +55,6 @@ cluster_groups:
   - master
   - vsphere02
   osd_global_pull_secret:
-  - build03
   - build04
   - build05
 secret_configs:
@@ -2027,6 +2027,10 @@ secret_configs:
     - non_app_ci
     name: cluster-secrets-libvirt-ppc64le
     namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-libvirt-ppc64le-s2s
+    namespace: ci
 - from:
     pull-secret:
       dockerconfigJSON:
@@ -2082,9 +2086,6 @@ secret_configs:
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build02.ci.openshift.org
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.build03.ci.openshift.org
       - auth_field: token_image-puller_build04_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build04.ci.openshift.org
@@ -2136,9 +2137,6 @@ secret_configs:
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build02.ci.openshift.org
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.build03.ci.openshift.org
       - auth_field: token_image-puller_build05_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build05.ci.openshift.org
@@ -2175,9 +2173,6 @@ secret_configs:
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build02.ci.openshift.org
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.build03.ci.openshift.org
       - auth_field: token_image-puller_build04_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build04.ci.openshift.org
@@ -2200,6 +2195,57 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-equinix-ocp-metal-qe
+    namespace: ci
+- from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build01.ci.openshift.org
+      - auth_field: token_image-puller_build02_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build02.ci.openshift.org
+      - auth_field: token_image-puller_build04_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build04.ci.openshift.org
+      - auth_field: token_image-puller_build05_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build05.ci.openshift.org
+      - auth_field: token_image-puller_build06_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build06.ci.openshift.org
+      - auth_field: token_image-puller_build07_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build07.ci.openshift.org
+      - auth_field: token_image-puller_build09_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build09.ci.openshift.org
+      - auth_field: token_image-puller_build11_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build11.ci.openshift.org
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-equinix-edge-enablement
     namespace: ci
 - from:
     pull-secret:
@@ -4160,17 +4206,6 @@ secret_configs:
     name: build02-dex-oidc
     namespace: ci
 - from:
-    build03-id:
-      field: build03-id
-      item: dex
-    build03-secret:
-      field: build03-secret
-      item: dex
-  to:
-  - cluster: app.ci
-    name: build03-secret
-    namespace: dex
-- from:
     build04-id:
       field: build04-id
       item: dex
@@ -5034,84 +5069,6 @@ secret_configs:
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: image-registry.openshift-image-registry.svc:5000
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.build03.ci.openshift.org
-      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
-      - auth_field: auth
-        item: quay-io-push-credentials
-        registry_url: quay.io/openshift/ci
-  to:
-  - cluster: build03
-    name: registry-push-credentials-ci-central
-    namespace: ci
-    type: kubernetes.io/dockerconfigjson
-  - cluster: build03
-    name: registry-push-credentials-ci-central
-    namespace: test-credentials
-    type: kubernetes.io/dockerconfigjson
-- from:
-    .dockerconfigjson:
-      dockerconfigJSON:
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: image-registry.openshift-image-registry.svc:5000
-      - auth_field: token_image-puller_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.build03.ci.openshift.org
-      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        item: quay.io-pull-secret
-        registry_url: quay.io
-      - auth_field: auth
-        item: quayio-ci-read-only-robot
-        registry_url: quay-proxy.ci.openshift.org
-      - auth_field: auth
-        item: quayio-ci-read-only-robot
-        registry_url: quay.io/openshift/ci
-      - auth_field: auth
-        item: quayio-ci-read-only-robot
-        registry_url: quay.io/openshift/network-edge-testing
-      - auth_field: auth
-        item: quayio-ci-read-only-robot
-        registry_url: qci-pull-through-cache-us-east-1-ci.apps.ci.l2s4.p1.openshiftapps.com
-  to:
-  - cluster: build03
-    name: registry-pull-credentials
-    namespace: ci
-    type: kubernetes.io/dockerconfigjson
-  - cluster: build03
-    name: registry-pull-credentials
-    namespace: test-credentials
-    type: kubernetes.io/dockerconfigjson
-- from:
-    kubeconfig:
-      field: sa.ci-operator.build03.config
-      item: build_farm
-    sa.ci-operator.build03.token.txt:
-      field: sa.ci-operator.build03.token.txt
-      item: build_farm
-  to:
-  - cluster: build03
-    name: ci-operator
-    namespace: test-credentials
-- from:
-    .dockerconfigjson:
-      dockerconfigJSON:
       - auth_field: token_image-puller_build04_reg_auth_value.txt
         item: build_farm
         registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
@@ -5744,24 +5701,6 @@ secret_configs:
     namespace: ci
     type: kubernetes.io/dockerconfigjson
   - cluster: build02
-    name: manifest-tool-local-pusher
-    namespace: test-credentials
-    type: kubernetes.io/dockerconfigjson
-- from:
-    .dockerconfigjson:
-      dockerconfigJSON:
-      - auth_field: token_image-pusher_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: image-registry.openshift-image-registry.svc:5000
-      - auth_field: token_image-pusher_build03_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.build03.ci.openshift.org
-  to:
-  - cluster: build03
-    name: manifest-tool-local-pusher
-    namespace: ci
-    type: kubernetes.io/dockerconfigjson
-  - cluster: build03
     name: manifest-tool-local-pusher
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
@@ -6890,6 +6829,141 @@ secret_configs:
     namespace: ci
     type: kubernetes.io/dockerconfigjson
   - cluster: master
+    name: manifest-tool-local-pusher
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-puller_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-puller_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build03.ci.openshift.org
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
+  to:
+  - cluster: build03
+    name: registry-push-credentials-ci-central
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build03
+    name: registry-push-credentials-ci-central
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-puller_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-puller_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build03.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/network-edge-testing
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: qci-pull-through-cache-us-east-1-ci.apps.ci.l2s4.p1.openshiftapps.com
+  to:
+  - cluster: build03
+    name: registry-pull-credentials
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build03
+    name: registry-pull-credentials
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    kubeconfig:
+      field: sa.ci-operator.build03.config
+      item: build_farm
+    sa.ci-operator.build03.token.txt:
+      field: sa.ci-operator.build03.token.txt
+      item: build_farm
+  to:
+  - cluster: build03
+    name: ci-operator
+    namespace: test-credentials
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-pusher_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_multi-arch-builder-controller_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.multi-build01.arm-build.devcluster.openshift.com
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+  to:
+  - cluster: build03
+    name: multi-arch-builder-controller-build03-registry-credentials
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+- from:
+    build03-id:
+      field: build03-id
+      item: dex
+    build03-secret:
+      field: build03-secret
+      item: dex
+  to:
+  - cluster: app.ci
+    name: build03-secret
+    namespace: dex
+  - cluster: app.ci
+    name: build03-dex-oidc
+    namespace: ci
+- from:
+    clientSecret:
+      field: build03-secret
+      item: dex
+  to:
+  - cluster: build03
+    name: dex-rh-sso
+    namespace: openshift-config
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-pusher_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-pusher_build03_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build03.ci.openshift.org
+  to:
+  - cluster: build03
+    name: manifest-tool-local-pusher
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build03
     name: manifest-tool-local-pusher
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson

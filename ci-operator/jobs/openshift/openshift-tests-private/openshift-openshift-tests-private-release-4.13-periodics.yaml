@@ -11432,7 +11432,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 16 15 2 2,4,6,8,10,12 *
   decorate: true
   decoration_config:
@@ -11442,9 +11442,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: amd64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -11515,7 +11515,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 14 15 24 2,4,6,8,10,12 *
   decorate: true
   decoration_config:
@@ -11525,9 +11525,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: amd64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -11598,7 +11598,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 52 19 23 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -11608,9 +11608,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: amd64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -11681,7 +11681,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 41 13 8 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -11691,9 +11691,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: amd64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -12840,7 +12840,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build02
-  cron: 16 19 17 1,3,5,7,9,11 *
+  cron: 5 14 7 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -12855,7 +12855,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-gcp-ipi-confidential-computing-fips-mini-perm-f60-destructive
+  name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-gcp-ipi-confidential-fips-mini-perm-f60-destructive
   spec:
     containers:
     - args:
@@ -12865,7 +12865,89 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=gcp-ipi-confidential-computing-fips-mini-perm-f60-destructive
+      - --target=gcp-ipi-confidential-fips-mini-perm-f60-destructive
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 17 22 4 1,3,5,7,9,11 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.13
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-gcp-ipi-confidential-secureboot-mini-perm-f60
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=gcp-ipi-confidential-secureboot-mini-perm-f60
       - --variant=amd64-nightly
       command:
       - ci-operator
@@ -15162,170 +15244,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=gcp-ipi-sdn-migration-ovn-f60
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  cron: 28 3 23 2,4,6,8,10,12 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.13
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.13"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-gcp-ipi-secureboot-confidential-computing-mini-perm-f60
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=gcp-ipi-secureboot-confidential-computing-mini-perm-f60
-      - --variant=amd64-nightly
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  cron: 36 22 16 1,3,5,7,9,11 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.13
-    org: openshift
-    repo: openshift-tests-private
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
-    ci-operator.openshift.io/variant: amd64-nightly
-    ci.openshift.io/generator: prowgen
-    job-release: "4.13"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-gcp-ipi-secureboot-mini-perm-f60-destructive
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=gcp-ipi-secureboot-mini-perm-f60-destructive
       - --variant=amd64-nightly
       command:
       - ci-operator
@@ -25296,7 +25214,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 14 16 13 2,4,6,8,10,12 *
   decorate: true
   decoration_config:
@@ -25306,9 +25224,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: arm64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -25379,7 +25297,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 26 20 15 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -25389,9 +25307,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: arm64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -25462,7 +25380,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 25 18 24 2,4,6,8,10,12 *
   decorate: true
   decoration_config:
@@ -25472,9 +25390,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: arm64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -25545,7 +25463,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 34 21 4 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -25555,9 +25473,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: arm64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -25628,7 +25546,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 16 20 15 1,3,5,7,9,11 *
   decorate: true
   decoration_config:
@@ -25638,9 +25556,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: arm64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -25711,7 +25629,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 28 21 3 2,4,6,8,10,12 *
   decorate: true
   decoration_config:
@@ -25721,9 +25639,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: arm64-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -26851,7 +26769,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 8 8 29 2 *
   decorate: true
   decoration_config:
@@ -26861,9 +26779,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: arm64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -35588,7 +35506,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 8 8 29 2 *
   decorate: true
   decoration_config:
@@ -35598,9 +35516,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: multi-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -35671,7 +35589,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 8 8 29 2 *
   decorate: true
   decoration_config:
@@ -35681,9 +35599,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: multi-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
@@ -35754,7 +35672,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 8 8 29 2 *
   decorate: true
   decoration_config:
@@ -35764,9 +35682,9 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/cluster: build05
     ci-operator.openshift.io/variant: multi-nightly
     ci.openshift.io/generator: prowgen
     job-release: "4.13"

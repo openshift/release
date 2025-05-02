@@ -1,6 +1,6 @@
 base_images:
   installer:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: installer
   ubi9-minimal:
@@ -23,17 +23,17 @@ operator:
     with: pipeline:lifecycle-agent-operator
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -98,15 +98,15 @@ tests:
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle
     env:
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.19"
+      OCP_BASE_VERSION: "4.20"
       OCP_TARGET_IMAGE_SOURCE: ci
-      OCP_TARGET_VERSION: "4.18"
+      OCP_TARGET_VERSION: "4.19"
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
   timeout: 4h0m0s
@@ -115,14 +115,14 @@ tests:
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     dependencies:
       INSTALLER_PULL_REF: pipeline:installer
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle
     env:
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.18"
+      OCP_BASE_VERSION: "4.19"
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install

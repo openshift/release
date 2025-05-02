@@ -76,7 +76,7 @@ tests:
       AWS_MULTI_ARCH: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aks
-  cron: 0 4 * * *
+  cron: 0 */6 * * *
   steps:
     cluster_profile: hypershift
     env:
@@ -125,7 +125,14 @@ tests:
   minimum_interval: 168h
   steps:
     cluster_profile: hypershift
+    workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-conformance-cilium-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
       TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
         access to server in CIDR block \[Feature:NetworkPolicy\] \[Suite:openshift/conformance/parallel\]
         \[Suite:k8s\]\| Netpol NetworkPolicy between server and client should ensure
@@ -142,7 +149,9 @@ tests:
         Unidling with Deployments \[apigroup:route.openshift.io\] should work with
         UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
         the local DNS endpoint \[Suite:openshift/conformance/parallel\]
-    workflow: hypershift-aws-conformance-cilium
+    test:
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-aws-ipi-cilium-hypershift-private-guest
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:

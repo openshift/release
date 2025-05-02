@@ -1,0 +1,169 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: release-mirror-cleanup-controller
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# These cluster-level permissions are for the listers and watchers that are used throughout the
+#     release-mirror-cleanup-controller.  The "infrastructures" permission is required by library-go to perform part of it's
+#     initialization.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: release-mirror-cleanup-controller
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - infrastructures
+  verbs:
+  - get
+  - list
+  - watch
+---
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: release-mirror-cleanup-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: release-mirror-cleanup-controller
+subjects:
+- kind: ServiceAccount
+  name: release-mirror-cleanup-controller
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# These RBAC resources are required by library-go, to operate, in the "ci" namespace.  The
+#     "configmaps" and "Events" are used for Leader Election.  The "pods" and "replicasets" are used for Owner References.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-mirror-cleanup-controller
+  namespace: ci
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - create
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+---
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-mirror-cleanup-controller
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-mirror-cleanup-controller
+subjects:
+- kind: ServiceAccount
+  name: release-mirror-cleanup-controller
+---
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# These RBAC resources allow the release-mirror-cleanup-controller to read secrets in the ci-release namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-mirror-cleanup-controller
+  namespace: ci-release
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - secrets
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-mirror-cleanup-controller
+  namespace: ci-release
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-mirror-cleanup-controller
+subjects:
+- kind: ServiceAccount
+  name: release-mirror-cleanup-controller
+  namespace: ci
