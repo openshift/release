@@ -18,10 +18,10 @@ fi
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 
-#regulus_repo=/tmp/regulus-${LAB_CLOUD}-$(date +%s)
-regulus_repo=/tmp/regulus-${LAB_CLOUD}
+regulus_repo=/root/regulus-${LAB_CLOUD}-$(date +%s)
+#regulus_repo=/root/regulus-${LAB_CLOUD}
 
-function clone-regulus {
+function install-regulus {
   # Setup Bastion
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
@@ -43,10 +43,10 @@ function clone-regulus {
   "
 }
 
-clone-regulus
+install-regulus
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Regulus lab.config required var
+# Generate Regulus lab.config 
 # ─────────────────────────────────────────────────────────────────────────────
 vars=(
   KUBECONFIG
@@ -72,9 +72,6 @@ vars=(
   REM_DPDK_CONFIG
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Generate lab.config
-# ─────────────────────────────────────────────────────────────────────────────
 if [ -e  /tmp/lab.config ]; then
     rm /tmp/lab.config
 fi
@@ -101,8 +98,8 @@ for v in "${vars[@]}"; do
   printf '%s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
 done
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Init regulus on the target cluster
+# ───────────────────────────────────────────────────────────────────────────
+# Init Regulus and execute test suite. See jobs.config of $REG_BRANCH
 # ───────────────────────────────────────────────────────────────────────────
 
 function init-regulus {
@@ -119,54 +116,7 @@ function init-regulus {
   "
 }
 
-init-regulus
-exit
+run-regulus
 
-cat /etc/os-release
-
-if [ ${BAREMETAL} == "true" ]; then
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-  bastion="$(cat /bm/address)"
-  # Copy over the kubeconfig
-  if [ ! -f "${SHARED_DIR}/kubeconfig" ]; then
-    ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
-    export KUBECONFIG=/tmp/kubeconfig
-  else
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
-  fi
-  # Setup socks proxy
-  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
-  export https_proxy=socks5://localhost:12345
-  export http_proxy=socks5://localhost:12345
-  oc --kubeconfig="$KUBECONFIG" config set-cluster bm --proxy-url=socks5://localhost:12345
-
-  ssh ${SSH_ARGS} root@${bastion} "
-      set -e 
-      set -o pipefail
-      mkdir /tmp/day2-regulus-baremetal
-   "
-else
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-  bastion="$(cat /bm/address)"
-  ssh ${SSH_ARGS} root@${bastion} "
-      set -e 
-      set -o pipefail
-      mkdir /tmp/day2-regulus-no-baremetal
-   "
-fi
-
-oc config view
-oc projects
-
-# Install the Regulus 
-
-sleep 10
-
-# Regulus is ready
-
-
-if [ ${BAREMETAL} == "true" ]; then
-  # kill the ssh tunnel so the job completes
-  pkill ssh
-fi
+# EOF
 
