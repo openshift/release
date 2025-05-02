@@ -11,16 +11,16 @@ build_root:
       # latest version compatible with most kustomize manifests without throwing warnings (v4)
       # from v5 warning will be thrown, however the ansible module will fail
       ENV KUBECTL_VERSION=v1.24.17
-      RUN dnf install -y python3-pip diffutils && \
-      pip install ansible ansible-lint jinja2-cli && \
-      dnf remove -y golang && \
+      RUN dnf remove -y golang && \
       wget -q https://go.dev/dl/go1.23.6.linux-amd64.tar.gz && \
       rm -rf /usr/local/go && \
       tar -C /usr/local -xzf go1.23.6.linux-amd64.tar.gz && \
       mkdir /tmp/kubectl && \
       curl -sSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
       install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
-      rm -rf /tmp/kubectl
+      rm -rf /tmp/kubectl && \
+      dnf install -y python3-pip diffutils && \
+      pip install ansible ansible-lint jinja2-cli
       ENV PATH=$PATH:/usr/local/go/bin
 releases:
   latest:
