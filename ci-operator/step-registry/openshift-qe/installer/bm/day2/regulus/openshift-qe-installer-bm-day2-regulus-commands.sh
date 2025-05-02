@@ -112,12 +112,15 @@ function init-regulus {
     set -e
     set -o pipefail
     cd ${regulus_repo}
-    #cp lab.config lab.config.build
-    #cp ../lab.config .
-    #cat ${KUBECONFIG_PATH} > /tmp/kubeconfig
     source bootstrap.sh
     make init-lab 
     make init-jobs 
+    # crcucible pods previlege
+    kubectl label namespace crucible-rickshaw \
+        pod-security.kubernetes.io/enforce=privileged \
+        pod-security.kubernetes.io/enforce-version=v1.27 \
+        --overwrite
+    make jobs
   "
 }
 
