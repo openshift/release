@@ -1,0 +1,109 @@
+base_images:
+  tests-base:
+    name: "4.19"
+    namespace: ocp
+    tag: tests
+binary_build_commands: |
+  # The CentOS 8 build root does not have golang package installed so that we
+  # use the golang installed by Kata Containers setup script. Here it is
+  # ensured the tools are searcheable.
+  export GOPATH=/go
+  export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
+build_root:
+  project_image:
+    dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
+images:
+- dockerfile_literal: |
+    FROM bin
+    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
+    RUN dnf install -y --nobest gettext jq azure-cli
+  from: bin
+  to: with-deps
+- dockerfile_literal: |
+    FROM tests-base
+    RUN mv /usr/bin/openshift-tests /usr/bin/openshift-tests-original
+    ADD https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/kata-containers/kata-containers/wrapped-openshift-tests.sh /
+    RUN cat /wrapped-openshift-tests.sh | tr -d '\r' > /usr/bin/openshift-tests
+    RUN chmod +x /usr/bin/openshift-tests
+  from: tests-base
+  to: tests
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: e2e-tests
+  cron: 2 7 * * 0
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure4
+    env:
+      TEST_ARGS: ' --max-parallel-tests 10 --cluster-stability Disruptive --run ^\[sig-node\].*'
+      TEST_SKIPS: \[sig-node\] Pods Extended Pod Container Status should never report\|\[sig-node\]
+        Sysctls.*should support sysctls\|\[sig-node\] Pods Extended Pod Container
+        Status should never report success for a pending container\|\[sig-node\] Security
+        Context should support seccomp runtime/default\|\[sig-node\] Variable Expansion
+        should allow substituting values in a volume subpath\|\[k8s.io\] Probing container
+        should be restarted with a docker exec liveness probe with timeout\|\[sig-node\]
+        Pods Extended Pod Container lifecycle evicted pods should be terminal\|\[sig-node\]
+        PodOSRejection \[NodeConformance\] Kubelet should reject pod when the node
+        OS doesn't match pod's OS\|\[sig-network\].*for evicted pods\|\[sig-network\].*HAProxy
+        router should override the route\|\[sig-network\].*HAProxy\|\[sig-network\].*all
+        sysctl on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
+        pods should successfully create sandboxes by adding pod to network\|\[sig-network\].*should
+        create pingable pods with vlan interface on an in-container master\|\[sig-network\].*should
+        create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
+        create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
+        in writing subpaths in container\|\[sig-node\].*\[Feature:PodLifecycleSleepAction\]\|\[sig-node\].*Container
+        Runtime blackbox test on terminated container should report termination message
+        from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError
+        is set\|\[sig-node\].*TerminationMessagePath\|\[sig-node\].*CPU Partitioning\|\[sig-node\].*supplemental
+        groups Ensure supplemental groups propagate to docker should propagate requested
+        groups to the container\|\[sig-node\].*should override timeoutGracePeriodSeconds
+        when annotation is set
+    pre:
+    - chain: ipi-azure-pre
+    - as: kata-containers-e2e-pre
+      cli: latest
+      commands: |
+        # oc is made available to this script via cli configuration, but
+        # kubectl is not. Since kubectl is used by kata-webhook scripts,
+        # thus it is created a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
+        # which causes openshift-tests to fail.
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
+
+        # Install peer-pods
+        bash -e ci/openshift-ci/peer-pods-azure.sh
+
+        # Test it
+        KATA_RUNTIME=kata-remote ci/openshift-ci/run_smoke_test.sh
+      from: with-deps
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+zz_generated_metadata:
+  branch: main
+  org: kata-containers
+  repo: kata-containers
+  variant: peer-pods
