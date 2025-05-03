@@ -21,11 +21,9 @@ images:
   to: sriov-network-device-plugin
 promotion:
   to:
-  - disabled: true
-    name: sriov-4.19
+  - name: sriov-4.19
     namespace: origin
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -45,7 +43,7 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: unit-test
   commands: make test-race
@@ -58,6 +56,12 @@ tests:
       PROJECT_NAME: sriov-network-device-plugin
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

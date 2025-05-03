@@ -54,13 +54,13 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      SLEEP_DURATION: 1h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption-provision
+      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:

@@ -210,7 +210,7 @@ fi
 function is_bm_node {
     node=$1
 
-    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
+    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]] ; then
         # Define thresholds
         CPU_THRESHOLD=79
         MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
@@ -395,7 +395,7 @@ export HYPERSHIFT_ENVIRONMENT=false
 export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
-if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
     export FEATURES="${FEATURES:-performance sriov sctp}"
 elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
     export FEATURES="${FEATURES:-sriov}"
@@ -471,7 +471,7 @@ fi
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
     oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 fi
 
@@ -507,7 +507,7 @@ export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
 
 skip_tests=$(get_skip_tests)
 
-if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
     echo "******** For non-SNO jobs, get worker nodes"
     worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
     --selector='!node-role.kubernetes.io/master' -o name)
@@ -529,7 +529,7 @@ if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
     fi
 fi
 
-if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
     echo "******** For SNO jobs, get master nodes"
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     export ROLE_WORKER_CNF="master"
@@ -557,7 +557,7 @@ if [[ ${val_status} -ne 0 ]]; then
     status=${val_status}
 fi
 
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
     echo "Wait until number of nodes matches number of machines"
     # Wait until number of nodes matches number of machines
     # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh

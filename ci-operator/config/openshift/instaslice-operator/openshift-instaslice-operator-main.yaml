@@ -11,17 +11,17 @@ images:
   to: instaslice-base-src
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -90,6 +90,36 @@ tests:
         export -f wait_for_image
         timeout 25m bash -c "wait_for_image"
 
+        oc apply -f - <<EOF
+          apiVersion: config.openshift.io/v1
+          kind: ImageTagMirrorSet
+          metadata:
+            name: instaslice-registry
+          spec:
+            imageTagMirrors:
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-daemonset
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-daemonset-rhel9
+        EOF
+
+        oc apply -f - <<EOF
+          apiVersion: config.openshift.io/v1
+          kind: ImageDigestMirrorSet
+          metadata:
+            name: instaslice-registry
+          spec:
+            imageDigestMirrors:
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-daemonset
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-daemonset-rhel9
+        EOF
+
         echo "Image is available. Proceeding with tests..."
 
         make deploy-cert-manager-ocp
@@ -101,6 +131,15 @@ tests:
         umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
         oc create -f bundle/rootfs/manifests
         popd
+
+        echo "Creating OperatorGroup"
+        oc create -f - <<EOF
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+                name: "instaslice"
+                namespace: "instaslice-system"
+        EOF
 
         make test-e2e-ocp
       from: instaslice-base-src

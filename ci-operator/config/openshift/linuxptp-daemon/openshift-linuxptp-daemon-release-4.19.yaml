@@ -5,11 +5,9 @@ images:
   to: ptp
 promotion:
   to:
-  - disabled: true
-    name: ptp-4.19
+  - name: ptp-4.19
     namespace: origin
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -37,7 +35,7 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: security
   optional: true
@@ -47,6 +45,12 @@ tests:
       PROJECT_NAME: linuxptp-daemon
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

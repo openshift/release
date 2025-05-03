@@ -32,7 +32,8 @@ images:
   to: f5-router
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -84,7 +85,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: e2e-metal-ipi-ovn-router
   cluster: build05
@@ -185,6 +186,12 @@ tests:
     test:
     - chain: openshift-qe-ingress-perf
   timeout: 5h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

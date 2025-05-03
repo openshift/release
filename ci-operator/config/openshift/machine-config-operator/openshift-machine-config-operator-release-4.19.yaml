@@ -83,8 +83,7 @@ images:
   to: zacks-toolbox
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - custom-os-image
     - zacks-toolbox
     name: "4.19"
@@ -122,7 +121,7 @@ tests:
   as: e2e-aws-ovn-fips-op
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -141,7 +140,7 @@ tests:
   as: e2e-aws-ovn-fips
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -153,7 +152,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-azure-ovn-upgrade
   optional: true
@@ -178,7 +177,7 @@ tests:
 - as: e2e-aws-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: verify
   commands: |
@@ -267,7 +266,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-upgrade-out-of-change
   optional: true
@@ -573,6 +572,12 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-aws
   timeout: 5h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift
