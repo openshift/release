@@ -12,7 +12,7 @@ ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
-ADDITIONAL_PARAMS='{"quayVersion": '"${QUAY_OPERATOR_CHANNEL}"'}'
+ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
 echo "QUAY_ROUTE: $QUAY_ROUTE"
 
 #Create organization "perftest" and namespace "quay-perf" for Quay performance test
