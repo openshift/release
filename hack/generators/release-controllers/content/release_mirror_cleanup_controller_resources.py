@@ -59,6 +59,46 @@ def _cluster_scoped_rbac_resources(gendoc):
         }
     ])
 
+def _docker_credentials_rbac_resources(gendoc, namespace):
+    config = gendoc.context.config
+
+    gendoc.add_comments(f'These RBAC resources allow the release-mirror-cleanup-controller to read secrets in the {namespace} namespace.')
+    gendoc.append_all([
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'Role',
+            'metadata': {
+                'name': 'release-mirror-cleanup-controller',
+                'namespace': namespace
+            },
+            'rules': [
+                {
+                    'apiGroups': [''],
+                    'resources': ['secrets'],
+                    'verbs': ['get']
+                },
+            ]
+        },
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'RoleBinding',
+            'metadata': {
+                'name': 'release-mirror-cleanup-controller',
+                'namespace': namespace
+            },
+            'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'Role',
+                'name': 'release-mirror-cleanup-controller'
+            },
+            'subjects': [{
+                'kind': 'ServiceAccount',
+                'name': 'release-mirror-cleanup-controller',
+                'namespace': config.rc_deployment_namespace
+            }]
+        },
+    ])
+
 
 def _library_go_rbac(gendoc):
     config = gendoc.context.config
@@ -122,6 +162,7 @@ def _library_go_rbac(gendoc):
 
 def _namespace_scoped_rbac_resources(gendoc):
     _library_go_rbac(gendoc)
+    _docker_credentials_rbac_resources(gendoc, gendoc.context.jobs_namespace)
 
 
 def _namespace_list(namespaces):
@@ -176,6 +217,7 @@ def _deployment_resources(gendoc, namespaces):
                                                'start',
                                                '-v=4',
                                                '--dry-run',
+                                               '--credentials-namespace='+context.jobs_namespace,
                                            ] + _namespace_list(namespaces),
                                 'image': 'release-mirror-cleanup-controller:latest',
                                 'name': 'controller',
