@@ -99,9 +99,9 @@ function retry() {
 }
 
 function wait_deploy() {
-  retry oc -n stackrox rollout status deploy/"$1" --timeout=${2:-300s} \
+  retry kubectl -n ${3:-stackrox} rollout status deploy/"$1" --timeout=${2:-300s} \
     || {
-      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=5 --all-pods
+      kubectl logs -n ${3:-stackrox} --selector="app==$1" --pod-running-timeout=30s --tail=5 --all-pods
       return 1;
     }
 }
@@ -246,7 +246,7 @@ function install_central_with_helm() {
 function get_init_bundle() {
   echo ">>> Get init-bundle and save to local helm values file"
   function init_bundle() {
-    oc -n stackrox exec deploy/central -- \
+    kubectl -n stackrox exec deploy/central -- \
       roxctl central init-bundles generate my-test-bundle \
         --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output - \
         > "${SCRATCH}/helm-init-bundle-values.yaml"
@@ -288,17 +288,18 @@ function install_secured_cluster_with_helm() {
 function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
   set +e  # ignore errors
-  wait_deploy scanner-v4-matcher 300s
-  if oc describe -n stackrox deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS; then
+  kubectl wait deploy --for=create scanner-v4-matcher --namespace stackrox --timeout=120s
+  if kubectl describe -n stackrox deploy/scanner-v4-matcher \
+    | grep "SCANNER_V4_MATCHER_READINESS.*${SCANNER_V4_MATCHER_READINESS:-}"; then
     echo 'The scanner-v4-matcher readiness is set.'
     return
   fi
   echo 'The scanner-v4-matcher readiness env var is not set. Adding it to the deployment...'
-  oc -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
+  kubectl -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
   echo 'Restarting scanner-v4-matcher to apply the new config during startup...'
-  oc rollout restart deploy/scanner-v4-matcher
-  oc -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s
-  oc -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS
+  kubectl rollout restart deploy/scanner-v4-matcher
+  kubectl -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s
+  kubectl -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS
   echo ">>> Finished scanner-v4-matcher configuration readiness=${SCANNER_V4_MATCHER_READINESS:-}."
   set -e
 }
@@ -328,7 +329,7 @@ wait_deploy sensor
 wait_deploy admission-control
 
 function secured_cluster_connection_test() {
-  nohup oc port-forward --namespace stackrox svc/central "8443:443" 1>/dev/null 2>&1 &
+  nohup kubectl port-forward --namespace stackrox svc/central "8443:443" 1>/dev/null 2>&1 &
   echo $! > "${SCRATCH}/port_forward_pid"
 
   echo '>>> Wait for secured cluster to connect to central.'
@@ -366,22 +367,22 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
   if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
     timeout 600s wait "${scanner_readiness_configure_pid:?}" || true
-    if oc wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=0; then
+    if kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=0; then
       echo 'scanner-v4-matcher is not deployed?'
       echo '>>> Check for matcher readiness log entries:'
-      oc logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
+      kubectl logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
       for i in {1..10}; do
-        if oc wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${step_wait_time:-30s}; then
+        if kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${step_wait_time:-30s}; then
           echo '>>> scanner-v4-matcher condition==Ready'
           break
         fi
-        oc logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+        kubectl logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
         if [[ $i == 10 ]]; then
           echo '>>> scanner-v4-matcher not ready after max wait time. Log details and continue...'
           echo '>>> List scanner-v4-matcher deployment events'
-          oc get deployment -n stackrox scanner-v4-matcher
+          kubectl get deployment -n stackrox scanner-v4-matcher
           kubectl describe pod -A --selector 'app=scanner-v4-matcher'
-          oc logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+          kubectl logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
         fi
       done
     fi
@@ -390,5 +391,5 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   fi
 fi
 
-oc get nodes -o wide
-oc get pods -o wide --namespace stackrox
+kubectl get nodes -o wide
+kubectl get pods -o wide --namespace stackrox
