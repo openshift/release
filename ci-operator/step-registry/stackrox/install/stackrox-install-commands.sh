@@ -114,7 +114,8 @@ function create_cr_files() {
   echo ">>> Writing custom-resource definition files to ${SCRATCH}"
   local central_cr_file="${SCRATCH}/central-cr.yaml"
   local secured_cluster_cr_file="${SCRATCH}/secured-cluster-cr.yaml"
-  local centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
+  local centralAdminPasswordBase64
+  centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
   cat <<EOF > "${central_cr_file}"
 apiVersion: platform.stackrox.io/v1alpha1
 kind: Central
