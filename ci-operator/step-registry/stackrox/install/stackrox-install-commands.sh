@@ -323,7 +323,6 @@ function create_cr() {
   app=${1:-central}
   pushd "${SCRATCH}"
   set -x
-  ls -la
   echo ">>> Install ${app^}"
   if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
     && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
@@ -390,9 +389,9 @@ wait_created crd centrals.platform.stackrox.io
 
 create_cr_files
 
-kubectl get namespace stackrox \
-  || oc new-project stackrox --skip-config-write=true >/dev/null \
-  || kubectl create namespace stackrox --save-config=false >/dev/null
+kubectl get namespace stackrox 2>/dev/null \
+  || oc new-project stackrox --skip-config-write=true 2>/dev/null \
+  || kubectl create namespace stackrox --save-config=false
   # new-project is an oc-only command
 create_cr central
 
