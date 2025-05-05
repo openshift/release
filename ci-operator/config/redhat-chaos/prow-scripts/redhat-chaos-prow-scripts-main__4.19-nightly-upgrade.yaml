@@ -15,6 +15,10 @@ base_images:
     name: prow-scripts
     namespace: chaos
     tag: latest
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
   upi-installer:
     name: "4.18"
     namespace: ocp
@@ -237,15 +241,19 @@ tests:
 - as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-node-scenarios
   cron: 0 12 5 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "24"
       ENABLE_FORCE: "true"
       GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE: "3"
+      PROFILE_TYPE: reporting
     observers:
       enable:
       - redhat-chaos-cerberus
@@ -259,15 +267,19 @@ tests:
 - as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-pod-scenarios
   cron: 0 12 5 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "24"
       ENABLE_FORCE: "true"
       GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE: "3"
+      PROFILE_TYPE: reporting
     observers:
       enable:
       - redhat-chaos-cerberus
