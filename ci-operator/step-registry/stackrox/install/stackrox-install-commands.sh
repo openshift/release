@@ -293,7 +293,7 @@ function install_operator_lifecycle_manager() {
 function install_operator() {
   local currentCSV catalogSource catalogSourceNamespace
   echo ">>> Install rhacs-operator"
-  kubectl get packagemanifests rhacs-operator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV}{'\n'}{end}"
+  retry kubectl get packagemanifests rhacs-operator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV}{'\n'}{end}"
   currentCSV=$(kubectl get packagemanifests rhacs-operator -o jsonpath="{.status.channels[?(.name=='${OPERATOR_CHANNEL}')].currentCSV}")
   currentCSV=${OPERATOR_VERSION:-${currentCSV}}
   catalogSource=$(kubectl get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSource}")
