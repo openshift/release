@@ -1,0 +1,70 @@
+base_images:
+  tests-base:
+    name: "4.18"
+    namespace: ocp
+    tag: tests
+binary_build_commands: |
+  # The CentOS 8 build root does not have golang package installed so that we
+  # use the golang installed by Kata Containers setup script. Here it is
+  # ensured the tools are searcheable.
+  export GOPATH=/go
+  export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
+build_root:
+  project_image:
+    dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
+images:
+- dockerfile_literal: |
+    FROM bin
+    RUN dnf install -y --nobest gettext jq
+  from: bin
+  to: with-deps
+- dockerfile_literal: |
+    FROM tests-base
+    RUN mv /usr/bin/openshift-tests /usr/bin/openshift-tests-original
+    ADD https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/kata-containers/kata-containers/wrapped-openshift-tests.sh /
+    RUN cat /wrapped-openshift-tests.sh | tr -d '\r' > /usr/bin/openshift-tests
+    RUN chmod +x /usr/bin/openshift-tests
+  from: tests-base
+  to: tests
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: e2e-tests
+  cron: 2 7 * * 0
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure4
+    env:
+      INSTALL_KATA_RPM: "true"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: sandboxed-containers-operator-get-kata-rpm
+    test:
+    - as: do-nothing
+      commands: |
+        echo "do nothing"
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: openshift-e2e-azure
+zz_generated_metadata:
+  branch: main
+  org: kata-containers
+  repo: kata-containers
+  variant: get-kata
