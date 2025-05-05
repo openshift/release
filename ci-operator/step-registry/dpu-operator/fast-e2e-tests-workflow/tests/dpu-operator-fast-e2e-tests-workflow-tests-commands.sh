@@ -76,8 +76,8 @@ wait_for_job_to_finish_running() {
 	done
 }
 
-endpoint=$(cat "/var/run/token/dpu-token/url")
-dpu_token=$(cat "/var/run/token/dpu-token/dpu-key")
+endpoint=$(cat "/var/run/token/jenkins-secrets/url")
+dpu_token=$(cat "/var/run/token/jenkins-secrets/dpu-key")
 test_name="99_FAST_E2E_IPU_Deploy"
 endpoint_resolve="${endpoint}:443:10.0.180.88"
 job_url="https://${endpoint}/job/${test_name}/lastBuild"
