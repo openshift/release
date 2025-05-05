@@ -64,12 +64,13 @@ items:
 
         WORKDIR /opt/app-root/src
         RUN mkdir /go && chmod g+xw -R /go \
-            && chown -R 1001:0 /opt/app-root/src
+            && chown -R 1001:0 /opt/app-root/src \
+            && chmod ug+rwx /opt/app-root/src
         USER 1001
-        ENV USER_UID=1001 HOME="/opt/app-root/src" PATH="/opt/app-root/src/.local/bin/:$PATH"
+        ENV USER_UID=1001 HOME="/opt/app-root/src" PATH="/opt/app-root/src/.local/bin:/opt/app-root/src/.cargo/bin:$PATH"
         ### UBI has no dnf repo providing those tools
         RUN pip3 install --user yamllint \
-            && mkdir -p ${CARGO_HOME:-~/.cargo}/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+            && mkdir -p /opt/app-root/src/.cargo/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C /opt/app-root/src/.cargo/bin
       type: Dockerfile
     strategy:
       dockerStrategy:
