@@ -91,8 +91,6 @@ tests:
 - as: update-istio-builder-image
   commands: |
     export NEW_IMAGE_MASTER=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
-    export NEW_IMAGE_1_22=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.22/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
-    export NEW_IMAGE_1_23=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.23/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
     export NEW_IMAGE_1_24=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.24/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
     ./tools/automator-main.sh \
     --org=openshift \
@@ -101,8 +99,8 @@ tests:
     --token-path=/creds-github/token \
     '--title=Update maistra/istio builder image' \
     --modifier=update_istio_builder_image_master \
-    '--cmd=sed -i -e "s|\(gcr.io/istio-testing/build-tools\):master.*|\1:$NEW_IMAGE_MASTER|" -e "s|\(gcr.io/istio-testing/build-tools\):release-1\.24.*|\1:$NEW_IMAGE_1_24|" -e "s|\(gcr.io/istio-testing/build-tools\):release-1\.23.*|\1:$NEW_IMAGE_1_23|" -e "s|\(gcr.io/istio-testing/build-tools\):release-1\.22.*|\1:$NEW_IMAGE_1_22|" core-services/image-mirroring/_config.yaml' \
-    '--body=cc @jwendell'
+    '--cmd=sed -i -e "s|\(gcr.io/istio-testing/build-tools\):master.*|\1:$NEW_IMAGE_MASTER|" -e "s|\(gcr.io/istio-testing/build-tools\):release-1\.24.*|\1:$NEW_IMAGE_1_24|" core-services/image-mirroring/_config.yaml ci-operator/config/openshift-service-mesh/sail-operator/*' \
+    '--body=cc @jwendell, @FilipB'
   container:
     from: src
   cron: 00 05 * * 1-5

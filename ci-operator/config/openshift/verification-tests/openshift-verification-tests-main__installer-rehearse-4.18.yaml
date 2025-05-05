@@ -1,0 +1,103 @@
+base_images:
+  ansible:
+    name: "4.18"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.18"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe-c3-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-highcpu-192-metal
+      CONFIDENTIAL_COMPUTE: Disabled
+      CONTROL_PLANE_NODE_TYPE: n2-standard-4
+      ON_HOST_MAINTENANCE: Terminate
+      SLEEP_DURATION: 30m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-c3-metal-private-provision
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-ipi-resourcegroup
+- as: installer-rehearse-gcp
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
+    env:
+      CREDENTIALS_MODE: Passthrough
+      SLEEP_DURATION: 30m
+    post:
+    - ref: cucushift-installer-wait
+    - ref: storage-destroy-csi-gcp-filestore
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-provision
+    - chain: storage-conf-csi-optional-gcp-filestore
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-z2551dt/release:latest
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: verification-tests
+  variant: installer-rehearse-4.18

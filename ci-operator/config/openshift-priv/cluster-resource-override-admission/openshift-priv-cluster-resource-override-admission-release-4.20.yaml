@@ -23,7 +23,8 @@ images:
   to: cluster-resource-override-admission
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -58,8 +59,14 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

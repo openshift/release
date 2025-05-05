@@ -80,7 +80,7 @@ if [[ -n ${id_m} ]]; then
     echo "INFO: master key registrations list is: ${#vols_m[@]}" "${vols_m[@]}"
     #check that node os disk is encrypted
     set_proxy
-    machines=$(oc get machines -A --no-headers | grep master | awk '{print $2}')
+    machines=$(oc get machines.machine.openshift.io -A --no-headers | grep master | awk '{print $2}')
     unset_proxy
     if [[ ! $(echo "${machines}" | wc -l) -gt 0 ]]; then
         echo "ERROR: Fail to find master machines ${machines}"
@@ -102,7 +102,7 @@ if [[ -n ${id_w} ]]; then
     mapfile -t vols_w < <(ibmcloud kp registrations -i ${id_w} -o JSON  | jq -r .[].resourceCrn)
     echo "INFO: worker key registrations list is: ${#vols_w[@]}" "${vols_w[@]}"
     set_proxy
-    machines=$(oc get machines -A --no-headers | grep worker | awk '{print $2}')
+    machines=$(oc get machines.machine.openshift.io -A --no-headers | grep worker | awk '{print $2}')
     unset_proxy
     if [[ ! $(echo "${machines}" | wc -l) -gt 0 ]]; then
         echo "ERROR: Fail to find worker machines ${machines}"

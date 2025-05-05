@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import yaml
+import shutil 
 
 def log(msg):
   print(msg)
@@ -31,6 +32,9 @@ load_envbash('/var/run/vault/vsphere-ibmcloud-ci/nested-secrets.sh')
 cluster_profile_name = os.environ.get("CLUSTER_PROFILE_NAME")
 leased_resource = os.environ.get("LEASED_RESOURCE")
 shared_dir = os.environ.get("SHARED_DIR")
+
+artifact_dir = os.environ.get("ARTIFACT_DIR")
+home = os.environ.get('HOME')
 
 if cluster_profile_name is None:
     log("CLUSTER_PROFILE_NAME is undefined")
@@ -60,22 +64,38 @@ os.environ["NESTED_PASSWORD"]               = os.environ["vcenter_password"]
 os.environ["HOSTS_PER_FAILURE_DOMAIN"]      = os.environ["HOSTS"]
 os.environ["CLUSTER_NAME"]                  = f'{os.environ["NAMESPACE"]}-{os.environ["UNIQUE_HASH"]}'
 
+ara_dir                                     = f'{artifact_dir}/ara'
+os.makedirs(ara_dir, exist_ok=True)
+
+
 for key in os.environ:
-    if "PASSWORD" in key:
+    if "password" in key.lower():
         continue
     print(f"export {key}={os.environ[key]}")
 
 os.environ["ANSIBLE_TASK_TIMEOUT"] = str(20 * 60)
 
-r = ansible_runner.run_command(
-    executable_cmd='ansible-playbook',
-    cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=VC8.0.2.00100-22617221-ESXi8.0u2c','-vvvv', '-k'],
-    input_fd=sys.stdin,
-    output_fd=sys.stdout,
-    error_fd=sys.stdout,
-    )
+if os.environ["VCENTER_VERSION"] == "7":
+    vcenter_version="VC7.0.3.01400-21477706-ESXi7.0u3q"
+else:
+    vcenter_version="VC8.0.2.00100-22617221-ESXi8.0u2c"
 
-print(r)
+try:
+    r = ansible_runner.run_command(
+        executable_cmd='ansible-playbook',
+        cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=%s' %vcenter_version,'-vvvvvv', '-k'],
+        input_fd=sys.stdin,
+        output_fd=sys.stdout,
+        error_fd=sys.stdout,
+        )
+
+    print(r)
+
+finally:
+    # Copy ara's sqlite db to artifacts
+    ara_sql = f"{home}/.ara/server/ansible.sqlite"
+    shutil.copy2(ara_sql, ara_dir)
+
 
 with open(os.path.join(shared_dir, "vips.txt"), "r") as vip_file:
     vips = vip_file.readlines()
@@ -127,3 +147,5 @@ with open(os.path.join(shared_dir, "platform.yaml"), "w") as platform_yaml_file:
 
 with open(os.path.join(shared_dir, "install-config.yaml"), "w") as install_config_file:
     yaml.dump(install_config, install_config_file)
+
+

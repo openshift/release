@@ -1,14 +1,14 @@
+base_images:
+  lightspeed-service-api:
+    name: lightspeed-service-api
+    namespace: ols
+    tag: latest
 build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
       RUN dnf install -y podman
-images:
-- dockerfile_path: Containerfile
-  to: lightspeed-service-api
-- dockerfile_path: Containerfile.redis
-  to: lightspeed-service-redis
 releases:
   latest:
     candidate:
@@ -29,7 +29,8 @@ tests:
     cloud: aws
     labels:
       region: us-east-1
-    owner: ols
+      variant: fips
+    owner: obs
     product: ocp
     timeout: 1h0m0s
     version: "4.15"
@@ -37,14 +38,7 @@ tests:
   steps:
     allow_skip_on_success: true
     post:
-    - as: gather-must-gather
-      commands: gather-must-gather-commands.sh
-      from: cli
-      optional_on_success: true
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
+    - ref: gather-must-gather
     test:
     - as: e2e
       cli: latest

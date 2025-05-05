@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: ocp-art-ci
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: ocp-art-ci
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ocp-art-ci:latest
+    source:
+      dockerfile: |
+          FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_ubi-python-311_9
+          RUN pip install pyyaml requests
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: quay-proxy.ci.openshift.org/openshift/ci:ocp_ubi-python-311_9
+      type: Docker
+    triggers:
+    - type: ConfigChange

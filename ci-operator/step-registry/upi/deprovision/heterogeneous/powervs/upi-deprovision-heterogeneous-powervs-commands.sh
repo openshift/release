@@ -4,10 +4,7 @@
 IBMCLOUD_HOME=/tmp/ibmcloud
 export IBMCLOUD_HOME
 
-IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
-export IBMCLOUD_HOME_FOLDER
-
-export PATH=$PATH:/tmp:"${IBMCLOUD_HOME_FOLDER}"
+export PATH=$PATH:/tmp:"${IBMCLOUD_HOME}"
 
 # Variables
 # OCP Version
@@ -70,14 +67,6 @@ function cleanup_ibmcloud_powervs() {
       sleep 60
     done
 
-    echo "Deleting the Images"
-    for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[].imageID')
-    do
-      echo "Deleting Images ${IMAGE_ID}"
-      ibmcloud pi image delete "${IMAGE_ID}"
-      sleep 60
-    done
-
     if [ -n "$(ibmcloud pi nets 2> /dev/null | grep DHCP)" ]
     then
        curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
@@ -97,33 +86,14 @@ function cleanup_ibmcloud_powervs() {
       ibmcloud pi network delete "${NETWORK_ID}" || true
       sleep 60
     done
-
-    ibmcloud resource service-instance-update "${CRN}" --allow-cleanup true
-    sleep 30
-    ibmcloud resource service-instance-delete "${CRN}" --force --recursive
-    for COUNT in $(seq 0 5)
-    do
-      FIND=$(ibmcloud pi workspace ls 2> /dev/null| grep "${CRN}" || true)
-      echo "FIND: ${FIND}"
-      if [ -z "${FIND}" ]
-      then
-        echo "service-instance is deprovisioned"
-        break
-      fi
-      echo "waiting on service instance to deprovision ${COUNT}"
-      sleep 60
-    done
-    echo "Done Deleting the ${CRN}"
   done
-
   echo "Done cleaning up prior runs"
 }
 
 # var.tfvars used to provision the powervs nodes is copied to the ${SHARED_DIR}
 echo "Invoking upi deprovision heterogeneous powervs for ${WORKSPACE_NAME}"
 
-IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
-mkdir -p "${IBMCLOUD_HOME_FOLDER}"
+mkdir -p "${IBMCLOUD_HOME}"
 
 if [ -z "$(command -v ibmcloud)" ]
 then
@@ -155,36 +125,36 @@ then
   rm -rf "${ARTIFACT_DIR}"/must-gather-ppc64le
 
   # short-circuit to download and install terraform
-  curl -o "${IBMCLOUD_HOME_FOLDER}"/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
-    && gunzip "${IBMCLOUD_HOME_FOLDER}"/terraform.gz \
-    && chmod +x "${IBMCLOUD_HOME_FOLDER}"/terraform \
+  curl -o "${IBMCLOUD_HOME}"/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+    && gunzip "${IBMCLOUD_HOME}"/terraform.gz \
+    && chmod +x "${IBMCLOUD_HOME}"/terraform \
     || true
 
-  "${IBMCLOUD_HOME_FOLDER}"/terraform -version -json
+  "${IBMCLOUD_HOME}"/terraform -version -json
 
   echo "Destroy the terraform"
   # Fetch the ocp4-upi-compute-powervs repo to perform deprovisioning
-  cd "${IBMCLOUD_HOME_FOLDER}" && curl -L "https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}-per.tar.gz" -o "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
-      && tar -xzf "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
-      && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs"
+  cd "${IBMCLOUD_HOME}" && curl -L "https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}-per.tar.gz" -o "${IBMCLOUD_HOME}/ocp-${OCP_VERSION}.tar.gz" \
+      && tar -xzf "${IBMCLOUD_HOME}/ocp-${OCP_VERSION}.tar.gz" \
+      && mv "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs"
   # copy the var.tfvars file from ${SHARED_DIR}
-  cp "${SHARED_DIR}/var.tfvars" ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/var.tfvars
-  cp "${SHARED_DIR}/terraform.tfstate" ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/terraform.tfstate
+  cp "${SHARED_DIR}/var.tfvars" ${IBMCLOUD_HOME}/ocp4-upi-compute-powervs/data/var.tfvars
+  cp "${SHARED_DIR}/terraform.tfstate" ${IBMCLOUD_HOME}/ocp4-upi-compute-powervs/terraform.tfstate
 
   # Copy over the key files and kubeconfig
   export PRIVATE_KEY_FILE="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
   export PUBLIC_KEY_FILE="${CLUSTER_PROFILE_DIR}/ssh-publickey"
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-  cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/id_rsa.pub"
-  cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/id_rsa"
-  cp "${KUBECONFIG}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/kubeconfig"
+  cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs/data/id_rsa.pub"
+  cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs/data/id_rsa"
+  cp "${KUBECONFIG}" "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs/data/kubeconfig"
 
   # Invoke the destroy command
-  cd "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs" \
-    && "${IBMCLOUD_HOME_FOLDER}"/terraform init -upgrade -no-color \
-    && "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
+  cd "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs" \
+    && "${IBMCLOUD_HOME}"/terraform init -upgrade -no-color \
+    && "${IBMCLOUD_HOME}"/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
     || sleep 30 \
-    || "${IBMCLOUD_HOME_FOLDER}"/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
+    || "${IBMCLOUD_HOME}"/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
     || true
 else
   echo "Error: File ${SHARED_DIR}/var.tfvars does not exists."

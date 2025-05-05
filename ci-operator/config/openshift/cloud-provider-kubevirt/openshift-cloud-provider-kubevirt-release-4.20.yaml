@@ -31,7 +31,8 @@ images:
   to: kubevirt-cloud-controller-manager
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -65,12 +66,18 @@ tests:
     from: src
 - as: hypershift-kubevirt-conformance-baremetalds
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

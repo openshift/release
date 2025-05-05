@@ -1,6 +1,6 @@
 base_images:
   ocp_4.19_ovn-kubernetes:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: ovn-kubernetes
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -8,7 +8,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
   tools:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: '"make build --warn-undefined-variables"'
@@ -28,17 +28,17 @@ images:
   to: network-tools
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -53,6 +53,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift-priv

@@ -6,12 +6,63 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 #Save stacks events
 trap 'save_stack_events_to_artifacts' EXIT TERM INT
+trap 'prepare_next_steps' EXIT TERM INT
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
 export PATH=/tmp:${PATH}
 GATHER_BOOTSTRAP_ARGS=
 NEW_STACKS=$(mktemp)
+
+INSTALL_DIR=/tmp/installer
+mkdir ${INSTALL_DIR}
+
+function populate_artifact_dir()
+{
+  set +e
+  current_time=$(date +%s)
+
+  echo "Copying log bundle..."
+  cp "${INSTALL_DIR}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+
+  echo "Removing REDACTED info from log..."
+  sed '
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${INSTALL_DIR}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
+
+  # terraform may not exist now
+  if [ -f "${INSTALL_DIR}/terraform.txt" ]; then
+    sed -i '
+      s/password: .*/password: REDACTED/;
+      s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+      s/UserData:.*,/UserData: REDACTED,/;
+      ' "${INSTALL_DIR}/terraform.txt"
+    tar -czvf "${ARTIFACT_DIR}/terraform-${current_time}.tar.gz" --remove-files "${INSTALL_DIR}/terraform.txt"
+  fi
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${INSTALL_DIR}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
+    cp -rpv "${INSTALL_DIR}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
+  fi
+  set -e
+}
+
+function prepare_next_steps() {
+  set +e
+  populate_artifact_dir
+
+  echo "Copying required artifacts to shared dir"
+  cp \
+      -t "${SHARED_DIR}" \
+      "${INSTALL_DIR}/auth/kubeconfig" \
+      "${INSTALL_DIR}/auth/kubeadmin-password" \
+      "${INSTALL_DIR}/metadata.json"
+  set -e
+}
 
 function add_param_to_json() {
     local k="$1"
@@ -25,7 +76,7 @@ function add_param_to_json() {
 
 function gather_bootstrap_and_fail() {
   if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
-    openshift-install --dir=${ARTIFACT_DIR}/installer gather bootstrap --key "${SSH_PRIV_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
+    openshift-install --dir=${INSTALL_DIR} gather bootstrap --key "${SSH_PRIV_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
   fi
 
   return 1
@@ -48,7 +99,6 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 cp "$(command -v openshift-install)" /tmp
-mkdir ${ARTIFACT_DIR}/installer
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
@@ -67,7 +117,7 @@ export PULL_SECRET
 
 mkdir -p ~/.ssh
 cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
-cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.yaml
+cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}/install-config.yaml
 export PATH=${HOME}/.local/bin:${PATH}
 
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
@@ -82,29 +132,35 @@ ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}
 echo "OCP Version: ${ocp_version}"
 rm /tmp/pull-secret
 
-pushd ${ARTIFACT_DIR}/installer
+pushd ${INSTALL_DIR}
 
-base_domain=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'baseDomain')
-AWS_REGION=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'platform.aws.region')
-CLUSTER_NAME=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'metadata.name')
+base_domain=$(yq-go r "${INSTALL_DIR}/install-config.yaml" 'baseDomain')
+AWS_REGION=$(yq-go r "${INSTALL_DIR}/install-config.yaml" 'platform.aws.region')
+CLUSTER_NAME=$(yq-go r "${INSTALL_DIR}/install-config.yaml" 'metadata.name')
 
 echo ${AWS_REGION} > ${SHARED_DIR}/AWS_REGION
 echo ${CLUSTER_NAME} > ${SHARED_DIR}/CLUSTER_NAME
 MACHINE_CIDR=10.0.0.0/16
 
+
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-openshift-install --dir=${ARTIFACT_DIR}/installer create manifests
-sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
-rm -f ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
-rm -f ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
-rm -f ${ARTIFACT_DIR}/installer/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
-sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${ARTIFACT_DIR}/installer/manifests/cluster-scheduler-02-config.yml
+openshift-install --dir=${INSTALL_DIR} create manifests
+sed -i '/^  channel:/d' ${INSTALL_DIR}/manifests/cvo-overrides.yaml
+rm -f ${INSTALL_DIR}/openshift/99_openshift-cluster-api_master-machines-*.yaml
+rm -f ${INSTALL_DIR}/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+rm -f ${INSTALL_DIR}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
+sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${INSTALL_DIR}/manifests/cluster-scheduler-02-config.yml
 
 echo "Creating ignition configs"
-openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs &
+openshift-install --dir=${INSTALL_DIR} create ignition-configs &
 wait "$!"
 
-cp ${ARTIFACT_DIR}/installer/bootstrap.ign ${SHARED_DIR}
+cp ${INSTALL_DIR}/bootstrap.ign ${SHARED_DIR}
 BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
 export BOOTSTRAP_URI
 
@@ -120,9 +176,9 @@ fi
 
 export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
 
-INFRA_ID="$(jq -r .infraID ${ARTIFACT_DIR}/installer/metadata.json)"
+INFRA_ID="$(jq -r .infraID ${INSTALL_DIR}/metadata.json)"
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
-IGNITION_CA="$(jq '.ignition.security.tls.certificateAuthorities[0].source' ${ARTIFACT_DIR}/installer/master.ign)"  # explicitly keeping wrapping quotes
+IGNITION_CA="$(jq '.ignition.security.tls.certificateAuthorities[0].source' ${INSTALL_DIR}/master.ign)"  # explicitly keeping wrapping quotes
 
 HOSTED_ZONE="$(aws route53 list-hosted-zones-by-name \
   --dns-name "${base_domain}" \
@@ -274,11 +330,11 @@ if [[ -d "${SHARED_DIR}/CA" ]]; then
   echo "Proxy is available at ${PROXY_URL}"
   echo "TLS Proxy is available at ${TLS_PROXY_URL}"
 
-  echo ${PROXY_IP} > ${ARTIFACT_DIR}/installer/proxyip
+  echo ${PROXY_IP} > ${INSTALL_DIR}/proxyip
 fi
 
 S3_BOOTSTRAP_URI="${S3_BUCKET_URI}/bootstrap.ign"
-aws s3 cp ${ARTIFACT_DIR}/installer/bootstrap.ign "$S3_BOOTSTRAP_URI"
+aws s3 cp ${INSTALL_DIR}/bootstrap.ign "$S3_BOOTSTRAP_URI"
 
 cf_params_bootstrap=${ARTIFACT_DIR}/cf_params_bootstrap.json
 add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_bootstrap}"
@@ -392,7 +448,7 @@ done
 echo "bootstrap: ${BOOTSTRAP_IP} control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP} compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}"
 
 echo "Waiting for bootstrap to complete"
-openshift-install --dir=${ARTIFACT_DIR}/installer wait-for bootstrap-complete &
+openshift-install --dir=${INSTALL_DIR} wait-for bootstrap-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!" || gather_bootstrap_and_fail
 
 echo "Bootstrap complete, destroying bootstrap resources"
@@ -425,22 +481,14 @@ function update_image_registry() {
 }
 
 echo "Approving pending CSRs"
-export KUBECONFIG=${ARTIFACT_DIR}/installer/auth/kubeconfig
+export KUBECONFIG=${INSTALL_DIR}/auth/kubeconfig
 approve_csrs &
 
 set +x
 echo "Completing UPI setup"
-openshift-install --dir=${ARTIFACT_DIR}/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
+openshift-install --dir=${INSTALL_DIR} wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-# Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
-# The image registry in some instances the config object
-# is not properly configured. Rerun patching
-# after cluster complete
-cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}/"
-cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}/"
-cp "${ARTIFACT_DIR}/installer/auth/kubeadmin-password" "${SHARED_DIR}/"
 touch /tmp/install-complete

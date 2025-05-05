@@ -123,6 +123,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: post-unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -133,6 +134,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: snyk-code
   commands: |
     SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
@@ -143,6 +145,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvms-snyk-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: snyk-deps
   commands: |
     SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
@@ -153,11 +156,13 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvms-snyk-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   cron: '@daily'
   presubmit: true
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -172,12 +177,25 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: e2e-gather
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
+      dependencies:
+      - env: GATHER_IMG
+        name: lvms-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
 - as: e2e-aws
   cron: '@daily'
   presubmit: true
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -192,8 +210,21 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: e2e-gather
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
+      dependencies:
+      - env: GATHER_IMG
+        name: lvms-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-aws-hypershift
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
     cluster_profile: aws-2
     dependencies:
@@ -206,6 +237,18 @@ tests:
     - as: e2e-test
       cli: latest
       commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-gather
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
+      dependencies:
+      - env: GATHER_IMG
+        name: lvms-must-gather
       from: test-bin
       resources:
         requests:

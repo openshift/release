@@ -216,6 +216,23 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
   timeout: 5h0m0s
+- as: e2e-gcp-op-ocl
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-ocl
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-gcp
 - as: e2e-gcp-op-techpreview
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -242,7 +259,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -250,34 +267,22 @@ tests:
 - as: e2e-aws-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       PLATFORM_VERSION: "8.4"
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       PLATFORM_VERSION: "8.4"
     workflow: openshift-e2e-aws-ovn-workers-rhel
 - as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-disruption
-- as: cluster-bootimages
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: ./test/e2e/old-bootimages.sh
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-vsphere-ovn-upi
   optional: true
   steps:
@@ -320,7 +325,7 @@ tests:
 - as: e2e-aws-proxy
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere
   optional: true
@@ -335,13 +340,14 @@ tests:
 - as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-assisted
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-ovirt
   optional: true
   steps:
@@ -355,7 +361,7 @@ tests:
 - as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-gcp-rt
@@ -394,7 +400,7 @@ tests:
 - as: e2e-aws-upgrade-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws-single-node
 - as: e2e-openstack
   optional: true

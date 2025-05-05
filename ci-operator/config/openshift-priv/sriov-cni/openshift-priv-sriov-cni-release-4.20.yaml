@@ -32,7 +32,8 @@ promotion:
   - disabled: true
     name: sriov-4.20
     namespace: origin
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -52,7 +53,7 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: security
   optional: true
@@ -61,6 +62,12 @@ tests:
       PROJECT_NAME: sriov-cni
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

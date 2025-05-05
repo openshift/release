@@ -4,9 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save stacks events
-trap 'save_stack_events_to_artifacts' EXIT TERM INT
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; save_stack_events_to_artifacts' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
@@ -324,7 +328,11 @@ echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/proxyip"
 
-PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+if [[ "${CUSTOM_PROXY_CREDENTIAL}" == "true" ]]; then
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/custom_proxy_creds)
+else
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+fi
 PROXY_PUBLIC_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
 PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
 

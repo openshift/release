@@ -20,6 +20,8 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=index
+export PPROF=false 
+
 EXTRA_FLAGS="$METRIC_PROFILES --check-health=false"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
@@ -45,5 +47,6 @@ export START_TIME=${START_TIME:-$(date -d "-1 hour" +%s)};
 export END_TIME=${END_TIME:-$(date +%s)};
 elapsed_time=$((END_TIME - START_TIME))
 export ELAPSED="${elapsed_time}s"
+
 
 ./run.sh

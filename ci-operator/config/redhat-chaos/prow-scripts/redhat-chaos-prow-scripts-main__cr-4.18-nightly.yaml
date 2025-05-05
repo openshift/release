@@ -3,12 +3,26 @@ base_images:
     name: cerberus
     namespace: chaos
     tag: cerberus-prow
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
   to: cerberus-main-prow-418
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -29,19 +43,24 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      PROFILE_TYPE: reporting
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.18-component-readiness
+      USER_TAGS: |
+        TicketId 419
     observers:
       enable:
       - redhat-chaos-cerberus
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-etcd-tests
     - chain: redhat-chaos-krkn-hub-ovn-disruption
+    workflow: redhat-chaos-installer-aws
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

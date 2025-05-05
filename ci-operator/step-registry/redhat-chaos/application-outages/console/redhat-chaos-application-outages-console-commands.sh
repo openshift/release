@@ -30,5 +30,9 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./application-outages/prow_run.sh
 rc=$?
+
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running application outages scenarios"
 echo "Return code: $rc"

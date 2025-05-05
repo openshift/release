@@ -6,15 +6,91 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build11
+    context: ci/prow/e2e-aws-ai-model-serving
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-main-e2e-aws-ai-model-serving
+    rerun_command: /test e2e-aws-ai-model-serving
+    run_if_changed: ^(scripts/ci-ai-model-serving/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ai-model-serving
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ai-model-serving,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
     context: ci/prow/e2e-aws-footprint-and-performance
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-footprint-and-performance
     rerun_command: /test e2e-aws-footprint-and-performance
@@ -88,9 +164,9 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests
     rerun_command: /test e2e-aws-tests
@@ -166,7 +242,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-arm
     rerun_command: /test e2e-aws-tests-arm
@@ -240,9 +316,9 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-bootc
     rerun_command: /test e2e-aws-tests-bootc
@@ -318,7 +394,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-bootc-arm
     rerun_command: /test e2e-aws-tests-bootc-arm
@@ -392,9 +468,9 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-bootc-periodic
     rerun_command: /test e2e-aws-tests-bootc-periodic
@@ -468,9 +544,9 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-bootc-periodic-arm
     rerun_command: /test e2e-aws-tests-bootc-periodic-arm
@@ -537,16 +613,17 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-tests-cache
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-cache
     rerun_command: /test e2e-aws-tests-cache
@@ -613,16 +690,17 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-tests-cache-arm
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-cache-arm
     rerun_command: /test e2e-aws-tests-cache-arm
@@ -696,9 +774,9 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-periodic
     rerun_command: /test e2e-aws-tests-periodic
@@ -772,9 +850,9 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-e2e-aws-tests-periodic-arm
     rerun_command: /test e2e-aws-tests-periodic-arm
@@ -848,7 +926,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-images
     rerun_command: /test images
@@ -905,9 +983,9 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-ocp-full-conformance-rhel-eus
     rerun_command: /test ocp-full-conformance-rhel-eus
@@ -983,7 +1061,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-ocp-full-conformance-serial-rhel-eus
     rerun_command: /test ocp-full-conformance-serial-rhel-eus
@@ -1057,7 +1135,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-security
     optional: true
@@ -1121,7 +1199,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-test-rebase
     optional: true
@@ -1186,7 +1264,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-test-rpm
     rerun_command: /test test-rpm
@@ -1243,7 +1321,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-test-unit
     rerun_command: /test test-unit
@@ -1299,7 +1377,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-main-verify
     rerun_command: /test verify

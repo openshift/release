@@ -46,5 +46,10 @@ export SUBNET_ID
 
 ./zone-outages/prow_run.sh
 rc=$?
+
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
+
 echo "Finished running zone outages"
 echo "Return code: $rc"

@@ -33,6 +33,7 @@ operator:
   bundles:
   - as: cert-manager-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
@@ -87,7 +88,7 @@ tests:
     - ref: fips-check-image-scan
 - as: e2e-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -104,6 +105,29 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: fips-check-fips-or-die
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-operator-tech-preview
+  optional: true
+  run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
     - ref: fips-check-fips-or-die
     - as: test
       cli: latest

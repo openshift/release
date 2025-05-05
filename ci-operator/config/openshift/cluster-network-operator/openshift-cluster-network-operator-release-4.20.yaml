@@ -11,6 +11,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.20"
     namespace: ocp
@@ -34,7 +38,8 @@ images:
   to: cluster-network-operator
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -66,9 +71,8 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-upgrade-gcp-ovn
-- always_run: false
+- always_run: true
   as: e2e-aws-ovn-ipsec-upgrade
-  optional: true
   steps:
     cluster_profile: aws
     env:
@@ -77,7 +81,7 @@ tests:
 - as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
@@ -85,7 +89,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -102,7 +105,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-ovn-ipsec-step-registry
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec
@@ -117,7 +120,7 @@ tests:
   as: e2e-aws-ovn-ipsec-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec-serial
@@ -142,9 +145,10 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipsec
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -230,7 +234,7 @@ tests:
   as: e2e-aws-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -259,7 +263,7 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-single-node
@@ -315,7 +319,7 @@ tests:
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -418,6 +422,21 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: cluster-network-operator
     workflow: openshift-ci-security
+- as: hypershift-e2e-aks
+  steps:
+    cluster_profile: hypershift
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: eastus2
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-e2e
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

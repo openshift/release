@@ -97,6 +97,12 @@ wait_machineconfig_applied "master"
 wait_machineconfig_applied "worker"
 
 echo "Adding the CA signed mirror-registry server cert to cluster"
+if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+    client_ca_cert="${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt"
+else
+    client_ca_cert=/var/run/vault/mirror-registry/client_ca.crt
+fi
+
 client_ca_cert=/var/run/vault/mirror-registry/client_ca.crt
 mirror_registry_host=$(echo "$mirror_registry_url" | cut -d : -f 1)
 oc create configmap registry-config --from-file="${mirror_registry_host}..5000"=${client_ca_cert} --from-file="${mirror_registry_host}..6001"=${client_ca_cert} --from-file="${mirror_registry_host}..6002"=${client_ca_cert} -n openshift-config

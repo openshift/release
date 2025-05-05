@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   ocp_4.19_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
@@ -27,7 +31,8 @@ images:
   to: gcp-machine-controllers
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -75,22 +80,32 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: regression-clusterinfra-cucushift-rehearse-gcp-ipi
+- as: regression-clusterinfra-gcp-ipi-mapi
   optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp
     env:
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "5400"
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+      TEST_TIMEOUT: "35"
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 7h0m0s
 - as: security
   steps:
     env:
       PROJECT_NAME: machine-api-provider-gcp
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
