@@ -275,20 +275,19 @@ EOF
 }
 
 function install_operator_lifecycle_manager() {
-  local url
-  url='https://raw.githubusercontent.com/operator-framework/operator-lifecycle-manager/master/deploy/upstream/quickstart'
+  local url='https://raw.githubusercontent.com/operator-framework/operator-lifecycle-manager/master/deploy/upstream/quickstart'
+  local olm_ns='openshift-operator-lifecycle-manager'
   if kubectl get crd | grep 'catalogsource\|operatorgroup'; then
     echo '>>> OLM crds already exist.'
   else
     echo '>>> Creating crds for OLM install'
     set -x
+    olm_ns='olm'
     kubectl create -f "${url}/crds.yaml" || true
     kubectl create -f "${url}/olm.yaml" || true
   fi
-  wait_deploy olm-operator 60s openshift-operator-lifecycle-manager \
-    || wait_deploy olm-operator 60s olm
-  kubectl get catalogsources -n openshift-operator-lifecycle-manager \
-    || kubectl get catalogsources -n olm
+  wait_deploy olm-operator 60s "${olm_ns}"
+  kubectl get catalogsources -n "${olm_ns}"
 }
 
 function install_operator() {
@@ -398,7 +397,7 @@ kubectl get namespace stackrox \
 create_cr central
 
 echo '>>> Wait for rhacs-operator to deploy Central based on the crd'
-retry kubectl get deploy -n stackrox central \
+retry kubectl get deploy -n stackrox central 2>/dev/null \
   || kubectl logs -n openshift-operators deploy/rhacs-operator-controller-manager --tail=15
 
 if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
