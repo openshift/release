@@ -397,8 +397,9 @@ kubectl get namespace stackrox \
   # new-project is an oc-only command
 create_cr central
 
-# TODO: wait for rhacs-operator to act on the new Central CRD
-kubectl logs -n openshift-operators deploy/rhacs-operator-controller-manager --tail=5
+echo '>>> Wait for rhacs-operator to deploy Central based on the crd'
+retry kubectl get deploy -n stackrox central \
+  || kubectl logs -n openshift-operators deploy/rhacs-operator-controller-manager --tail=15
 
 if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
   configure_scanner_readiness &
