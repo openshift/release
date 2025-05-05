@@ -383,7 +383,7 @@ function configure_scanner_readiness() {
 echo '>>> Begin setup'
 
 install_operator_lifecycle_manager
-kubectl get deploy -A -lapp==rhacs-operator,control-plane=controller-manager -o jsonpath='{.items[0].metadata.name}' \
+kubectl get deploy -A -lapp==rhacs-operator,control-plane=controller-manager -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
   || install_operator
 wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
 wait_created crd centrals.platform.stackrox.io
