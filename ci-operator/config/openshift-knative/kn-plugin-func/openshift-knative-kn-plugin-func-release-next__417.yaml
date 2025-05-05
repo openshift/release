@@ -11,26 +11,41 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/4.17:cli-artifacts as tools
-      FROM registry.access.redhat.com/ubi8/ubi as builder
+
+      # Dockerfile to bootstrap build and test in openshift-ci
+      FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.23-openshift-4.19 as builder
+
       ARG TARGETARCH
+
       ENV GO_VERSION=1.24.2
       RUN rm -rf /usr/local/go && \
         curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
       ENV PATH="/usr/local/go/bin:$PATH"
+
       COPY --from=tools /usr/share/openshift/linux_$TARGETARCH/oc.rhel8 /usr/bin/oc
+
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
-      RUN yum install -y httpd-tools git make gcc
+
+      #RUN yum install -y httpd-tools git make gcc
+      RUN yum install -y httpd-tools
+
       RUN curl -Ls https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get-helm-3 && \
           chmod 700 ./get-helm-3
+
       RUN ./get-helm-3 --version v3.11.3 --no-sudo && helm version
+
       RUN GOFLAGS='' go install github.com/mikefarah/yq/v3@latest
       RUN GOFLAGS='' go install -tags="exclude_graphdriver_btrfs containers_image_openpgp" github.com/containers/skopeo/cmd/skopeo@v1.16.1
+
       RUN rm -rf $GOPATH/.cache
+
+      # go install creates $GOPATH/.cache with root permissions, we delete it here
+      # to avoid permission issues with the runtime users
       ENV CGO_ENABLED=1
       ENV GOFLAGS=''
 images:
 - dockerfile_literal: |
-    ARG GO_BUILDER=registry.access.redhat.com/ubi8/ubi
+    ARG GO_BUILDER=registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.23-openshift-4.19
     ARG GO_RUNTIME=registry.access.redhat.com/ubi8/ubi-minimal
 
     FROM $GO_BUILDER as builder
@@ -38,7 +53,7 @@ images:
     RUN rm -rf /usr/local/go && \
        curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
     ENV PATH="/usr/local/go/bin:$PATH"
-    RUN yum install git -y
+    #RUN yum install git -y
 
     WORKDIR /workspace
     COPY . .
