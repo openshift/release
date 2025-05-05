@@ -10,6 +10,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+
+
 # ensure leases file is present
 if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   echo "Couldn't find lease config file"
@@ -61,7 +63,7 @@ networking:
   - cidr: "192.168.$(leaseLookup "subnet").0/24"
   networkType: OVNKubernetes
   serviceNetwork:
-  - 172.32.0.0/16
+  - 172.30.0.0/16
 compute:
 - architecture: "${ARCH}"
   hyperthreading: Enabled
