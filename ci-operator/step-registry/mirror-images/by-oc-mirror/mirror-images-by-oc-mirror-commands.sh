@@ -41,6 +41,11 @@ fi
 
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+ignore_signatures_flag=""
+if [[ "${IGNORE_SIGNATURES}" == "yes" ]]; then
+    ignore_signatures_flag="--ignore-release-signatures"
+fi
+
 # target release
 target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 target_release_image_repo="${target_release_image%:*}"
@@ -114,7 +119,7 @@ cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
 unset REGISTRY_AUTH_PREFERENCE
 
 # execute the oc-mirror command
-run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
+run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir} ${ignore_signatures_flag}"
 
 # Save output from oc-mirror
 result_folder="${oc_mirror_dir}/working-dir"
