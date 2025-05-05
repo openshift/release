@@ -5,21 +5,18 @@ set -o pipefail
 set -x
 
 LAB_CLOUD="${LAB_CLOUD:-}"
-#RUNLOCAL="${RUNLOCAL:-1}"
 
 SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 if [ -z "${RUNLOCAL:-}" ]; then
   bastion=$(cat "/bm/address")
 else
-  #bastion=localhost
-  bastion=m42-h01-000-r760.rdu3.labs.perfscale.redhat.com
+  bastion=localhost
 fi
 
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 
 regulus_repo=/root/regulus-${LAB_CLOUD}-$(date +%s)
-#regulus_repo=/root/regulus-${LAB_CLOUD}
 
 function install-regulus {
   # Setup Bastion
@@ -84,11 +81,13 @@ for v in "${vars[@]}"; do
   # "${!v}" expands the variable whose name is in $v
   if [[ "$v" == "KUBECONFIG" ]]; then
     val=$KUBECONFIG_PATH  # Force override. idk why KUBECONFIG is wrong.
+  elif [[ "$v" == "REG_OCPHOST" ]]; then
+    val=$bastion
   else
     val="${!v:-}"
   fi
 
-  # Force ~ at start to become /root/
+  # Reformat vars in the form of ~/something to become /root/something
   if [[ "$val" == ~* ]]; then
     val="${val/#\~\//\/root/}"
   fi
@@ -112,7 +111,7 @@ function run-regulus {
     source bootstrap.sh
     make init-lab 
     make init-jobs 
-    make jobs
+    #make jobs
   "
 }
 
