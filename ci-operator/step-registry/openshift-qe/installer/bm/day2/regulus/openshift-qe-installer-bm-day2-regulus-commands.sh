@@ -16,7 +16,7 @@ fi
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 
-regulus_repo="/root/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%T")"
+regulus_repo="/root/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
 
 function install-regulus {
   # Setup Bastion
