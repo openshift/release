@@ -305,6 +305,11 @@ CONFIG = {
     'openstack-vh-mecha-az0-quota-slice': {
         'default': 3,
     },
+    'openstack-vh-bm-rhos-quota-slice': {
+        'openstack-vh-mecha-central': 3,
+        'openstack-vh-mecha-az0': 3,
+        'openstack-hwoffload': 3,
+    },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'ovirt-upgrade-quota-slice': {},

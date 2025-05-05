@@ -66,14 +66,10 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - as: krkn-hub-node-tests
   cron: 0 9 1 * *
@@ -93,12 +89,9 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: redhat-chaos-krkn-hub-node-tests
+    test:
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-cloud-gcp-node
@@ -119,7 +112,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
-    workflow: openshift-qe-installer-gcp
+    workflow: redhat-chaos-installer-gcp
 - always_run: false
   as: krkn-hub-tests-azure-node
   steps:
@@ -145,7 +138,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
-    workflow: openshift-qe-installer-azure
+    workflow: redhat-chaos-installer-azure
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-tests-gcp
@@ -164,7 +157,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-gcp
+    workflow: redhat-chaos-installer-gcp
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-tests-azure
@@ -185,7 +178,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-azure
+    workflow: redhat-chaos-installer-azure
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-ibm-cloud-api-tests
@@ -198,7 +191,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - ref: redhat-chaos-node-disruptions-master-outage
-    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+    workflow: redhat-chaos-installer-ibmcloud-ipi-ovn
 - always_run: false
   as: krkn-hub-tests-aro
   steps:
@@ -222,7 +215,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-etcd-tests
     - chain: redhat-chaos-krkn-hub-console-tests
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
-    workflow: openshift-qe-installer-azure-aro-upi
+    workflow: redhat-chaos-installer-azure-aro-upi
   timeout: 5h0m0s
 - always_run: false
   as: krkn-hub-tests-aro-node
@@ -247,7 +240,7 @@ tests:
     - ref: redhat-chaos-network-chaos
     - ref: redhat-chaos-pod-network-chaos
     - chain: redhat-chaos-hog-scenarios
-    workflow: openshift-qe-installer-azure-aro-upi
+    workflow: redhat-chaos-installer-azure-aro-upi
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
