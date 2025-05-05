@@ -312,7 +312,6 @@ prepare_helm_templates
 install_central_with_helm
 
 if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
-  echo "configure readiness"
   configure_scanner_readiness &
   scanner_readiness_configure_pid=$!
 fi

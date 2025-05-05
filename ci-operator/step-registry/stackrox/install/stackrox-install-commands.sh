@@ -110,10 +110,12 @@ function wait_pods_running() {
     || { kubectl get pods "${@}"; return 1; }
 }
 
-central_cr_file="${SCRATCH}/central-cr.yaml"
-secured_cluster_cr_file="${SCRATCH}/secured-cluster-cr.yaml"
-centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
-cat <<EOF > "${central_cr_file}"
+function create_cr_files() {
+  echo ">>> Writing custom-resource definition files to ${SCRATCH}"
+  local central_cr_file="${SCRATCH}/central-cr.yaml"
+  local secured_cluster_cr_file="${SCRATCH}/secured-cluster-cr.yaml"
+  local centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
+  cat <<EOF > "${central_cr_file}"
 apiVersion: platform.stackrox.io/v1alpha1
 kind: Central
 metadata:
@@ -149,20 +151,18 @@ spec:
     telemetry:
       enabled: false
 EOF
-if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
-  cat <<EOF >> "${central_cr_file}"
+
+  if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+    cat <<EOF >> "${central_cr_file}"
   customize:
     envVars:
       - name: SCANNER_V4_MATCHER_READINESS
         value: ${SCANNER_V4_MATCHER_READINESS:-}
 EOF
-fi
-if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
-  cat <<EOF >> "${central_cr_file}"
-  customize:
-    envVars:
-      - name: SCANNER_V4_MATCHER_READINESS
-        value: ${SCANNER_V4_MATCHER_READINESS}
+  fi
+
+  if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+    cat <<EOF >> "${central_cr_file}"
   scannerV4:
     # Explicitly enable, scannerV4 is currenlty opt-in
     scannerComponent: Enabled
@@ -197,7 +197,8 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
           cpu: "1000m"
           memory: "2500Mi"
 EOF
-fi
+  fi
+
   cat <<EOF >> "${central_cr_file}"
   scanner:
     analyzer:
@@ -231,7 +232,8 @@ metadata:
 data:
   password: ${centralAdminPasswordBase64}
 EOF
-cat <<EOF > "${secured_cluster_cr_file}"
+
+  cat <<EOF > "${secured_cluster_cr_file}"
 apiVersion: platform.stackrox.io/v1alpha1
 kind: SecuredCluster
 metadata:
@@ -268,6 +270,8 @@ spec:
           memory: 100Mi
           cpu: 100m
 EOF
+  ls -latr "${SCRATCH}"/*.yaml
+}
 
 function install_operator_lifecycle_manager() {
   local url
@@ -280,12 +284,10 @@ function install_operator_lifecycle_manager() {
     kubectl create -f "${url}/crds.yaml" || true
     kubectl create -f "${url}/olm.yaml" || true
   fi
-  if wait_deploy olm-operator 60s openshift-operator-lifecycle-manager; then
-    kubectl get catalogsources -n olm
-  else
-    wait_deploy olm-operator 60s olm
-    kubectl get catalogsources -n openshift-operator-lifecycle-manager
-  fi
+  wait_deploy olm-operator 60s openshift-operator-lifecycle-manager \
+    || wait_deploy olm-operator 60s olm
+  kubectl get catalogsources -n openshift-operator-lifecycle-manager \
+    || kubectl get catalogsources -n olm
 }
 
 function install_operator() {
@@ -381,18 +383,23 @@ function configure_scanner_readiness() {
 echo '>>> Begin setup'
 
 install_operator_lifecycle_manager
-kubectl get pods -A -lapp==rhacs-operator,control-plane=controller-manager --field-selector="status.phase==Running" \
+kubectl get deploy -A -lapp==rhacs-operator,control-plane=controller-manager -o jsonpath='{.items[0].metadata.name}' \
   || install_operator
 wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
 wait_created crd centrals.platform.stackrox.io
 
-oc new-project stackrox --skip-config-write=true >/dev/null \
-  || kubectl create namespace stackrox --save-config=false >/dev/null || true
-  # new-project is an kubectl only command
+create_cr_files
+
+kubectl get namespace stackrox \
+  || oc new-project stackrox --skip-config-write=true >/dev/null \
+  || kubectl create namespace stackrox --save-config=false >/dev/null
+  # new-project is an oc-only command
 create_cr central
 
+# TODO: wait for rhacs-operator to act on the new Central CRD
+kubectl logs -n openshift-operators deploy/rhacs-operator-controller-manager --tail=5
+
 if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
-  echo "configure readiness"
   configure_scanner_readiness &
   scanner_readiness_configure_pid=$!
 fi
