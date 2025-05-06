@@ -308,6 +308,7 @@ tests:
     test:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
+    - ref: openshift-qe-connectivity-check
     workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 8h0m0s
 - as: control-plane-ipsec-252nodes
@@ -330,6 +331,26 @@ tests:
     test:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+- always_run: false
+  as: control-plane-ipsec-252nodes-connectivity-check
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "249"
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      GC: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-connectivity-check
     workflow: openshift-qe-installer-aws-ovn-ipsec
 - as: data-path-ipsec-9nodes
   cron: 0 2 8,22 * *
