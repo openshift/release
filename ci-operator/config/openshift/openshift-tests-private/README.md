@@ -56,62 +56,29 @@ Job frequency is defined by cron according to the test requirements
 - f999: disable the job temporarily
 
 ~~~
-NOTE: We can use below script to generate cron settings against the frequency:
+NOTE: We can use below script to generate cron setting for a test case:
       ci-operator/config/openshift/openshift-tests-private/tools/generate-cron-entry.sh
+      We can use below script to generate cron settings for all test cases in a confilg file:
+      ci-operator/config/openshift/openshift-tests-private/tools/update-cron-entries.py
 ~~~
 
-# Installer (base_images)
+# Installer
 Available installers can be found in: ci-operator/config/openshift/installer
+
 Examples:
+```
   upi-installer:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
-
+```
+```
   openstack-installer:
     name: "4.14"
     namespace: ocp
     tag: openstack-installer
-
-# releases:
-The releases configuration option allows specification of a version of OpenShift that a component will be tested on.
-For details, please refer [Testing With an Ephemeral OpenShift Release](https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-an-ephemeral-openshift-release)
-
-## For E2E test
-latest: latest release describes the version that will be installed before tests are run.
-
-## For Upgrade Test
-initial: initial release describes the version of OpenShift which is initially installed, after which an upgrade is executed to the latest release, after which tests are run.
-latest: upgrade to version.
-
-## For non-amd64 tests, we have to keep latest and target settings as test framework need them.
-
-## Suggest to use fast channel as the init installed payload for upgrade tests
-
-## Examples
-###  Below is the script used to get a stable/ec build
-Get payload from release page(a release page like https://amd64.ocp.releases.ci.openshift.org/)
 ```
-releases:
-  latest: # User defined name, can be accessed in all test steps
-    # Below is Prow definde structure
-    prerelease: # references a version known to a release controller (release page)
-      architecture: arm64   # amd64, arm64, multi, ppc64le
-      product: ocp
-      version_bounds:   # find latest version >= lower and < upper
-        lower: 4.14.0-0
-        upper: 4.15.0-0
-```
-get payload from channel
-```
-releases:
-  arm64-latest:
-    # Below is Prow definde structure
-    release:    # references a version from Red Hat's Cincinnati update service https://api.openshift.com/api/upgrades_info/v1/graph
-      architecture: arm64
-      channel: fast # candidate, fast, stable, eus
-      version: "4.12"
-```
+
 ### Below is the script used to get a nightly/ci build
 ```
 releases:
