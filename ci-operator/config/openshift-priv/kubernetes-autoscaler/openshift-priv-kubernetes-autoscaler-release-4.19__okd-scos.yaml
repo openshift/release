@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.19
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
@@ -16,24 +12,23 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.19
+canonical_go_repository: github.com/openshift/kubernetes-autoscaler
 images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile
+  dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
   from: origin_scos-4.19_base-stream9
   inputs:
-    ocp_builder_rhel-9-base-nodejs-openshift-4.19:
-      as:
-      - web-builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.19
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: monitoring-plugin
+  to: cluster-autoscaler
 promotion:
   to:
-  - name: scos-4.19
+  - disabled: true
+    name: scos-4.19
     namespace: origin
 releases:
   latest:
@@ -56,6 +51,6 @@ tests:
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.19
-  org: openshift
-  repo: monitoring-plugin
+  org: openshift-priv
+  repo: kubernetes-autoscaler
   variant: okd-scos
