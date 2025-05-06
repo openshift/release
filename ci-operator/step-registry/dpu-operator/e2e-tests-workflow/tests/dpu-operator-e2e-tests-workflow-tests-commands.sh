@@ -42,13 +42,13 @@ check_pull_number() {
         
         handle_job_status "$check_pull_number_response"
 
-        sleep 300
+        sleep 100
     done
 }
 
-queue_url=$(cat "/var/run/token/dpu-token/queue-url")
-queue_endpoint=$(cat "/var/run/token/dpu-token/queue-endpoint")
-ip_address=$(cat "/var/run/token/dpu-token/ip-address")
+queue_url=$(cat "/var/run/token/e2e-test/queue-url")
+queue_endpoint=$(cat "/var/run/token/e2e-test/queue-endpoint")
+ip_address=$(cat "/var/run/token/e2e-test/ip-address")
 endpoint_resolve="${queue_endpoint}:80:${ip_address}"
 
 #Check timeout wa

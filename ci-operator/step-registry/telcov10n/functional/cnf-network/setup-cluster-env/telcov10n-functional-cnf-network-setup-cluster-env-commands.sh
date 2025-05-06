@@ -2,6 +2,16 @@
 set -e
 set -o pipefail
 
-echo kni-qe-92 > ${SHARED_DIR}/cluster_name
-echo intel_710 > ${SHARED_DIR}/ocp_nic
-echo mlx_cx_6 > ${SHARED_DIR}/secondary_nic
+echo "Setup pipeline environment"
+cd /eco-ci-cd/
+export ANSIBLE_REMOTE_TEMP="/tmp"
+ansible-playbook ./playbooks/setup-cluster-env.yml --extra-vars "release=${VERSION} dest_directory=${SHARED_DIR}"
+
+echo "Cluster name"
+cat ${SHARED_DIR}/cluster_name
+
+echo "OCP primary nic"
+cat ${SHARED_DIR}/ocp_nic
+
+echo "OCP secondary nic"
+cat ${SHARED_DIR}/secondary_nic

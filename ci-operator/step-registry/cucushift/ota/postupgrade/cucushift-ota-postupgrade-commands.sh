@@ -304,14 +304,16 @@ function run_ota_multi_test(){
     caseset=(OCP-47197)
     for case in ${caseset[*]}; do
         if ! type post-"${case}" &>/dev/null; then
-            echo "WARN: no post-${case} function found" >> "${report_file}"
+            echo "WARN: no post-${case} function found"
         else
             echo "------> ${case}"
             post-"${case}"
             if [[ $? == 0 ]]; then
-                echo "PASS: post-${case}" >> "${report_file}"
+                echo "PASS: post-${case}"
+                export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${case}"
             else
-                echo "FAIL: post-${case}" >> "${report_file}"
+                echo "FAIL: post-${case}"
+                export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${case}"
             fi
         fi
     done
@@ -320,23 +322,44 @@ function run_ota_multi_test(){
 # Run single case through case ID
 function run_ota_single_case(){
     if ! type post-"${1}" &>/dev/null; then
-        echo "WARN: no post-${1} function found" >> "${report_file}"
+        echo "WARN: no post-${1} function found"
     else
         echo "------> ${1}"
         post-"${1}"
         if [[ $? == 0 ]]; then
-            echo "PASS: post-${1}" >> "${report_file}"
+            echo "PASS: post-${1}"
+            export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${1}"
         else
-            echo "FAIL: post-${1}" >> "${report_file}"
+            echo "FAIL: post-${1}"
+            export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${1}"
         fi
     fi
+}
+
+# Generate the Junit for ota-postupgrade
+function createPostUpgradeJunit() {
+    echo -e "\n# Generating the Junit for ota-postupgrade"
+    local report_file="${ARTIFACT_DIR}/junit_ota_postupgrade.xml"
+    IFS=" " read -r -a ota_success_cases <<< "${SUCCESS_CASE_SET}"
+    IFS=" " read -r -a ota_failure_cases <<< "${FAILURE_CASE_SET}"
+    local cases_count=$((${#ota_success_cases[@]} + ${#ota_failure_cases[@]}))
+    echo '<?xml version="1.0" encoding="UTF-8"?>' > "${report_file}"
+    echo "<testsuite name=\"ota postupgrade\" tests=\"${cases_count}\" failures=\"${#ota_failure_cases[@]}\">" >> "${report_file}"
+    for success in "${ota_success_cases[@]}"; do
+        echo "  <testcase name=\"ota postupgrade should succeed: ${success}\"/>" >> "${report_file}"
+    done
+    for failure in "${ota_failure_cases[@]}"; do
+        echo "  <testcase name=\"ota postupgrade should succeed: ${failure}\">" >> "${report_file}"
+        echo "    <failure message=\"ota postupgrade failed at ${failure}\"></failure>" >> "${report_file}"
+        echo "  </testcase>" >> "${report_file}"
+    done
+    echo '</testsuite>' >> "${report_file}"
 }
 
 if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
   exit 0
 fi
 
-report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 # oc cli is injected from release:target
 run_command "which oc"
 run_command "oc version --client"
@@ -347,10 +370,13 @@ fi
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
-
+export SUCCESS_CASE_SET=""
+export FAILURE_CASE_SET=""
 set +e
+
 if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
 else
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
+createPostUpgradeJunit

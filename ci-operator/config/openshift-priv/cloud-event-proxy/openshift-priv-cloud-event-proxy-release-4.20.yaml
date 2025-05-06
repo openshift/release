@@ -26,7 +26,8 @@ images:
   to: cloud-event-consumer
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - cloud-event-consumer
     name: 4.20-priv
     namespace: ocp-private
@@ -49,7 +50,6 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws
-  optional: true
   steps:
     cluster_profile: aws-telco
     env:
@@ -91,6 +91,12 @@ tests:
     env:
       PROJECT_NAME: cloud-event-proxy
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
