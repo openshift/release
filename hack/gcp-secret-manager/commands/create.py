@@ -31,7 +31,7 @@ REQUEST_INFO = "request-information"
     help="The secret collection to store the secret",
     type=str,
 )
-@click.option("-n", "--name", required=True, help="Name of the secret", type=str)
+@click.option("-s", "--secret", required=True, help="Name of the secret", type=str)
 @click.option(
     "-f",
     "--from-file",
@@ -42,10 +42,10 @@ REQUEST_INFO = "request-information"
 @click.option(
     "-l", "--from-literal", default="", help="Secret data as string input", type=str
 )
-def create(collection: str, name: str, from_file: str, from_literal: str):
+def create(collection: str, secret: str, from_file: str, from_literal: str):
     """Create a new secret in the specified collection."""
 
-    validate(collection, name, from_file, from_literal)
+    validate(collection, secret, from_file, from_literal)
     click.echo(
         "\nTo help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
         "If a field does not apply to your case, type 'N/A' to continue.\n"
@@ -55,10 +55,11 @@ def create(collection: str, name: str, from_file: str, from_literal: str):
 
     try:
         client = secretmanager.SecretManagerServiceClient()
-        secret = client.create_secret(
+
+        gcp_secret = client.create_secret(
             request={
                 "parent": f"projects/{PROJECT_ID}",
-                "secret_id": get_secret_name(collection, name),
+                "secret_id": get_secret_name(collection, secret),
                 "secret": {
                     "replication": {"automatic": {}},
                     "labels": labels,
@@ -67,22 +68,22 @@ def create(collection: str, name: str, from_file: str, from_literal: str):
             }
         )
         client.add_secret_version(
-            parent=secret.name,
+            parent=gcp_secret.name,
             payload={
                 "data": create_payload(from_file, from_literal),
             },
         )
-        click.echo(f"Secret '{name}' successfully created")
+        click.echo(f"Secret '{secret}' successfully created")
     except AlreadyExists:
         raise click.ClickException(
-            "Secret '{name}' already exists in collection '{collection}'."
+            f"Secret '{secret}' already exists in collection '{collection}'."
         )
     except PermissionDenied:
-        raise click.UsageError(
+        raise click.ClickException(
             f"Access denied: You do not have permission to create secrets in collection '{collection}'"
         )
     except Exception as e:
-        raise click.ClickException(f"Failed to create secret '{name}': {e}")
+        raise click.ClickException(f"Failed to create secret '{secret}': {e}")
 
 
 def prompt_for_labels() -> typing.Dict[str, str]:
@@ -130,6 +131,7 @@ def prompt_for_annotations() -> typing.Dict[str, str]:
         "Do not include sensitive information.\n"
     )
     annotations[REQUEST_INFO] = prompt_for_annotation(REQUEST_INFO)
+    check_annotations_size(annotations)
     return annotations
 
 
@@ -141,3 +143,13 @@ def prompt_for_annotation(msg: str) -> str:
         if value:
             return value
         click.echo("Input cannot be empty. Please enter a value or 'N/A'.")
+
+
+def check_annotations_size(annotations: dict) -> bool:
+    size = sum(
+        len(key.encode("utf-8")) + len(value.encode("utf-8"))
+        for key, value in annotations
+    )
+    # The total size of annotation keys and values must be less than 16KiB.
+    if size > (16 * 1024):
+        raise click.ClickException("Total annotations size exceeds the allowed limit.")
