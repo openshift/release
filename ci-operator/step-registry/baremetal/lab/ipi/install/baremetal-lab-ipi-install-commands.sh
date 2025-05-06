@@ -233,24 +233,24 @@ if ! wait $!; then
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-if [ "${DISCONNECTED}" == "true" ]; then
-  IPI_BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address_fw")"
-  echo -e "\n[INFO] Deleting firewall rules for bootstrap IP"
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${IPI_BOOTSTRAP_IP}" << 'EOF'
-    set -o nounset
-    set -o errexit
-    IPI_BOOTSTRAP_IP="${1}"
-    if [ -n "${IPI_BOOTSTRAP_IP}" ]; then
-      rule=$(iptables -S FORWARD | grep "${IPI_BOOTSTRAP_IP}"| grep DROP | sed 's/^-A /-D /')
-      read -r -a RULE <<< "${rule}"
-      [[ "${rule}" =~ D.*$IPI_BOOTSTRAP_IP.*DROP ]] && iptables "${RULE[@]}"
-      while read -r line; do
-        read -r -a RULE <<< "${line}"
-        [[ "${line}" =~ D.*$IPI_BOOTSTRAP_IP.*ACCEPT ]] && iptables "${RULE[@]}"
-      done < <(iptables -S FORWARD | grep "${IPI_BOOTSTRAP_IP}"| grep ACCEPT | sed 's/^-A /-D /')
-    fi
-EOF
-fi
+#if [ "${DISCONNECTED}" == "true" ]; then
+#  IPI_BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address_fw")"
+#  echo -e "\n[INFO] Deleting firewall rules for bootstrap IP"
+#  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${IPI_BOOTSTRAP_IP}" << 'EOF'
+#    set -o nounset
+#    set -o errexit
+#    IPI_BOOTSTRAP_IP="${1}"
+#    if [ -n "${IPI_BOOTSTRAP_IP}" ]; then
+#      rule=$(iptables -S FORWARD | grep "${IPI_BOOTSTRAP_IP}"| grep DROP | sed 's/^-A /-D /')
+#      read -r -a RULE <<< "${rule}"
+#      [[ "${rule}" =~ D.*$IPI_BOOTSTRAP_IP.*DROP ]] && iptables "${RULE[@]}"
+#      while read -r line; do
+#        read -r -a RULE <<< "${line}"
+#        [[ "${line}" =~ D.*$IPI_BOOTSTRAP_IP.*ACCEPT ]] && iptables "${RULE[@]}"
+#      done < <(iptables -S FORWARD | grep "${IPI_BOOTSTRAP_IP}"| grep ACCEPT | sed 's/^-A /-D /')
+#    fi
+#EOF
+#fi
 
 echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
 oinst wait-for install-complete &

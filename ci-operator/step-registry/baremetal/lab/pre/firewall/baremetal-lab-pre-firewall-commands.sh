@@ -70,17 +70,30 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   IP_ARRAY=("${@:4}")
   for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
-    if [[ -n "${IPI_BOOTSTRAP_IP}" ]]; then
-      iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
-      iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${ip}" -j ACCEPT
-    fi
     iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
-  if [[ -n "${IPI_BOOTSTRAP_IP}" ]]; then
-    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
-    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
-  fi
 EOF
+
+#  "${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" << 'EOF'
+#  set -o nounset
+#  set -o errexit
+#  INTERNAL_NET_CIDR="${1}"
+#  BMC_NETWORK="${2}"
+#  IPI_BOOTSTRAP_IP="${3}"
+#  IP_ARRAY=("${@:4}")
+#  for ip in "${IP_ARRAY[@]}"; do
+#    # TODO: change to firewalld or nftables
+#    if [[ -n "${IPI_BOOTSTRAP_IP}" ]]; then
+#      iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
+#    #  iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${ip}" -j ACCEPT
+#    fi
+#    iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+#  done
+#  if [[ -n "${IPI_BOOTSTRAP_IP}" ]]; then
+#    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
+#    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+#  fi
+#EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
 cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
