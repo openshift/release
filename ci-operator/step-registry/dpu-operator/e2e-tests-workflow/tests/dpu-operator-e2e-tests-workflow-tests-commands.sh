@@ -2,6 +2,11 @@
 
 echoerr() { echo "$@" 1>&2; }
 
+die() {
+    printf '%s\n' "$*"
+    exit 1
+}
+
 check_timeout_status() {
         curl --resolve "${endpoint_resolve}" -X POST "$queue_url/check_timed_out_job" -H "Content-Type: application/json" -d "{\"pull_pull_sha\": \"${PULL_PULL_SHA}\"}"
 }
@@ -46,8 +51,16 @@ check_pull_number() {
     done
 }
 
+resolve_name() {
+    # No nslookup/dig is installed. Use python.
+    pip install dnspython &>/dev/null &&
+      python3 -c 'import sys, dns.resolver as d; r = d.Resolver(); r.nameservers = ["10.38.5.26"]; print(next(iter(r.resolve(sys.argv[1], "A"))))' "$1"
+}
+
 queue_endpoint=$(cat "/var/run/token/e2e-test/queue-endpoint")
-ip_address=$(cat "/var/run/token/e2e-test/ip-address")
+
+ip_address="$(resolve_name "$queue_endpoint")" || die "Failed to resolve endpoint"
+
 queue_url="http://$queue_endpoint"
 endpoint_resolve="${queue_endpoint}:80:${ip_address}"
 
