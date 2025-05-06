@@ -363,6 +363,7 @@ echo ">>> Wait for 'stackrox scanner' deployments"
 wait_deploy scanner
 wait_deploy scanner-db
 
+set +e  # ignore errors
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
@@ -373,7 +374,6 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
     if ! kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=0; then
       echo 'scanner-v4-matcher is not ready'
       echo '>>> Check for matcher readiness log entries:'
-      kubectl logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods --tail=10 | grep initial
       { kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT} | sed -e '/^/WAIT: /'; } &
       waiter_pid=$!
       for i in {1..10}; do
