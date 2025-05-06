@@ -49,29 +49,34 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-if ! openstack network show "${OPENSTACK_SRIOV_NETWORK}" >/dev/null 2>&1; then
-    echo "Network ${OPENSTACK_SRIOV_NETWORK} doesn't exist"
-    exit 1
-fi
-NETWORK_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f value -c id)
-SUBNET_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f json -c subnets | jq '.subnets[0]' | sed 's/"//g')
-
-oc_version=$(oc version -o json | jq -r '.openshiftVersion')
-if [[ "${oc_version}" != *"4.9"* && "${oc_version}" != *"4.10"* && "$CONFIG_DRIVE" != "true" ]]; then
-    CONFIG_DRIVE=false
+# If this file is present, Hypershift has already configured the workers correctly
+# in a previous step so there's no need to recreate them.
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 else
-    CONFIG_DRIVE=true
-fi
-
-echo "Downloading current MachineSet for workers"
-WORKER_MACHINESET=$(oc get machinesets.machine.openshift.io -n openshift-machine-api | grep worker | awk '{print $1}')
-oc get machinesets.machine.openshift.io -n openshift-machine-api "${WORKER_MACHINESET}" -o json > "${SHARED_DIR}/original-worker-machineset.json"
-
-if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"hwoffload"* ]]; then
-    PROFILE="\"profile\": {\"capabilities\": \"[switchdev]\"},"
-fi
-
-cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
+	if ! openstack network show "${OPENSTACK_SRIOV_NETWORK}" >/dev/null 2>&1; then
+	    echo "Network ${OPENSTACK_SRIOV_NETWORK} doesn't exist"
+	    exit 1
+	fi
+	NETWORK_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f value -c id)
+	SUBNET_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f json -c subnets | jq '.subnets[0]' | sed 's/"//g')
+	
+	if [[ "$CONFIG_DRIVE" != "true" ]]; then
+	    CONFIG_DRIVE=false
+	else
+	    CONFIG_DRIVE=true
+	fi
+	
+	echo "Downloading current MachineSet for workers"
+	WORKER_MACHINESET=$(oc get machinesets.machine.openshift.io -n openshift-machine-api | grep worker | awk '{print $1}')
+	oc get machinesets.machine.openshift.io -n openshift-machine-api "${WORKER_MACHINESET}" -o json > "${SHARED_DIR}/original-worker-machineset.json"
+	
+	if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"hwoffload"* ]]; then
+	    PROFILE="\"profile\": {\"capabilities\": \"[switchdev]\"},"
+	fi
+	
+	cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
 {
   "spec": {
     "template": {
@@ -104,20 +109,21 @@ cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
   }
 }
 EOF
-echo "Merging the original worker MachineSet with the patched configuration for SR-IOV"
-jq -Ss '.[0] * .[1]' "${SHARED_DIR}/original-worker-machineset.json" "${SHARED_DIR}/sriov_patch.json" > "${SHARED_DIR}/sriov-worker-machineset.json"
-python -c 'import sys, yaml, json; yaml.dump(json.load(sys.stdin), sys.stdout, indent=2)' < "${SHARED_DIR}/sriov-worker-machineset.json" > "${SHARED_DIR}/sriov-worker-machineset.yaml"
-
-echo "Apply the new MachineSet for SR-IOV workers"
-oc apply -f "${SHARED_DIR}/sriov-worker-machineset.yaml"
-
-echo "Scaling up worker to 1"
-oc scale --replicas=1 machinesets.machine.openshift.io "${WORKER_MACHINESET}" -n openshift-machine-api
-wait_for_worker_machines
-
-echo "Disable mastersSchedulable since we now have a dedicated worker node"
-oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
-sleep 10
+	echo "Merging the original worker MachineSet with the patched configuration for SR-IOV"
+	jq -Ss '.[0] * .[1]' "${SHARED_DIR}/original-worker-machineset.json" "${SHARED_DIR}/sriov_patch.json" > "${SHARED_DIR}/sriov-worker-machineset.json"
+	python -c 'import sys, yaml, json; yaml.dump(json.load(sys.stdin), sys.stdout, indent=2)' < "${SHARED_DIR}/sriov-worker-machineset.json" > "${SHARED_DIR}/sriov-worker-machineset.yaml"
+	
+	echo "Apply the new MachineSet for SR-IOV workers"
+	oc apply -f "${SHARED_DIR}/sriov-worker-machineset.yaml"
+	
+	echo "Scaling up worker to 1"
+	oc scale --replicas=1 machinesets.machine.openshift.io "${WORKER_MACHINESET}" -n openshift-machine-api
+	wait_for_worker_machines
+	
+	echo "Disable mastersSchedulable since we now have a dedicated worker node"
+	oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
+	sleep 10
+fi
 
 echo "Apply SRIOV capable label to the worker node"
 WORKER_NODE=$(oc get node -o custom-columns=NAME:.metadata.name --no-headers -l node-role.kubernetes.io/worker)

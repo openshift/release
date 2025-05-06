@@ -1,0 +1,189 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+images:
+- dockerfile_path: automation/generatetasks/build/Dockerfile
+  to: base-tests
+- dockerfile_path: build/Containerfile
+  to: tekton-tasks
+- dockerfile_path: build/Containerfile.DiskVirt
+  to: tekton-task-disk-virt
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit-tests:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+test_binary_build_commands: automation/build-test.sh
+tests:
+- as: unit-tests
+  commands: |
+    make test-with-reports
+  container:
+    from: test-bin
+- as: e2e-tests
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+
+        if ! hash kubectl 2>/dev/null; then
+          pushd $(dirname $(which oc))
+          ln -s oc kubectl
+          popd
+        fi
+
+        accessKeyPath="/tmp/secrets/accessKeyId"
+        secretKeyPath="/tmp/secrets/secretKey"
+        if test -f "$accessKeyPath" && test -f "$secretKeyPath"; then
+          export REGISTRY_ACCESS_KEY_ID=$(cat ${accessKeyPath} | tr -d '\n')
+          export REGISTRY_SECRET_KEY=$(cat ${secretKeyPath} | tr -d '\n')
+          export IMAGE_DESTINATION="quay.io/kubevirtci/tekton-tasks"
+        fi
+
+        automation/build-test.sh
+        export PATH=$PATH:$(pwd)/go/bin
+        NUM_NODES=4 \
+          make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: tekton-tasks-pusher
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: base-tests
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-gcp
+- as: win10-pipeline-example-test
+  run_if_changed: (^automation/.*|^templates-pipelines/windows-bios-installer/.*|^templates-pipelines/windows-customize/.*|^modules/.*|^templates/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win10-pipeline-example-test
+      cli: latest
+      commands: TARGET=windows10 ./automation/e2e-pipelines/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win11-pipeline-example-test
+  run_if_changed: (^automation/.*|^templates-pipelines/windows-efi-installer/.*|^templates-pipelines/windows-customize/.*|^modules/.*|^templates/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      cli: latest
+      commands: TARGET=windows11 ./automation/e2e-pipelines/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win2k22-pipeline-example-test
+  run_if_changed: (^automation/.*|^templates-pipelines/windows-efi-installer/.*|^templates-pipelines/windows-customize/.*|^modules/.*|^templates/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win2k22-pipeline-example-test
+      cli: latest
+      commands: TARGET=windows2k22 ./automation/e2e-pipelines/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win2k25-pipeline-example-test
+  run_if_changed: (^automation/.*|^templates-pipelines/windows-efi-installer/.*|^templates-pipelines/windows-customize/.*|^modules/.*|^templates/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win2k25-pipeline-example-test
+      cli: latest
+      commands: TARGET=windows2k25 ./automation/e2e-pipelines/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.24
+  org: kubevirt
+  repo: kubevirt-tekton-tasks

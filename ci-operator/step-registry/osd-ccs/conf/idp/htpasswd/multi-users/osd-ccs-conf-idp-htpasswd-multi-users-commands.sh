@@ -32,9 +32,9 @@ fi
 # Get the HTPasswd IDP ID
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 IDP_ID=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/identity_providers" --parameter search="type is 'HTPasswdIdentityProvider'" | jq -r '.items[].id' | head -n 1)
-
+IDP_INFO=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/identity_providers/${IDP_ID}")
 # Generate mulitple users 
-echo "Generate the mulitple users under the htpasswd idp ..."
+echo "Generate the mulitple users under ${IDP_INFO} the htpasswd idp ..."
 users=""
 for i in $(seq 1 ${USER_COUNT});
 do

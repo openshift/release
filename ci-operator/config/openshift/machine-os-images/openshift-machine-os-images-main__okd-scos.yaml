@@ -1,21 +1,17 @@
 base_images:
-  ocp_4.19_installer:
-    name: "4.19"
-    namespace: ocp
-    tag: installer
-  origin_scos-4.19_base-stream9:
-    name: scos-4.19
+  origin_scos-4.20_base-stream9:
+    name: scos-4.20
     namespace: origin
     tag: base-stream9
-  origin_scos-4.19_installer:
-    name: scos-4.19
+  origin_scos-4.20_installer:
+    name: scos-4.20
     namespace: origin
     tag: installer
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.19
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.20
 images:
 - build_args:
   - name: TAGS
@@ -23,24 +19,22 @@ images:
   - name: DIRECT_DOWNLOAD
     value: "true"
   dockerfile_path: Dockerfile
-  from: origin_scos-4.19_base-stream9
+  from: origin_scos-4.20_base-stream9
   inputs:
-    ocp_4.19_installer:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:installer
-    origin_scos-4.19_installer:
+    origin_scos-4.20_installer:
       as:
       - builder
+      - registry.ci.openshift.org/ocp/4.19:installer
   to: machine-os-images
 promotion:
   to:
-  - name: scos-4.19
+  - name: scos-4.20
     namespace: origin
 releases:
   latest:
     integration:
       include_built_images: true
-      name: scos-4.19
+      name: scos-4.20
       namespace: origin
 resources:
   '*':

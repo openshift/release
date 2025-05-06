@@ -16,13 +16,16 @@ CONFIG = {
         'us-east-1': 5,
     },
     'aws-2-quota-slice': {
-        'us-east-1': 60,
-        'us-east-2': 60,
-        'us-west-1': 55,
-        'us-west-2': 60,
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-3-quota-slice': {
-        'us-east-1': 40,
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-cspi-qe-quota-slice': {
         'us-east-1': 30,
@@ -34,10 +37,10 @@ CONFIG = {
     },
     'aws-qe-quota-slice': {
         'us-east-1': 25,
-        'ap-northeast-1': 5,
+        'ap-northeast-1': 10,
     },
     'aws-autorelease-qe-quota-slice': {
-        'us-east-1': 4,
+        'us-east-1': 7,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -87,6 +90,12 @@ CONFIG = {
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
     },
+    'metal-perfscale-selfsched-quota-slice': {
+        'metal-perfscale-selfsched': 3,
+    },
+    'metal-perfscale-telco-quota-slice': {
+        'metal-perfscale-telco-rdu2': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -96,7 +105,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 5,
+        'us-east-1': 15,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -185,7 +194,7 @@ CONFIG = {
         'canadacentral': 5,
     },
     'azure-autorelease-qe-quota-slice': {
-        'eastus2': 4
+        'eastus2': 7
     },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,
@@ -198,10 +207,10 @@ CONFIG = {
         'usgovtexas': 5
     },
     'azure-sustaining-autorelease-412-quota-slice': {
-        'eastus': 10,
+        'eastus': 15,
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 70,
+        'default': 110,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -209,17 +218,26 @@ CONFIG = {
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
     },
+    'equinix-edge-enablement-quota-slice': {
+        'default': 40,
+    },
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-observability-quota-slice': {
+        'us-central1': 30,
+    },
     'gcp-qe-c3-metal-quota-slice': {
         'us-central1': 4,
     },
     'gcp-autorelease-qe-quota-slice': {
-        'us-central1': 4,
+        'us-central1': 7,
+    },
+    'gcp-sustaining-autorelease-412-quota-slice': {
+        'us-east1': 15,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -244,7 +262,11 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
+    'libvirt-s390x-vpn-quota-slice': {
+        'libvirt-s390x-0-1': 1
+    },
     'libvirt-ppc64le-quota-slice': {},
+    'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'default': 1000,
@@ -263,22 +285,30 @@ CONFIG = {
         'default': 2,
     },
     'openstack-hwoffload-quota-slice': {
-        'default': 5,
+        'default': 3,
     },
     'openstack-nerc-dev-quota-slice': {
         'default': 1,
     },
-    'rhoso-giant28-quota-slice': {
+    'openstack-rhoso-quota-slice': {
+        'serval71.lab.eng.tlv2.redhat.com': 1,
+    },
+    'openstack-rhos-ci-quota-slice': {
         'default': 1,
-    },    
+    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 4,
+        'default': 3,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 4,
+        'default': 3,
+    },
+    'openstack-vh-bm-rhos-quota-slice': {
+        'openstack-vh-mecha-central': 3,
+        'openstack-vh-mecha-az0': 3,
+        'openstack-hwoffload': 3,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
@@ -339,7 +369,7 @@ CONFIG = {
         'us-east': 7,
     },
     'ibmcloud-qe-quota-slice': {
-        'jp-tok': 10,
+        'jp-tok': 20,
     },
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
@@ -498,6 +528,9 @@ for i in range(3):
 # Reserve one for internal debugging use
 del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-0-3']
 
+for i in range(4):
+    CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-{}'.format(i)] = 1
+
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
@@ -537,7 +570,7 @@ for i in [871,991,1165,1154,1148,1140]:
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
-for i in range(0,100):
+for i in range(0,80):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
 for i in range(4):

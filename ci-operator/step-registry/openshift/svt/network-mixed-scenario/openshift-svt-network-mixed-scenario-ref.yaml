@@ -1,0 +1,101 @@
+ref:
+  as: openshift-svt-network-mixed-scenario
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "v2.3.1"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is true, which means the workload with delete and recreate a set number of namespaces
+  - name: EXTRA_FLAGS
+    default: "--churn-duration=20m --timeout=5h"
+    documentation: |-
+      Default is Churn Duration for 20 minutes
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "false"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: ITERATIONS
+    default: "9"
+    documentation: |-
+      The number of iterations per worker nodes to create
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: ADDITIONAL_PARAMS
+    default: ""
+    documentation: |-
+      JSON value to upload additonal metadata to ES index
+  - name: PPROF
+    default: "false"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: PPROF
+    default: "false"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: NO_VERIFY_ANP
+    default: "true"
+    documentation: |-
+      Verify network connection after create anp if set it false
+  - name: ENABLE_INGRESS_CONTROLLER
+    default: "true"
+    documentation: |-
+      If creating customized ingress controller
+  - name: ENABLE_EGRESS_FIREWALL_POLICY
+    default: "true"
+    documentation: |-
+      If creating egress firewall policy
+  - name: EGRESS_FIREWALL_POLICY_RULES_TOTAL_NUM
+    default: "50"
+    documentation: |-
+      How many rules per egress network firewall policy
+  - name: ENABLE_NETWORK_POLICY
+    default: "true"
+    documentation: |-
+      If creating network policy
+  - name: IF_SCALE_NODE_TESTING
+    default: "true"
+    documentation: |-
+      If scaling out/down worker nodes after creating large scale anp,netpol and egressfirewall
+  commands: openshift-svt-network-mixed-scenario-commands.sh
+  timeout: 8h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  - namespace: test-credentials
+    name: ocp-perfscale-horreum-poc
+    mount_path: /horreum-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale network mixed scenario workload in the deployed cluster

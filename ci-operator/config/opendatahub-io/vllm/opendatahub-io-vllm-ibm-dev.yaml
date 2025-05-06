@@ -6,7 +6,7 @@ build_root:
 images:
 - build_args:
   - name: max_jobs
-    value: "12"
+    value: "24"
   - name: nvcc_threads
     value: "2"
   - name: TORCH_CUDA_ARCH_LIST
@@ -31,8 +31,8 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 200m
-      memory: 200Mi
+      cpu: "1"
+      memory: 500Mi
   smoke-test:
     limits:
       cpu: "4"
@@ -44,15 +44,16 @@ resources:
       nvidia.com/gpu: "1"
   vllm-build-ibm-dev-cuda:
     limits:
-      cpu: "16"
-      memory: 50Gi
+      cpu: "24"
+      memory: 84Gi
     requests:
-      cpu: "16"
-      memory: 24Gi
+      cpu: "24"
+      memory: 84Gi
 tests:
 - always_run: true
   as: smoke-test
-  cluster: build05
+  capabilities:
+  - gpu
   commands: |
     export VIRTUAL_ENV=/opt/vllm
     export PATH=$VIRTUAL_ENV/bin/:$PATH
@@ -64,6 +65,8 @@ tests:
     clone: true
     from: vllm-build-ibm-dev-cuda
 - as: ibm-dev-image-mirror
+  capabilities:
+  - highperf
   postsubmit: true
   steps:
     dependencies:
@@ -72,6 +75,7 @@ tests:
       IMAGE_REPO: vllm
       RELEASE_VERSION: fast-ibm
     workflow: opendatahub-io-ci-image-mirror
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: ibm-dev
   org: opendatahub-io

@@ -13,7 +13,7 @@ spec:
     ovnKubernetesConfig:
       gatewayConfig:
         ipv4:
-          internalMasqueradeSubnet: 100.254.169.0/29
+          internalMasqueradeSubnet: 100.254.169.0/24
 EOF
 
 cat ${SHARED_DIR}/manifest_cluster-network-03-config.yml

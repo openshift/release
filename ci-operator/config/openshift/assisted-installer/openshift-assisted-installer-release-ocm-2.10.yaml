@@ -98,13 +98,13 @@ tests:
   container:
     clone: true
     from: assisted-installer-build
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: format-check
   commands: make format-check
   container:
     clone: true
     from: assisted-installer-build
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test
   commands: |
     export GOCACHE=/tmp/gocache
@@ -116,7 +116,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
     export GOCACHE=/tmp/gocache
@@ -130,7 +130,8 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
 - as: e2e-ai-operator-ztp
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  cluster: build05
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -138,8 +139,8 @@ tests:
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal-operator-ztp
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
 zz_generated_metadata:
   branch: release-ocm-2.10
   org: openshift

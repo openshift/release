@@ -77,7 +77,7 @@ fi
 if [[ -n "$AKS_K8S_VERSION" ]]; then
     AKS_CREATE_COMMAND+=(--kubernetes-version "$AKS_K8S_VERSION")
 elif [[ "$USE_LATEST_K8S_VERSION" == "true" ]]; then
-    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[*].orchestratorVersion)')
+    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[?isPreview==`null`].orchestratorVersion)')
     AKS_CREATE_COMMAND+=(--kubernetes-version "$K8S_LATEST_VERSION")
 fi
 
@@ -109,6 +109,8 @@ if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
     RG_ID="$(az group show -n "$RESOURCEGROUP" --query id -o tsv)"
     az role assignment create --assignee-object-id "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" --role "Key Vault Secrets User" --scope "${RG_ID}" --assignee-principal-type ServicePrincipal
 fi
+
+echo "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" > "${SHARED_DIR}/kv-object-id"
 
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(

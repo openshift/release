@@ -1,0 +1,80 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  opendatahub-tests:
+    name: opendatahub-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: ods_ci/build/Dockerfile_interop
+  to: rhoai-tests
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.19.0-0
+        stream: 4-dev-preview
+        upper: 4.20.0-0
+resources:
+  '*':
+    limits:
+      memory: 20Gi
+    requests:
+      cpu: 8000m
+      memory: 10Gi
+tests:
+- as: rhoai-interop-aws
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: aws-rhoai-qe
+    env:
+      BASE_DOMAIN: interop.rh-ods.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      CONTROL_PLANE_REPLICAS: "3"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "rhoai-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19","self-managed","rhoai"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: obarhaim@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: RHOAIENG-22952
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+            {"name": "authorino-operator", "source": "redhat-operators", "channel": "tech-preview-v1", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
+            {"name": "rhods-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
+        ]
+      RE_TRIGGER_ON_FAILURE: "false"
+      TEST_MARKERS: ocp_interop
+      USER_TAGS: |
+        scenario rhoai
+    test:
+    - ref: install-operators
+    - ref: rhoai-deploy-dsc
+    - ref: rhoai-opendatahub-tests
+    - ref: rhoai-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: release-2.19
+  org: red-hat-data-services
+  repo: ods-ci
+  variant: rhoai-ocp4.19-interop

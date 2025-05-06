@@ -105,10 +105,18 @@ done
 
 echo "Waiting for cluster-admin ready..."
 start_time=$(date +"%s")
+
 while true; do
   sleep 30
   echo "Attempt to get cluster-admins group..."
-  cluster_admin=$(oc get group cluster-admins -o json | jq -r '.users[0]' || true)
+
+  for((i=0;i<=5;i++)); do
+    cluster_admin=$(oc get group cluster-admins -o json | jq -r .users[$i] || true)
+    if [[ "${cluster_admin}" == "${IDP_USER}" ]]; then
+      break
+    fi
+  done
+
   if [[ "${cluster_admin}" == "${IDP_USER}" ]]; then
     echo "cluster-admin is granted succesffully on the user ${cluster_admin}"
     break

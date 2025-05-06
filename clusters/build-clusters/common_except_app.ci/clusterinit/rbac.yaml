@@ -120,3 +120,59 @@ subjects:
 - kind: ServiceAccount
   name: cluster-init
   namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cluster-init
+  namespace: openshift-cloud-credential-operator
+rules:
+- apiGroups:
+  - cloudcredential.openshift.io
+  resources:
+  - credentialsrequests
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cluster-init
+  namespace: openshift-cloud-credential-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cluster-init
+subjects:
+- kind: ServiceAccount
+  name: cluster-init
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cluster-init
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  - serviceaccounts/token
+  verbs:
+  - get
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cluster-init
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cluster-init
+subjects:
+- kind: ServiceAccount
+  name: cluster-init
+  namespace: ci

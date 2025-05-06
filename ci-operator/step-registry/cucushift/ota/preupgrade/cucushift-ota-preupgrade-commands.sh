@@ -37,6 +37,19 @@ function get_tp_operator(){
     echo ${tp_operator[*]}
 }
 
+# get prometheus object
+# Parameter
+#    sub_url: the sub url of prometheus api
+# Example:
+#    get_prometheus_api "v1/label/reason/values"
+function get_prometheus_api(){
+    local token url sub_url="${1}"
+    token="$(oc -n openshift-monitoring create token prometheus-k8s)"
+    url="$(oc get route prometheus-k8s -n openshift-monitoring --no-headers|awk '{print $2}')"
+    curl -s -k -H "Authorization: Bearer $token" "https://${url}/api/${sub_url}"
+}
+        
+
 function check_tp_operator_notfound(){
     local try=0 max_retries=2
     declare -A tp_resourece=(
@@ -266,6 +279,98 @@ function pre-OCP-24358(){
         return 1
     fi
     return 0
+}
+
+function pre-OCP-32747(){
+    local reason alerts alert namespace severity description state summary retry=10
+    
+    oc patch featuregate cluster --type json -p '[{"op": "add", "path": "/spec/featureSet", "value": "TechPreviewNoUpgrade"}]'
+    while (( retry > 0 )); do
+        reason=$( get_prometheus_api "v1/label/reason/values" )
+        if [[ "${reason}" == *"FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+            break
+        fi
+        sleep 1m
+        retry=$((retry-1))
+    done
+    if [[ "${reason}" != *"FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+        echo "Error: 32747 After waiting 10 minutes, FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade still not appears"
+        return 1
+    fi
+
+    retry=5
+    while (( retry > 0 )); do
+        alerts=$( get_prometheus_api "v1/alerts" )
+        alert="$(echo "${alerts}" | yq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+        namespace="$(echo "${alert}" | yq -r ".labels.namespace")"
+        severity="$(echo "${alert}" | yq -r ".labels.severity")"
+        description="$(echo "${alert}" | yq -r ".annotations.description")"
+        state="$(echo "${alert}" | yq -r ".state")"
+        if [[ "${namespace}" != "openshift-cluster-version" ]] \
+            || [[ "${severity}" != "info" ]] \
+            || [[ "${description}" != *"In most cases, you will still be able to apply patch releases."* ]] \
+            || [[ "${state}" != "pending" ]]; then
+            sleep 1m
+            retry=$((retry-1))
+            continue
+        fi
+        break
+    done
+    echo -e "Alert ClusterNotUpgradeable at beginning:\n${alert}"
+    if [[ "${namespace}" != "openshift-cluster-version" ]]; then
+        echo "Error: 32747 namespace is incorrect, expected is openshift-cluster-version, but observed is ${namespace}"
+        return 1
+    fi
+    if [[ "${severity}" != "info" ]]; then
+        echo "Error: 32747 severity is incorrect, expected is info, but observed is ${severity}"
+        return 1
+    fi
+    if [[ "${description}" != *"In most cases, you will still be able to apply patch releases."* ]]; then
+        echo "Error: 32747 description is incorrect, expected is 'In most cases, you will still be able to apply patch releases.', but observed is '${description}'"
+        return 1
+    fi
+    if [[ "${state}" != "pending" ]]; then
+        echo "Error: 32747 state is incorrect, expected is pending, but observed is ${state}"
+        return 1
+    fi
+    echo "Alert ClusterNotUpgradeable at beginning is correct"
+
+    retry=0
+    while (( retry < 70 ));do
+        alerts=$( get_prometheus_api "v1/alerts" )
+        alert="$(echo "${alerts}" | yq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+        state="$(echo "${alert}" | yq -r ".state")"
+        if [[ "${state}" == "firing" ]]; then
+            if [[ ${retry} -lt 60 ]]; then
+                echo "Error: 32747 Alerts should be changed for at least 1 hour: https://github.com/openshift/cluster-version-operator/blob/8a8bca5df3bd89f8caab7c185f407f6a6e2697c8/install/0000_90_cluster-version-operator_02_servicemonitor.yaml#L87-L93"
+                echo "${alert}"
+                return 1
+            fi
+            break
+        fi
+        echo "Attempted ${retry}"
+        sleep 1m
+        retry=$((retry+1))
+    done
+
+    echo -e "Alert ClusterNotUpgradeable after 70 minutes is:\n${alert}"
+    if [[ "${state}" != "firing" ]]; then
+        echo -e "Error: 32747 Alert not changed to firing after 70 minutes"
+        return 1
+    fi
+
+    summary="$(echo "${alert}" | yq -r ".annotations.summary")"
+    if [[ "${summary}" != *"One or more cluster operators have been blocking minor version cluster upgrades for at least an hour."* ]]; then
+        echo "Error: 32747 When state is firing, summary is incorrect, expected is 'One or more cluster operators have been blocking minor version cluster upgrades for at least an hour.', but observed is '${summary}'"
+        return 1
+    fi
+
+    description="$(echo "${alert}" | yq -r ".annotations.description")"
+    if [[ "${description}" != *"Reason FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+        echo "Error: 32747 When state is firing, description is incorrect, expected is 'Reason FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade', but observed is '${description}'"
+        return 1
+    fi
+    echo "Alert ClusterNotUpgradeable works normal"
 }
 
 function pre-OCP-47197(){
@@ -705,14 +810,16 @@ function run_ota_multi_test(){
     caseset=(OCP-47197)
     for case in ${caseset[*]}; do
         if ! type pre-"${case}" &>/dev/null; then
-            echo "WARN: no pre-${case} function found" >> "${report_file}"
+            echo "WARN: no pre-${case} function found"
         else
             echo "------> ${case}"
             pre-"${case}"
             if [[ $? == 0 ]]; then
-                echo "PASS: pre-${case}" >> "${report_file}"
+                echo "PASS: pre-${case}"
+                export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${case}"
             else
-                echo "FAIL: pre-${case}" >> "${report_file}"
+                echo "FAIL: pre-${case}"
+                export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${case}"
             fi
         fi
     done
@@ -721,14 +828,16 @@ function run_ota_multi_test(){
 # Run single case through case ID
 function run_ota_single_case(){
     if ! type pre-"${1}" &>/dev/null; then
-        echo "WARN: no pre-${1} function found" >> "${report_file}"
+        echo "WARN: no pre-${1} function found"
     else
         echo "------> ${1}"
         pre-"${1}"
         if [[ $? == 0 ]]; then
-            echo "PASS: pre-${1}" >> "${report_file}"
+            echo "PASS: pre-${1}"
+            export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${1}"
         else
-            echo "FAIL: pre-${1}" >> "${report_file}"
+            echo "FAIL: pre-${1}"
+            export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${1}"
             # case failed in the middle may leave the cluster in unusable state
             if type defer-"${1}" &>/dev/null; then
                 defer-"${1}"
@@ -737,11 +846,31 @@ function run_ota_single_case(){
     fi
 }
 
+# Generate the Junit for ota-preupgrade
+function createPreUpgradeJunit() {
+    echo -e "\n# Generating the Junit for ota-preupgrade"
+    local report_file="${ARTIFACT_DIR}/junit_ota_preupgrade.xml"
+    IFS=" " read -r -a ota_success_cases <<< "${SUCCESS_CASE_SET}"
+    IFS=" " read -r -a ota_failure_cases <<< "${FAILURE_CASE_SET}"
+    local cases_count=$((${#ota_success_cases[@]} + ${#ota_failure_cases[@]}))
+    echo '<?xml version="1.0" encoding="UTF-8"?>' > "${report_file}"
+    echo "<testsuite name=\"ota preupgrade\" tests=\"${cases_count}\" failures=\"${#ota_failure_cases[@]}\">" >> "${report_file}"
+    for success in "${ota_success_cases[@]}"; do
+        echo "  <testcase name=\"ota preupgrade should succeed: ${success}\"/>" >> "${report_file}"
+    done
+    for failure in "${ota_failure_cases[@]}"; do
+        echo "  <testcase name=\"ota preupgrade should succeed: ${failure}\">" >> "${report_file}"
+        echo "    <failure message=\"ota preupgrade failed at ${failure}\"></failure>" >> "${report_file}"
+        echo "  </testcase>" >> "${report_file}"
+    done
+    echo '</testsuite>' >> "${report_file}"
+}
+
+
 if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
   exit 0
 fi
 
-report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 # oc cli is injected from release:target
 run_command "which oc"
 run_command "oc version --client"
@@ -753,9 +882,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+export SUCCESS_CASE_SET=""
+export FAILURE_CASE_SET=""
+
 set +e
 if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
 else
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
+createPreUpgradeJunit

@@ -113,19 +113,19 @@ storageConfig:
     path: /tmp/images
 mirror:
   operators:
-  - catalog: brew.registry.redhat.io/rh-osbs/iib:875516
+  - catalog: brew.registry.redhat.io/rh-osbs/iib:928197
     targetCatalog: rh-osbs/tempo
     packages:
     - name: tempo-product
       channels:
       - name: stable
-  - catalog: brew.registry.redhat.io/rh-osbs/iib:877598
+  - catalog: brew.registry.redhat.io/rh-osbs/iib:927219
     targetCatalog: rh-osbs/otel
     packages:
     - name: opentelemetry-product
       channels:
       - name: stable
-  - catalog: brew.registry.redhat.io/rh-osbs/iib:876810
+  - catalog: brew.registry.redhat.io/rh-osbs/iib:933808
     targetCatalog: rh-osbs/jaeger
     packages:
     - name: jaeger-product

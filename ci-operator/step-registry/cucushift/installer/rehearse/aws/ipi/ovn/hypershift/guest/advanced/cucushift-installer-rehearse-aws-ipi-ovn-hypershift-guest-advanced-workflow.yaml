@@ -1,0 +1,21 @@
+workflow:
+  as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-advanced
+  steps:
+    env:
+      REGION: us-east-1
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      HYPERSHIFT_DISK_ENCRYPTION: "true"
+      HYPERSHIFT_ETCD_ENCRYPTION: "true"
+    pre:
+    - ref: aws-provision-kms-key
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
+    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: cucushift-hypershift-extended-enable-guest
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
+    - ref: aws-deprovision-kms-key
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow.
+    The hosted cluster default storage will use the aws efs csi.

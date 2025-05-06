@@ -1,4 +1,3 @@
-
 def _add_files_cache_resources(gendoc):
     context = gendoc.context
 
@@ -151,7 +150,7 @@ instance.
                                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                                      '-tls-cert=/etc/tls/private/tls.crt',
                                      '-tls-key=/etc/tls/private/tls.key'],
-                            'image': 'quay.io/openshift/origin-oauth-proxy:4.16',
+                            'image': 'quay.io/openshift/origin-oauth-proxy:4.19',
                             'imagePullPolicy': 'IfNotPresent',
                             'name': 'oauth-proxy',
                             'ports': [{

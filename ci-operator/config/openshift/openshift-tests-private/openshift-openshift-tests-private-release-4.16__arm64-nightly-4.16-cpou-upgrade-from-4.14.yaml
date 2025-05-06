@@ -66,7 +66,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: azure-ipi-without-identity-mini-perm-f28
+  cron: 11 1 26 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
+        name: release:intermediate-arm64
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:target-arm64
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-azure-ipi-without-identity
 - as: baremetalds-ipi-ovn-ipv4-f28
+  cluster: build05
   cron: 36 20 20 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -75,8 +103,6 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
-      PACKET_METRO: dc
-      PACKET_PLAN: c3.large.arm64
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
@@ -93,14 +119,15 @@ tests:
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: gcp-ipi-private-f28
-  cron: 41 18 2 * *
+- as: gcp-ipi-private-mini-perm-f28
+  cron: 26 23 4 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - as: set-upgrade-releases

@@ -29,6 +29,7 @@ fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -58,6 +59,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 # create an empty resource group
 az group create -l "${REGION}" -n "${RG_NAME}"

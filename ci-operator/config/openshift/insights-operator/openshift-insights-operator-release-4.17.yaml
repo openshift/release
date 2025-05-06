@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
@@ -116,6 +120,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -163,6 +170,9 @@ tests:
         namespace: test-credentials
       - mount_path: /secret/aws/aws-secret-access-key
         name: aws-secret-access-key
+        namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
         namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
@@ -302,6 +312,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -327,6 +340,55 @@ tests:
       SCAN_IMAGE: insights-operator
     test:
     - ref: fips-check-image-scan
+- as: hosted-hypershift-insights-operator-e2e-tests
+  cron: 0 0 * * 6
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "not tp_only and not slow and not UI" --junitxml=$(pwd)/test-report.xml
+        --rp_enabled --rp_name=hosted-hypershift-insights-operator-e2e-tests-4.17
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+  timeout: 8h0m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
   cluster: build05

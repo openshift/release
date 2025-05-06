@@ -2,11 +2,19 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-9-release-golang-1.23-openshift-4.19
 images:
-- dockerfile_path: Dockerfiles/ocp4_content
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfiles/ocp4_content
   to: ocp4-content-ds
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
   initial:
     integration:
       name: "4.16"
@@ -619,6 +627,37 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-ocp4-moderate-weekly-arm
+  cron: 0 23 * * 3,6
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-ocp4-moderate-node-weekly
   cron: 0 23 * * 3,6
   steps:
@@ -626,6 +665,37 @@ tests:
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate-node
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ocp4-moderate-node-weekly-arm
+  cron: 0 23 * * 3,6
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
     test:
     - as: test
       cli: latest
@@ -670,12 +740,72 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-ocp4-cis-weekly-arm
+  cron: 0 23 * * 3,6
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=cis
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-ocp4-cis-node-weekly
   cron: 0 23 * * 3,6
   steps:
     cluster_profile: quay-aws
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=cis-node
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ocp4-cis-node-weekly-arm
+  cron: 0 23 * * 3,6
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      OCP_ARCH: arm64
     test:
     - as: test
       cli: latest
@@ -702,6 +832,40 @@ tests:
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate
+        export PRODUCT=rhcos4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-rhcos4-moderate-weekly-arm
+  cron: 0 23 * * 3,6
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
     pre:
     - chain: ipi-aws-pre
     - ref: fips-check

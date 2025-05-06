@@ -87,7 +87,7 @@ tests:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-sno-tp-pin-mco-f60
-  cron: 15 13 25 2,4,6,8,10,12 *
+  cron: 31 11 12 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -198,6 +198,7 @@ tests:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-kubevirt-hypershift-mce-replace-f60
+  cluster: build05
   cron: 35 12 1 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -210,7 +211,8 @@ tests:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetal-compact-agent-ipv4-static-connected-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 36 17 27 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -226,7 +228,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-ha-agent-platform-none-ipv4-static-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 56 21 8 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -244,6 +247,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetalds-ipi-ovn-ipv6-fips-f999
+  cluster: build05
   cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -263,13 +267,14 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+  cluster: build05
   cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -283,7 +288,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetal-sno-agent-ipv4-static-connected-fips-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 16 18 12 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -300,13 +306,15 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
-- as: gcp-ipi-disc-priv-oidc-fips-f60
-  cron: 21 20 10 2,4,6,8,10,12 *
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f60
+  cron: 6 21 3 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-upgrade-qe-test-disconnected

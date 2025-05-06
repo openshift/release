@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.18"
     namespace: ocp
     tag: cli
   opm-builder:
@@ -38,6 +38,19 @@ images:
     RUN yum install -y skopeo
   from: openstack-operator-ci-build-deploy
   to: openstack-operator-ci-build-deploy-kuttl
+- build_args:
+  - name: CHAINSAW_VERSION
+    value: v0.2.12
+  dockerfile_literal: |
+    FROM openstack-operator-ci-build-deploy
+    ARG CHAINSAW_VERSION=v0.2.12
+    RUN curl -s -L "https://github.com/kyverno/chainsaw/releases/download/${CHAINSAW_VERSION}/chainsaw_linux_amd64.tar.gz" -o chainsaw.tar.gz
+    RUN tar xf chainsaw.tar.gz chainsaw
+    RUN mv chainsaw /usr/local/bin
+    RUN rm chainsaw.tar.gz
+    RUN yum install -y skopeo
+  from: openstack-operator-ci-build-deploy
+  to: openstack-operator-ci-build-deploy-chainsaw
 - dockerfile_literal: |
     FROM src
     RUN pip3 install pre-commit
@@ -66,7 +79,7 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.16"
+    version: "4.18"
   optional: true
   steps:
     env:
@@ -79,11 +92,24 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.16"
+    version: "4.18"
   steps:
     env:
       CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
+  timeout: 6h0m0s
+- as: mariadb-operator-build-deploy-chainsaw
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
+    workflow: openstack-k8s-operators-test-build-deploy-chainsaw
   timeout: 6h0m0s
 - as: precommit-check
   commands: |

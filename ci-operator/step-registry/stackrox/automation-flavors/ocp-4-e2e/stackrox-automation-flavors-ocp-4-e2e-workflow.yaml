@@ -1,6 +1,7 @@
 workflow:
   as: stackrox-automation-flavors-ocp-4-e2e
   steps:
+    allow_best_effort_post_steps: true
     pre:
     - ref: stackrox-stackrox-begin
     - as: ocp-4-create
@@ -31,6 +32,7 @@ workflow:
     - ref: stackrox-stackrox-e2e-test
     post:
     - as: ocp-4-destroy
+      best_effort: true
       commands: |
         echo "Running openshift-4 ${OCP_VERSION} automation"
         /usr/bin/openshift-ci.sh destroy openshift-4 "${OCP_VERSION}"
@@ -46,6 +48,7 @@ workflow:
         requests:
           cpu: 2000m
           memory: 4000Mi
+      timeout: 30m0s
     - ref: stackrox-stackrox-end
   documentation: |-
     A stackrox workflow to execute e2e QA tests in an OCP 4 cluster.

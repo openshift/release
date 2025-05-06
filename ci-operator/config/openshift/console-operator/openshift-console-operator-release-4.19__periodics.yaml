@@ -1,0 +1,86 @@
+base_images:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel7
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: console-operator
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: ci
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-techpreview
+  interval: 8h
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h0m0s
+    workflow: openshift-e2e-aws
+- as: e2e-azure-techpreview
+  interval: 8h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h0m0s
+    workflow: ipi-azure
+- as: e2e-gcp-techpreview
+  interval: 8h
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h0m0s
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: console-operator
+  variant: periodics

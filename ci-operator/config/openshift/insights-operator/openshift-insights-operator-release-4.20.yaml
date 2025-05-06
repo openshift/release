@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
@@ -28,7 +32,8 @@ images:
   to: insights-operator
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -116,6 +121,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -171,6 +179,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -197,6 +208,12 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

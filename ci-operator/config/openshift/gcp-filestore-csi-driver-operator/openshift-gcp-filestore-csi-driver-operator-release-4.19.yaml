@@ -88,8 +88,7 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -159,6 +158,22 @@ tests:
     env:
       COMPUTE_NODE_TYPE: n4-standard-4
     workflow: openshift-e2e-gcp-csi-custom-worker
+- as: periodic-e2e-gcp-filestore-csi
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    env:
+      CLUSTERCSIDRIVER: filestore.csi.storage.gke.io
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: gcp-filestore-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-filestore.yaml
+      TEST_SUITE: openshift/csi
+      TRUECONDITIONS: GCPFilestoreDriverControllerServiceControllerAvailable GCPFilestoreDriverNodeServiceControllerAvailable
+    workflow: openshift-e2e-gcp-csi-filestore
 - as: security
   optional: true
   steps:

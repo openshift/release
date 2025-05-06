@@ -43,7 +43,7 @@ echo  "-------------------------------------------------------------------------
 if [ -d ocp-qe-perfscale-ci ];then
      rm -rf ocp-qe-perfscale-ci
 fi
-git clone -b upgrade https://github.com/openshift-qe/ocp-qe-perfscale-ci.git --depth=1
+git clone -b upgrade https://github.com/openshift-eng/ocp-qe-perfscale-ci.git --depth=1
 cd ocp-qe-perfscale-ci/upgrade_scripts 
 ENABLE_FORCE=${ENABLE_FORCE:=true}
 SCALE=${SCALE:=false}

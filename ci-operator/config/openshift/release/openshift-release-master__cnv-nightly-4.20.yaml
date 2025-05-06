@@ -1,0 +1,184 @@
+base_images:
+  base:
+    name: "4.20"
+    namespace: ocp
+    tag: base
+  cnv-ci:
+    name: "4.20"
+    namespace: cnv
+    tag: cnv-ci-src-upgrade
+  cnv-ci-src:
+    name: "4.20"
+    namespace: cnv
+    tag: cnv-ci-src
+  cnv-ci-src-upgrade:
+    name: "4.20"
+    namespace: cnv
+    tag: cnv-ci-src-upgrade
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.20"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  multi-initial:
+    prerelease:
+      architecture: multi
+      product: ocp
+      version_bounds:
+        lower: 4.20.0-0
+        stream: 4-dev-preview
+        upper: 4.20.0-0
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-arm64-deploy-cnv
+  interval: 168h
+  steps:
+    cluster_profile: aws-1-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: c8g.metal-24xl
+      KUBEVIRT_RELEASE: v1.4.0
+      KUBEVIRT_STORAGECLASS_NAME: gp3-csi
+      KUBEVIRT_STORAGECLASS_RWX_NAME: ""
+      MAKEFILE_TARGET: deploy_test_arm64
+      OCP_ARCH: arm64
+      OCP_VERSION: "4.20"
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: cnv-e2e
+    workflow: cnv-e2e-ipi-aws
+- as: e2e-aws-arm64-upgrade-cnv
+  interval: 168h
+  steps:
+    cluster_profile: aws-1-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: c8g.metal-24xl
+      KUBEVIRT_RELEASE: v1.4.0
+      KUBEVIRT_STORAGECLASS_NAME: gp3-csi
+      KUBEVIRT_STORAGECLASS_RWX_NAME: ""
+      MAKEFILE_TARGET: upgrade_test
+      OCP_ARCH: arm64
+      OCP_VERSION: "4.20"
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: cnv-e2e
+    workflow: ipi-aws
+- as: deploy-azure-kubevirt-ovn
+  interval: 24h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.20 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make deploy_test
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: v1.4.0
+        name: KUBEVIRT_RELEASE
+      - default: "4.20"
+        name: OCP_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: "true"
+        name: PRODUCTION_RELEASE
+      from: cnv-ci-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
+- as: upgrade-azure-kubevirt-ovn
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.20 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make upgrade_test
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: v1.4.0
+        name: KUBEVIRT_RELEASE
+      - default: "4.20"
+        name: OCP_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: "true"
+        name: PRODUCTION_RELEASE
+      from: cnv-ci-src-upgrade
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: cnv-nightly-4.20

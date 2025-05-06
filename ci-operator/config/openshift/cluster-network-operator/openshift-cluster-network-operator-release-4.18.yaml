@@ -11,26 +11,26 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.17_base-rhel9:
+  ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.18
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.18_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: cluster-network-operator
 promotion:
   to:
@@ -68,7 +68,6 @@ tests:
     workflow: openshift-upgrade-gcp-ovn
 - always_run: false
   as: e2e-aws-ovn-ipsec-upgrade
-  optional: true
   steps:
     cluster_profile: aws
     env:
@@ -77,15 +76,14 @@ tests:
 - as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -96,7 +94,7 @@ tests:
 - as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
@@ -146,7 +144,7 @@ tests:
     workflow: baremetalds-e2e-ovn-ipsec
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
@@ -234,7 +232,7 @@ tests:
   as: e2e-aws-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -261,14 +259,14 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-ovn-clusternetwork-cidr-expansion
-  cron: 0 3 * * 0,2,4,6
+  cron: 3 11 13,26 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-subnet-configs
-  cron: 0 3 * * 0,2,4,6
+  cron: 14 23 5,24 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: ovn-subnet-configs
 - as: e2e-aws-ovn-single-node
   optional: true

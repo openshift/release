@@ -5,7 +5,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
 # ----------------------------------------------------------------------
 # C2S apply metadata patch
@@ -91,7 +97,11 @@ rm /tmp/pull-secret
 
 ca_file=`mktemp`
 cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" > ${ca_file}
-cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt" >> ${ca_file}
+else
+    cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+fi
 
 if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
   echo "C2S: workaround for C2S emulator (BZ#1926975)"

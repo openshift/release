@@ -2,11 +2,7 @@ base_images:
   base:
     name: builder
     namespace: ocp
-    tag: rhel-9-enterprise-base-multi-openshift-4.17
-  builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+    tag: rhel-9-enterprise-base-multi-openshift-4.19
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -15,10 +11,6 @@ images:
   - arm64
   dockerfile_path: Dockerfile
   from: base
-  inputs:
-    builder:
-      as:
-      - golang:1.22
   to: multiarch-tuning-operator
 - additional_architectures:
   - arm64
@@ -76,7 +68,8 @@ resources:
       memory: 400Mi
 tests:
 - as: e2e-gcp
-  cluster: build10
+  capabilities:
+  - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
     cluster_profile: gcp
@@ -94,10 +87,12 @@ tests:
     - ref: ipi-install-heterogeneous
     - ref: multiarch-tuning-operator-e2e-olm-kustomize
     workflow: ipi-gcp
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-proxy-mto-origin
-  cluster: build10
-  cron: 30 10 10 * *
+  capabilities:
+  - arm64
+  cron: 30 10 * * 2
   steps:
     cluster_profile: aws
     dependencies:
@@ -132,7 +127,7 @@ tests:
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - as: e2e-aws-ovn-mto-origin-post
-  cluster: build10
+  cluster: build01
   postsubmit: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/)konflux\.Dockerfile$)
   steps:
@@ -165,6 +160,7 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

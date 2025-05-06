@@ -6,16 +6,20 @@ set -x
 cat /etc/os-release
 
 if [ ${BAREMETAL} == "true" ]; then
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-  bastion="$(cat /bm/address)"
+  SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+  bastion="$(cat /secret/address)"
   # Copy over the kubeconfig
-  ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
+  if [ ! -f "${SHARED_DIR}/kubeconfig" ]; then
+    ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
+    export KUBECONFIG=/tmp/kubeconfig
+  else
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+  fi
   # Setup socks proxy
   ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
-  export KUBECONFIG=/tmp/kubeconfig
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
-  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
+  oc --kubeconfig="$KUBECONFIG" config set-cluster bm --proxy-url=socks5://localhost:12345
 fi
 
 oc config view
@@ -90,6 +94,10 @@ sleep 20
 
 oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+
+if [ -n "$TUNING_POLICY" ]; then
+  oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type=json -p="[{'op': 'add', 'path': '/spec/tuningPolicy', 'value': '$TUNING_POLICY'}]"
+fi
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes

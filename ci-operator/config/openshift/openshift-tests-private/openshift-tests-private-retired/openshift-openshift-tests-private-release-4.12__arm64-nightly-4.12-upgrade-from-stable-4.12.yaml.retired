@@ -1,0 +1,133 @@
+base_images:
+  ansible:
+    name: "4.12"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.12"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.12"
+  tools:
+    name: "4.12"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  arm64-latest:
+    prerelease:
+      architecture: arm64
+      product: ocp
+      version_bounds:
+        lower: 4.12.0-0
+        upper: 4.13.0-0
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.12.0-0
+        upper: 4.13.0-0
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-disc-priv-sno-basecap-none-f999
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+- as: aws-ipi-disc-priv-sts-ep-f999
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: azure-ipi-disc-fullyprivate-f999
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: baremetalds-ipi-ovn-ipv4-f999
+  cluster: build05
+  cron: '@yearly'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      ARCHITECTURE: arm64
+      NVME_DEVICE: /dev/nvme1n1
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: openshift-tests-private-retired
+  variant: arm64-nightly-4.12-upgrade-from-stable-4.12

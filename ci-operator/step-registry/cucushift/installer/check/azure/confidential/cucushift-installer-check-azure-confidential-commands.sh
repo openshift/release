@@ -17,6 +17,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -46,6 +47,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 function property_check() {
     local node_name=$1
@@ -175,7 +177,7 @@ echo -e "\nGen2 image definition check..."
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 expected_image_security_type="${master_security_type:-$worker_security_type}"
 expected_image_security_type="${expected_image_security_type/VM/Vm}"
-if (( ${ocp_minor_version} > 17 )); then
+if (( ${ocp_minor_version} > 16 )); then
     expected_image_security_type="${expected_image_security_type}Supported"
 fi
 image_def_security_type=$(az sig image-definition show --gallery-image-definition ${INFRA_ID}-gen2 --gallery-name gallery_${INFRA_ID//-/_} -g ${RESOURCE_GROUP} --query "features[?name=='SecurityType'].value" -otsv)

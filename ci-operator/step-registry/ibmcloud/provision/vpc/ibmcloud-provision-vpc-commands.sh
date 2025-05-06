@@ -101,12 +101,12 @@ function waitAvailable() {
 }
 
 function create_vpc() {
-    local preName="$1" vpcName="$2" rg="$3" num_subnets_pair_per_zone="${4:-1}"
+    local preName="$1" vpcName="$2" rgID="$3" num_subnets_pair_per_zone="${4:-1}"
     local zone zone_cidr zone_cidr_main subnetName subnet_cidr_main subnets_pair_idx subnets_idx
 
-    echo "Creating vpc $vpcName under $rg ..."
+    echo "Creating vpc $vpcName under $rgID ..."
     # create vpc
-    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName} --resource-group-name "${rg}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
+    IBMCLOUD_TRACE=true "${IBMCLOUD_CLI}" is vpc-create ${vpcName}  --resource-group-id "${rgID}" ||  ( "${IBMCLOUD_CLI}" resource groups && exit 1 )
 
     waitAvailable "vpc" ${vpcName}
     
@@ -181,11 +181,11 @@ function attach_public_gateway_to_subnet() {
 # for verify case OCPBUGS-36185[IBMCloud] MAPI only checks first set of subnets (no pagination support)
 function checkUsedSubnets() {
     local used_subnets_file="$1" rg="$2"
-    local used_subnets TOKEN next_start subnets2
+    local used_subnets TOKEN next_start subnets2 rg_id
     readarray -t used_subnets < <(yq-go r ${used_subnets_file} | awk '{print $2}')
 
     TOKEN=$("${IBMCLOUD_CLI}" iam oauth-tokens | awk '{print $4}')
-    rg_id=$("${IBMCLOUD_CLI}" resource group $rg --output json | jq -r '.[0]|.id')
+    rg_id=$("${IBMCLOUD_CLI}" resource group $rg --id)
     filter="resource_group.id=$rg_id&generation=2&version=2024-11-05"
     echo "filter subnets with $filter"
     next_start=$(curl -s -X GET "https://$region.iaas.cloud.ibm.com/v1/subnets?${filter}" -H "Authorization: Bearer $TOKEN" | jq -r '.next.href' | awk -F 'start=' '{print $2}')
@@ -213,16 +213,26 @@ else
     echo "Did not found a provisoned resource group"
     exit 1
 fi
-"${IBMCLOUD_CLI}" target -g ${resource_group}
+rg_id=$("${IBMCLOUD_CLI}" resource group $resource_group --id)
+"${IBMCLOUD_CLI}" target -g ${rg_id}
 
 ## Create the VPC
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vpc_name="${CLUSTER_NAME}-vpc"
-declare -a ZONES=("${region}-1" "${region}-2" "${region}-3")
+
+readarray -t ZONES  < <(${IBMCLOUD_CLI} is zones -q | grep ${region} | awk '{print $1}')
+max_zones="${#ZONES[@]}"
+if [ ${ZONES_COUNT} -gt ${max_zones} ]; then
+  echo "based on the availability zones: ${ZONES[*]} adjust the ZONES_COUNT!"
+  ZONES_COUNT=${max_zones}
+fi
+
+ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
+echo "Adjusted zones to ${ZONES[*]} based on ZONES_COUNT: ${ZONES_COUNT}."
 
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 echo "${vpc_name}" > "${SHARED_DIR}/ibmcloud_vpc_name"
-create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${resource_group}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
+create_vpc "${CLUSTER_NAME}" "${vpc_name}" "${rg_id}" "${NUMBER_SUBNETS_PAIR_PER_ZONE}"
 
 vpc_info_file="${ARTIFACT_DIR}/vpc_info"
 check_vpc "${vpc_name}" "${vpc_info_file}"

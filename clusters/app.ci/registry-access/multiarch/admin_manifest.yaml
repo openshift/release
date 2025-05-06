@@ -1,0 +1,65 @@
+# this is the Namespace in which your images live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for Multiarch team
+    openshift.io/display-name: MULTIARCH team CI
+  name: multiarch
+---
+# this is the ServiceAccount whose credentials you will use to pull images
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: multiarch
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multiarch-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: multiarch
+    name: image-puller
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multiarch-viewer-binding
+  namespace: multiarch
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: multiarch-devel
+    namespace: multiarch
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multiarch-admins-binding
+  namespace: multiarch
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    # This is a group from Rover https://rover.redhat.com/groups/
+    name: multiarch-devel
+    namespace: multiarch

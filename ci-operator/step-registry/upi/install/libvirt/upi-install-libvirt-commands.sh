@@ -222,7 +222,7 @@ else
       --name ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
       --format qcow2 \
-      --capacity ${VOLUME_CAPACITY}
+      --capacity ${VOLUME_CAPACITY} || echo "Volume ${VOLUME_NAME} already exists, proceed without creation"
 
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
