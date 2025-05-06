@@ -121,7 +121,7 @@ EOF
 
 if [[ "$PROVIDER" = "equinix" ]]; then
     echo "Provider is equinix, gathering metadata..."
-    ansible-playbook gather_equinix_metadata.yaml -i "${SHARED_DIR}/inventory" -vv
+    ansible-playbook gather_equinix_metadata.yaml -i "${SHARED_DIR}/inventory"
     exit 0
 fi
 
@@ -145,8 +145,11 @@ cat > gather_ibm_classic_metadata.yaml <<-'EOF'
         url: "{{ sl_api_url }}/SoftLayer_Resource_Metadata/getId.json"
         method: GET
         return_content: yes
+        timeout: 5
       register: sl_metadata_id
-      no_log: true
+      retries: 5
+      delay: 5
+      until: sl_metadata_id is succeeded
 
     - name: Fetch full hardware details
       ansible.builtin.uri:
@@ -156,8 +159,11 @@ cat > gather_ibm_classic_metadata.yaml <<-'EOF'
         password: "{{ api_key }}"
         force_basic_auth: yes
         return_content: yes
+        timeout: 5
       register: sl_hw
-      no_log: true
+      retries: 5
+      delay: 5
+      until: sl_hw is succeeded
 
     - name: Fetch operating system details
       ansible.builtin.uri:
@@ -167,16 +173,22 @@ cat > gather_ibm_classic_metadata.yaml <<-'EOF'
         password: "{{ api_key }}"
         force_basic_auth: yes
         return_content: yes
+        timeout: 5
       register: sl_os
-      no_log: true
+      retries: 5
+      delay: 5
+      until: sl_os is succeeded
 
     - name: Fetch datacenter information
       ansible.builtin.uri:
         url: "{{ sl_api_url }}/SoftLayer_Resource_Metadata/getDatacenter.json"
         method: GET
         return_content: yes
+        timeout: 5
       register: sl_datacenter
-      no_log: true
+      retries: 5
+      delay: 5
+      until: sl_datacenter is succeeded
 
     - name: Combine all metadata into one structure
       ansible.builtin.set_fact:
@@ -196,6 +208,6 @@ EOF
 
 if [[ "$PROVIDER" = "ibmcloud" ]]; then
     echo "Provider is IBM Classic, gathering metadata..."
-    ansible-playbook gather_ibm_classic_metadata.yaml -i "${SHARED_DIR}/inventory" -vv
+    ansible-playbook gather_ibm_classic_metadata.yaml -i "${SHARED_DIR}/inventory"
 fi
 
