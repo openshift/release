@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o verbose
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -46,5 +45,11 @@ export NAME_3
 export NAME_4
 export NAME_5
 
+echo "TEST_SUITE: ${TEST_SUITE}"
+export TEST_SUITE
+
+mkdir -p ${ARTIFACT_DIR}/${TEST_SUITE}
+
+name=
 # running RHOAI tests
 ./run_interop.sh
