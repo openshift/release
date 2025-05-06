@@ -46,9 +46,9 @@ check_pull_number() {
     done
 }
 
-queue_url=$(cat "/var/run/token/e2e-test/queue-url")
 queue_endpoint=$(cat "/var/run/token/e2e-test/queue-endpoint")
 ip_address=$(cat "/var/run/token/e2e-test/ip-address")
+queue_url="http://$queue_endpoint"
 endpoint_resolve="${queue_endpoint}:80:${ip_address}"
 
 #Check timeout wa
