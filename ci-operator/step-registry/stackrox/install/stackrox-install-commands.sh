@@ -72,10 +72,13 @@ case $ARCH in
 esac
 OS=$(echo "$(uname)"|tr '[:upper:]' '[:lower:]')
 
+oc version || true
+kubectl version || true
+
 function install_jq() {
   local url
   url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-${OS//darwin/macos}-${ARCH}
-  curl -v -Ls -o ./jq "${url}"
+  curl -Ls -o ./jq "${url}"
   chmod u+x ./jq
   jq --version
 }
@@ -360,6 +363,7 @@ function curl_central() {
 function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
   set +e  # ignore errors
+  kubectl describe deploy scanner-v4-matcher --namespace stackrox || true
   kubectl wait deploy --for=create scanner-v4-matcher --namespace stackrox --timeout=120s
   if kubectl describe -n stackrox deploy/scanner-v4-matcher \
     | grep "SCANNER_V4_MATCHER_READINESS.*${SCANNER_V4_MATCHER_READINESS:-}"; then
