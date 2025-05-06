@@ -281,7 +281,6 @@ function install_operator_lifecycle_manager() {
     echo '>>> OLM crds already exist.'
   else
     echo '>>> Creating crds for OLM install'
-    set -x
     olm_ns='olm'
     kubectl create -f "${url}/crds.yaml" || true
     kubectl create -f "${url}/olm.yaml" || true
@@ -322,7 +321,6 @@ function create_cr() {
   local app
   app=${1:-central}
   pushd "${SCRATCH}"
-  set -x
   echo ">>> Install ${app^}"
   if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
     && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
@@ -454,24 +452,31 @@ if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
   if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
     timeout 600s wait "${scanner_readiness_configure_pid:?}" || true
-    if kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=0; then
-      echo 'scanner-v4-matcher is not deployed?'
+    if ! kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=0; then
+      echo 'scanner-v4-matcher is not ready'
       echo '>>> Check for matcher readiness log entries:'
-      kubectl logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods | grep initial
+      kubectl logs deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods --tail=10 | grep initial
+      { kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT} | sed -e '/^/WAIT: /'; } &
+      waiter_pid=$!
       for i in {1..10}; do
         if kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${step_wait_time:-30s}; then
+          kubectl logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
           echo '>>> scanner-v4-matcher condition==Ready'
           break
         fi
-        kubectl logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
         if [[ $i == 10 ]]; then
           echo '>>> scanner-v4-matcher not ready after max wait time. Log details and continue...'
           echo '>>> List scanner-v4-matcher deployment events'
           kubectl get deployment -n stackrox scanner-v4-matcher
           kubectl describe pod -A --selector 'app=scanner-v4-matcher'
           kubectl logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
+        else
+          kubectl logs --tail=1 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
         fi
       done
+      echo 'Then wait for the bg pid wait...'
+      jobs
+      wait "$waiter_pid"
     fi
   else
     wait_deploy scanner-v4-matcher "${step_wait_time}" || true
