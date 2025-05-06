@@ -59,6 +59,11 @@ resolve_name() {
 
 queue_endpoint=$(cat "/var/run/token/e2e-test/queue-endpoint")
 
+echo ">>> resolve name via getent"
+getent hosts "$queue_endpoint" || :
+echo ">>> resolve name via python"
+resolve_name "$queue_endpoint" || :
+
 ip_address="$(resolve_name "$queue_endpoint")" || die "Failed to resolve endpoint"
 
 queue_url="http://$queue_endpoint"
