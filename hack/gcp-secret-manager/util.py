@@ -21,7 +21,7 @@ def ensure_authentication():
 
 
 def validate_collection(collection: str):
-    if not re.fullmatch("[a-z0-9-]+", collection.lower()):
+    if not re.fullmatch("[a-z0-9-]+"):
         raise click.UsageError(
             f"Invalid collection name '{collection}'. May only contain lowercase letters, numbers or dashes."
         )

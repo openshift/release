@@ -17,41 +17,53 @@ from util import CONFIG_PATH, PROJECT_ID, ensure_authentication, validate_collec
     help="Output format, defaults to plain text but can be set to 'json'. Only applicable when a collection is specified.",
 )
 @click.option("-c", "--collection", default="", help="Name of the secret collection")
-def list_secrets(output, collection):
+@click.option(
+    "-g",
+    "--group",
+    default="",
+    help="Use this option to list all collections for a group",
+)
+def list_secrets(output, collection, group):
     """
     List secrets from the specified collection.
     If no collection is provided, lists all secret collections.
     """
 
     if collection == "":
-        list_collections(output)
+        list_collections(group, output)
     else:
         validate_collection(collection)
         ensure_authentication()
         list_secrets_for_collection(collection, output)
 
 
-def list_collections(output):
+def list_collections(group: str, output: str):
     try:
         response = requests.get(CONFIG_PATH)
         data = yaml.safe_load(response.text)
     except Exception as e:
         raise click.ClickException(f"Failed to list collections: {e}")
 
-    collections = set()
+    result = {}
 
-    for group in data.get("groups", {}).values():
-        if "secret_collections" in group:
-            for c in group["secret_collections"]:
-                collections.add(c)
+    for group_name, group_data in data.get("groups", {}).items():
+        collections = group_data.get("secret_collections", [])
+        if collections:
+            if group and group != group_name:
+                continue
+            result[group_name] = sorted(collections)
 
-    collections = sorted(collections)
+    if group and group not in result:
+        click.echo(f"Group '{group}' has no secret collection")
+        return
 
     if output == "json":
-        click.echo(json.dumps(sorted(list(collections)), indent=2))
+        click.echo(json.dumps(result, indent=2))
     else:
-        for c in collections:
-            click.echo(c)
+        for group_name, collections in result.items():
+            click.echo(f"{group_name}:")
+            for c in collections:
+                click.echo(f"- {c}")
 
 
 def list_secrets_for_collection(collection: str, output: str):
