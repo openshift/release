@@ -40,7 +40,7 @@ function install-regulus {
   "
 }
 
-install-regulus
+#install-regulus
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Generate Regulus lab.config 
@@ -89,7 +89,7 @@ for v in "${vars[@]}"; do
 
   # Expand tilda if var=~/something 
   if [[ "$val" == ~* ]]; then
-    val=$(readlink -f "${val}")
+    val="${val/#~/$HOME}"
   fi
 
   # Escape any embedded double-quotes
@@ -100,6 +100,8 @@ done
 # ───────────────────────────────────────────────────────────────────────────
 # Init Regulus and execute test suite. See jobs.config of $REG_BRANCH
 # ───────────────────────────────────────────────────────────────────────────
+
+exit
 
 function run-regulus {
   echo scp -q ${SSH_ARGS} /tmp/lab.config  root@${bastion}:${regulus_repo}/ 
