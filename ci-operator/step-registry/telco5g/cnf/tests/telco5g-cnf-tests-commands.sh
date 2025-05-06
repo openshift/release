@@ -396,7 +396,7 @@ export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
-    export FEATURES="${FEATURES:-performance sriov sctp}"
+    export FEATURES="${FEATURES:-sctp}"
 elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
     export FEATURES="${FEATURES:-sriov}"
     export HYPERSHIFT_ENVIRONMENT=true
