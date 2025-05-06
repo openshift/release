@@ -403,7 +403,7 @@ fi
 echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
 set +e
-timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
+timeout -s 9 180m make ${DEVSCRIPTS_TARGET}
 rv=\$?
 
 # squid needs to be restarted after network changes
