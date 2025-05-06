@@ -24,12 +24,47 @@ _json_get() {
     printf '%s' "$1" | jq -r "$2" 2>/dev/null
 }
 
+prepare_resolve_name() {
+    python3 -c 'import dns.resolver' 2>/dev/null || pip install dnspython &>/dev/null
+}
+
+resolve_name() {
+    # No nslookup/dig is installed. Use python.
+    # DNS servers from https://github.com/openshift/release/blob/master/clusters/build-clusters/common_managed/dns.yaml
+    python3 -c 'if 1:
+        import sys
+
+        try:
+            name = sys.argv[1]
+            nameservers = sys.argv[2:]
+
+            import dns.resolver as d
+            r = d.Resolver()
+            r.nameservers = nameservers
+            print(next(iter(r.resolve(name, "A"))))
+        except Exception:
+            sys.exit(1)
+    ' \
+    "$@"
+}
+
 queue_manager_tls_host=$(cat "/var/run/token/e2e-test/queue-manager-tls-host")
-queue_manager_tls_ip=$(cat "/var/run/token/e2e-test/queue-manager-tls-ip")
 queue_manager_auth_token=$(cat "/var/run/token/jenkins-secrets/queue-manager-auth-token")
 queue_manager_tls_crt="/var/run/token/jenkins-secrets/queue-manager-tls-crt"
+nameservers_s=$(cat "/var/run/token/jenkins-secrets/nameservers")
+
+IFS=' ' read -r -a nameservers <<< "$nameservers_s"
 
 echo "Handling pull request https://github.com/openshift/dpu-operator/pull/$PULL_NUMBER , git-sha=$PULL_PULL_SHA"
+
+prepare_resolve_name
+
+queue_manager_tls_ip="$(resolve_name "$queue_manager_tls_host" "${nameservers[@]}")" || :
+
+if [ -z "$queue_manager_tls_ip" ] ; then
+    echo "Failure to resolve \"queue-manager-tls-host\" using \"nameservers\". Check the secrets in the vault."
+    exit 1
+fi
 
 submit_response="$(_curl_jobs_submit "$PULL_NUMBER" "$PULL_PULL_SHA")"
 
