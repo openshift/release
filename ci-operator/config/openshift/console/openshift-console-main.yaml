@@ -33,6 +33,13 @@ images:
 - dockerfile_path: Dockerfile.plugins.demo
   from: nodejs-10
   to: console-plugin-demo
+- dockerfile_literal: |
+    FROM builder
+    WORKDIR /go/src/github.com/openshift/console
+    RUN chmod g+xw -R /go
+    COPY . .
+  from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
+  to: go-builder-src
 promotion:
   to:
   - additional_images:
@@ -115,10 +122,22 @@ tests:
   timeout: 8h0m0s
 - as: verify-deps
   steps:
-    env:
-      CHECK_MOD_LIST: "false"
     test:
-    - ref: go-verify-deps
+    - as: go-verify-deps
+      commands: |
+        go mod tidy
+        go mod vendor
+        CHANGES=$(git status --porcelain --ignored)
+        if [ -n "$CHANGES" ] ; then
+            echo "ERROR: detected vendor inconsistency after 'go mod tidy; go mod vendor':"
+            echo "$CHANGES"
+            exit 1
+        fi
+      from: go-builder-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
