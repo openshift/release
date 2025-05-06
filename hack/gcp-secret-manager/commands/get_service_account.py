@@ -4,6 +4,7 @@ import click
 from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
 from util import PROJECT_ID, ensure_authentication, validate_collection
+from google.oauth2 import service_account
 
 
 @click.command(name="get-sa")
@@ -19,7 +20,7 @@ def get_service_account(collection):
     validate_collection(collection)
     ensure_authentication()
 
-    secret_id = f"{collection}__updater_service_account"
+    secret_id = f"{collection}__updater-service-account"
     name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
 
     client = secretmanager.SecretManagerServiceClient()
@@ -34,6 +35,11 @@ def get_service_account(collection):
         raise click.ClickException(
             f"Error while accessing '{secret_id}' secret: {e.message}"
         )
+    except Exception as e:
+        raise click.ClickException(
+            f"Error while accessing '{secret_id}' secret: {e.message}"
+        )
+
     payload = response.payload.data.decode("UTF-8")
 
     try:
