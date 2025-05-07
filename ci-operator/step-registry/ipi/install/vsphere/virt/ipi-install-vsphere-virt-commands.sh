@@ -35,7 +35,7 @@ function approve_csrs() {
 
 
 # Generate YAML for creation VM
-installer_bin=$(which openshift-install)
+#installer_bin=$(which openshift-install)
 #VIRT_IMAGE=$("${installer_bin}" coreos print-stream-json | jq -r '.architectures.x86_64.images.kubevirt.image')
 VIRT_IMAGE=$(jq -r '.architectures.x86_64.images.kubevirt.image' ${SHARED_DIR}/coreos.json)
 echo ${VIRT_IMAGE}
