@@ -75,6 +75,16 @@ VERSION=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IM
 rm pull-secret
 popd
 
+# https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
+# This code needs to handle pre-4.8 installers though too.
+if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
+  echo "Saved stream metadata"
+else
+  echo "Unhandled error from openshift-install" 1>&2
+  cat /tmp/err.txt
+  exit 1
+fi
+
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare vsphere_datacenter
