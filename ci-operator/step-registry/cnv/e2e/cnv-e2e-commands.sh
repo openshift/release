@@ -35,7 +35,7 @@ CNV_CI_ARCHIVE_URL=$(
 
 # Fallback to release branch from upstream repo
 if [[ -z "${CNV_CI_ARCHIVE_URL}" ]]; then
-  CNV_CI_ARCHIVE_URL=https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}
+  CNV_CI_ARCHIVE_URL=https://github.com/phoracek/cnv-ci/tarball/release-${OCP_VERSION}
 fi
 
 curl -L "${CNV_CI_ARCHIVE_URL}" -o /tmp/cnv-ci.tgz
