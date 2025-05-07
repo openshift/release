@@ -114,11 +114,13 @@ tests:
     workflow: ipi-gcp
   timeout: 8h0m0s
 - as: verify-deps
-  steps:
-    env:
-      CHECK_MOD_LIST: "false"
-    test:
-    - ref: go-verify-deps
+  commands: |
+    # Verify main repo deps
+    make -f openshift/Makefile verify-deps
+    # Verify openshift dir
+    cd openshift && make verify-deps
+  container:
+    from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
 zz_generated_metadata:
   branch: release-4.19
   org: openshift
