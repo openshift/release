@@ -80,13 +80,13 @@ for dev in "${devices[@]}"; do
   # eth2 will only get local routes configuration
   ovs-docker.sh add-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME"
   nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
-    /sbin/dhclient -v \
+    /sbin/dhclient -1 -v \
     -pf "/var/run/dhclient.$interface.pid" \
     -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface"
   
   if [ "$bridge" = "br-int" ]; then
     nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
-      /sbin/dhclient -6 -v \
+      /sbin/dhclient -1 -6 -v \
       -pf "/var/run/dhclient.$interface.v6.pid" \
       -lf "/var/lib/dhcp/dhclient.$interface.v6.lease" "$interface"
   fi
