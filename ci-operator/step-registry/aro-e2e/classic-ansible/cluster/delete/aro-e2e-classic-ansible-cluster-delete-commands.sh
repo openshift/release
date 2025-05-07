@@ -5,14 +5,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CERT="${SHARED_DIR}/dev-client.pem"
-
 function vars {
-    export AZURE_TENANT="$(<"/var/run/aro-v4-e2e-prow-spn/tenant")"
-    export AZURE_SUBSCRIPTION_ID="$(<"/var/run/aro-v4-e2e-prow-spn/subscription")"
-    export AZURE_CLIENT_ID="$(<"/var/run/aro-v4-e2e-prow-spn/appId")"
-    export AZURE_CLIENT_NAME="$(<"/var/run/aro-v4-e2e-prow-spn/displayName")"
-    export AZURE_SECRET="$(<"/var/run/aro-v4-e2e-prow-spn/password")"
+    AZURE_TENANT="$(<"/var/run/aro-v4-e2e-prow-spn/tenant")"
+    export AZURE_TENANT
+    AZURE_SUBSCRIPTION_ID="$(<"/var/run/aro-v4-e2e-prow-spn/subscription")"
+    export AZURE_SUBSCRIPTION_ID
+    AZURE_CLIENT_ID="$(<"/var/run/aro-v4-e2e-prow-spn/appId")"
+    export AZURE_CLIENT_ID
+    AZURE_CLIENT_NAME="$(<"/var/run/aro-v4-e2e-prow-spn/displayName")"
+    export AZURE_CLIENT_NAME
+    AZURE_SECRET="$(<"/var/run/aro-v4-e2e-prow-spn/password")"
+    export AZURE_SECRET
     export ANSIBLE_VERBOSITY=${ANSIBLE_VERBOSITY:-0}
     export AZURE_CLUSTER_RESOURCE_GROUP="prow-${JOB_NAME_SAFE}-${AZURE_LOCATION}"
     export AZURE_CLUSTER_NAME="aro-e2e"
