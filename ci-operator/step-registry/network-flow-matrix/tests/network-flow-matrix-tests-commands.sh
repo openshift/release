@@ -7,8 +7,14 @@ get_cluster_version() {
   minor=$(echo "$version" | cut -d '.' -f 2)
   echo "$major.$minor"
 }
-cluster_version=$(get_cluster_version)
 
+# greater that function for versions
+version_greater_than() {
+  [[ "$(printf "%s\n%s\n" "$1" "$2" | sort -V | tail -1)" == "$1" && "$1" != "$2" ]]
+}
+
+cluster_version=$(get_cluster_version)
+KREW_REQUIRED_VERSION_THRESHOLD="4.18"
 ADDITIONAL_NFTABLES_RULES_FILE_PATH="${SHARED_DIR}/additional-nftables-rules"
 SUITE=${SUITE:-"all"}
 
@@ -36,11 +42,28 @@ latest_release_version="$(git branch -r | grep -oE 'release-[0-9]+\.[0-9]+' | se
 testing_branch="release-$cluster_version"
 
 # If cluster's version is greater than latest release version, use main as testing branch.
-if [[ "$(printf "%s\n%s\n" "$cluster_version" "$latest_release_version" | sort -V | tail -1)" == "$cluster_version" && "$cluster_version" != "$latest_release_version" ]]; then
+if version_greater_than "$cluster_version" "$latest_release_version"; then
   testing_branch="main"
 fi
-
 git checkout ${testing_branch}
+
+# if cluster verion greater than threshold, install Krew and the commatrix-krew plugin
+if version_greater_than "$cluster_version" "$KREW_REQUIRED_VERSION_THRESHOLD"; then
+  # Install krew
+  OS="$(uname | tr '[:upper:]' '[:lower:]')"
+  ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/' -e 's/armv7l/arm/')"
+  KREW="krew-${OS}_${ARCH}"
+  mkdir -p ${SHARED_DIR}/krew
+  curl -fsSL "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" -o "${SHARED_DIR}/krew/${KREW}.tar.gz"
+  tar -xvzf ${SHARED_DIR}/krew/${KREW}.tar.gz -C ${SHARED_DIR}/krew
+  ${SHARED_DIR}/krew/${KREW} install krew
+  export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"  
+  # install commatrix-krew plugin
+  oc krew install --manifest=cmd/commatrix-krew.yaml
+  # cleanUP
+  rm -rf "${SHARED_DIR}/krew"
+fi
+
 go mod vendor
 EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" SUITE="${SUITE}" \
 OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE}" OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT}" make e2e-test
