@@ -3,7 +3,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.23
+    tag: rhel-9-release-golang-1.24-nofips-openshift-4.19
 promotion:
   to:
   - name: "4.19"
@@ -28,6 +28,19 @@ resources:
 tests:
 - as: integration
   commands: ./run_integration_tests.sh
+  container:
+    from: src
+- as: unit-as-ginkgo
+  commands: |
+    unset GOFLAGS
+    make test ginkgo_junit_report=${ARTIFACT_DIR}/junit-ginkgo-unit-junit.xml
+  container:
+    from: src
+- as: unit
+  commands: |
+    unset GOFLAGS
+    go install gotest.tools/gotestsum@latest
+    gotestsum --junitfile ${ARTIFACT_DIR}/junit-unit-junit.xml -- -race ./...
   container:
     from: src
 zz_generated_metadata:
