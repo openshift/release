@@ -73,12 +73,13 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   if [[ ! -f "${bastion_ignition_file}" ]]; then
     echo "'${bastion_ignition_file}' not found , abort." && exit 1
   fi
-  bastion_image_list_url="https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json"
-  if [[ "${REGION}" =~ ^us-gov-(east|west)-1$ ]]; then
-    bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
-  fi
+  #Use 4.18 RHCOS image as the boot image of bastion by default
+  bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
   curl -sL "${bastion_image_list_url}" -o /tmp/bastion-image.json
-  ami_id=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/bastion-image.json)
+  ami_id=$(jq -r --arg r ${REGION} '.architectures.x86_64.images.aws.regions[$r].image // ""' /tmp/bastion-image.json)
+  if [[ ${ami_id} == "" ]]; then
+    echo "Bastion host AMI was found in region ${REGION}, exit now." && exit 1
+  fi
 
   ign_location="s3://${s3_bucket_name}/bastion.ign"
   aws --region $REGION s3 mb "s3://${s3_bucket_name}"
