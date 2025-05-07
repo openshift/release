@@ -173,8 +173,7 @@ function create_multi_arch_vpc_tf_varfile(){
   cd "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/ || true
   cp "${PUBLIC_KEY_FILE}" "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/data/id_rsa.pub
   cp "${PRIVATE_KEY_FILE}" "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/data/id_rsa
-  PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-  cp "${PULL_SECRET}" "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/data/pull-secret.txt
+  cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc/data/pull-secret.txt
   echo "Copied the pull secret"
 
   cat <<EOF >${IBMCLOUD_HOME}/ocp4-multi-arch-vpc/var-multi-arch-vpc.tfvars

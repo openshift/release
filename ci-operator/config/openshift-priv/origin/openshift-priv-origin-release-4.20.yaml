@@ -57,7 +57,8 @@ images:
   to: hello-openshift
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -292,23 +293,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-serial-1of2
+- as: e2e-aws-ovn-serial
+  shard_count: 2
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
-      TEST_ARGS: --shard-count 2 --shard-id 1
-      TEST_SUITE: openshift/conformance/serial
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-serial
-- as: e2e-aws-ovn-serial-2of2
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws-2
-    env:
-      TEST_ARGS: --shard-count 2 --shard-id 2
       TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
@@ -385,7 +375,7 @@ tests:
   cluster: build05
   optional: true
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
   timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn
@@ -526,17 +516,14 @@ tests:
   as: e2e-metal-ovn-single-node-live-iso
   optional: true
   steps:
-    cluster_profile: packet-sno
-    env:
-      PACKET_OS: rocky_9
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - always_run: false
   as: e2e-metal-ovn-single-node-with-worker-live-iso
   optional: true
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
-      PACKET_OS: rocky_9
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno

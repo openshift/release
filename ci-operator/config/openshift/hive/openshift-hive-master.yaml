@@ -32,11 +32,6 @@ releases:
       product: ocp
       stream: nightly
       version: "4.17"
-  tmp419:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.19"
 resources:
   '*':
     requests:
@@ -212,24 +207,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-azure-419
-  run_if_changed: azure
-  steps:
-    cluster_profile: azure4
-    test:
-    - as: test
-      cli: tmp419
-      commands: GO_COMPLIANCE_INFO=0 CLOUD=azure make test-e2e
-      dependencies:
-      - env: HIVE_IMAGE
-        name: hive
-      - env: RELEASE_IMAGE
-        name: release:tmp419
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-azure
 - as: e2e-vsphere
   run_if_changed: vsphere
   steps:
@@ -243,6 +220,14 @@ tests:
         source $SHARED_DIR/vsphere_context.sh
         source $SHARED_DIR/govc.sh
         source $SHARED_DIR/additional_cluster.sh
+
+        export CLUSTER_NAME=$ADDITIONAL_CLUSTER_NAME
+        export VSPHERE_API_VIP=$ADDITIONAL_CLUSTER_API_VIP
+        export VSPHERE_INGRESS_VIP=$ADDITIONAL_CLUSTER_INGRESS_VIP
+        export VSPHERE_MACHINE_NETWORK=$(<"${SHARED_DIR}"/machinecidr.txt)
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        export VSPHERE_INSTALLER_PLATFORM_SPEC_JSON=$(<"${SHARED_DIR}"/platform.json)
+
         GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
       credentials:
       - mount_path: /var/run/vault/vsphere-ibmcloud-ci

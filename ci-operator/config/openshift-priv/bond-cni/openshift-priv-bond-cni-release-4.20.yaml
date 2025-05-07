@@ -15,7 +15,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.19
 canonical_go_repository: github.com/openshift/bond-cni
 images:
 - dockerfile_path: Dockerfile.openshift
@@ -32,7 +32,8 @@ images:
   to: network-interface-bond-cni
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -56,6 +57,12 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

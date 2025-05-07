@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: cli
   dev-scripts:
@@ -12,11 +12,11 @@ base_images:
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -28,7 +28,7 @@ base_images:
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.19
   openstack-cinder-csi-driver-operator-test:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: openstack-cinder-csi-driver-operator-test
 build_root:
@@ -61,7 +61,7 @@ promotion:
   - excluded_images:
     - hypershift-operator
     - hypershift-tests
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
   - additional_images:
       hypershift-operator: hypershift-operator
@@ -76,33 +76,33 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.19"
+      version: "4.20"
   initial-418:
     candidate:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.18"
+      version: "4.20"
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.20"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.20"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.17"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -138,19 +138,6 @@ tests:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
-- as: e2e-aks-4-18
-  run_if_changed: ^(test/e2e|hypershift-operator)
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:latest-418
-      OCP_IMAGE_N1: release:latest-418
-      OCP_IMAGE_N2: release:latest-418
-      OCP_IMAGE_PREVIOUS: release:initial-418
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
   - build-tmpfs
@@ -161,6 +148,19 @@ tests:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
     env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-aws-minimal
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+    env:
+      CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
@@ -389,6 +389,12 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     workflow: hypershift-aws-e2e-cluster
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv
