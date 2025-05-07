@@ -363,11 +363,10 @@ function curl_central() {
 function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
   set +e  # ignore errors
-  kubectl describe deploy scanner-v4-matcher --namespace stackrox || true
   kubectl wait deploy --for=create scanner-v4-matcher --namespace stackrox --timeout=120s
   if kubectl describe -n stackrox deploy/scanner-v4-matcher \
     | grep "SCANNER_V4_MATCHER_READINESS.*${SCANNER_V4_MATCHER_READINESS:-}"; then
-    echo 'The scanner-v4-matcher readiness is set.'
+    echo 'scanner-v4-matcher readiness is set'
     return
   fi
   echo 'The scanner-v4-matcher readiness env var is not set. Adding it to the deployment...'
@@ -375,7 +374,8 @@ function configure_scanner_readiness() {
   echo 'Restarting scanner-v4-matcher to apply the new config during startup...'
   kubectl rollout restart deploy/scanner-v4-matcher
   kubectl -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s
-  kubectl -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS
+  kubectl -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS \
+    || kubectl describe deploy scanner-v4-matcher --namespace stackrox
   echo ">>> Finished scanner-v4-matcher configuration readiness=${SCANNER_V4_MATCHER_READINESS:-}."
   set -e
 }
@@ -444,46 +444,32 @@ function secured_cluster_connection_test() {
   rm "${SCRATCH}/port_forward_pid"
 }
 set +x  # reduce logging for connection check
+secured_cluster_connection_test
+set -x
 
 echo ">>> Wait for 'stackrox scanner' deployments"
 wait_deploy scanner
 wait_deploy scanner-db
 
-set +e  # ignore errors
 if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
-  step_wait_time=$(( ${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:0:-1} / 10 ))${SCANNER_V4_MATCHER_READINESS_MAX_WAIT: -1} 
   if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
-    timeout 600s wait "${scanner_readiness_configure_pid:?}" || true
-    if ! kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=0; then
-      echo 'scanner-v4-matcher is not ready'
-      echo '>>> Check for matcher readiness log entries:'
-      { kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT} | sed -e '/^/WAIT: /'; } &
-      waiter_pid=$!
-      for i in {1..10}; do
-        if kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox --timeout=${step_wait_time:-30s}; then
-          kubectl logs --tail=5 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
-          echo '>>> scanner-v4-matcher condition==Ready'
-          break
-        fi
-        if [[ $i == 10 ]]; then
-          echo '>>> scanner-v4-matcher not ready after max wait time. Log details and continue...'
-          echo '>>> List scanner-v4-matcher deployment events'
-          kubectl get deployment -n stackrox scanner-v4-matcher
-          kubectl describe pod -A --selector 'app=scanner-v4-matcher'
-          kubectl logs --tail=10 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
-        else
-          kubectl logs --tail=1 deploy/scanner-v4-matcher -n stackrox --timestamps --all-pods
-        fi
-      done
-      echo 'Then wait for the bg pid wait...'
-      jobs
-      wait "$waiter_pid"
-    fi
+    set +e
+    echo '>>> Follow scanner-v4-matcher logs until ready state'
+    timeout 600s wait "${scanner_readiness_configure_pid:-}"
+    wait_deploy scanner-v4-matcher "${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}" &
+    wait_pid=$!
+    kubectl -n stackrox rollout status deploy/scanner-v4-matcher --timeout=0
+    kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' --namespace stackrox \
+      --timeout="${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}" \
+      || kubectl logs --tail=20 --selector 'app=scanner-v4-matcher' -n stackrox --timestamps
+    kubectl -n stackrox rollout status deploy/scanner-v4-matcher --timeout=0
+    sleep 30
+    kill -9 "${wait_pid}"
   else
-    wait_deploy scanner-v4-matcher "${step_wait_time}" || true
+    wait_deploy scanner-v4-matcher "${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}"
   fi
 fi
 
