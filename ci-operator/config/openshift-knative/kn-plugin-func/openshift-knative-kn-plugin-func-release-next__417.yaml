@@ -9,9 +9,88 @@ base_images:
     tag: rhel-8-release-golang-1.23-openshift-4.19
 build_root:
   project_image:
-    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/4.17:cli-artifacts as tools
+
+      # Dockerfile to bootstrap build and test in openshift-ci
+      FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.23-openshift-4.19 as builder
+
+      ARG TARGETARCH
+
+      ENV GO_VERSION=1.24.2
+      RUN rm -rf /usr/local/go && \
+        curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+      ENV PATH="/usr/local/go/bin:$PATH"
+
+      COPY --from=tools /usr/share/openshift/linux_$TARGETARCH/oc.rhel8 /usr/bin/oc
+
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+
+      #RUN yum install -y httpd-tools git make gcc
+      RUN yum install -y httpd-tools
+
+      RUN curl -Ls https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o get-helm-3 && \
+          chmod 700 ./get-helm-3
+
+      RUN ./get-helm-3 --version v3.11.3 --no-sudo && helm version
+
+      RUN GOFLAGS='' go install github.com/mikefarah/yq/v3@latest
+      RUN GOFLAGS='' go install -tags="exclude_graphdriver_btrfs containers_image_openpgp" github.com/containers/skopeo/cmd/skopeo@v1.16.1
+
+      RUN rm -rf $GOPATH/.cache
+
+      # go install creates $GOPATH/.cache with root permissions, we delete it here
+      # to avoid permission issues with the runtime users
+      ENV CGO_ENABLED=1
+      ENV GOFLAGS=''
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/func-util/Dockerfile
+- dockerfile_literal: |
+    ARG GO_BUILDER=registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.23-openshift-4.19
+    ARG GO_RUNTIME=registry.access.redhat.com/ubi8/ubi-minimal
+
+    FROM $GO_BUILDER as builder
+    ENV GO_VERSION=1.24.2
+    RUN rm -rf /usr/local/go && \
+       curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+    ENV PATH="/usr/local/go/bin:$PATH"
+    #RUN yum install git -y
+
+    WORKDIR /workspace
+    COPY . .
+
+    ENV CGO_ENABLED=1
+    ENV GOFIPS140=latest
+    ENV GOFLAGS=''
+
+    RUN go build -tags exclude_graphdriver_btrfs -o /usr/bin/main ./cmd/func-util
+
+    FROM $GO_RUNTIME
+
+    ARG VERSION=knative-nightly
+
+    RUN microdnf install socat tar
+
+    COPY --from=builder /usr/bin/main /usr/bin/func-util
+    COPY LICENSE /licenses/
+
+    RUN ln -s /usr/bin/func-util /usr/local/bin/deploy && \
+    ln -s /usr/bin/func-util /usr/local/bin/scaffold && \
+    ln -s /usr/bin/func-util /usr/local/bin/s2i
+
+    USER 65532
+
+    LABEL \
+    com.redhat.component="openshift-serverless-1-kn-plugin-func-func-util-rhel8-container" \
+    name="openshift-serverless-1/kn-plugin-func-func-util-rhel8" \
+    version=$VERSION \
+    summary="Red Hat OpenShift Serverless 1 Kn Plugin Func Func Util" \
+    maintainer="serverless-support@redhat.com" \
+    description="Red Hat OpenShift Serverless 1 Kn Plugin Func Func Util" \
+    io.k8s.display-name="Red Hat OpenShift Serverless 1 Kn Plugin Func Func Util" \
+    io.k8s.description="Red Hat OpenShift Serverless Kn Plugin Func Func Util" \
+    io.openshift.tags="func-util"
+
+    ENTRYPOINT ["/usr/bin/bash"]
   inputs:
     ocp_ubi-minimal_8:
       as:
