@@ -16,7 +16,13 @@ from util import CONFIG_PATH, PROJECT_ID, ensure_authentication, validate_collec
     default="text",
     help="Output format, defaults to plain text but can be set to 'json'. Only applicable when a collection is specified.",
 )
-@click.option("-c", "--collection", default="", help="Name of the secret collection")
+@click.option(
+    "-c",
+    "--collection",
+    default="",
+    help="Name of the secret collection",
+    callback=validate_collection,
+)
 @click.option(
     "-g",
     "--group",
@@ -32,7 +38,6 @@ def list_secrets(output, collection, group):
     if collection == "":
         list_collections(group, output)
     else:
-        validate_collection(collection)
         ensure_authentication()
         list_secrets_for_collection(collection, output)
 

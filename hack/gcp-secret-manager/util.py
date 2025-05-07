@@ -20,28 +20,26 @@ def ensure_authentication():
         )
 
 
-def validate_collection(collection: str):
-    if not re.fullmatch("[a-z0-9-]+"):
-        raise click.UsageError(
-            f"Invalid collection name '{collection}'. May only contain lowercase letters, numbers or dashes."
+def validate_collection(ctx, param, value):
+    if not re.fullmatch("[a-z0-9-]+", value):
+        raise click.BadParameter(
+            "May only contain lowercase letters, numbers or dashes."
         )
+    return value
 
 
-def validate_secret_name(name: str):
-    if not re.fullmatch("[A-Za-z0-9-]+", name):
-        raise click.UsageError(
-            f"Invalid secret name '{name}'. May only contain lowercase letters, numbers or dashes."
-        )
+def validate_secret_name(ctx, param, value):
+    if not re.fullmatch("[A-Za-z0-9-]+", value):
+        raise click.BadParameter("May only contain letters, numbers or dashes.")
+    return value
 
 
 def get_secret_name(collection, name: str) -> str:
     return f"{collection}__{name}"
 
 
-def validate(collection: str, name: str, from_file: str, from_literal: str):
+def validate(from_file: str, from_literal: str):
     ensure_authentication()
-    validate_collection(collection)
-    validate_secret_name(name)
 
     if from_literal != "" and from_file != "":
         raise click.BadOptionUsage(
@@ -52,7 +50,7 @@ def validate(collection: str, name: str, from_file: str, from_literal: str):
     if from_literal == "" and from_file == "":
         raise click.BadOptionUsage(
             option_name=from_file,
-            message="You must provide either secret content or a path to file",
+            message="You must provide secret data either as string input or a path to file",
         )
 
 

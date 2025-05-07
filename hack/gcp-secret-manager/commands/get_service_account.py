@@ -4,7 +4,6 @@ import click
 from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
 from util import PROJECT_ID, ensure_authentication, validate_collection
-from google.oauth2 import service_account
 
 
 @click.command(name="get-sa")
@@ -13,11 +12,12 @@ from google.oauth2 import service_account
     "--collection",
     required=True,
     help="Name of the secret collection",
+    type=str,
+    callback=validate_collection,
 )
 def get_service_account(collection):
     """Retrieve the service account associated with a secret collection."""
 
-    validate_collection(collection)
     ensure_authentication()
 
     secret_id = f"{collection}__updater-service-account"

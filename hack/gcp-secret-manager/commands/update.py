@@ -6,6 +6,8 @@ from util import (
     create_payload,
     get_secret_name,
     validate,
+    validate_collection,
+    validate_secret_name,
 )
 
 
@@ -16,8 +18,16 @@ from util import (
     required=True,
     help="The collection the secret belongs to",
     type=str,
+    callback=validate_collection,
 )
-@click.option("-s", "--secret", required=True, help="Name of the secret", type=str)
+@click.option(
+    "-s",
+    "--secret",
+    required=True,
+    help="Name of the secret",
+    type=str,
+    callback=validate_secret_name,
+)
 @click.option(
     "-f",
     "--from-file",
@@ -31,7 +41,7 @@ from util import (
 def update(collection: str, secret: str, from_file: str, from_literal: str):
     """Update an existing secret."""
 
-    validate(collection, secret, from_file, from_literal)
+    validate(from_file, from_literal)
 
     client = secretmanager.SecretManagerServiceClient()
     secret_name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))

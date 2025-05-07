@@ -9,6 +9,8 @@ from util import (
     create_payload,
     get_secret_name,
     validate,
+    validate_collection,
+    validate_secret_name,
 )
 
 # Metadata keys used when creating secrets:
@@ -30,8 +32,16 @@ REQUEST_INFO = "request-information"
     required=True,
     help="The secret collection to store the secret",
     type=str,
+    callback=validate_collection,
 )
-@click.option("-s", "--secret", required=True, help="Name of the secret", type=str)
+@click.option(
+    "-s",
+    "--secret",
+    required=True,
+    help="Name of the secret",
+    type=str,
+    callback=validate_secret_name,
+)
 @click.option(
     "-f",
     "--from-file",
@@ -45,7 +55,7 @@ REQUEST_INFO = "request-information"
 def create(collection: str, secret: str, from_file: str, from_literal: str):
     """Create a new secret in the specified collection."""
 
-    validate(collection, secret, from_file, from_literal)
+    validate(from_file, from_literal)
     click.echo(
         "\nTo help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
         "If a field does not apply to your case, type 'N/A' to continue.\n"

@@ -17,13 +17,19 @@ from util import (
     required=True,
     help="The collection the secret belongs to",
     type=str,
+    callback=validate_collection,
 )
-@click.option("-s", "--secret", required=True, help="Name of the secret", type=str)
+@click.option(
+    "-s",
+    "--secret",
+    required=True,
+    help="Name of the secret",
+    type=str,
+    callback=validate_secret_name,
+)
 def delete(collection: str, secret: str):
     """Delete a secret from the specified collection."""
 
-    validate_collection(collection)
-    validate_secret_name(secret)
     ensure_authentication()
 
     try:
