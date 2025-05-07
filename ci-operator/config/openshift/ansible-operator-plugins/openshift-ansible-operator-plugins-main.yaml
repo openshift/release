@@ -22,6 +22,33 @@ images:
 - dockerfile_path: openshift/ci/dockerfiles/ansible-e2e.Dockerfile
   from: openshift-ansible-operator-plugins
   to: ansible-operator-e2e
+- dockerfile_path: openshift/Dockerfile.requirements
+  to: build-requirements
+- dockerfile_literal: |
+    FROM build-requirements AS builder
+
+    FROM src
+    RUN rm openshift/requirements*.txt
+    COPY --from=builder requirements*.txt openshift/
+  from: src
+  inputs:
+    build-requirements:
+      as:
+      - build-requirements
+  to: get-requirements
+- dockerfile_literal: |
+    FROM src AS builder
+
+    FROM base
+    RUN yum install -y python3.12-pip make git && pip3.12 install ansible-core
+    COPY --from=builder /go/src/github.com/openshift/ansible-operator-plugins/ /go/src/github.com/openshift/ansible-operator-plugins/
+    WORKDIR /go/src/github.com/openshift/ansible-operator-plugins/
+  from: ocp_4.19_base-rhel9
+  inputs:
+    src:
+      as:
+      - src
+  to: check-collections
 promotion:
   to:
   - name: "4.20"
@@ -75,6 +102,18 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: verify-requirements
+  commands: |
+    git diff --exit-code
+  container:
+    from: get-requirements
+  run_if_changed: images/ansible-operator/Pipfile*
+- as: verify-collections
+  commands: |
+    # Set $HOME for sufficient permission
+    HOME=/tmp make -f openshift/Makefile check-collections
+  container:
+    from: check-collections
 zz_generated_metadata:
   branch: main
   org: openshift
