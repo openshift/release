@@ -183,7 +183,7 @@ function create_machineset() {
 
     #Set default value for key VARIABLE
     #Use the first machineset name by default if no REF_MACHINESET_NAME specified
-    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets.m | grep worker | head -n1)
+    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets.m | grep worker | grep -v rhel | head -n1)
     REF_MACHINESET_NAME=${REF_MACHINESET_NAME:-$ref_machineset_name}
 
     get_ref_machineset_info $REF_MACHINESET_NAME

@@ -41,7 +41,7 @@ function waitForReady() {
 }
 
 function scaleMachineSets(){
-    worker_machine_sets=$(oc get --no-headers machinesets.m -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name )
+    worker_machine_sets=$(oc get --no-headers machinesets.m -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel )
     scale_num=$(echo $worker_machine_sets | wc -w | xargs)
     scale_size=$(($1/$scale_num))
     first_machine=""
@@ -70,7 +70,7 @@ function scaleDownMachines() {
     num_to_decrease=$(($1-$2))
     echo "num to decrease $num_to_decrease"
 
-    for machineset in $(oc get --no-headers machinesets.m -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name ); do
+    for machineset in $(oc get --no-headers machinesets.m -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel); do
         echo "machine set to edit $machineset"
         machine_set_num=$(oc get $machineset -n openshift-machine-api -o jsonpath="{.spec.replicas}")
         echo "machine set scale num currently: $machine_set_num"
