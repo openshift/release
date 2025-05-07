@@ -31,14 +31,10 @@ else
 fi
 
 pip install .
-export EXTRA_FLAGS=" --lookback ${LOOKBACK}d"
+export EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [[ ! -z "$UUID" ]]; then
     export EXTRA_FLAGS+=" --uuid ${UUID}"
-fi
-
-if [ ${HUNTER_ANALYZE} == "true" ]; then
-    export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
