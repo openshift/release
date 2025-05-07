@@ -105,7 +105,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 15,
+        'us-east-1': 25,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -207,7 +207,7 @@ CONFIG = {
         'usgovtexas': 5
     },
     'azure-sustaining-autorelease-412-quota-slice': {
-        'eastus': 15,
+        'eastus': 25,
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 110,
@@ -237,7 +237,7 @@ CONFIG = {
         'us-central1': 7,
     },
     'gcp-sustaining-autorelease-412-quota-slice': {
-        'us-east1': 15,
+        'us-east1': 25,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
