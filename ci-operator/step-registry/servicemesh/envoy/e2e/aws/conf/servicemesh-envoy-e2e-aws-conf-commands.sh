@@ -229,9 +229,8 @@ EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 # ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 # ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
@@ -261,13 +260,16 @@ rm /tmp/pull-secret
 #   rm "${PATCH}"
 # fi
 
+# custom rhcos ami for non-public regions
+RHCOS_AMI=""
+
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
   openshift-install version
   RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
 fi
 
-if [ ! -z ${RHCOS_AMI} ]; then
+if [ -n "${RHCOS_AMI}" ]; then
   echo "patching rhcos ami to install-config.yaml"
   CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
   cat >> "${CONFIG_PATCH_AMI}" << EOF
