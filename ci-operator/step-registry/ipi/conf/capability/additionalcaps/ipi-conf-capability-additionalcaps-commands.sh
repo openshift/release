@@ -71,6 +71,7 @@ latest_version="v418"
 # define capability dependency
 declare -A dependency_caps
 dependency_caps["marketplace"]="OperatorLifecycleManager"
+dependency_caps["Ingress"]="OperatorLifecycleManager"
 
 declare "v${ocp_major_version}${ocp_minor_version}"
 v_current_version="v${ocp_major_version}${ocp_minor_version}"
@@ -133,6 +134,10 @@ while [[ -z "${selected_capability}" ]]; do
         enabled_capabilities=${enabled_capabilities/${selected_capability}}
         for key in "${!dependency_caps[@]}"; do
             if [[ "${selected_capability}" == "${dependency_caps[$key]}" ]]; then
+                if (( ocp_minor_version < 19 )) && [[ "${key}" == "Ingress" ]]; then
+                    # skip enabling on 4.18 and previouse version, dependency for Ingress is only applicable on 4.19+.
+                    continue
+                fi
                 echo "capability ${key} depends on Capability ${dependency_caps[$key]}, so disable ${key} along with ${dependency_caps[$key]}"
                 enabled_capabilities=${enabled_capabilities/"$key"}
             fi
