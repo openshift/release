@@ -46,6 +46,11 @@ promotion:
   - name: ocm-2.14
     namespace: edge-infrastructure
 releases:
+  4-18:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
   latest:
     candidate:
       product: ocp
@@ -368,6 +373,29 @@ tests:
         OPENSHIFT_VERSION=4.19
       CLUSTERTYPE: assisted_medium_el9
       TEST_TYPE: minimal
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-late-binding-sno-4-18
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:4-18
+    env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
+        WORKER_CPU=3
+        WORKER_MEMORY=10240
+        OPENSHIFT_VERSION=4.18
+      CLUSTERTYPE: assisted_large_el9
+      POST_INSTALL_COMMANDS: |
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
+        export SET_INFRAENV_VERSION=true
+        make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-binding-sno-4-19
