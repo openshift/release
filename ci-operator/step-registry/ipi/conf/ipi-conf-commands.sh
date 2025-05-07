@@ -35,6 +35,21 @@ fips: true
 EOF
 fi
 
+if [ -n "${CLUSTER_NETWORK_CIDR:-}" ] || [ -n "${CLUSTER_NETWORK_HOST_PREFIX:-}" ] || [ -n "${MACHINE_NETWORK_CIDR:-}" ] || [ -n "${SERVICE_NETWORK_CIDR:-}" ]; then
+    echo "Adding 'networking.clusterNetwork' to install-config.yaml"
+    cat >> "${out}" << EOF
+networking:
+  networkType: OVNKubernetes
+  clusterNetwork:
+  - cidr: ${CLUSTER_NETWORK_CIDR:-10.128.0.0/14}
+    hostPrefix: ${CLUSTER_NETWORK_HOST_PREFIX:-23}
+  machineNetwork:
+  - cidr: ${MACHINE_NETWORK_CIDR:-10.0.0.0/16}
+  serviceNetwork:
+  - ${SERVICE_NETWORK_CIDR:-172.30.0.0/16}
+EOF
+fi
+
 if [ -n "${BASELINE_CAPABILITY_SET}" ]; then
 	echo "Adding 'capabilities: ...' to install-config.yaml"
 	cat >> "${out}" << EOF
