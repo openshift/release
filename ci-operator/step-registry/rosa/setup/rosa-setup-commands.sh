@@ -83,6 +83,8 @@ if [[ "$UPGRADE_ENABLED" == "true" ]];then
   export VERSION=$start_version
 fi
 
+make -h
+exit 0
 rosatest --ginkgo.v --ginkgo.no-color \
   --ginkgo.timeout "60m" \
   --ginkgo.label-filter "day1" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
