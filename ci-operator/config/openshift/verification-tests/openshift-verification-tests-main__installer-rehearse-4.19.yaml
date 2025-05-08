@@ -66,10 +66,16 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-sj2qqdk/release:latest
-      ENABLE_DES_DEFAULT_MACHINE: "true"
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+      REQUIRED_DEFAULT_STORAGECLASS: azurefile-csi
+      SLEEP_DURATION: 24h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-provision
+    - ref: storage-conf-storageclass-set-default-storageclass
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
