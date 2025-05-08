@@ -281,6 +281,8 @@ function check_clusteroperators_status() {
     echo "$(date) - all clusteroperators are done progressing."
 }
 
+TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
+
 case "${CLUSTER_TYPE}" in
 packet|equinix*)
     # shellcheck source=/dev/null
