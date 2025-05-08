@@ -38,22 +38,27 @@ function approve_csrs() {
 
 
 # Generate YAML for creation VM
+echo "$(date -u --rfc-3339=seconds) - Generating ignition data"
 installer_bin=$(which openshift-install)
 VIRT_IMAGE=$("${installer_bin}" coreos print-stream-json | jq -r '.architectures.x86_64.images.kubevirt.image')
-#VIRT_IMAGE=$(jq -r '.architectures.x86_64.images.kubevirt.image' ${SHARED_DIR}/coreos.json)
 echo ${VIRT_IMAGE}
 
 IGNITION_DATA=$(oc get secret worker-user-data -n openshift-machine-api -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.data.userData')
 
+echo "$(date -u --rfc-3339=seconds) - Generating virtual machine yaml"
 virtctl create vm --name ${VM_NAME} --instancetype virtualmachineinstancetype/manta --volume-containerdisk src:${VIRT_IMAGE} --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual > "${SHARED_DIR}/vm.yaml"
 
 # Create VM (VM will not be running)
-oc create -f vm.yaml --kubeconfig=${VIRT_KUBECONFIG}
+echo "$(date -u --rfc-3339=seconds) - Creating virtual machine"
+oc create ns ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
+oc create -f "${SHARED_DIR}/vm.yaml" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
 
 # Update VM to have CI network
+echo "$(date -u --rfc-3339=seconds) - Patching networking config into virtual machine"
 oc patch vm ${VM_NAME} -n ${VM_NAMESPACE} --type=merge --patch-file ${VM_NETWORK_PATCH} --kubeconfig=${VIRT_KUBECONFIG}
 
 # Start VM
+echo "$(date -u --rfc-3339=seconds) - Starting virtual machine"
 virtctl start "${VM_NAME}" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
 
 # Monitor cluster for CSRs
