@@ -22,6 +22,109 @@ images:
 - dockerfile_path: openshift/ci/dockerfiles/ansible-e2e.Dockerfile
   from: openshift-ansible-operator-plugins
   to: ansible-operator-e2e
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+
+    RUN set -e && dnf clean all && rm -rf /var/cache/dnf/* \
+      && dnf update -y \
+      && dnf install -y rust cargo libffi-devel python3.12-devel gcc \
+      && pushd /usr/local/bin && ln -sf ../../bin/python3.12 python3 && popd \
+      && python3 -m ensurepip --upgrade
+
+    COPY ./images/ansible-operator/Pipfile* ./
+
+    # The build dependencies are required by cachito. Following script
+    # does exactly the same. More info at: https://github.com/containerbuildsystem/cachito/blob/master/docs/pip.md#build-dependencies
+    RUN curl -LO https://raw.githubusercontent.com/containerbuildsystem/cachito/master/bin/pip_find_builddeps.py \
+        && chmod +x pip_find_builddeps.py
+
+    RUN python3 -m pip install --upgrade pip
+
+    # Create requirements.in file from the pipenv created using the
+    # same Pipfile and Pipfile.lock used for upstream image. Then
+    # use pip-compile to generate the requirements.txt file.
+    RUN python3 -m pip install pipenv==2023.11.15 \
+        && python3 -m pip install pip-tools \
+        && pipenv install --deploy \
+        # NOTE: This ignored vulnerability (71064) was detected in requests, \
+        # but the upgraded version doesn't support the use case (protocol we are using).\
+        # Ref: https://github.com/operator-framework/ansible-operator-plugins/pull/67#issuecomment-2189164688
+        && pipenv check --ignore 71064 \
+        && pipenv run pip freeze --all  > ./requirements.in \
+        && pip-compile --output-file=./requirements.txt ./requirements.in --strip-extras \
+        # NOTE: Comment out ansible-core, ansible-runner, ansible-runner-http, and
+        # requests-unixsocket from `requirements.txt` to avoid running
+        # `pip_find_builddeps.py` script against these.
+        # These are required to properly resolve dependency conflicts:
+        #   1. Resolve conflict with `setuptools` version:
+        #     - `setuptools>=70.1` is required by ansible-core (via markupsafe).
+        #     - `setuptools<=69.0.2,>=45` is required by ansible-runner.
+        #     - `setuptools>=77.0.3` is required by charset-normalizer (via types-psutil).
+        #   2. Resolve conflict with `setuptools_scm` version:
+        #     - `setuptools_scm>=8` is required by requests-unixsocket.
+        #     - `setuptools_scm<8` is required by kubernetes.
+        && sed -i '/ansible-core==/s/^/#/g' ./requirements.txt \
+        && sed -i '/ansible-runner==/s/^/#/g' ./requirements.txt \
+        && sed -i '/ansible-runner-http==/s/^/#/g' ./requirements.txt \
+        && sed -i '/requests-unixsocket==/s/^/#/g' ./requirements.txt \
+        # NOTE: Comment out cryptography and its dependencies from the requirements.txt
+        # files as these packages can't be installed in the isolated environment of OSBS
+        # image build. These packages will be installed through rpms.
+        && sed -i '/cryptography==/s/^/#/g' ./requirements.txt \
+        && sed -i '/cffi==/s/^/#/g' ./requirements.txt \
+        && sed -i '/pycparser==/s/^/#/g' ./requirements.txt \
+        && sed -i '/maturin==/s/^/#/g' ./requirements.txt \
+        && ./pip_find_builddeps.py requirements.txt -o requirements-build.in --append \
+        # Uncomment ansible-core, ansible-runner, ansible-runner-http and requests-unixsocket,
+        # so that they are re-enabled in the requirements.txt file.
+        && sed -i '/ansible-core==/s/^#//g' ./requirements.txt \
+        && sed -i '/ansible-runner==/s/^#//g' ./requirements.txt \
+        && sed -i '/ansible-runner-http==/s/^#//g' ./requirements.txt \
+        && sed -i '/requests-unixsocket==/s/^#//g' ./requirements.txt \
+        && pip-compile --output-file=./requirements-build.txt ./requirements-build.in --strip-extras --allow-unsafe \
+        # NOTE: Comment out cryptography and its dependencies from the requirements-build.txt
+        # files as these packages can't be installed in the isolated environment of OSBS image
+        # build. These packages will be installed through rpms.
+        && sed -i '/cryptography==/s/^/#/g' ./requirements-build.txt \
+        && sed -i '/cffi==/s/^/#/g' ./requirements-build.txt \
+        && sed -i '/pycparser==/s/^/#/g' ./requirements-build.txt \
+        && sed -i '/maturin==/s/^/#/g' ./requirements-build.txt \
+        # Add ansible-core into a separate requirements-build1-temp.in file to include it
+        # into the requirements-build1.in file.
+        && grep "ansible-core==" ./requirements.in >> ./requirements-build1-temp.in || true \
+        && ./pip_find_builddeps.py requirements-build1-temp.in -o requirements-build1.in --append \
+        && pip-compile --output-file=./requirements-build1.txt ./requirements-build1.in --strip-extras --allow-unsafe \
+        # NOTE: Comment out cryptography and its dependencies from the requirements-build1.txt
+        # files as these packages can't be installed in the isolated environment of OSBS
+        # image build. These packages will be installed through rpms.
+        && sed -i '/cryptography==/s/^/#/g' ./requirements-build1.txt \
+        && sed -i '/cffi==/s/^/#/g' ./requirements-build1.txt \
+        && sed -i '/pycparser==/s/^/#/g' ./requirements-build1.txt \
+        && sed -i '/maturin==/s/^/#/g' ./requirements-build1.txt \
+        # Add ansible-runner into a separate requirements-pre-build-temp.in
+        # file to include it into the requirements-pre-build.in file.
+        && grep "ansible-runner==" ./requirements.in >> ./requirements-pre-build-temp.in || true \
+        # Add flit-core to requirements-pre-build.in file as this package is part of the
+        # build dependencies of some packages in requirements-build.txt file.
+        && grep "flit-core==" ./requirements-build.txt >> ./requirements-pre-build.in || true \
+        && ./pip_find_builddeps.py requirements-pre-build-temp.in -o requirements-pre-build.in --append \
+        && pip-compile --output-file=./requirements-pre-build.txt ./requirements-pre-build.in --strip-extras --allow-unsafe
+
+    VOLUME /tmp/requirements
+    ENTRYPOINT ["cp", "./requirements.txt", "./requirements-build.txt",  "./requirements-build1.txt", "./requirements-pre-build.txt", "/tmp/requirements/"]
+  to: pip-requirements
+- dockerfile_literal: |
+    FROM pip-requirements AS builder
+
+    FROM src
+    RUN rm openshift/requirements*.txt
+    COPY --from=builder requirements*.txt openshift/
+  from: src
+  inputs:
+    pip-requirements:
+      as:
+      - pip-requirements
+  to: diff-requirements
 promotion:
   to:
   - name: "4.20"
