@@ -89,6 +89,24 @@ systemd:
 
       [Install]
       RequiredBy=default.target
+storage:
+  files:
+    - path: /etc/NetworkManager/system-connections/${baremetal_iface}.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=${baremetal_iface}
+          type=ethernet
+          interface-name=${baremetal_iface}
+          [ipv4]
+          method=disabled
+          [ipv6]
+          address1=${ipv6}/64,fd99:2222:3456::1
+          dns=fd99:2222:3456::1;
+          dns-search=
+          may-fail=false
+          method=manual
 EOF
 done
 
