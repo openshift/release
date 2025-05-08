@@ -47,7 +47,7 @@ export ES_SERVER=""
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=true --metrics-profile=${METRICS_PROFILE}"
 export EXTRA_FLAGS
 
 
