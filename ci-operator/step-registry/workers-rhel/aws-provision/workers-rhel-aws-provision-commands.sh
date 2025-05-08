@@ -123,9 +123,13 @@ cat > create_machineset.yaml <<-'EOF'
   set_fact:
     machineset_name: "{{ machineset_obj.metadata.name ~ '-' ~ platform_type }}"
 
-- name: Set up dict_edit base
+- name: Update machineset definition
   set_fact:
-    dict_edit_base:
+    machineset: "{{ machineset_obj | combine(dict_edit, recursive=True) }}"
+  vars:
+    ssh_key_name: "{{ lookup('env', 'SSH_KEY_NAME') }}"
+    instance_type: "{{ lookup('env', 'RHEL_VM_TYPE') }}"
+    dict_edit:
       metadata:
         name: "{{ machineset_name }}"
         resourceVersion: ""
@@ -143,23 +147,7 @@ cat > create_machineset.yaml <<-'EOF'
                 ami:
                   id: "{{ aws_ami }}"
                 instanceType: "{{ instance_type }}"
-  vars:
-    ssh_key_name: "{{ lookup('env', 'SSH_KEY_NAME') }}"
-    instance_type: "{{ lookup('env', 'RHEL_VM_TYPE') }}"
-
-- name: Add keyName conditionally
-  set_fact:
-    dict_edit: "{{ dict_edit_base | combine({'spec': {'template': {'spec': {'providerSpec': {'value': {'keyName': ssh_key_name}}}}}}, recursive=True) }}"
-  when: ssh_key_name != ''
-
-- name: Set dict_edit to base if no keyName
-  set_fact:
-    dict_edit: "{{ dict_edit_base }}"
-  when: ssh_key_name == ''
-
-- name: Update machineset definition
-  set_fact:
-    machineset: "{{ machineset_obj | combine(dict_edit, recursive=True) }}"
+                keyName: "{{ ssh_key_name }}"
 
 - name: Import machineset definition
   command: >
