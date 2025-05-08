@@ -28,7 +28,7 @@ kind: ClusterImageSet
 metadata:
   name: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
 spec:
-  releaseImage: "${RELEASE_IMAGE_LATEST}"
+  releaseImage: "$(cat ${SHARED_DIR}/release-image-tag.txt)"
 EOF
 
   set -x
