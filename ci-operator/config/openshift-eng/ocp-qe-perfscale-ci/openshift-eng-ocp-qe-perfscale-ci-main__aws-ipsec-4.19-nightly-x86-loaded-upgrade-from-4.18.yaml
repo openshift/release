@@ -21,8 +21,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: loaded-upgrade-418to419-24nodes
+- as: loaded-upgrade-418to419-24nodes
+  cron: 0 2 3 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -34,20 +34,13 @@ tests:
       ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE_WORKER: "3"
       ZONES_COUNT: "3"
-    post:
-    - ref: openshift-qe-kube-burner-index
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install
     test:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-upgrade-max-unavailable
     - chain: openshift-qe-cluster-density-v2
     - chain: openshift-upgrade-qe-sanity
     - ref: openshift-qe-connectivity-check
+    workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
