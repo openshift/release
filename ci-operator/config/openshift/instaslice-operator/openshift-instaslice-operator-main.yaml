@@ -11,14 +11,13 @@ images:
   to: instaslice-base-src
 releases:
   initial:
-    integration:
-      name: "4.18"
-      namespace: ocp
+    release:
+      channel: stable
+      version: "4.18"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.18"
-      namespace: ocp
+    release:
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -125,7 +124,7 @@ tests:
         mkdir /tmp/oci-image && pushd /tmp/oci-image
         skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
         umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
-        oc create -f bundle/rootfs/manifests
+        oc create -f bundle/rootfs/manifests || true
         popd
 
         echo "Creating OperatorGroup"
@@ -136,6 +135,8 @@ tests:
                 name: "instaslice"
                 namespace: "instaslice-system"
         EOF
+
+        sleep 30
 
         make test-e2e-ocp
       from: instaslice-base-src
