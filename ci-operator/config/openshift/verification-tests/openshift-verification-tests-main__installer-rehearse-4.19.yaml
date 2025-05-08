@@ -37,6 +37,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-manual-gcp-confidential
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_CONFIDENTIAL_COMPUTE: IntelTrustedDomainExtensions
+      COMPUTE_NODE_TYPE: c3-standard-4
+      COMPUTE_ON_HOST_MAINTENANCE: Terminate
+      CONFIDENTIAL_COMPUTE: ""
+      CONTROL_PLANE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      CONTROL_PLANE_NODE_TYPE: n2d-standard-4
+      CONTROL_PLANE_ON_HOST_MAINTENANCE: Terminate
+      SLEEP_DURATION: 24h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-confidential-computing-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
