@@ -12,7 +12,10 @@ fi
 
 VIRT_KUBECONFIG=/var/run/vault/vsphere-ibmcloud-config/vsphere-virt-kubeconfig
 CLUSTER_KUBECONFIG=${SHARED_DIR}/kubeconfig
+VM_NETWORK_PATCH=/var/run/vault/vsphere-ibmcloud-config/vm-network-patch.json
+
 VM_NAME="$(oc get infrastructure cluster -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.status.infrastructureName')-bm"
+VM_NAMESPACE="${NAMESPACE}"
 
 function approve_csrs() {
   CSR_COUNT=0
@@ -42,16 +45,16 @@ echo ${VIRT_IMAGE}
 
 IGNITION_DATA=$(oc get secret worker-user-data -n openshift-machine-api -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.data.userData')
 
-virtctl create vm --name ${VM_NAME} --instancetype virtualmachineinstancetype/manta --volume-containerdisk src:${VIRT_IMAGE} --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual > vm.yaml
+virtctl create vm --name ${VM_NAME} --instancetype virtualmachineinstancetype/manta --volume-containerdisk src:${VIRT_IMAGE} --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual > "${SHARED_DIR}/vm.yaml"
 
 # Create VM (VM will not be running)
-oc create -f vm.yaml
+oc create -f vm.yaml --kubeconfig=${VIRT_KUBECONFIG}
 
 # Update VM to have CI network
-oc patch vm ${VM_NAME} -n manta --type=merge --patch-file vm-network-patch.json --kubeconfig=${VIRT_KUBECONFIG}
+oc patch vm ${VM_NAME} -n ${VM_NAMESPACE} --type=merge --patch-file ${VM_NETWORK_PATCH} --kubeconfig=${VIRT_KUBECONFIG}
 
 # Start VM
-virtctl start "${VM_NAME}" -n manta --kubeconfig=${VIRT_KUBECONFIG}
+virtctl start "${VM_NAME}" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
 
 # Monitor cluster for CSRs
 approve_csrs
