@@ -107,13 +107,13 @@ EOF
             echo "JUnit result written to ${JUNIT_IMAGE_FILE}"
         fi
 
-        TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
+        TEST_ARGS="${TEST_ARGS:-} --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }
 
 function use_minimal_test_list() {
         echo "### Skipping test images mirroring, fall back to minimal tests list"
 
-        TEST_ARGS="--file /tmp/tests"
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
         TEST_SKIPS=""
         echo "${TEST_MINIMAL_LIST}" > /tmp/tests
 }
