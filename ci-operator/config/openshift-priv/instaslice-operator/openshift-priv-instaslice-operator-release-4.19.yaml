@@ -12,8 +12,7 @@ images:
   to: instaslice-base-src
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -128,7 +127,11 @@ tests:
         make deploy-nfd-ocp
         make deploy-nvidia-ocp
 
-        oc new-project instaslice-system
+        mkdir /tmp/oci-image && pushd /tmp/oci-image
+        skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
+        umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
+        oc create -f bundle/rootfs/manifests
+        popd
 
         echo "Creating OperatorGroup"
         oc create -f - <<EOF
@@ -138,12 +141,6 @@ tests:
                 name: "instaslice"
                 namespace: "instaslice-system"
         EOF
-
-        mkdir /tmp/oci-image && pushd /tmp/oci-image
-        skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
-        umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
-        oc create -f bundle/rootfs/manifests
-        popd
 
         make test-e2e-ocp
       from: instaslice-base-src

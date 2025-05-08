@@ -319,7 +319,7 @@ function check_upgrade_status() {
 
 # Check version, state in history
 function check_history() {
-    local version state testcase="cvo"
+    local version state testcase="OCP-21588"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"

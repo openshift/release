@@ -6,11 +6,18 @@ items:
   metadata:
     namespace: cincinnati-ci-public
     name: rust
+  spec:
+    tags:
+    - name: latest
+      from:
+        kind: ImageStreamTag
+        name: rust:boot-root-1.79.0
+        namespace: cincinnati-ci-public
 - kind: BuildConfig
   apiVersion: build.openshift.io/v1
   metadata:
     namespace: cincinnati-ci-public
-    name: rust-ubi9
+    name: rust-ubi9  # will be replaced by rust-boot-root-1.79.0
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -25,6 +32,45 @@ items:
           && dnf install -y jq rust cargo \
           && dnf install -y openssl-devel \
           && dnf clean all
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: ubi:9
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+      - type: ConfigChange
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: cincinnati-ci-public
+    name: rust-boot-root-1.79.0
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: rust:boot-root-1.79.0
+    source:
+      dockerfile: |
+        FROM registry.access.redhat.com/ubi9/ubi:9.5
+        RUN dnf update -y \
+            && dnf install -y git jq rust rustfmt cargo openssl-devel python3-pip \
+            && dnf clean all
+
+        WORKDIR /opt/app-root/src
+        RUN mkdir /go && chmod g+xw -R /go \
+            && chown -R 1001:0 /opt/app-root/src \
+            && chmod ug+rwx /opt/app-root/src
+        USER 1001
+        ENV USER_UID=1001 HOME="/opt/app-root/src" PATH="/opt/app-root/src/.local/bin:/opt/app-root/src/.cargo/bin:$PATH"
+        ### UBI has no dnf repo providing those tools
+        RUN pip3 install --user yamllint \
+            && mkdir -p /opt/app-root/src/.cargo/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C /opt/app-root/src/.cargo/bin
       type: Dockerfile
     strategy:
       dockerStrategy:
