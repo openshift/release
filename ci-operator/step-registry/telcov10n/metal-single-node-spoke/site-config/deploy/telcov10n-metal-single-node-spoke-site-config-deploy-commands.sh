@@ -470,14 +470,22 @@ function get_openshift_baremetal_install_tool {
   echo "************ telcov10n Extract RHCOS images: Getting openshift-baremetal-install tool ************"
 
   set -x
+  local rel_img
+  if [ -n "${PULL_NUMBER:-}" ] && [ -n "${SET_SPECIFIC_RELEASE_IMAGE}" ]; then
+    rel_img="${SET_SPECIFIC_RELEASE_IMAGE}"
+  else
+    rel_img=${RELEASE_IMAGE_LATEST}
+  fi
+
   pull_secret=${SHARED_DIR}/pull-secret
-  oc adm release extract -a ${pull_secret} --command=openshift-baremetal-install ${RELEASE_IMAGE_LATEST}
+  oc adm release extract -a ${pull_secret} --command=openshift-baremetal-install ${rel_img}
   attempts=0
   while sleep 5s ; do
     ./openshift-baremetal-install version && break
     [ $(( attempts=${attempts} + 1 )) -lt 2 ] || exit 1
   done
 
+  echo -n "${rel_img}" > ${SHARED_DIR}/release-image-tag.txt
   echo -n "$(./openshift-baremetal-install version | head -1 | awk '{print $2}')" > ${SHARED_DIR}/cluster-image-set-ref.txt
   set +x
 }
