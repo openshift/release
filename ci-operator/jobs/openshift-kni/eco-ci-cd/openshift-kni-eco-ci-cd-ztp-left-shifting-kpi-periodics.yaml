@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build06
-  cron: 0 21 * * *
+  cron: 0 19 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -17,6 +17,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-ztp-left-shifting-kpi-ci-4.19-telcov10n-virtualised-single-node-hub-ztp
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
