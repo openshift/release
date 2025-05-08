@@ -202,3 +202,39 @@ cat > ensure-memory.yaml <<-"EOF"
 EOF
 
 ansible-playbook ensure-memory.yaml -i "${SHARED_DIR}/inventory"
+
+cat > ensure-network-manager-dns-servers.yaml <<-"EOF"
+- name: Make sure inventory contains at least one host
+  hosts: localhost
+  tasks:
+    - name: Fail if inventory is empty
+      ansible.builtin.fail:
+        msg: "[ERROR] Empty inventory. No host available."
+      when: groups.all|length == 0
+      
+- name: Configure NetworkManager DNS servers
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Extract DNS servers from /etc/resolv.conf
+      ansible.builtin.shell: |
+        awk '/^nameserver/ {print $2}' /etc/resolv.conf | paste -sd "," -
+      register: dns_servers
+      changed_when: false
+
+    - name: Configure NetworkManager to use those DNS servers
+      ansible.builtin.ini_file:
+        dest: /etc/NetworkManager/conf.d/dns-servers.conf
+        section: 'global-dns-domain-*'
+        option: servers
+        value: "{{ dns_servers.stdout }}"
+        create: yes
+
+    - name: Reload NetworkManager to pick up new DNS settings
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: reloaded
+
+EOF
+
+ansible-playbook ensure-network-manager-dns-servers.yaml -i "${SHARED_DIR}/inventory"
