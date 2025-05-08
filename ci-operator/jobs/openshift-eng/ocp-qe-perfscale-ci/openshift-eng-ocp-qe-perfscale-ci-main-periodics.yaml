@@ -3473,6 +3473,81 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build07
+  cron: 0 0 3 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-eng
+    repo: ocp-qe-perfscale-ci
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+    ci-operator.openshift.io/variant: aws-4.19-nightly-x86-cpou-loaded-upgrade-from-4.17
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.19-nightly-x86-cpou-loaded-upgrade-from-4.17-loaded-upgrade-ipsec-417to419-24nodes
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=loaded-upgrade-ipsec-417to419-24nodes
+      - --variant=aws-4.19-nightly-x86-cpou-loaded-upgrade-from-4.17
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build07
   cron: 0 3 1,8,15,22 * *
   decorate: true
   decoration_config:
@@ -3663,18 +3738,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.19-nightly-x86-loaded-upgrade-from-4.18-loaded-upgrade-417to418-120nodes
-  reporter_config:
-    slack:
-      channel: '#ocp-qe-scale-ci-results'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :warning: {{end}}'
+  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.19-nightly-x86-loaded-upgrade-from-4.18-loaded-upgrade-418to419-120nodes
   spec:
     containers:
     - args:
@@ -3683,7 +3747,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=loaded-upgrade-417to418-120nodes
+      - --target=loaded-upgrade-418to419-120nodes
       - --variant=aws-4.19-nightly-x86-loaded-upgrade-from-4.18
       command:
       - ci-operator
@@ -3750,18 +3814,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.19-nightly-x86-loaded-upgrade-from-4.18-loaded-upgrade-417to418-24nodes
-  reporter_config:
-    slack:
-      channel: '#ocp-qe-scale-ci-results'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :warning: {{end}}'
+  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.19-nightly-x86-loaded-upgrade-from-4.18-loaded-upgrade-418to419-24nodes
   spec:
     containers:
     - args:
@@ -3770,7 +3823,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=loaded-upgrade-417to418-24nodes
+      - --target=loaded-upgrade-418to419-24nodes
       - --variant=aws-4.19-nightly-x86-loaded-upgrade-from-4.18
       command:
       - ci-operator
@@ -3837,18 +3890,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.19-nightly-x86-loaded-upgrade-from-4.18-loaded-upgrade-417to418-252nodes
-  reporter_config:
-    slack:
-      channel: '#ocp-qe-scale-ci-results'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :warning: {{end}}'
+  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.19-nightly-x86-loaded-upgrade-from-4.18-loaded-upgrade-418to419-252nodes
   spec:
     containers:
     - args:
@@ -3857,7 +3899,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=loaded-upgrade-417to418-252nodes
+      - --target=loaded-upgrade-418to419-252nodes
       - --variant=aws-4.19-nightly-x86-loaded-upgrade-from-4.18
       command:
       - ci-operator
@@ -5680,6 +5722,81 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=loaded-upgrade-417to418-24nodes
       - --variant=aws-ipsec-4.18-nightly-x86-loaded-upgrade-from-4.17
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build07
+  cron: 0 2 3 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-eng
+    repo: ocp-qe-perfscale-ci
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+    ci-operator.openshift.io/variant: aws-ipsec-4.19-nightly-x86-loaded-upgrade-from-4.18
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-ipsec-4.19-nightly-x86-loaded-upgrade-from-4.18-loaded-upgrade-418to419-24nodes
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=loaded-upgrade-418to419-24nodes
+      - --variant=aws-ipsec-4.19-nightly-x86-loaded-upgrade-from-4.18
       command:
       - ci-operator
       image: ci-operator:latest
