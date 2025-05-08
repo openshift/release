@@ -291,7 +291,7 @@ function install_secured_cluster_with_helm() {
 function configure_scanner_readiness() {
   echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
   set +e  # ignore errors
-  kubectl wait deploy --for=create scanner-v4-matcher --namespace stackrox --timeout=120s
+  kubectl wait --for condition=established --timeout=120s deploy/scanner-v4-matcher --namespace stackrox --timeout=120s || true
   if kubectl describe -n stackrox deploy/scanner-v4-matcher \
     | grep "SCANNER_V4_MATCHER_READINESS.*${SCANNER_V4_MATCHER_READINESS:-}"; then
     echo 'scanner-v4-matcher readiness is set'
