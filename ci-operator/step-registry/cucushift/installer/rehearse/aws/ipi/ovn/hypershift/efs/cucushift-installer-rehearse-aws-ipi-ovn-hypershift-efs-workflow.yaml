@@ -1,0 +1,16 @@
+workflow:
+  as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-efs
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
+    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: cucushift-hypershift-extended-enable-guest
+    - chain: storage-conf-csi-optional-aws-efs-sts
+    - ref: cucushift-hypershift-extended-disable-guest
+    post:
+    - ref: storage-destroy-csi-aws-efs-sts-operator-role
+    - ref: storage-destroy-csi-aws-efs
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow.
+    The hosted cluster default storage will use the aws efs csi.

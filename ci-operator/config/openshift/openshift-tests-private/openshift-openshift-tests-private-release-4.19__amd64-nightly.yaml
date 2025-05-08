@@ -890,6 +890,21 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
+- as: aws-ipi-ovn-efs-hypershift-mgmt-longduration-f365-destructive
+  cron: 13 18 4 * *
+  steps:
+    cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.19
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: NonPreRelease&;HyperShiftMGMT&;NonHyperShiftHOST&;Longduration&;Serial&;Disruptive&;~ChkUpgrade&;~MicroShiftOnly&
+      TEST_IMPORTANCE: Medium
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt-longrun
+    - ref: wait
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-efs
 - as: aws-ipi-private-fips-f28-disasterrecovery
   cron: 11 11 20 * *
   steps:
