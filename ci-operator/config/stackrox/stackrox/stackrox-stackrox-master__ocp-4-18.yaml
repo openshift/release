@@ -16,11 +16,6 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-ui-test-0.4.8
-releases:
-  latest:
-    release:
-      channel: stable
-      version: "4.18"
 resources:
   '*':
     requests:
@@ -28,29 +23,6 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: 24nodes-scale-scannerv4-test
-  optional: true
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-stackrox
-    env:
-      BASE_DOMAIN: perfscale.rox.systems
-      COMPUTE_NODE_REPLICAS: "24"
-      ES_SECRETS_PATH: /secret_stackrox
-      EXTRA_FLAGS: --churn-duration=20m --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
-      PPROF: "true"
-      ROX_SCANNER_V4: "true"
-      SCANNER_V4_MATCHER_READINESS: vulnerability
-      SCANNER_V4_MATCHER_READINESS_MAX_WAIT: 60m
-      SET_ENV_BY_PLATFORM: custom
-      USER_TAGS: |
-        TicketId 382
-        RoxProject PerfScale
-      ZONES_COUNT: "3"
-    test:
-    - chain: stackrox-perfscale
-    workflow: stackrox-install-helm
-  timeout: 8h0m0s
 - as: qa-e2e-tests
   optional: true
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
