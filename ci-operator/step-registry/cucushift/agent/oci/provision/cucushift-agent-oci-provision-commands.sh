@@ -35,9 +35,9 @@ platform:
 "
 
 pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build03_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build03_auth=$(jq -c '.auths."registry.build03.ci.openshift.org"' ${build03_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build03_auth" '.auths["registry.build03.ci.openshift.org"] += $auth' "${pull_secret_path}")
+build05_secrets="/var/run/vault/secrets/.dockerconfigjson"
+extract_build05_auth=$(jq -c '.auths."registry.build05.ci.openshift.org"' ${build05_secrets})
+final_pull_secret=$(jq -c --argjson auth "$extract_build05_auth" '.auths["registry.build05.ci.openshift.org"] += $auth' "${pull_secret_path}")
 
 echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
 pull_secret=$(<"${SHARED_DIR}/pull-secrets")
