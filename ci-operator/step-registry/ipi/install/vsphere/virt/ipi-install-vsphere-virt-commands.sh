@@ -46,12 +46,12 @@ echo ${VIRT_IMAGE}
 IGNITION_DATA=$(oc get secret worker-user-data -n openshift-machine-api -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.data.userData')
 
 echo "$(date -u --rfc-3339=seconds) - Generating virtual machine yaml"
-virtctl create vm --name ${VM_NAME} --instancetype ci-baremetal --volume-containerdisk src:${VIRT_IMAGE} --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual > "${SHARED_DIR}/vm.yaml"
+virtctl create vm --name ${VM_NAME} --instancetype ci-baremetal --volume-containerdisk src:${VIRT_IMAGE} --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual -n ${VM_NAMESPACE} > "${SHARED_DIR}/vm.yaml"
 
 # Create VM (VM will not be running)
 echo "$(date -u --rfc-3339=seconds) - Creating virtual machine"
 oc create ns ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
-oc create -f "${SHARED_DIR}/vm.yaml" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
+oc create -f "${SHARED_DIR}/vm.yaml" --kubeconfig=${VIRT_KUBECONFIG}
 
 # Update VM to have CI network
 echo "$(date -u --rfc-3339=seconds) - Patching networking config into virtual machine"
