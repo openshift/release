@@ -5,6 +5,9 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
+SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/sriov_num_vfs)
+SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
+
 if [ ${BAREMETAL} == "true" ]; then
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"

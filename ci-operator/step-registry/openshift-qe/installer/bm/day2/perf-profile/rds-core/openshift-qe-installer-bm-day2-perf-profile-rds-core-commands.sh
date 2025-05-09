@@ -5,6 +5,9 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
+ISOLATED_CORES=$(cat ${CLUSTER_PROFILE_DIR}/isolated_cores)
+RESERVED_CORES=$(cat ${CLUSTER_PROFILE_DIR}/reserved_cores)
+
 if [ ${BAREMETAL} == "true" ]; then
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
