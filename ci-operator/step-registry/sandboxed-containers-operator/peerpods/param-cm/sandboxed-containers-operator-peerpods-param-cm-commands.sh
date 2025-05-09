@@ -39,7 +39,7 @@ handle_azure() {
         # Useful when testing this script outside of ci-operator
         AZURE_CLIENT_ID="$(from_azure_credentials azure_client_id)"
         AZURE_CLIENT_SECRET="$(from_azure_credentials azure_client_secret)"
-        AZURE_SUBSCRIPTION_ID="$(from_azure_credentials azure_subscription_id)"
+        #AZURE_SUBSCRIPTION_ID="$(from_azure_credentials azure_subscription_id)"
         AZURE_TENANT_ID="$(from_azure_credentials azure_tenant_id)"
     fi
 
