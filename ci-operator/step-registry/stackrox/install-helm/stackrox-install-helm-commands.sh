@@ -104,7 +104,8 @@ function retry() {
 function wait_deploy() {
   retry kubectl -n ${3:-stackrox} rollout status deploy/"$1" --timeout=${2:-300s} \
     || {
-      kubectl logs -n ${3:-stackrox} --selector="app==$1" --pod-running-timeout=30s --tail=5
+      kubectl describe -n ${3:-stackrox} deploy/"$1" || true
+      kubectl logs -n ${3:-stackrox} --selector="app==$1" --all-containers --pod-running-timeout=30s --tail=25
       return 1;
     }
 }
