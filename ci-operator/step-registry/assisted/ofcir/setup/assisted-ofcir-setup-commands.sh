@@ -7,14 +7,9 @@ set -o pipefail
 echo "************ assisted ofcir setup command ************"
 
 PACKET_CONF="$SHARED_DIR/packet-conf.sh"
-CIRFILE="$SHARED_DIR/cir"
 SSH_KEY_FILE="$CLUSTER_PROFILE_DIR/packet-ssh-key"
 ANSIBLE_CONFIG_FILE="${SHARED_DIR}/ansible.cfg"
 
-if [[ ! -f "$CIRFILE" ]]; then
-    echo "Error: CIR file not found at $CIRFILE"
-    exit 1
-fi
 
 if [[ ! -f "$PACKET_CONF" ]]; then
     echo "Error: packet-conf.sh not found at $PACKET_CONF"
@@ -33,7 +28,8 @@ source "$PACKET_CONF"
 export SSH_KEY_FILE="$SSH_KEY_FILE"
 
 if [[ -z "${IP:-}" ]]; then
-    IP=$(jq -r '.ip' "$CIRFILE")
+  echo "Error: IP env var is missing, it should be set in the script in $PACKET_CONF"
+  exit 1
 fi
 export IP
 
@@ -111,9 +107,16 @@ cat > ensure-memory.yaml <<-"EOF"
     swapfile_basename: swapfile-ci
 
   tasks:
-    - name: Determine mount with most available space
+    - name: Pick first suitable mount (whitelist)
       ansible.builtin.set_fact:
-        target_mount: "{{ ansible_mounts | sort(attribute='size_available', reverse=true) | first }}"
+        target_mount: >-
+          {{
+            ansible_mounts
+            | selectattr('fstype', 'match', '^(ext[234]|xfs|btrfs)$')
+            | sort(attribute='size_available', reverse=true)
+            | first
+          }}
+      failed_when: target_mount is undefined
 
     - name: Set swapfile_path on largest filesystem
       ansible.builtin.set_fact:
@@ -144,25 +147,38 @@ cat > ensure-memory.yaml <<-"EOF"
         msg: "No additional swap needed (current total ≥ {{ required_memory_gib }} GiB)."
       when: "(needed_mb | int) <= 0"
 
-    - name: Create swap file using fallocate
-      ansible.builtin.command: fallocate -l {{ needed_mb | int }}M {{ swapfile_path }}
-      args:
-        creates: "{{ swapfile_path }}"
-      when: "(needed_mb | int) > 0 and fallocate_bin.stat.exists"
+    - name: Allocate swapfile
+      when: needed_mb | int > 0
+      block:
 
-    - name: Create swap file using dd fallback
-      ansible.builtin.command: dd if=/dev/zero of={{ swapfile_path }} bs=1M count={{ needed_mb | int }}
-      args:
-        creates: "{{ swapfile_path }}"
-      when: "(needed_mb | int) > 0 and not fallocate_bin.stat.exists"
+        - name: Try fast allocation with fallocate
+          ansible.builtin.command:
+            cmd: fallocate -l {{ needed_mb | int }}M {{ swapfile_path }}
+            creates: "{{ swapfile_path }}"
+          register: fallocate_result
+          changed_when: fallocate_result.rc == 0
 
-    - name: Secure swap file permissions
+      rescue:
+
+        - name: Remove partially created file (if any)
+          ansible.builtin.file:
+            path: "{{ swapfile_path }}"
+            state: absent
+          ignore_errors: true
+
+        - name: Fallback to dd
+          ansible.builtin.command:
+            cmd: dd if=/dev/zero of={{ swapfile_path }} bs=1M count={{ needed_mb | int }}
+            creates: "{{ swapfile_path }}"
+
+    - name: Ensure correct permissions on swapfile
       ansible.builtin.file:
         path: "{{ swapfile_path }}"
         owner: root
         group: root
         mode: '0600'
-      when: "(needed_mb | int) > 0"
+        force: yes
+      when: needed_mb | int > 0
 
     - name: Format the swap file
       ansible.builtin.command: mkswap {{ swapfile_path }}
@@ -198,7 +214,6 @@ cat > ensure-memory.yaml <<-"EOF"
     - name: Show final summary
       ansible.builtin.debug:
         var: final_mem_info.stdout_lines
-
 EOF
 
 ansible-playbook ensure-memory.yaml -i "${SHARED_DIR}/inventory"
