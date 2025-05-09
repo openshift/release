@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-config
+  namespace: coredns
+data:
+  Corefile: |
+    .:5353 {
+      log
+      errors
+      health
+      
+      template IN A ^.*libvirt-ppc64le-s2s-0-[0-9].*$ {
+        answer "{{ .Name }} 60 IN A 10.130.34.101{{ .Group 1 }}"
+        fallthrough
+      }
+
+      forward . /etc/resolv.conf {
+        policy sequential
+      }
