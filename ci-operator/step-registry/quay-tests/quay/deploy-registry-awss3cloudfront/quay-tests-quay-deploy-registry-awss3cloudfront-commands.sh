@@ -103,7 +103,7 @@ EOF
 
 sleep 300  # wait for pods to be ready
 
-for i in {1..600}; do
+for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
     oc -n ${QUAYNAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
