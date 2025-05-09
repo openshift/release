@@ -8,7 +8,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -29,17 +29,17 @@ images:
   to: cluster-node-tuning-operator
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -214,7 +214,8 @@ tests:
     from: src
 - always_run: false
   as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -227,6 +228,12 @@ tests:
       TEST_RUN_FEATURES: performance
     workflow: telco5g-cnf
   timeout: 6h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift
