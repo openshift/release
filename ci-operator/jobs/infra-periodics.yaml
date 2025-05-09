@@ -1394,23 +1394,31 @@ periodics:
   name: periodic-org-sync
   spec:
     containers:
-    - args:
-      - --config-path=./org/config.yaml
-      - --confirm=true
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --fix-org
-      - --fix-org-members
-      - --fix-teams
-      - --fix-team-members
-      - --fix-team-repos
-      - --fix-repos
-      - --github-hourly-tokens=600
-      - --github-allowed-burst=600
-      command:
-      - /ko-app/peribolos
+    - command:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        echo "Installing yq"
+        curl -Lso /tmp/yq https://github.com/mikefarah/yq/releases/download/v4.42.1/yq_linux_amd64 && chmod +x /tmp/yq
+        echo "Removing openshift-priv from config"
+        /tmp/yq eval 'del(.orgs.openshift-priv)' org/config.yaml > /tmp/stripped-config.yaml
+        echo "Running peribolos with filtered config"
+        exec /ko-app/peribolos \
+          --config-path=/tmp/stripped-config.yaml \
+          --confirm=true \
+          --github-token-path=/etc/github/oauth \
+          --github-endpoint=http://ghproxy \
+          --github-endpoint=https://api.github.com \
+          --github-graphql-endpoint=http://ghproxy/graphql \
+          --fix-org \
+          --fix-org-members \
+          --fix-teams \
+          --fix-team-members \
+          --fix-team-repos \
+          --fix-repos \
+          --github-hourly-tokens=600 \
+          --github-allowed-burst=600
       image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250505-555102b43
       imagePullPolicy: Always
       name: ""
