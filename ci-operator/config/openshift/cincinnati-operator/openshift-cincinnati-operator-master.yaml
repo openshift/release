@@ -3,6 +3,10 @@ base_images:
     name: cincinnati-build-root
     namespace: cincinnati-ci
     tag: deploy
+  fips-check-payload:
+    name: check-payload
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.18"
     namespace: origin
@@ -23,6 +27,10 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile
   from: ubi
+  inputs:
+    root:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: cincinnati-operator
 - dockerfile_path: dev/Dockerfile
   from: ubi
@@ -136,6 +144,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: fips-image-scan-operator
+  steps:
+    dependencies:
+      SCAN_IMAGE: cincinnati-operator
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-operator-production
+  cron: '@weekly'
+  steps:
+    test:
+    - as: check-payload
+      commands: |
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        set -x
+        SCAN_IMAGE="registry.redhat.io/openshift-update-service/openshift-update-service-rhel8-operator:latest"
+
+        export REGISTRY_AUTH_FILE=/var/secrets/ci-pull-credentials/.dockerconfigjson
+        mkdir -p /tmp/oci-images
+        skopeo copy --remove-signatures docker://"$SCAN_IMAGE" oci:/tmp/oci-images:image:latest
+        umoci raw unpack --rootless --image /tmp/oci-images:image:latest /tmp/unpacked-image
+        /check-payload scan local --path=/tmp/unpacked-image --output-file="$ARTIFACT_DIR"/check-payload-report.txt
+      credentials:
+      - mount_path: /var/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: fips-check-payload
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
 - as: operator-e2e-new-ocp-published-graph-data
   cluster_claim:
     architecture: amd64
