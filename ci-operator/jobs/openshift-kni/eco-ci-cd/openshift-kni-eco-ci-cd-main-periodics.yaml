@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build07
-  cron: '* 1 * * *'
+  cron: 0 1 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -466,7 +466,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build07
-  cron: '* 4 * * *'
+  cron: 20 4 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -554,7 +554,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build07
-  cron: '* 4 * * *'
+  cron: 10 4 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -593,6 +593,94 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=telcov10n-metal-single-node-spoke
       - --variant=nightly-4.19
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build07
+  cron: 30 21 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/variant: nightly-4.19-ztp-kpis
+    ci.openshift.io/generator: prowgen
+    job-release: "4.19"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-nightly-4.19-ztp-kpis-telcov10n-metal-single-node-spoke-kpis
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=telcov10n-metal-single-node-spoke-kpis
+      - --variant=nightly-4.19-ztp-kpis
       command:
       - ci-operator
       image: ci-operator:latest
@@ -681,6 +769,94 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=telcov10n-metal-single-node-spoke
       - --variant=nightly-4.20
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build07
+  cron: 0 3 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/variant: nightly-4.20-ztp-kpis
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-nightly-4.20-ztp-kpis-telcov10n-metal-single-node-spoke-kpis
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=telcov10n-metal-single-node-spoke-kpis
+      - --variant=nightly-4.20-ztp-kpis
       command:
       - ci-operator
       image: ci-operator:latest

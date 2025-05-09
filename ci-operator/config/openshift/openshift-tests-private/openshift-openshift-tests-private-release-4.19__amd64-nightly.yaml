@@ -1287,13 +1287,13 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
       NAME_PREFIX: rosa-hcp-auth
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_PROFILE: ocpe2e-rosa-hcp-external-auth
       VERSION: "4.19"
     test:
-    - chain: openshift-e2e-test-hypershift-qe
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: rosa-lifecycle-external-auth-advanced
 - as: aws-rosa-hcp-pl-stage-f7
   cron: 31 13 1,8,15,24 * *
@@ -4337,6 +4337,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-upi-ovn-dual-stack-realtime-kernel-f7
+  capabilities:
+  - intranet
+  cron: 23 15 8,15,22,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: cucushift-installer-check-realtime
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-dual-stack
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

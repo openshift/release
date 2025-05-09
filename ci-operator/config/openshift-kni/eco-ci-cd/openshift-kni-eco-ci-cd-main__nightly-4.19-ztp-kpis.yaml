@@ -1,0 +1,338 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM quay.io/openshift-kni/ztp-site-generator:4.18.0 AS ztp-gen
+      WORKDIR /home/ztp
+      FROM registry.ci.openshift.org/ci/telco-runner
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY --from=ztp-gen /home/ztp /output/ztp
+      RUN \
+        curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+        chmod 700 /tmp/get_helm.sh && \
+        /tmp/get_helm.sh && \
+        rm -f /tmp/get_helm.sh
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telcov10n-metal-single-node-spoke-kpis
+  capabilities:
+  - intranet
+  cron: 30 21 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: 10.6.157.20
+      CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.19
+      CATALOGSOURCE_NAME: prega-operators-4-19
+      DU_PROFILE: v4.19
+      GITEA_NAMESPACE: ztp-gitea
+      IMAGE_INDEX_OCP_VERSION: "4.19"
+      INTERNAL_NET_CIDR: 10.6.157.0/24
+      MCH_NAMESPACE: open-cluster-management
+      PGT_RELATED_FILES: |-
+        - filename: kustomization.yaml
+          content: |-
+            generators:
+            - common-ranGen.yaml
+            - group-du-sno-ranGen.yaml
+            - group-du-sno-validator-ranGen.yaml
+            - spree-03.yaml
+            resources:
+            - ns.yaml
+        - filename: ns.yaml
+          content: |-
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-common
+            ---
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-group
+            ---
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-site
+        - filename: common-ranGen.yaml
+          content: |-
+            ---
+            apiVersion: ran.openshift.io/v1
+            kind: PolicyGenTemplate
+            metadata:
+              name: "common"
+              namespace: "ztp-common"
+            spec:
+              bindingRules:
+                # These policies will correspond to all clusters with this label:
+                common: "true"
+              sourceFiles:
+                # Create operators policies that will be installed in all clusters
+                - fileName: OperatorHub.yaml
+                  policyName: "config-policy"
+                  spec:
+                    sources:
+                      - disabled: true
+                        name: community-operators
+                      - disabled: true
+                        name: certified-operators
+                      - disabled: true
+                        name: redhat-operators
+                      - disabled: true
+                        name: redhat-marketplace
+                # SR-IOV
+                - fileName: SriovSubscriptionNS.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: SriovSubscriptionOperGroup.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: SriovSubscription.yaml
+                  policyName: "subscriptions-policy"
+                  spec:
+                    source: prega-operators-4-19
+                - fileName: SriovOperatorStatus.yaml
+                  policyName: "subscriptions-policy"
+                # PTP
+                - fileName: PtpSubscriptionNS.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: PtpSubscriptionOperGroup.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: PtpSubscription.yaml
+                  policyName: "subscriptions-policy"
+                  spec:
+                    source: prega-operators-4-19
+                    # channel: "stable"
+                - fileName: PtpOperatorStatus.yaml
+                  policyName: "subscriptions-policy"
+                # Cluster Logging
+                - fileName: ClusterLogNS.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: ClusterLogOperGroup.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: ClusterLogSubscription.yaml
+                  policyName: "subscriptions-policy"
+                  spec:
+                    source: prega-operators-4-19
+                    channel: "stable-6.2"
+                - fileName: ClusterLogOperatorStatus.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: ClusterLogServiceAccount.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: ClusterLogServiceAccountAuditBinding.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: ClusterLogServiceAccountInfrastructureBinding.yaml
+                  policyName: "subscriptions-policy"
+                # Storage
+                - fileName: StorageNS.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: StorageOperGroup.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: StorageSubscription.yaml
+                  policyName: "subscriptions-policy"
+                  spec:
+                    source: prega-operators-4-19
+                - fileName: StorageOperatorStatus.yaml
+                  policyName: "subscriptions-policy"
+                # MISC
+                - fileName: ReduceMonitoringFootprint.yaml
+                  policyName: "config-policy"
+                - fileName: DefaultCatsrc.yaml
+                  policyName: "config-policy"
+                  metadata:
+                      name: prega-operators-4-19
+                  spec:
+                    displayName: Red Hat Custom Operators Catalog
+                    image: quay.io/prega/prega-operator-index:v4.19.0
+                    # image: registry.redhat.io/redhat/redhat-operator-index:v4.17
+        - filename: group-du-sno-ranGen.yaml
+          content: |-
+            ---
+            apiVersion: ran.openshift.io/v1
+            kind: PolicyGenTemplate
+            metadata:
+              # The name will be used to generate the placementBinding and placementRule names as {name}-placementBinding and {name}-placementRule
+              name: "group-du-sno"
+              namespace: "ztp-group"
+            spec:
+              bindingRules:
+                # These policies will correspond to all clusters with this label:
+                group-du-sno: ""
+              mcp: "master"
+              sourceFiles:
+                - fileName: DisableOLMPprof.yaml
+                  policyName: "config-policy"
+                # Set ClusterLogForwarder as example might be better to create another policyTemp-Group
+                - fileName: ClusterLogForwarder.yaml
+                  policyName: "config-policy"
+                  spec:
+                    outputs:
+                    - type: "kafka"
+                      name: kafka-open
+                      kafka:
+                        url: "tcp://vran-qe-kafka.kni-qe-11.lab.eng.rdu2.redhat.com:9092/vran-qe"
+                    filters:
+                    - name: test-labels
+                      type: openshiftLabels
+                      openshiftLabels:
+                        label1: test1
+                        label2: test2
+                        label3: test3
+                        label4: test4
+                    pipelines:
+                    - name: all-to-default
+                      inputRefs:
+                      - audit
+                      - infrastructure
+                      filterRefs:
+                      - test-labels
+                      outputRefs:
+                      - kafka-open
+                - fileName: PtpOperatorConfig.yaml
+                  policyName: "config-policy"
+                - fileName: PtpConfigSlaveForEvent.yaml
+                  # Note: The KPI pipeline is using PtpConfigSlaveForEvent.yaml so that the
+                  # PTP KPI test which relies on regular log output can function, even
+                  # though we are not using PtpOperatorConfigForEvent.yaml above
+                  policyName: "config-policy"
+                  spec:
+                    profile:
+                    - name: "slave"
+                      # This interface must match the hardware in this group
+                      interface: "ens2f0"
+                - fileName: SriovOperatorConfigForSNO.yaml
+                  policyName: "config-policy"
+                  # For existing clusters with node selector set as "master",
+                  # change the complianceType to "mustonlyhave".
+                  # After complying with the policy, the complianceType can
+                  # be reverted to "musthave"
+                  complianceType: musthave
+                  spec:
+                    configDaemonNodeSelector:
+                      node-role.kubernetes.io/worker: ""
+                - fileName: DisableSnoNetworkDiag.yaml
+                  policyName: "config-policy"
+                - fileName: PerformanceProfile.yaml
+                  policyName: "config-policy"
+                  spec:
+                    cpu:
+                      isolated: "2-31,34-63"
+                      reserved: "0-1,32-33"
+                    hugepages:
+                      defaultHugepagesSize: 1G
+                      pages:
+                        - size: 1G
+                          count: 32
+                    realTimeKernel:
+                      enabled: true
+                    workloadHints:
+                      realTime: true
+                      highPowerConsumption: false
+                      perPodPowerManagement: false
+                - fileName: TunedPerformancePatch.yaml
+                  policyName: "config-policy"
+        - filename: group-du-sno-validator-ranGen.yaml
+          content: |-
+            apiVersion: ran.openshift.io/v1
+            kind: PolicyGenTemplate
+            metadata:
+              # The name will be used to generate the placementBinding name as {name}-placementBinding, the placementRule name as {name}-placementRule,
+              # and the policy name as {name}-{spec.sourceFiles[x].policyName}
+              name: "group-du-sno-validator"
+              namespace: "ztp-group"
+            spec:
+              bindingRules:
+                # This policy will correspond to all clusters with label specified in bindingRules and
+                # without label specified in bindingExcludedRules.
+                group-du-sno: ""
+              bindingExcludedRules:
+                # The ztp-done label is used in coordination with the Topology Aware Lifecycle Operator(TALO).
+                # Please do not change this label.
+                ztp-done: ""
+              mcp: "master"
+              sourceFiles:
+                # Create inform policy to validate configuration CRs that will be applied to all SNO clusters
+                - fileName: validatorCRs/informDuValidator.yaml
+                  remediationAction: inform
+                  policyName: "du-policy"
+        - filename: spree-03.yaml
+          content: |-
+            ---
+            apiVersion: ran.openshift.io/v1
+            kind: PolicyGenTemplate
+            metadata:
+              name: "spree-03"
+              namespace: "ztp-site"
+            spec:
+              bindingRules:
+                # sites: "spree-03"
+                group-du-sno: ""
+              mcp: "master"
+              sourceFiles:
+                - fileName: SriovNetwork.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    name: "sriov-nw-du-fh"
+                  spec:
+                    resourceName: du_fh
+                    vlan: 140
+                - fileName: SriovNetworkNodePolicy.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    name: "sriov-nnp-du-fh"
+                  spec:
+                    deviceType: vfio-pci
+                    isRdma: false
+                    nicSelector:
+                      pfNames: []
+                      rootDevices:
+                        - 0000:ca:00.2
+                      vendor: "8086"
+                      deviceID: "1593"
+                    numVfs: 8
+                    priority: 10
+                    resourceName: du_fh
+                - fileName: SriovNetwork.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    name: "sriov-nw-du-mh"
+                  spec:
+                    resourceName: du_mh
+                    vlan: 150
+                - fileName: SriovNetworkNodePolicy.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    name: "sriov-nnp-du-mh"
+                  spec:
+                    deviceType: vfio-pci
+                    isRdma: false
+                    nicSelector:
+                      pfNames: []
+                      rootDevices:
+                        - 0000:ca:00.3
+                      vendor: "8086"
+                      deviceID: "1593"
+                    numVfs: 8
+                    priority: 10
+                    resourceName: du_mh
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      SOCKS5_PROXY: socks5h://10.6.157.20:3124
+    test:
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests
+    workflow: telcov10n-metal-single-node-spoke-kpis
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: nightly-4.19-ztp-kpis

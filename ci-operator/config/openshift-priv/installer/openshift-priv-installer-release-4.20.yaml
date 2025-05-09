@@ -471,6 +471,45 @@ tests:
       AWS_METADATA_SERVICE_AUTH: Required
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-byo-subnet-role-security-groups
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      ADDITIONAL_SUBNETS_COUNT: "1"
+      ASSIGN_ROLES_TO_SUBNETS: "yes"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      SUBNET_ROLES: |-
+        [
+          [
+            {
+              "private": "ClusterNode",
+              "public": "IngressControllerLB BootstrapNode"
+            },
+            {
+              "private": "ControlPlaneInternalLB",
+              "public": "ControlPlaneExternalLB"
+            }
+          ]
+        ]
+      ZONES_COUNT: "1"
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - ref: aws-deprovision-security-group
+    - ref: aws-deprovision-stacks
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-security-group
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-aws-custom-security-groups
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+  timeout: 6h0m0s
 - as: e2e-gcp-ovn
   run_if_changed: (gcp|google)
   steps:
@@ -636,6 +675,15 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
+  timeout: 5h0m0s
+- always_run: false
+  as: e2e-metal-ovn-two-node-fencing
+  cluster: build05
+  optional: true
+  run_if_changed: (baremetal|metal3|ironic)
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing
   timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn
   cluster: build05
