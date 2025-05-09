@@ -82,6 +82,9 @@ case "${CLUSTER_TYPE,,}" in
             --aws-private-region="${REGION}"
         )
     fi
+    if [[ -n "$HYPERSHIFT_DYNAMIC_DNS" ]]; then
+    COMMAND+=(--kas-dns-name="$HYPERSHIFT_DYNAMIC_DNS")
+    fi
 
     # If latest supported version is 4.15.0 or above, add the cvo conditional update while installing HO
     ho_version_info=$("${HCP_CLI}" -v)
