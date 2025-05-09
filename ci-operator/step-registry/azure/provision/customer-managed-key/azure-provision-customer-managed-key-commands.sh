@@ -114,6 +114,12 @@ run_command "az identity create -g ${RESOURCE_GROUP} -n ${user_assinged_identity
 identity_principal_id=$(az identity show -n ${user_assinged_identity_name} -g ${RESOURCE_GROUP} --query 'principalId' -otsv)
 run_command "az role assignment create --assignee-object-id ${identity_principal_id} --role 'Key Vault Crypto Service Encryption User' --scope ${kv_id} --assignee-principal-type ServicePrincipal"
 
+if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+    cluster_sp_id="$(<"${SHARED_DIR}"/azure_minimal_permission jq -r .clientId)"
+    run_command "az role assignment create --assignee-object-id ${cluster_sp_id} --role 'Key Vault Crypto Officer' --scope ${kv_id} --assignee-principal-type ServicePrincipal"
+    sleep 120
+fi
+
 cat > "${SHARED_DIR}/customer_managed_key_for_installer_sa.yaml" <<EOF
 platform:
   azure:
