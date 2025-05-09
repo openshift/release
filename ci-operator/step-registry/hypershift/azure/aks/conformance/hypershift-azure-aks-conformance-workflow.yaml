@@ -14,19 +14,12 @@ workflow:
     - Alberto Lamela (agarcial@redhat.com)
     - Seth Jennings (sjenning@redhat.com)
     - Cesar Wong (cewong@redhat.com)
-    - Patryk Stefanski (pstefans@redhat.com)
-    
+    - Bryan Cox (brcox@redhat.com)
 
     Learn more about HyperShift here: https://github.com/openshift/hypershift
 
-    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+    Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary 
   steps:
-    post:
-    - chain: hypershift-dump
-    - chain: hypershift-azure-destroy
-    - chain: cucushift-installer-rehearse-azure-aks-deprovision
-    test:
-    - chain: hypershift-conformance
     pre:
     - chain: cucushift-installer-rehearse-azure-aks-provision
     - ref: hypershift-azure-aks-attach-kv
@@ -36,6 +29,12 @@ workflow:
     - ref: hypershift-install
     - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
     - chain: hypershift-azure-create
+    test:
+    - chain: hypershift-conformance
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-azure-destroy
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
     env:
       USE_HYPERSHIFT_AZURE_CREDS: "true"
       HYPERSHIFT_AZURE_LOCATION: "eastus2"
@@ -62,5 +61,4 @@ workflow:
       HYPERSHIFT_CUSTOM_SUBNET: "true"
       HYPERSHIFT_CUSTOM_VNET: "true"
       AKS_ADDONS: "azure-keyvault-secrets-provider"
-      TECH_PREVIEW_NO_UPGRADE: "true"
       HYPERSHIFT_AZURE_CP_MI: "true"

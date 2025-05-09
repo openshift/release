@@ -60,11 +60,12 @@ images:
         MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
         curl -skL ${MIRRORURL}/ocp/stable-4.14/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
         tar -C /usr/bin/ -xzvf openshift-client-linux.tar.gz && rm -f openshift-client-linux.tar.gz && \
+        OCP_VERSION="$(/usr/bin/oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs)" && \
         curl -skL ${MIRRORURL}/ocp/stable-4.14/opm-linux.tar.gz -o opm-linux.tar.gz  && \
         tar -C /usr/bin/ -xzvf opm-linux.tar.gz && rm -f opm-linux.tar.gz && \
         curl -skL ${MIRRORURL}/ocp/stable-4.14/oc-mirror.tar.gz -o oc-mirror.tar.gz && \
         tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
-        curl -skL ${MIRRORURL}/operator-sdk/latest/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
+        curl -skL ${MIRRORURL}/operator-sdk/${OCP_VERSION}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
         tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
         curl -skL ${MIRRORURL}/rosa/latest/rosa-linux.tar.gz -o rosa.tar.gz && \
         tar -C /usr/bin/ -xf rosa.tar.gz && chmod 755 /usr/bin/rosa && rosa version && rm -f rosa.tar.gz && \
@@ -258,6 +259,8 @@ tests:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: debug-disasterrecovery-baremetal-upi
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: test/extended/disaster_recovery/
   steps:

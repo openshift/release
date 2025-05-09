@@ -23,7 +23,11 @@ tests:
   restrict_network_access: false
   steps:
     env:
+      ECO_GOTESTS_ENV_VARS: -e ECO_CNF_CORE_NET_TEST_CONTAINER=quay.io/ocp-edge-qe/eco-gotests-network-client:v4.17
+        -e ECO_CNF_CORE_NET_DPDK_TEST_CONTAINER=quay.io/ocp-edge-qe/eco-gotests-rootless-dpdk:v4.16.0
+      FEATURES: core
       FEATURES_TO_TEST: sctp|sriov|dpdk|vrf|ovs_qos|metallb|fec|multinetworkpolicy
+      LABELS: net
       OPERATORS: |
         [
           {"name":"sriov-network-operator","catalog":"redhat-operators","nsname":"openshift-sriov-network-operator","deploy_default_config":"true", "og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
@@ -35,6 +39,7 @@ tests:
       VERSION: "4.17"
     test:
     - ref: telcov10n-functional-cnf-network-cnf-tests
+    - ref: telcov10n-functional-cnf-network-eco-gotests
     - ref: telcov10n-functional-cnf-network-cnf-gotests
     workflow: telcov10n-functional-cnf-network-ocp-setup
 zz_generated_metadata:
