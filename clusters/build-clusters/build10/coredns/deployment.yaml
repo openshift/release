@@ -1,0 +1,84 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: coredns
+    name: coredns
+    labels:
+      app: prow
+      component: coredns
+  spec:
+    selector:
+      app: prow
+      component: coredns
+    ports:
+    - name: dns-udp
+      port: 53
+      targetPort: dns-udp
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: dns-tcp
+      protocol: TCP
+    type: ClusterIP
+    clusterIP: 172.30.38.188
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: coredns
+    namespace: coredns
+    labels:
+      app: prow
+      component: coredns
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: coredns
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: coredns
+      spec:
+        containers:
+        - name: coredns
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_coredns_latest
+          command:
+          - /coredns
+          args:
+          - -conf
+          - /config/Corefile
+          ports:
+            - name: dns-tcp
+              containerPort: 5353
+              protocol: TCP
+            - name: dns-udp
+              containerPort: 5353
+              protocol: UDP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          volumeMounts:
+          - name: config
+            mountPath: /config/
+            readOnly: true
+          resources:
+            requests:
+              memory: "3Gi"
+              cpu: "100m"
+        restartPolicy: Always
+        volumes:
+        - name: config
+          configMap:
+            name: coredns-config
