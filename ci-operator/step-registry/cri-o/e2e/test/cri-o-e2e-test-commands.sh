@@ -12,5 +12,9 @@ EVENTED_PLEG=${EVENTED_PLEG:-false}
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
+	sudo subscription-manager release --list
+	sudo subscription-manager release --set=9.4
+	sudo subscription-manager release --show
+	sudo yum install -y ansible
     ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow USE_CONMONRS=$USE_CONMONRS EVENTED_PLEG=$EVENTED_PLEG" --connection=local -vvv --tags e2e
 EOF
