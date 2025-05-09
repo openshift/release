@@ -60,6 +60,11 @@ tests:
   commands: make verify-generate
   container:
     from: src
+- as: verify-crypto
+  commands: make verify-crypto
+  container:
+    from: src
+  run_if_changed: \.go$
 - as: unit
   commands: make unit-test
   container:
@@ -159,6 +164,31 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: operator-e2e-new-ocp-published-graph-data-fips
+  steps:
+    cluster_profile: aws-2
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - ref: fips-check-fips-or-die
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:published-cincinnati-graph-data
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: operator-e2e-hypershift-local-graph-data
   steps:
     allow_best_effort_post_steps: true

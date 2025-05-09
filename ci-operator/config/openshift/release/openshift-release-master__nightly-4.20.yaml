@@ -105,19 +105,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ovn-assisted
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: assisted-baremetal
 - as: e2e-aws-ovn-single-node-csi
   interval: 168h
   steps:
@@ -209,14 +196,14 @@ tests:
 - as: e2e-metal-ovn-single-node-live-iso
   interval: 168h
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
       PACKET_OS: rocky_9
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   interval: 168h
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
       PACKET_OS: rocky_9
       PACKET_PLAN: c3.medium.x86
@@ -400,30 +387,30 @@ tests:
   cluster: build05
   cron: '@daily'
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
   cron: '@daily'
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-fencing
   cluster: build05
   cron: '@daily'
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-upgrade
   cluster: build05
   cron: '@daily'
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
 - as: metal-ovn-network-flow-matrix-bm-single-node
   cron: 0 23 * * 0,2,4,6
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     test:
     - ref: network-flow-matrix-tests
     - ref: baremetalds-sno-test
@@ -805,7 +792,8 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-telco5g
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 11 20 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -820,7 +808,8 @@ tests:
       - observers-resource-watch
     workflow: telco5g-origin
 - as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 18 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -836,7 +825,8 @@ tests:
     workflow: telco5g-cnf
   timeout: 6h0m0s
 - as: e2e-telco5g-sno-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 18 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -851,11 +841,13 @@ tests:
       - observers-resource-watch
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
-  cluster: build05
-  cron: 0 8 * * *
+  capabilities:
+  - intranet
+  cron: 0 7 * * 0-5
   restrict_network_access: false
   steps:
     env:
+      SKIP_OCP_INSTALL: "false"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.19"
     observers:
@@ -863,7 +855,8 @@ tests:
       - observers-resource-watch
     workflow: telco5g-ptp
 - as: e2e-telco5g-hcp-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 10 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -1502,7 +1495,7 @@ tests:
 - as: metal-ovn-single-node-recert-cluster-rename
   cron: '@weekly'
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     test:
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
