@@ -19,11 +19,13 @@ unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} and destroy"
 
+set -x
 govc ls -json "/${GOVC_DATACENTER}/network/${vsphere_portgroup}" |
     jq '.elements[]?.Object.Vm[]?.Value' |
     xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
     jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
     xargs -I {} --no-run-if-empty govc vm.destroy {}
+set +x
 
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "$(date -u --rfc-3339=seconds) - Removing ${agent_iso} from iso-datastore.."

@@ -513,11 +513,13 @@ for LEASE in $LEASES; do
   export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${vsphere_datacenter} and destroy"
+  set -x
   govc ls -json "${vsphere_portgroup}" |
   jq '.elements[]?.Object.Vm[]?.Value' |
   xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
   jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
   xargs -I {} --no-run-if-empty govc vm.destroy {}
+  set +x
 done
 set -e
 
