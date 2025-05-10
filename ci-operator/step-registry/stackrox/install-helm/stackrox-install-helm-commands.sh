@@ -19,6 +19,11 @@ echo "SHARED_DIR=${SHARED_DIR}"
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "KUBECONFIG=${KUBECONFIG}"
 
+export SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
+SCANNER_V4_MATCHER_READINESS_MAX_WAIT=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:-60m}
+echo "ROX_SCANNER_V4:${ROX_SCANNER_V4:-}"
+echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
+
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 
@@ -55,9 +60,9 @@ function retry() {
 function wait_deploy() {
   retry oc -n stackrox rollout status deploy/"$1" --timeout=300s \
     || {
-      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
-      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
-      exit 1
+      oc describe -n stackrox deploy/"$1" || true
+      oc logs -n stackrox --selector="app==$1" --all-containers --pod-running-timeout=30s --tail=20
+      return 1
     }
 }
 
@@ -149,20 +154,51 @@ function install_central_with_helm() {
   installflags+=('--set' 'imagePullSecrets.allowNone=true')
   SMALL_INSTALL=true
   if [[ "${SMALL_INSTALL}" == "true" ]]; then
-      installflags+=('--set' 'central.resources.requests.memory=1Gi')
-      installflags+=('--set' 'central.resources.requests.cpu=1')
-      installflags+=('--set' 'central.resources.limits.memory=4Gi')
-      installflags+=('--set' 'central.resources.limits.cpu=1')
-      installflags+=('--set' 'central.db.resources.requests.memory=1Gi')
-      installflags+=('--set' 'central.db.resources.requests.cpu=500m')
-      installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
-      installflags+=('--set' 'central.db.resources.limits.cpu=1')
-      installflags+=('--set' 'scanner.autoscaling.disable=true')
-      installflags+=('--set' 'scanner.replicas=1')
-      installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
-      installflags+=('--set' 'scanner.resources.requests.cpu=500m')
-      installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
-      installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+    installflags+=('--set' 'central.resources.requests.memory=1Gi')
+    installflags+=('--set' 'central.resources.requests.cpu=1')
+    installflags+=('--set' 'central.resources.limits.memory=4Gi')
+    installflags+=('--set' 'central.resources.limits.cpu=1')
+    installflags+=('--set' 'central.db.resources.requests.memory=1Gi')
+    installflags+=('--set' 'central.db.resources.requests.cpu=500m')
+    installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
+    installflags+=('--set' 'central.db.resources.limits.cpu=1')
+    installflags+=('--set' 'scanner.autoscaling.disable=true')
+    installflags+=('--set' 'scanner.replicas=1')
+    installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
+    installflags+=('--set' 'scanner.resources.requests.cpu=500m')
+    installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
+    installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+  fi
+
+  if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+    installflags+=('--set' 'scannerV4.disable=false')
+    if [[ "${SMALL_INSTALL}" == "true" ]]; then
+      installflags+=('--set' 'scannerV4.scannerComponent=Enabled')
+      installflags+=('--set' 'scannerV4.indexer.scaling.autoScaling=Disabled')
+      installflags+=('--set' 'scannerV4.indexer.scaling.replicas=1')
+      installflags+=('--set' 'scannerV4.indexer.resources.requests.cpu=600m')
+      installflags+=('--set' 'scannerV4.indexer.resources.requests.memory=1500Mi')
+      installflags+=('--set' 'scannerV4.indexer.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.indexer.resources.limits.memory=2Gi')
+      installflags+=('--set' 'scannerV4.matcher.scaling.autoScaling=Disabled')
+      installflags+=('--set' 'scannerV4.matcher.scaling.replicas=1')
+      installflags+=('--set' 'scannerV4.matcher.resources.requests.cpu=600m')
+      installflags+=('--set' 'scannerV4.matcher.resources.requests.memory=5Gi')
+      installflags+=('--set' 'scannerV4.matcher.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.matcher.resources.limits.memory=5500Mi')
+      installflags+=('--set' 'scannerV4.db.resources.requests.cpu=200m')
+      installflags+=('--set' 'scannerV4.db.resources.requests.memory=2Gi')
+      installflags+=('--set' 'scannerV4.db.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.db.resources.limits.memory=2500Mi')
+    fi
+    if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+      # stackrox helm template _metadata.tpl parses 'customize' into values for target matching:
+      # https://github.com/stackrox/stackrox/blob/ae87894195796f9a88295af39a83451dbbb96c51/image/templates/helm/shared/templates/_metadata.tpl#L160-L181
+      # matched for "scanner-v4-matcher" in matcher deployment template:
+      # https://github.com/stackrox/stackrox/blob/62c5f12ba8c3acc0c3d92a71c79221edf25a765f/image/templates/helm/shared/templates/02-scanner-v4-07-matcher-deployment.yaml#L80C9-L80C103
+      # `{{ define "srox._envVars" }}` -> `{{- include "srox.envVars" (list . "deployment" "scanner-v4-matcher" "matcher") | nindent 8 }}`
+      installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}")
+    fi
   fi
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
@@ -203,11 +239,39 @@ function install_secured_cluster_with_helm() {
   --set imagePullSecrets.allowNone=true
 }
 
+function configure_scanner_readiness() {
+  echo '>>> Configure scanner-v4-matcher to reach ready status when vulnerability database is loaded.'
+  set +e  # ignore errors
+  kubectl wait --for condition=established --timeout=120s deploy/scanner-v4-matcher --namespace stackrox --timeout=120s || true
+  if kubectl describe -n stackrox deploy/scanner-v4-matcher \
+    | grep "SCANNER_V4_MATCHER_READINESS.*${SCANNER_V4_MATCHER_READINESS:-}"; then
+    echo 'scanner-v4-matcher readiness is set'
+    return
+  fi
+  echo 'The scanner-v4-matcher readiness env var is not set. Adding it to the deployment...'
+  kubectl -n stackrox set env deploy/scanner-v4-matcher "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
+  echo 'Restarting scanner-v4-matcher to apply the new config during startup...'
+  kubectl rollout restart deploy/scanner-v4-matcher
+  kubectl -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s
+  kubectl -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS \
+    || kubectl describe deploy scanner-v4-matcher --namespace stackrox
+  echo ">>> Finished scanner-v4-matcher configuration readiness=${SCANNER_V4_MATCHER_READINESS:-}."
+  set -e
+}
+
+
+echo '>>> Begin setup'
 fetch_last_nightly_tag
 prepare_helm_templates
 install_helm
 
 install_central_with_helm
+
+if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+  configure_scanner_readiness &
+  scanner_readiness_configure_pid=$!
+fi
+
 echo ">>> Wait for 'stackrox-central-services' deployments"
 wait_deploy central-db
 wait_deploy central
@@ -247,3 +311,23 @@ done
 # Cleanup nohup
 kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
 rm "${SCRATCH}/port_forward_pid"
+
+if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+  echo ">>> Wait for 'stackrox scanner-v4' deployments"
+  wait_deploy scanner-v4-db
+  wait_deploy scanner-v4-indexer
+  if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+    echo '>>> Follow scanner-v4-matcher logs until ready state'
+    ps -p "${scanner_readiness_configure_pid}" \
+      && wait "${scanner_readiness_configure_pid}" || true
+    kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' -n stackrox \
+      --timeout="${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}" \
+      || kubectl logs --tail=20 --selector 'app=scanner-v4-matcher' -n stackrox --timestamps
+    kubectl rollout status deploy/scanner-v4-matcher --timeout=0 -n stackrox
+  else
+    wait_deploy scanner-v4-matcher "${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}"
+  fi
+fi
+
+kubectl get nodes -o wide
+kubectl get pods -o wide --namespace stackrox
