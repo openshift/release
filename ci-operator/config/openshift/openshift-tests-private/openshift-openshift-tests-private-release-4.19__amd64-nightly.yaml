@@ -47,6 +47,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.19"
+  tests-private-burner:
+    name: tests-private-burner
+    namespace: ci
+    tag: "4.19"
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -338,6 +342,19 @@ tests:
     - ref: mco-conf-day2-enable-ocl
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: gcp-ipi-f7-stress-olm-kube
+  cron: 26 16 9,23 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      JOB_ITERATION_DELAY_V1: 4s
+      JOB_ITERATIONS_V1: "800"
+      JOB_PAUSE_V1: 20s
+      LOG_LEVEL_V1: error
+      WINDOW_SIZE_V1: "60"
+    test:
+    - ref: openshift-extended-olm-test-burner-pkg-ins-v1
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: aws-ipi-longrun-mco-tp-ocl-p1-f7
   cron: 19 21 4,11,18,27 * *
   steps:
