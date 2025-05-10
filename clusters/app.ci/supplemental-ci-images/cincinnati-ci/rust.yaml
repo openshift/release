@@ -62,14 +62,13 @@ items:
             && dnf install -y git jq rust rustfmt cargo openssl-devel python3-pip \
             && dnf clean all
 
-        WORKDIR /opt/app-root/src
-        RUN mkdir /go && chmod g+xw -R /go \
-            && chown -R 1001:0 /opt/app-root/src
-        USER 1001
-        ENV USER_UID=1001 HOME="/opt/app-root/src" PATH="/opt/app-root/src/.local/bin/:$PATH"
+        WORKDIR /go
+        ENV HOME="/go" PATH="/go/.local/bin:/go/.cargo/bin:$PATH"
         ### UBI has no dnf repo providing those tools
         RUN pip3 install --user yamllint \
-            && mkdir -p ${CARGO_HOME:-~/.cargo}/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+            && cargo install just \
+            && mkdir -p /go/.cargo/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C /go/.cargo/bin \
+            && chmod -R a+rwX,o-w /go
       type: Dockerfile
     strategy:
       dockerStrategy:
