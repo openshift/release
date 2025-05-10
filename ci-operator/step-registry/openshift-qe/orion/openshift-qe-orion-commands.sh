@@ -20,15 +20,26 @@ pushd orion
 
 pip install -r requirements.txt
 
-if [[ ${ES_TYPE} == "qe" ]]; then
-    ES_PASSWORD=$(cat "/secret/qe/password")
-    ES_USERNAME=$(cat "/secret/qe/username")
-    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-else
-    ES_PASSWORD=$(cat "/secret/internal/password")
-    ES_USERNAME=$(cat "/secret/internal/username")
-    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
-fi
+case "$ES_TYPE" in
+  qe)
+    ES_PASSWORD=$(<"/secret/qe/password")
+    ES_USERNAME=$(<"/secret/qe/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    ;;
+  quay-qe)
+    ES_PASSWORD=$(<"/secret/quay-qe/password")
+    ES_USERNAME=$(<"/secret/quay-qe/username")
+    ES_HOST=$(<"/secret/quay-qe/hostname")
+    ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    ;;
+  *)
+    ES_PASSWORD=$(<"/secret/internal/password")
+    ES_USERNAME=$(<"/secret/internal/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    ;;
+esac
+
+export ES_SERVER
 
 pip install .
 export EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
