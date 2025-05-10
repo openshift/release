@@ -34,11 +34,24 @@ then
 fi
 
 echo "Gathering artifacts ..."
-mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds
+mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds ${ARTIFACT_DIR}/inspect
 
 oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
 oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
 oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+oc --insecure-skip-tls-verify --request-timeout=5s adm inspect clusteroperators --dest-dir ${ARTIFACT_DIR}/inspect || true
+
+PLATFORM=$(oc get infrastructure cluster -o jsonpath="{.status.platform}")
+CAPI_PLATFORM=$(echo "$PLATFORM" | tr '[:upper:]' '[:lower:]')
+
+if [[ "${CAPI_PLATFORM}" == "baremetal" ]]; then
+  CAPI_PLATFORM=metal3
+fi
+
+if [[ "${CAPI_PLATFORM}" == "powervs" ]]; then
+  CAPI_PLATFORM=ibmpower
+fi
 
 queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
 queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
@@ -76,9 +89,16 @@ queue ${ARTIFACT_DIR}/oc_cmds/controlplanemachinesets oc --insecure-skip-tls-ver
 queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/machinesets oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A
 queue ${ARTIFACT_DIR}/machinesets.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.cluster.x-k8s.io -A -o json
+
 queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/machines oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o wide
+
 queue ${ARTIFACT_DIR}/machines.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.cluster.x-k8s.io -A -o json
+
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A -o json
+
 queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/namespaces oc --insecure-skip-tls-verify --request-timeout=5s get namespaces
 queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
