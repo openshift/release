@@ -9,6 +9,18 @@ cluster_pull_secret_file="$TMP_DIR/cluster-pull-secret.json"
 mcoqe_pull_secret_file="$TMP_DIR/mcoqe-pull-secret.json"
 merged_pull_secret_file="$TMP_DIR/merged-pull-secret.json"
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+# setup proxy
+echo "SHARED_DIR is set to: ${SHARED_DIR}"
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if oc get secret pull-secret -n openshift-config; then
   echo "Adding mcoqe robot account to the global clutser pull secret"
 else 
