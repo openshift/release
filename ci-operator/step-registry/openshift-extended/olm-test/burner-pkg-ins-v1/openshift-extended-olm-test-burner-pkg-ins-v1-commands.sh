@@ -107,6 +107,39 @@ function set_prometheus {
     export PROMETHEUS_URL PROMETHEUS_TOKEN
 }
 
+function collect_catalogd_log {
+    catalogd_log_dir="${ARTIFACT_DIR}/catalogdLog"
+    mkdir -p "${catalogd_log_dir}" || { ret_code=$?; FAIL_MESSAGE="cant create dir ${catalogd_log_dir}"; exit_burner $ret_code yes; }
+    duration_in_minutes=$(( BURNER_RUN_DURATION / 60 ))
+
+    catalogdPodName="$(oc get pods \
+        -l control-plane=catalogd-controller-manager \
+        -n openshift-catalogd \
+        -o=jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
+    if [ $? -ne 0 ] || [ -z "$catalogdPodName" ]; then
+        FAIL_MESSAGE="cant get pod name of catalogd"
+        exit_burner 1 yes
+    fi
+
+    log_file_pod="${catalogdPodName}.log"
+    oc logs -n openshift-catalogd ${catalogdPodName} --since "${duration_in_minutes}m" > ${log_file_pod} || true
+    cp -fr ${log_file_pod} ${catalogd_log_dir} || true
+
+    restart_count_pod="$(oc get pod "$catalogdPodName" \
+        -n openshift-catalogd \
+        -o=jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null)"
+    if [ $? -ne 0 ] || [ -z "$restart_count_pod" ]; then
+        FAIL_MESSAGE="cant get pod restart count of catalogd"
+        exit_burner 1 yes
+    fi
+
+    if [ "$restart_count_pod" -gt 0 ]; then
+        previous_log_file_pod="${catalogdPodName}.previous.log"
+        oc logs -n openshift-catalogd ${catalogdPodName} --previous --since "${duration_in_minutes}m" > ${previous_log_file_pod} || true
+        cp -fr ${previous_log_file_pod} ${catalogd_log_dir} || true
+    fi
+}
+
 function collect_container_cpu_metrics {
     metrics_origin_file="$1"
     metric_name=$2
@@ -349,6 +382,7 @@ function kube_burner_run {
     get_burner_run_duration
     generate_junit_xml $CPU_USAGE_RESULT
     summarize_test_result $CPU_USAGE_RESULT
+    collect_catalogd_log
     exit_burner $CPU_USAGE_RESULT "no"
 
 }
