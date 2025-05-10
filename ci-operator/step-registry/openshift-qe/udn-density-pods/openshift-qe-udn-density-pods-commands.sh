@@ -78,3 +78,5 @@ if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi
+echo "sleep time to add the fixed rpms"
+sleep 3600 
