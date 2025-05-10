@@ -162,11 +162,6 @@ if [ ! -f /tmp/pod-restart-workarounds.sh ]; then
   oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
   oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
   oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
-
-  # Workaround for https://issues.redhat.com/browse/OCPBUGS-48750
-  # Restart console and console-operator pods
-  oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
-  oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
 EOZ
   chmod a+x /tmp/pod-restart-workarounds.sh
   timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/pod-restart-workarounds.sh "core@${control_nodes[0]}:/tmp/pod-restart-workarounds.sh"
