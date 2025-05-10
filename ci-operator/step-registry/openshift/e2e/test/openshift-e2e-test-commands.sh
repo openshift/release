@@ -200,18 +200,7 @@ powervs*)
     export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
-external)
-    # FIXME(mtulio): https://issues.redhat.com/browse/OCPBUGS-53249
-    # Forcing openshift/origin presubmits to set the flag provider to "external" to validate the PR
-    # https://github.com/openshift/origin/pull/29623
-    # Presubmits on origin repo is currently permanent failing, skips is addressed on OCPBUGS-53249, required by
-    # https://github.com/openshift/kubernetes/pull/2247
-    if [[ $JOB_NAME == *"pull-ci-openshift-origin"* ]] || [[ $JOB_NAME == *"pull-ci-openshift-kubernetes"* ]]; then
-        export TEST_PROVIDER='{"type":"external"}'
-    else
-        export TEST_PROVIDER=''
-    fi
-    ;;
+external) export TEST_PROVIDER='{"type":"external"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
