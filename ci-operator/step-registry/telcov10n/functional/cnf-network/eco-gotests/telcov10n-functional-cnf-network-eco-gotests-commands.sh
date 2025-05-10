@@ -40,7 +40,7 @@ fi
 
 if [[ -n "${VLAN}" ]]; then
   echo "VLAN env var is not empty append parameters to ECO_GOTESTS_ENV_VARS"
-  ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_VLAN=${VLAN} ${ECO_GOTESTS_ENV_VARS}"
+  ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_VLAN=${VLAN%%,*} ${ECO_GOTESTS_ENV_VARS}"
 fi
 
 if [[ -n "${SWITCH_INTERFACES}" ]]; then
