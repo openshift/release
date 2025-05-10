@@ -40,7 +40,7 @@ fi
 
 if [[ -n "${VLAN}" ]]; then
   echo "VLAN env var is not empty append parameters to ECO_GOTESTS_ENV_VARS"
-  ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_VLAN=${VLAN} ${ECO_GOTESTS_ENV_VARS}"
+  ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_VLAN=${VLAN%%,*} ${ECO_GOTESTS_ENV_VARS}"
 fi
 
 if [[ -n "${SWITCH_INTERFACES}" ]]; then
@@ -68,7 +68,7 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
 echo "Run eco-gotests via ssh tunnel"
-ssh -o StrictHostKeyChecking=no "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/eco_gotests;./eco-gotests-run.sh || true"
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/eco_gotests;./eco-gotests-run.sh || true"
 
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154
