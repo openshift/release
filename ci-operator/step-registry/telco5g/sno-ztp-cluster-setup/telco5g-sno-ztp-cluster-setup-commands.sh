@@ -116,7 +116,7 @@ fi
 echo "Copy automation repo to local $SHARED_DIR"
 mkdir $SHARED_DIR/repos
 ssh -i $SSH_PKEY $COMMON_SSH_ARGS ${BASTION_USER}@${BASTION_IP} \
-    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
+    "tar --exclude='.git' -czf - -C /tmp ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
 
 cd $SHARED_DIR/repos/ansible-automation
 
@@ -181,6 +181,13 @@ cat << EOF > ~/fetch-information.yml
 
   - name: Get nodes
     shell: oc --kubeconfig=/home/kni/.kube/ztp_config_${CLUSTER_NAME} get node
+
+  - name: Get app sync status
+    shell: oc --kubeconfig=/home/kni/.kube/ztp_config_${CLUSTER_NAME} get applications.argoproj.io -n openshift-gitops -o json | jq -r ".items[0].status.sync.status"
+
+  - name: Get status errors
+    shell: oc --kubeconfig=/home/kni/.kube/ztp_config_${CLUSTER_NAME} get applications.argoproj.io -n openshift-gitops -o json | jq ".items[].status.conditions"
+
 
 EOF
 
