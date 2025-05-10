@@ -19,6 +19,13 @@ deploy_kafka
 deploy_netobserv
 createFlowCollector "-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
 
+if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
+    patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
+fi
+
+if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
+    patch_netobserv "flp" "$FLP_PR_IMAGE"
+fi
 
 # get NetObserv metadata 
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
