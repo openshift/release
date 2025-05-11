@@ -5,7 +5,10 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"
 cd odh-dashboard && npm install && npm run build
 
-npm run test
+CY_RESULTS_DIR="test-output" \
+  npm --verbose run \
+  --prefix frontend cypress:run -- \
+  --env "skipTags='@Bug @Maintain'" \
+  --config video=true
