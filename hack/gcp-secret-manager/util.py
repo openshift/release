@@ -1,6 +1,8 @@
 import re
 
 import click
+import requests
+import yaml
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
 
@@ -21,7 +23,7 @@ def ensure_authentication():
 
 
 def validate_collection(ctx, param, value):
-    if not re.fullmatch("[a-z0-9-]+", value):
+    if not re.fullmatch("[a-z0-9-]*", value):
         raise click.BadParameter(
             "May only contain lowercase letters, numbers or dashes."
         )
@@ -63,3 +65,27 @@ def create_payload(from_file: str, from_literal: str) -> bytes:
             return f.read()
     except Exception as e:
         raise click.UsageError(f"Failed to read file '{from_file}': {e}")
+
+
+def get_secret_collections() -> dict[str, list[str]]:
+    """
+    Returns a dictionary mapping each group to its associated secret collections.
+
+    Returns:
+        dict[str,list[str]]: A dictionary where each key is a group name and
+        each value is a list of secret collections associated with that group.
+    """
+    try:
+        response = requests.get(CONFIG_PATH)
+        data = yaml.safe_load(response.text)
+    except Exception as e:
+        raise click.ClickException(f"Failed to list collections: {e}")
+
+    result = {}
+
+    for group_name, group_data in data.get("groups", {}).items():
+        collections = group_data.get("secret_collections", [])
+        if collections:
+            result[group_name] = sorted(collections)
+
+    return result
