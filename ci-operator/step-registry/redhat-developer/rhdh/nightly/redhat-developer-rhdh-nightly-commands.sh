@@ -57,9 +57,9 @@ QUAY_REPO="rhdh-community/rhdh"
 RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
 
 # Clone and checkout the specific PR
-git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
+git clone "https://github.com/subhashkhileri/rhdh.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
-git checkout "$RELEASE_BRANCH_NAME" || exit
+git checkout "rhdh-sealight-nightly-job" || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
@@ -141,6 +141,24 @@ else
             exit 1
         fi
     done
+fi
+
+if [[ "$JOB_NAME" == *sealight* ]]; then
+    curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+
+    COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
+    cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
+    SL_CONTAINER_IMAGE="$(jq -r '
+            .payload
+            | @base64d
+            | fromjson
+            | .predicate.buildConfig.tasks[]
+            | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
+            | .invocation.parameters.IMAGE
+          ' cosign_metadata.json)"
+
+    QUAY_REPO=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f1 | sed 's|quay.io/||')
+    TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2)
 fi
 
 echo "############## Current branch ##############"
