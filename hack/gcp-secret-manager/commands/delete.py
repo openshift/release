@@ -15,7 +15,7 @@ from util import (
     "-c",
     "--collection",
     required=True,
-    help="The collection the secret belongs to",
+    help="The collection the secret belongs to.",
     type=str,
     callback=validate_collection,
 )
@@ -23,7 +23,7 @@ from util import (
     "-s",
     "--secret",
     required=True,
-    help="Name of the secret",
+    help="Name of the secret.",
     type=str,
     callback=validate_secret_name,
 )
@@ -36,6 +36,7 @@ def delete(collection: str, secret: str):
         client = secretmanager.SecretManagerServiceClient()
         name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
         client.delete_secret(name=name)
+        click.echo(f"Secret '{secret}' deleted")
     except NotFound:
         raise click.UsageError(
             f"Secret '{secret}' not found in collection '{collection}' (project: {PROJECT_ID})."

@@ -17,7 +17,7 @@ from util import (
     "--output",
     type=click.Choice(["json", "text"], case_sensitive=False),
     default="text",
-    help="Output format, defaults to plain text but can be set to 'json'. Only applicable when a collection is specified.",
+    help="Output format, defaults to plain text but can be set to 'json'. Only applicable when a collection or a group is specified.",
 )
 @click.option(
     "-c",

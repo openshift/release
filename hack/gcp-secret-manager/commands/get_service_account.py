@@ -11,7 +11,7 @@ from util import PROJECT_ID, ensure_authentication, validate_collection
     "-c",
     "--collection",
     required=True,
-    help="Name of the secret collection",
+    help="Name of the secret collection.",
     type=str,
     callback=validate_collection,
 )

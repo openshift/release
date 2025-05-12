@@ -8,7 +8,7 @@ from util import (
     PROJECT_ID,
     create_payload,
     get_secret_name,
-    validate,
+    validate_secret_source,
     validate_collection,
     validate_secret_name,
 )
@@ -30,7 +30,7 @@ REQUEST_INFO = "request-information"
     "-c",
     "--collection",
     required=True,
-    help="The secret collection to store the secret",
+    help="The secret collection to store the secret.",
     type=str,
     callback=validate_collection,
 )
@@ -38,7 +38,7 @@ REQUEST_INFO = "request-information"
     "-s",
     "--secret",
     required=True,
-    help="Name of the secret",
+    help="Name of the secret.",
     type=str,
     callback=validate_secret_name,
 )
@@ -46,16 +46,16 @@ REQUEST_INFO = "request-information"
     "-f",
     "--from-file",
     default="",
-    help="Path to file with secret data",
+    help="Path to file with secret data.",
     type=click.Path(file_okay=True, dir_okay=False, readable=True),
 )
 @click.option(
-    "-l", "--from-literal", default="", help="Secret data as string input", type=str
+    "-l", "--from-literal", default="", help="Secret data as string input.", type=str
 )
 def create(collection: str, secret: str, from_file: str, from_literal: str):
     """Create a new secret in the specified collection."""
 
-    validate(from_file, from_literal)
+    validate_secret_source(from_file, from_literal)
     click.echo(
         "To help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
         "If a field does not apply to your case, type 'none' to continue.\n"
@@ -83,7 +83,7 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
                 "data": create_payload(from_file, from_literal),
             },
         )
-        click.echo(f"Secret '{secret}' successfully created")
+        click.echo(f"Secret '{secret}' created")
     except AlreadyExists:
         raise click.ClickException(
             f"Secret '{secret}' already exists in collection '{collection}'."

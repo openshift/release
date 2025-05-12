@@ -14,6 +14,12 @@ CONFIG_PATH = "https://raw.githubusercontent.com/openshift/release/master/core-s
 
 
 def ensure_authentication():
+    """
+    Ensures that the user is authenticated with Google Cloud.
+
+    Raises:
+        click.ClickException: If application default credentials are not found.
+    """
     try:
         _, _ = default()
     except DefaultCredentialsError:
@@ -36,11 +42,31 @@ def validate_secret_name(ctx, param, value):
     return value
 
 
-def get_secret_name(collection, name: str) -> str:
+def get_secret_name(collection: str, name: str) -> str:
+    """
+    Returns a normalized secret name by combining the collection and secret name.
+
+    Args:
+        collection (str): The name of the secret collection.
+        name (str): The base name of the secret.
+
+    Returns:
+        str: A string in the format "{collection}__{name}".
+    """
     return f"{collection}__{name}"
 
 
-def validate(from_file: str, from_literal: str):
+def validate_secret_source(from_file: str, from_literal: str):
+    """
+    Validates that only one of --from-file or --from-literal is provided.
+
+    Args:
+        from_file (str): Path to the file containing secret data.
+        from_literal (str): Secret data provided as a string.
+
+    Raises:
+        click.BadOptionUsage: If both or neither of the options are provided.
+    """
     ensure_authentication()
 
     if from_literal != "" and from_file != "":
@@ -57,6 +83,19 @@ def validate(from_file: str, from_literal: str):
 
 
 def create_payload(from_file: str, from_literal: str) -> bytes:
+    """
+    Creates a secret payload from either a literal string or a file.
+
+    Args:
+        from_file (str): Path to the file containing the secret data.
+        from_literal (str): Secret data provided as a string literal.
+
+    Returns:
+        bytes: The secret data as bytes.
+
+    Raises:
+        click.UsageError: If reading the file fails.
+    """
     if from_literal != "":
         return from_literal.encode("UTF-8")
 
