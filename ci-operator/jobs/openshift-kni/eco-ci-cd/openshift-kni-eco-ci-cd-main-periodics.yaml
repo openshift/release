@@ -237,7 +237,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 00 00 * * 5
   decorate: true
   decoration_config:
@@ -247,7 +247,7 @@ periodics:
     org: openshift-kni
     repo: eco-ci-cd
   labels:
-    ci-operator.openshift.io/cluster: build05
+    capability/intranet: intranet
     ci-operator.openshift.io/variant: hcp-cnf-4.17
     ci.openshift.io/generator: prowgen
     job-release: "4.17"
@@ -313,7 +313,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build07
   cron: 00 08 * * 1,3,5
   decorate: true
   decoration_config:
@@ -323,12 +323,12 @@ periodics:
     org: openshift-kni
     repo: eco-ci-cd
   labels:
-    ci-operator.openshift.io/cluster: build05
+    capability/intranet: intranet
     ci-operator.openshift.io/variant: hcp-cnf-4.18
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-hcp-cnf-4.18-e2e-telcov10n-functional-hcp-cnf-candidate
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-hcp-cnf-4.18-e2e-telcov10n-functional-hcp-cnf-stable
   reporter_config:
     slack:
       channel: '#eco-ci-cd-notifications'
@@ -348,83 +348,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-telcov10n-functional-hcp-cnf-candidate
-      - --variant=hcp-cnf-4.18
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build05
-  cron: 00 16 * * 1, 5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-kni
-    repo: eco-ci-cd
-  labels:
-    ci-operator.openshift.io/cluster: build05
-    ci-operator.openshift.io/variant: hcp-cnf-4.18
-    ci.openshift.io/generator: prowgen
-    job-release: "4.18"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-hcp-cnf-4.18-e2e-telcov10n-functional-hcp-cnf-nightly
-  reporter_config:
-    slack:
-      channel: '#eco-ci-cd-notifications'
-      job_states_to_report:
-      - failure
-      - error
-      - success
-      - aborted
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-telcov10n-functional-hcp-cnf-nightly
+      - --target=e2e-telcov10n-functional-hcp-cnf-stable
       - --variant=hcp-cnf-4.18
       command:
       - ci-operator

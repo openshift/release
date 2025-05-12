@@ -59,4 +59,8 @@ ssh -o StrictHostKeyChecking=no $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "
 
 echo "Gather artifacts from bastion"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/junit/cnftests-junit.xml ${ARTIFACT_DIR}/junit_test-result.xml
+
+echo "Store report for reporter step"
+cp "${ARTIFACT_DIR}/junit_test-result.xml" "${SHARED_DIR}/junit_test-result.xml"
+
 rm -rf $PROJECT_DIR/temp_ssh_key
