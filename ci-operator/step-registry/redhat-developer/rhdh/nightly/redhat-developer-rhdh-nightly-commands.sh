@@ -145,9 +145,10 @@ fi
 
 if [[ "$JOB_NAME" == *sealight* ]]; then
     curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+    chmod +x /tmp/cosign
 
     COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
-    cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
+    /tmp/cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
     SL_CONTAINER_IMAGE="$(jq -r '
             .payload
             | @base64d
