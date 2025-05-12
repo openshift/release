@@ -30,6 +30,8 @@ function check_vm_tags() {
 
 }
 
+sleep 6h
+
 check_vm_tags || check_result=1
 exit ${check_result}
 
