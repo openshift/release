@@ -17,11 +17,14 @@ images:
   to: troubleshooting-panel-console-plugin
 - dockerfile_path: Dockerfile.test
   to: troubleshooting-panel-console-plugin-test
+- dockerfile_path: Dockerfile.cypress
+  to: troubleshooting-panel-console-plugin-cypress
 promotion:
   to:
   - excluded_images:
     - troubleshooting-panel-console-plugin
     - troubleshooting-panel-console-plugin-test
+    - troubleshooting-panel-console-plugin-cypress
     name: latest
     namespace: observability-ui
 resources:
@@ -42,6 +45,10 @@ tests:
       SCAN_IMAGE: troubleshooting-panel-console-plugin
     test:
     - ref: fips-check-image-scan
+- as: cypress
+  commands: make test-frontend
+  container:
+    from: troubleshooting-panel-console-plugin-cypress
 zz_generated_metadata:
   branch: main
   org: openshift
