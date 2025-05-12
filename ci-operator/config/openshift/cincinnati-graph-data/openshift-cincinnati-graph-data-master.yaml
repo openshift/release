@@ -28,8 +28,6 @@ images:
 - dockerfile_literal: |
     FROM replaced
     ENV RUST_LOG=actix_web=error,dkregistry=error
-    COPY . /code/
-    WORKDIR /code
     COPY graph-data.rs/public-keys /usr/local/share/public-keys
     COPY --from=pipeline:test-bin /go/.cargo/bin/cincinnati-graph-data /usr/local/bin/
     ENTRYPOINT ["/usr/local/bin/cincinnati-graph-data"]
@@ -63,6 +61,7 @@ tests:
 - as: e2e
   commands: /usr/local/bin/cincinnati-graph-data
   container:
+    clone: true
     from: graphdata-unittests
   run_if_changed: internal-channels/candidate.yaml|graph-data.rs/.*
 - as: e2e-latest-cincinnati
