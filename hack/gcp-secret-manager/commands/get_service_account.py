@@ -15,7 +15,7 @@ from util import PROJECT_ID, ensure_authentication, validate_collection
     type=str,
     callback=validate_collection,
 )
-def get_service_account(collection):
+def get_service_account(collection: str):
     """Retrieve the service account associated with a secret collection."""
 
     ensure_authentication()
