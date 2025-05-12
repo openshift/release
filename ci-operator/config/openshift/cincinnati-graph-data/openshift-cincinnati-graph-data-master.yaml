@@ -13,26 +13,18 @@ base_images:
     tag: "9"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: boot-root-1.79.0
 images:
 - dockerfile_path: Dockerfile
   to: stable
 - dockerfile_path: graph-data.rs/Dockerfile
   to: graphdata-unittests
 - dockerfile_literal: |
-    FROM ubi
-    RUN dnf -y install python-pip python
-    COPY . .
-    WORKDIR /cincinnati-graph-data
+    FROM replaced
     RUN pip install -r requirements.txt
-  from: ubi
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/cincinnati-graph-data
+  from: src
   to: content-checks
 promotion:
   to:
