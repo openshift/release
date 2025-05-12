@@ -24,8 +24,7 @@ if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
 fi
 
 echo "Waiting for the guest cluster to be ready"
-# shellcheck disable=SC2016
-timeout 30m bash -c 'while [[ $(oc get nodes --no-headers | wc -l) == 0 ]]; do sleep 15; done'
+timeout 30m bash -c "while [[ \$(oc get nodes --no-headers | wc -l) == 0 ]]; do sleep 15; done"
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 oc wait clusteroperators --all --for=condition=Available=True --timeout=30m
 oc wait clusteroperators --all --for=condition=Progressing=False --timeout=30m
