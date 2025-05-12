@@ -11,7 +11,7 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ironic-base
+  from: prevalidation-base
   inputs:
     ocp_4.19_base-rhel9:
       as:
@@ -19,15 +19,16 @@ images:
   to: ironic
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-20-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.art/ci/base-4-20-rhel-9-server-ironic.repo
+      curl http://base-4-20-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-4-20-rhel-9-ironic-prevalidation.repo
     from: ocp_4.19_base-rhel9
-    to: ironic-base
+    to: prevalidation-base
 releases:
   initial:
     integration:
@@ -44,39 +45,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-bm
+- as: e2e-metal-ipi-bm-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
   timeout: 5h0m0s
-- as: e2e-metal-ipi-virtualmedia
+- as: e2e-metal-ipi-virtualmedia-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-ipv6
+- as: e2e-metal-ipi-ovn-ipv6-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
   timeout: 5h0m0s
-- as: check-requirements
-  commands: |-
-    #!/bin/bash
-    set -euxo pipefail
-    # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="main"
-    make check-reqs
-  container:
-    from: src
 zz_generated_metadata:
-  branch: main
+  branch: release-4.20
   org: openshift
   repo: ironic-image
+  variant: prevalidation
