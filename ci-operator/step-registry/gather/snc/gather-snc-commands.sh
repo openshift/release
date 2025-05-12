@@ -40,10 +40,8 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --recurse packer@"${INSTANCE_PREFIX}":~/snc/*.crcbundle /tmp
 
 echo "Check if crc-bundle-${PULL_NUMBER} bucket" exists
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets describe "gs://crc-bundle-${PULL_NUMBER}" \
-    --format="value(name)" > /dev/null 2>&1
-
-if [ $? -eq 0 ]; then
+if LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets describe "gs://crc-bundle-${PULL_NUMBER}" \
+       --format="value(name)" > /dev/null 2>&1; then
   echo "Bucket 'gs://crc-bundle-${PULL_NUMBER}' already exists. No action needed."
 else
   echo "create crc-bundle-${PULL_NUMBER} bucket"
