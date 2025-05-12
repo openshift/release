@@ -273,10 +273,15 @@ else
 fi
 
 if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+  echo "Version is less than 4.19"
+  # release-4.18 consumer image supports event API v1
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
-# event API v1 is removed from 4.19 onwards
+  TEST_MODES=("dualnicbc" "bc" "oc")
 else
+  echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
+  # Only run tgm and dualfollower tests from 4.19 onwards
+  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "bc" "oc")
 fi
 
 # wait for the linuxptp-daemon to be deployed
@@ -352,18 +357,6 @@ sleep 300
 # get RTC logs
 print_time
 
-# Only run dual follower tests for versions < 4.19
-version=$(oc version -ojson| jq -r '.openshiftVersion')
-min_required="4.19"
-
-if [[ "$(printf '%s\n' "$version" "$min_required" | sort -V | head -n1)" != "$min_required" ]]; then
-  echo "Version is less than 4.19"
-  TEST_MODES=("dualnicbc" "bc" "oc")
-else
-  echo "Version is 4.19 or greater"
-  TEST_MODES=("dualfollower" "dualnicbc" "bc" "oc")
-fi
-
 # Run tests
 for mode in "${TEST_MODES[@]}"; do
   echo "Running tests for PTP_TEST_MODE=${mode}"
@@ -373,7 +366,9 @@ for mode in "${TEST_MODES[@]}"; do
   set_events_output_file
 
   temp_status="temp_status_${mode}" # Convert to lowercase for variable naming
-  make functests; declare "$temp_status=$?"
+  exit_code=0
+  make functests || exit_code=$?
+  declare "$temp_status=$exit_code"
 
   # Get RTC logs
   print_time

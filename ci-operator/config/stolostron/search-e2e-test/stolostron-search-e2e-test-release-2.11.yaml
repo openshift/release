@@ -17,6 +17,44 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: deploy-and-run-e2e
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: search-e2e
+    env:
+      ACM_RELEASE_VERSION: release-2.11
+      CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
+      CLUSTERPOOL_GROUP_NAME: Search
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: sno-41
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+      DEPLOY_TIMEOUT: "2700"
+      PIPELINE_STAGE: integration
+    test:
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        ./run-prow-e2e.sh
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
+      from: search-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 - as: lint
   commands: |
     export SELF="make -f Makefile.prow"
