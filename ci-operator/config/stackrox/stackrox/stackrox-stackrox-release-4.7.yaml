@@ -19,6 +19,10 @@ base_images:
     name: automation-flavors
     namespace: stackrox
     tag: rosa-stable
+  rosa-hcp:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-stable
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -166,6 +170,23 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aks-e2e
   timeout: 5h0m0s
+- always_run: false
+  as: rosa-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-rosa-e2e
+  timeout: 5h0m0s
+- always_run: false
+  as: rosa-hcp-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: rosa-qa-e2e-tests
+    workflow: stackrox-automation-flavors-rosa-hcp-e2e
+  timeout: 5h0m0s
 - as: merge-shell-unit-tests
   postsubmit: true
   steps:
@@ -269,6 +290,21 @@ tests:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aks-e2e
+  timeout: 5h0m0s
+- as: merge-rosa-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-rosa-e2e
+  timeout: 5h0m0s
+- as: merge-rosa-hcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: rosa-qa-e2e-tests
+    workflow: stackrox-automation-flavors-rosa-hcp-e2e
   timeout: 5h0m0s
 - always_run: false
   as: powervs-qa-e2e-tests
