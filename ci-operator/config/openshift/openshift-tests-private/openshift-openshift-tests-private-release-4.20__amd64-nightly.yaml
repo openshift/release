@@ -149,6 +149,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-ipi-outpost-day2-f14
+  cron: 21 7 12,28 * *
+  steps:
+    cluster_profile: aws-outpost-qe
+    env:
+      BASE_DOMAIN: outpost-dev.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-outpost-day2
 - as: aws-c2s-ipi-disc-priv-fips-f28-destructive
   cron: 30 12 16 * *
   steps:
@@ -1716,7 +1726,9 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: None
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_AZURE_REGION: northeurope
     test:
     - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-azure-ipi
@@ -1725,15 +1737,16 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
-      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_CUSTOM_AZURE_AZ: '[''2'']'
       COMPUTE_NODE_TYPE: Standard_EC4es_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v5
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-t2pkwtt/release:latest
       ENABLE_CONFIDENTIAL_COMPUTE: "true"
       ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
       ENABLE_ENCRYPTIONATHOST_CONTROL_PLANE: "false"
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
 - as: azure-ipi-confidentialvm-vmgueststateonly-f28-destructive
@@ -1747,6 +1760,7 @@ tests:
       ENABLE_CONFIDENTIAL_DEFAULT_MACHINE: "true"
       ENABLE_ENCRYPTIONATHOST_DEFAULT_MACHINE: "false"
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
 - as: azure-ipi-confidential-trustedlaunch-mini-perm-f7
@@ -2160,9 +2174,11 @@ tests:
   steps:
     cluster_profile: azurestack-qe
     env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-89sg5bk/release:latest
       E2E_RUN_TAGS: not @storage
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-stack-ipi
 - as: azure-stack-ipi-f28-destructive
@@ -3993,14 +4009,15 @@ tests:
   steps:
     cluster_profile: vsphere-connected-2
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
 - as: vsphere-ipi-static-ip-f28-destructive
   cron: 26 22 28 * *
   steps:
     cluster_profile: vsphere-connected-2
-    test:
-    - chain: openshift-e2e-test-qe-destructive
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
 - as: vsphere-ipi-template-usertags-f28
   cron: 26 9 25 * *
