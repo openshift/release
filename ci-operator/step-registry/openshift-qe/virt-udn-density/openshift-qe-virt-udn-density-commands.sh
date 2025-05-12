@@ -31,7 +31,7 @@ ES_SERVER="" EXTRA_FLAGS="--layer3=${ENABLE_L3} --iteration=${current_worker_cou
 
 # The measurable run
 ITERATIONS=$((current_worker_count * ITERATIONS_PER_NODE))
-EXTRA_FLAGS="--gc-metrics=true --iteration=$ITERATIONS --layer3=${ENABLE_LAYER_3} --vmi-ready-threshold=${VMI_READY_THRESHOLD} --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS="--gc-metrics=true --iteration=$ITERATIONS --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD} --profile-type=${PROFILE_TYPE}"
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
