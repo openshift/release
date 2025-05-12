@@ -143,6 +143,7 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_identity_user_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
     install_config_identity_user_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
     install_config_outbound_type=$(yq-go r ${CONFIG} 'platform.azure.outboundType')
+    install_config_publish_strategy=$(yq-go r ${CONFIG} 'publish')
 
     required_permissions="""
 \"Microsoft.Authorization/policies/audit/action\",
@@ -319,12 +320,16 @@ ${required_permissions}
 """
     fi
 
-    #optional permissions for creating a private storage endpoint for internal image registry
+    # optional permissions for fully private/internal image registry clusters used for azure file csi driver
     registry_conf="${SHARED_DIR}/manifest_image_registry-config.yml"
+    registry_type=""
     if [[ -f "${registry_conf}" ]]; then
         registry_type=$(yq-go r "${registry_conf}" 'spec.storage.azure.networkAccess.type')
-        if [[ "${registry_type}" == "Internal" ]]; then
-            required_permissions="""
+    fi
+    if [[ "${registry_type}" == "Internal" ]] || \
+       { [[ "${install_config_publish_strategy}" == "Internal" ]] && \
+       [[ "${install_config_outbound_type}" == "UserDefinedRouting" ]]; }; then
+        required_permissions="""
 \"Microsoft.Network/privateEndpoints/write\",
 \"Microsoft.Network/privateEndpoints/read\",
 \"Microsoft.Network/privateEndpoints/privateDnsZoneGroups/write\",
@@ -333,7 +338,6 @@ ${required_permissions}
 \"Microsoft.Storage/storageAccounts/PrivateEndpointConnectionsApproval/action\",
 ${required_permissions}
 """
-        fi
     fi
 
     # optional permissions when installing cluster in existing vnet
