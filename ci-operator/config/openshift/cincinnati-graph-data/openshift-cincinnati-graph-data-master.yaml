@@ -17,9 +17,27 @@ build_root:
     namespace: cincinnati-ci-public
     tag: boot-root-1.79.0
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_literal: |
+    FROM replaced
+    WORKDIR /home
+    COPY . graph-data/
+    RUN mkdir -p /var/lib/cincinnati/graph-data
+    CMD cp -rp graph-data/* /var/lib/cincinnati/graph-data
+  from: ubi
   to: stable
-- dockerfile_path: graph-data.rs/Dockerfile
+- dockerfile_literal: |
+    FROM replaced
+    ENV RUST_LOG=actix_web=error,dkregistry=error
+    COPY . /code/
+    WORKDIR /code
+    COPY graph-data.rs/public-keys /usr/local/share/public-keys
+    COPY --from=pipeline:test-bin /go/.cargo/bin/cincinnati-graph-data /usr/local/bin/
+    ENTRYPOINT ["/usr/local/bin/cincinnati-graph-data"]
+  from: ubi
+  inputs:
+    test-bin:
+      as:
+      - pipeline:test-bin
   to: graphdata-unittests
 - dockerfile_literal: |
     FROM replaced
@@ -38,6 +56,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  cargo test --manifest-path graph-data.rs/Cargo.toml
+  cargo install --locked --path graph-data.rs
 tests:
 - as: e2e
   commands: /usr/local/bin/cincinnati-graph-data
