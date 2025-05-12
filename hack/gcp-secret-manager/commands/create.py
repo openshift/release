@@ -57,8 +57,8 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
 
     validate(from_file, from_literal)
     click.echo(
-        "\nTo help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
-        "If a field does not apply to your case, type 'N/A' to continue.\n"
+        "To help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
+        "If a field does not apply to your case, type 'none' to continue.\n"
     )
     labels = prompt_for_labels()
     annotations = prompt_for_annotations()
@@ -98,25 +98,23 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
 
 def prompt_for_labels() -> typing.Dict[str, str]:
     click.echo(
-        "Enter team JIRA project associated with this secret "
-        "(e.g. 'ART' for issues.redhat.com/browse/ART).\n"
-        "Test Platform may open tickets in this project "
-        "to help handle incidents requiring secret rotation.\n"
+        "Enter team JIRA project associated with this secret (e.g. 'ART' for issues.redhat.com/browse/ART).\n"
+        "Test Platform may open tickets in this project to help handle incidents requiring secret rotation."
     )
     while True:
         jira = click.prompt(
-            text="JIRA project",
+            text="Jira project (required)",
             type=str,
         ).strip()
         if is_valid_label_value(jira):
-            return {JIRA_LABEL: jira}
+            return {JIRA_LABEL: jira.lower()}
         click.echo(
             "JIRA project label must be 1-63 characters, lowercase alphanumeric or hyphen, and not start or end with a hyphen."
         )
 
 
 def is_valid_label_value(value: str) -> bool:
-    if value.lower() == "n/a":
+    if value.lower() == "none":
         return True
     return bool(re.fullmatch(r"[a-z]([-a-z0-9]*[a-z0-9])?", value)) and (
         1 <= len(value) <= 63
@@ -129,18 +127,20 @@ def prompt_for_annotations() -> typing.Dict[str, str]:
     click.echo(
         "\nProvide a short description of how this secret can/will be rotated.\n"
         "This can help future team members support token rotation requirements.\n"
-        "Do not include sensitive information.\n"
+        "Do not include sensitive information."
     )
 
-    annotations[ROTATION_INSTRUCTIONS] = prompt_for_annotation(ROTATION_INSTRUCTIONS)
+    annotations[ROTATION_INSTRUCTIONS] = prompt_for_annotation(
+        "Rotation info (required)"
+    )
 
     click.echo(
-        "\nProvide a short description of how this secret was originally requested "
+        "\nProvide a short description of how this secret was originally requested\n"
         "(e.g. links to service now tickets, Jira tickets, documentation).\n"
         "This can help future team members know who to contact in case of problems.\n"
-        "Do not include sensitive information.\n"
+        "Do not include sensitive information."
     )
-    annotations[REQUEST_INFO] = prompt_for_annotation(REQUEST_INFO)
+    annotations[REQUEST_INFO] = prompt_for_annotation("Request info (required)")
     check_annotations_size(annotations)
     return annotations
 
@@ -158,7 +158,7 @@ def prompt_for_annotation(msg: str) -> str:
 def check_annotations_size(annotations: dict) -> bool:
     size = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
-        for key, value in annotations
+        for key, value in annotations.items()
     )
     # The total size of annotation keys and values must be less than 16KiB.
     if size > (16 * 1024):
