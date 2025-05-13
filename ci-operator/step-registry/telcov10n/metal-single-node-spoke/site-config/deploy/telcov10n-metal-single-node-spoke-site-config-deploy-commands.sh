@@ -315,6 +315,7 @@ function generate_ztp_cluster_manifests {
 
     SPOKE_CLUSTER_NAME=${NAMESPACE}
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
+    echo -n "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}" >| ${SHARED_DIR}/hostname_with_base_domain
 
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
