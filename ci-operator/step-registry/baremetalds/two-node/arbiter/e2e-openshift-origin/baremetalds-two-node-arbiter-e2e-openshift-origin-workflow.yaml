@@ -3,18 +3,17 @@ workflow:
   steps:
     allow_skip_on_success: true
     allow_best_effort_post_steps: true
-    cluster_profile: equinix-edge-enablement
+    cluster_profile: equinix-ocp-metal
     pre:
-      - chain: baremetalds-ipi-pre
+      - chain: baremetalds-ofcir-pre
     test:
       - ref: openshift-e2e-test
     post:
-      - chain: baremetalds-ipi-post
+      - chain: baremetalds-ofcir-post
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:initial"
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
     env:
-      CLUSTERTYPE: baremetal
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NUM_MASTERS=2
@@ -22,5 +21,4 @@ workflow:
         ENABLE_ARBITER=true
         FEATURE_SET="TechPreviewNoUpgrade"
   documentation: |-
-    Installs a Two Node Arbiter OpenShift cluster on baremetal.
-    This generic workflow runs tests based on env arguments using openshift-extended-test.
+    This workflow installs a Two Node OpenShift cluster with Arbiter on baremetal and runs only the conformance parallel test suite using openshift-e2e-test.
