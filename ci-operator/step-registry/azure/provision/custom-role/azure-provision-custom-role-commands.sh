@@ -144,6 +144,7 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_identity_user_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
     install_config_outbound_type=$(yq-go r ${CONFIG} 'platform.azure.outboundType')
     install_config_publish_strategy=$(yq-go r ${CONFIG} 'publish')
+    install_config_customer_managed_key=$(yq-go r ${CONFIG} 'platform.azure.customerManagedKey')
 
     required_permissions="""
 \"Microsoft.Authorization/policies/audit/action\",
@@ -301,6 +302,15 @@ ${required_permissions}
         required_permissions="""
 \"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
 \"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
+${required_permissions}
+"""
+    fi
+
+    # optional permissions when enabling customer managed key
+    if [[ -n "${install_config_customer_managed_key}" ]]; then
+        required_permissions="""
+\"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
+\"Microsoft.KeyVault/vaults/*/read\",
 ${required_permissions}
 """
     fi
