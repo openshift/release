@@ -17,10 +17,11 @@ handle_error() {
     if [ $exit_code -ne 0 ]; then        
         echo "Error occurred with exit code $exit_code. Waiting for 15 hours before exiting..."
         sleep 15h
+        echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
     fi
 }
 
-trap 'handle_error' ERR 
+trap 'handle_error; EXIT TERM' ERR 
 #trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
