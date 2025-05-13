@@ -73,4 +73,5 @@ spec:
   calicoNetwork:
     nodeAddressAutodetectionV4:
       kubernetes: NodeInternalIP
+    mtu: 1380
 EOF
