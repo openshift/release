@@ -13,9 +13,10 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 EXIT_CODE=100
 
 handle_error() {
-    local exit_code=$?
-    if [ $exit_code -ne 0 ]; then        
-        echo "Error occurred with exit code $exit_code. Waiting for 15 hours before exiting..."
+    if [ $? -ne 0 ]; then        
+        EXIT_CODE=$?
+        echo "Error occurred with exit code $EXIT_CODE. Waiting for 15 hours before exiting..."
+        cp -f /usr/bin/oc-mirror ${SHARED_DIR}
         sleep 15h
         echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
     fi
@@ -30,7 +31,7 @@ if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
   exit 0
 fi
 
-set -xv
+set -x
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
