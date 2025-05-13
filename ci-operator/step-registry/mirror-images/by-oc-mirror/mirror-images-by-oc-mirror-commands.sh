@@ -21,7 +21,7 @@ handle_error() {
 }
 
 trap 'handle_error' ERR 
-trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+#trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
   echo "users specifically do not use oc-mirror to run mirror"
