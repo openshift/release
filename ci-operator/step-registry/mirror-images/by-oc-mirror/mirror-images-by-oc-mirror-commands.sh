@@ -68,7 +68,7 @@ oc registry login
 run_command "which oc"
 run_command "oc version --client"
 oc_mirror_dir=$(mktemp -d)
-pushd "${oc_mirror_dir}"
+pushd "${oc_mirror_dir}" || true
 new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 
 # combine custom registry credential and default pull secret
