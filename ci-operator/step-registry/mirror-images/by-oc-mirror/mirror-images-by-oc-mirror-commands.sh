@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
+#set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -21,7 +21,8 @@ handle_error() {
     fi
 }
 
-trap 'handle_error; EXIT TERM' ERR 
+trap 'handle_error; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 #trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
@@ -105,6 +106,7 @@ oc registry login --to "${new_pull_secret}"
 #done
 
 oc_mirror_bin="oc-mirror"
+run_command "which '${oc_mirror_bin}'"
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
 
