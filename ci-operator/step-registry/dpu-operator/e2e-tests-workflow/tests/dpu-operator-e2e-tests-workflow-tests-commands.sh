@@ -3,7 +3,7 @@
 echoerr() { echo "$@" 1>&2; }
 
 _curl_qm() {
-    curl --resolve "$endpoint_resolve" --cacert "$queue_manager_tls_crt" "$@"
+    curl --resolve "$endpoint_resolve" --cacert "$queue_manager_tls_crt" -H "Authorization: Bearer $queue_manager_auth_token" "$@"
 }
 
 check_timeout_status() {
@@ -51,6 +51,7 @@ check_pull_number() {
 
 queue_manager_tls_host=$(cat "/var/run/token/e2e-test/queue-manager-tls-host")
 queue_manager_tls_ip=$(cat "/var/run/token/e2e-test/queue-manager-tls-ip")
+queue_manager_auth_token=$(cat "/var/run/token/jenkins-secrets/queue-manager-auth-token")
 queue_manager_tls_crt="/var/run/token/jenkins-secrets/queue-manager-tls-crt"
 
 queue_url="https://$queue_manager_tls_host"
