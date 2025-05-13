@@ -13,18 +13,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-handle_error() {
-    local exit_code=$?
-    if [ $exit_code -ne 0 ]; then
-        echo "Error occurred with exit code $exit_code. Waiting for 2 hours before exiting..."
-        sleep 15h
-    fi
-    exit $exit_code
-}
-
-# 设置trap捕获错误
-trap 'handle_error' ERR
-
 if [[ "${MIRROR_BIN}" != "oc-adm" ]]; then
   echo "users specifically do not use oc-adm to run mirror"
   exit 0

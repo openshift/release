@@ -11,12 +11,23 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # post check steps after cluster installation, exit code 101 if failed,
 # save to install-post-check-status.txt
 EXIT_CODE=100
+
+handle_error() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then        
+        echo "Error occurred with exit code $exit_code. Waiting for 15 hours before exiting..."
+        sleep 15h
+    fi
+}
+
+trap 'handle_error' ERR 
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
   echo "users specifically do not use oc-mirror to run mirror"
   exit 0
 fi
+
 set -x
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
