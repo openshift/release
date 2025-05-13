@@ -30,7 +30,7 @@ if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
   exit 0
 fi
 
-set -x
+set -xv
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
