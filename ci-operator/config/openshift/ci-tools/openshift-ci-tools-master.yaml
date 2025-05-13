@@ -786,12 +786,6 @@ promotion:
   to:
   - namespace: ci
     tag: latest
-releases:
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.19"
-      namespace: ocp
 resources:
   '*':
     requests:
@@ -868,7 +862,7 @@ tests:
         name: ci-operator
         namespace: test-credentials
       - mount_path: /tmp/pull-secret
-        name: registry-pull-credentials
+        name: ci-pull-credentials
         namespace: test-credentials
       - mount_path: /etc/push-secret
         name: registry-push-credentials-ci-central
@@ -958,112 +952,6 @@ tests:
   commands: make lint
   container:
     from: golangci-lint
-- as: canary-build09
-  cluster: build09
-  interval: 10m
-  steps:
-    test:
-    - as: test
-      commands: echo "here i am"
-      from: os
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: konflux-test-cluster-claim
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
-  cron: 0 0 1 1 0
-  steps:
-    test:
-    - as: konflux-test
-      commands: make-placeholder
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: konflux-operator-placeholder
-      from: konflux-artifacts-placeholder
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
-- as: konflux-test-aws
-  cron: 0 0 1 1 0
-  steps:
-    cluster_profile: aws-2
-    env:
-      OCP_ARCH: amd64
-    test:
-    - as: konflux-test
-      cli: latest
-      commands: make-placeholder
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: konflux-operator-placeholder
-      from: konflux-artifacts-placeholder
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: konflux-test-gcp
-  cron: 0 0 1 1 0
-  steps:
-    cluster_profile: gcp
-    env:
-      OCP_ARCH: amd64
-    test:
-    - as: konflux-test
-      cli: latest
-      commands: make-placeholder
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: konflux-operator-placeholder
-      from: konflux-artifacts-placeholder
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
-- as: konflux-test-azure
-  cron: 0 0 1 1 0
-  steps:
-    cluster_profile: azure4
-    env:
-      OCP_ARCH: amd64
-    test:
-    - as: konflux-test
-      cli: latest
-      commands: make-placeholder
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: konflux-operator-placeholder
-      from: konflux-artifacts-placeholder
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-azure
-- as: konflux-test-bundle
-  cron: 0 0 1 1 0
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_BUNDLE: bundle-placeholder
-    env:
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: operator-ns-placeholder
-    test:
-    - as: konflux-test
-      cli: latest
-      commands: make-placeholder
-      from: konflux-artifacts-placeholder
-      resources:
-        requests:
-          cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
 - as: security
   optional: true
   steps:

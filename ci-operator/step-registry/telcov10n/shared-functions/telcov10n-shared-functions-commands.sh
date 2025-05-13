@@ -85,7 +85,7 @@ function wait_until_command_is_ok {
   [ \$# -gt 0 ] && exit_non_ok_message=\${1} && shift
   for ((attempts = 0 ; attempts <  \${max_attempts:=10} ; attempts++)); do
     echo "Attempting[\${attempts}/\${max_attempts}]..."
-    set -x
+    [ "\${show_command:="yes"}" == "yes" ] && set -x
     eval "\${cmd}" && { set +x ; return ; }
     sleep \${sleep_for:='1m'}
     set +x
@@ -98,6 +98,121 @@ function wait_until_command_is_ok {
   else
     return 1
   fi
+}
+
+# ----------------------------------------------------------------------
+
+EO-shared-function
+
+echo "----------------------------------------------------------------------"
+echo " setup_aux_host_ssh_access"
+echo "----------------------------------------------------------------------"
+
+  cat <<EO-shared-function >> ${functions_path}
+
+# ----------------------------------------------------------------------
+# setup_aux_host_ssh_access
+# ----------------------------------------------------------------------
+
+function setup_aux_host_ssh_access {
+
+  echo "************ telcov10n Setup AUX_HOST SSH access ************"
+
+  local ssh_key
+  if [ \$# -gt 0 ];then
+    ssh_key=\${1}
+  else
+    ssh_key="\${CLUSTER_PROFILE_DIR}/ssh-key"
+  fi
+
+  SSHOPTS=(
+    -o 'ConnectTimeout=5'
+    -o 'StrictHostKeyChecking=no'
+    -o 'UserKnownHostsFile=/dev/null'
+    -o 'ServerAliveInterval=90'
+    -o LogLevel=ERROR
+    -i "\${ssh_key}"
+  )
+}
+
+# ----------------------------------------------------------------------
+
+EO-shared-function
+
+echo "----------------------------------------------------------------------"
+echo " try_to_lock_host, check_the_host_was_locked"
+echo "----------------------------------------------------------------------"
+
+  cat <<EO-shared-function >> ${functions_path}
+
+# ----------------------------------------------------------------------
+# try_to_lock_host
+# ----------------------------------------------------------------------
+
+function try_to_lock_host {
+
+  local bastion_host=\${1} ; shift
+  local lock_filename=\${1} ; shift
+  local ts=\${1} ; shift
+  local lock_timeout=\${1}
+
+  set -x
+  timeout -s 9 10m ssh "\${SSHOPTS[@]}" "root@\${bastion_host}" bash -s --  \
+    "\${lock_filename}" "\${ts}" "\${lock_timeout}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+set -x
+lock_fname="\${1}"
+ts_now="\${2}"
+lock_timeout="\${3}"
+
+sudo mkdir -pv \$(dirname \${lock_fname})
+
+if [ -f \${lock_fname} ]; then
+  ts_stored=\$(<\${lock_fname})
+  time_diff=\$(( ts_now - ts_stored ))
+  time_diff=\$(( time_diff < 0 ? 0 : time_diff ))
+
+  # Timeout in nanoseconds (lock_timeut is in seconds)
+  lock_timeout_in_ns=\$(( lock_timeout * 1000000000 ))
+
+  # Check if the stored timestamp is at least the timeout older
+  if (( time_diff >= lock_timeout_in_ns )); then
+    echo "The stored timestamp is at least the timeout older."
+    sudo echo "\${ts_now}" >| \${lock_fname}
+  else
+    echo "The stored timestamp is less than the timeout old."
+  fi
+else
+  sudo echo "\${ts_now}" >| \${lock_fname}
+fi
+EOF
+
+  set +x
+  echo
+}
+
+# ----------------------------------------------------------------------
+# check_the_host_was_locked
+# ----------------------------------------------------------------------
+
+function check_the_host_was_locked {
+
+  local bastion_host=\${1} ; shift
+  local lock_filename=\${1} ; shift
+  local ts=\${1} ; shift
+
+  set -x
+  local ts_stored
+  ts_stored=\$(timeout -s 9 10m ssh "\${SSHOPTS[@]}" "root@\${bastion_host}" cat \${lock_filename})
+  if (( ts == ts_stored )); then
+    echo "locked"
+  else
+    echo "fail"
+  fi
+  set +x
 }
 
 # ----------------------------------------------------------------------

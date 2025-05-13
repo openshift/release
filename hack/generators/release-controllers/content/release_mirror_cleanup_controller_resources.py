@@ -216,7 +216,6 @@ def _deployment_resources(gendoc, namespaces):
                                                '/usr/bin/release-mirror-cleanup-controller',
                                                'start',
                                                '-v=4',
-                                               '--dry-run',
                                                '--credentials-namespace='+context.jobs_namespace,
                                            ] + _namespace_list(namespaces),
                                 'image': 'release-mirror-cleanup-controller:latest',

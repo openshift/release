@@ -221,10 +221,27 @@ tests:
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
+        export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
+        export LLM_PROVIDER="azure_openai"
+        export LLM_MODEL="gpt-4o-mini"
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azureopenai-entra-id
+        name: azureopenai-entra-id
         namespace: test-credentials
       from: src
       resources:

@@ -1,0 +1,65 @@
+base_images:
+  base:
+    name: "4.19"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ci/telco-runner
+      RUN pip3 install --no-cache-dir \
+            "pytest==8.2.2" \
+            "pytest-shell==0.3.2" \
+            "requests[socks]==2.32.3" \
+            "netaddr==1.3.0"
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telcov10n-virtualised-single-node-hub-ztp
+  capabilities:
+  - intranet
+  cron: 0 19 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: 10.6.157.20
+      CATALOGSOURCE_NAME: prega-operators
+      IMAGE_INDEX_OCP_VERSION: "4.19"
+      MCH_AVAILABILITY_CONFIG: Basic
+      MCH_CATALOG_ANNOTATION: '{"source": "prega-operators", "channel": "!default"}'
+      MCH_NAMESPACE: open-cluster-management
+      OCP_HUB_VERSION: "4.19"
+      OPERATORS: |
+        [
+          {"name": "lvms-operator", "source": "prega-operators", "channel": "!default", "install_namespace": "openshift-storage", "target_namespaces": "openshift-storage", "operator_group": "lvms-operator-operatorgroup"},
+          {"name": "advanced-cluster-management", "source": "prega-operators", "channel": "!default", "install_namespace": "open-cluster-management", "target_namespaces": "open-cluster-management", "operator_group": "acm-operator-group"},
+          {"name": "topology-aware-lifecycle-manager", "source": "prega-operators", "channel": "!default", "install_namespace": "openshift-talm", "target_namespaces": "", "operator_group": "topology-aware-lifecycle-manager"},
+          {"name": "openshift-gitops-operator", "source": "prega-operators", "channel": "!default", "install_namespace": "openshift-gitops-operator", "target_namespaces": "", "operator_group": "gitops-operator-group"}
+        ]
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      SOCKS5_PROXY: socks5h://10.6.157.20:3124
+    test:
+    - ref: install-operators-verify
+    - ref: telcov10n-metal-single-node-hub-ztp-verify-hub
+    - ref: telcov10n-virtualised-single-node-hub-ztp-verify-hub
+    workflow: telcov10n-virtualised-single-node-hub-ztp
+zz_generated_metadata:
+  branch: ztp-left-shifting-kpi
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: ci-4.19

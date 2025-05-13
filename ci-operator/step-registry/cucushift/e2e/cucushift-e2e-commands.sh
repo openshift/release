@@ -417,8 +417,8 @@ else
     export E2E_RUN_TAGS="$E2E_RUN_TAGS and $CUCUSHIFT_FORCE_SKIP_TAGS"
 fi
 date --utc
-oc version --client --output='yaml' || true
 set_cluster_access
+oc version --client --output='yaml' || true
 preparation_for_test
 filter_tests
 test_execution

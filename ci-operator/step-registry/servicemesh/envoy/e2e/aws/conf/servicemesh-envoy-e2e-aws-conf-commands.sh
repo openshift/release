@@ -229,9 +229,8 @@ EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 # ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 # ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
@@ -262,13 +261,7 @@ rm /tmp/pull-secret
 # fi
 
 # custom rhcos ami for non-public regions
-RHCOS_AMI=
-if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
-  # TODO: move repo to a more appropriate location
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
-  echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
-fi
+RHCOS_AMI=""
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
@@ -276,7 +269,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
 fi
 
-if [ ! -z ${RHCOS_AMI} ]; then
+if [ -n "${RHCOS_AMI}" ]; then
   echo "patching rhcos ami to install-config.yaml"
   CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
   cat >> "${CONFIG_PATCH_AMI}" << EOF

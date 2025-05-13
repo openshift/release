@@ -1287,13 +1287,13 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
       NAME_PREFIX: rosa-hcp-auth
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_PROFILE: ocpe2e-rosa-hcp-external-auth
       VERSION: "4.19"
     test:
-    - chain: openshift-e2e-test-hypershift-qe
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: rosa-lifecycle-external-auth-advanced
 - as: aws-rosa-hcp-pl-stage-f7
   cron: 31 13 1,8,15,24 * *
@@ -1615,6 +1615,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
+- as: azure-aks-hypershift-arm-nodepool-guest-f7
+  cron: 31 11 1,8,15,22 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.19
+    env:
+      EXTRA_ARGS: --arch=arm64
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: 418-arm
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 418.94.20250122
+      HYPERSHIFT_INSTANCE_TYPE: Standard_D4ps_v5
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-guest
 - as: azure-aks-hypershift-byo-vnet-fips-guest-f7
   cron: 32 1 1,8,17,24 * *
   steps:
@@ -3589,8 +3609,8 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-fbc-ystream:latest
-      NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-fbc-ystream:latest
+      CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
@@ -4311,12 +4331,13 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-oci
-- as: oci-agent-vm-compact-f14
+- as: oci-agent-vm-compact-fips-f14
   cluster: build05
   cron: 11 5 8,22 * *
   steps:
     cluster_profile: oci-agent-qe
     env:
+      FIPS_ENABLED: "true"
       MASTERS: "3"
     test:
     - chain: openshift-e2e-test-qe-automated-release
@@ -4337,6 +4358,52 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-upi-ovn-dual-stack-realtime-kernel-f7
+  capabilities:
+  - intranet
+  cron: 23 15 8,15,22,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: cucushift-installer-check-realtime
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-dual-stack
+- as: nutanix-agent-sno-f28
+  cluster: build01
+  cron: 12 22 28 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      MASTERS: "1"
+    workflow: agent-qe-nutanix
+- as: nutanix-agent-compact-fips-f28
+  cluster: build01
+  cron: 15 12 28 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      FIPS_ENABLED: "true"
+    workflow: agent-qe-nutanix
+- as: nutanix-agent-ha-f28
+  cluster: build01
+  cron: 15 22 27 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      WORKERS: "2"
+    workflow: agent-qe-nutanix
+- as: nutanix-agent-disc-compact-f60
+  cluster: build01
+  cron: 28 12 27 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    workflow: agent-qe-nutanix-disconnected
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

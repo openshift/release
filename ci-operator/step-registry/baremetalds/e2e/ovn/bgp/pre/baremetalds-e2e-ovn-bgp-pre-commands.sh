@@ -194,7 +194,7 @@ deploy_agnhost_container() {
   $IP link set $dummy up
   $CLI network create --driver macvlan --ipam-driver=none -o parent=$dummy --ipv6 $net
   
-  $CLI run -d --privileged --name $name --network $net --rm registry.k8s.io/e2e-test-images/agnhost:2.40 netexec --http-port=8000
+  $CLI run -d --privileged --name $name --hostname $name --network $net --rm registry.k8s.io/e2e-test-images/agnhost:2.40 netexec --http-port=8000
   $CLI exec $name ip address add dev eth0 172.20.0.100/16
   $CLI exec $name ip route add default dev eth0 via 172.20.0.2
   $CLI exec $name ip -6 address add dev eth0 2001:db8:2::100/64
