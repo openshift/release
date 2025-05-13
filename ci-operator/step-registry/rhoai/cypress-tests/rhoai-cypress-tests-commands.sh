@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+sleep 2h
+
 cd odh-dashboard && npm install && npm run build
 
 CY_RESULTS_DIR="test-output" \
