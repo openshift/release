@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.17"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -10,17 +10,17 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.17"
   tests-private-ui:
     name: tests-private-ui
     namespace: ci
     tag: "4.14"
   tools:
-    name: "4.14"
+    name: "4.17"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.14"
+    name: "4.17"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -29,13 +29,13 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.17"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -58,13 +58,12 @@ tests:
       OPERATORS: |
         [
             {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
         ]
       TEST_ADDITIONAL: ""
-      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
-      TEST_IMPORTANCE: ""
+      TEST_FILTERS: ~Loki&;~Disruptive&;~STS&;~WIF&;~Cloudwatch&;~Azure&;~Splunk
+      TEST_IMPORTANCE: Critical|High
       TEST_PARALLEL: "3"
       TEST_ROSA_LOGIN_ENV: ""
       TEST_SCENARIOS: sig-openshift-logging
@@ -73,9 +72,9 @@ tests:
     - ref: enable-qe-catalogsource-logging
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-sdn
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
-  branch: release-4.14
+  branch: release-4.17
   org: openshift
   repo: openshift-tests-private
   variant: amd64-nightly-openshift-logging-5.8
