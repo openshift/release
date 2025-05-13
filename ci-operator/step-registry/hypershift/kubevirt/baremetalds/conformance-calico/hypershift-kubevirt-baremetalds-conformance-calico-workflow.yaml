@@ -15,12 +15,7 @@ workflow:
     test:
     - chain: hypershift-conformance
     pre:
-    - ref: baremetalds-packet-setup
-    - ref: calico-conf
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-proxy
-    - ref: ipi-install-hosted-loki
-    - ref: baremetalds-devscripts-setup
+    - chain: baremetalds-ipi-pre
     - ref: enable-qe-catalogsource
     - chain: hypershift-kubevirt-baremetalds-lvm
     - chain: hypershift-kubevirt-baremetalds-metallb
@@ -33,7 +28,6 @@ workflow:
     - ref: cucushift-hypershift-extended-calico-health-check
     env:
       HYPERSHIFT_NETWORK_TYPE: "Other"
-      CALICO_VERSION: "3.29.3"
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
@@ -51,7 +45,7 @@ workflow:
       PACKET_OS: rocky_9
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=Calico
+        NETWORK_TYPE=OVNKubernetes
         NUM_WORKERS=0
         NUM_MASTERS=3
         MASTER_VCPU=16
@@ -59,4 +53,3 @@ workflow:
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST="vda vdb"
         VM_EXTRADISKS_SIZE=250G
-        ENABLE_LOCAL_REGISTRY=
