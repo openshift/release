@@ -11,6 +11,14 @@ base_images:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -31,58 +39,57 @@ releases:
       version: "4.19"
 resources:
   '*':
+    limits:
+      memory: 8Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "1"
+      memory: 1Gi
 tests:
 - always_run: false
   as: krkn-hub-tests-metal
   capabilities:
   - intranet
   steps:
-    cluster_profile: metal-perscale-cpt
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
     env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       CHURN: "true"
-      DISRUPTION_COUNT: "2"
       EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
-      LAB_CLOUD: cloud31
       TELEMETRY_GROUP: prow-ocp-4.18
-      TYPE: mno
     observers:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-load-kubeconfig
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
+    workflow: baremetal-lab-upi
   timeout: 7h0m0s
 - always_run: false
   as: krkn-hub-node-tests-metal
   capabilities:
   - intranet
   steps:
-    cluster_profile: metal-perscale-cpt
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
     env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       CHURN: "true"
       EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
-      LAB_CLOUD: cloud31
       TELEMETRY_GROUP: prow-ocp-4.18
-      TYPE: mno
     observers:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-load-kubeconfig
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: baremetal-lab-upi
   timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
