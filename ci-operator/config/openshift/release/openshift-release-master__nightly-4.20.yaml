@@ -330,6 +330,21 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-serial-ovn-ipv6-techpreview
+  cluster: build05
+  cron: 0 4 * * *
+  shard_count: 2
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-serial-ovn-ipv6
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6-runc-techpreview
   cluster: build05
   cron: '@daily'
@@ -356,6 +371,21 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-serial-ovn-dualstack-techpreview
+  cluster: build05
+  cron: 0 4 * * *
+  shard_count: 2
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-serial-ovn-dualstack
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   interval: 168h
@@ -399,13 +429,13 @@ tests:
   cluster: build05
   cron: '@daily'
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-upgrade
   cluster: build05
   cron: '@daily'
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
 - as: metal-ovn-network-flow-matrix-bm-single-node
   cron: 0 23 * * 0,2,4,6
@@ -792,7 +822,8 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-telco5g
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 11 20 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -807,7 +838,8 @@ tests:
       - observers-resource-watch
     workflow: telco5g-origin
 - as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 18 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -823,7 +855,8 @@ tests:
     workflow: telco5g-cnf
   timeout: 6h0m0s
 - as: e2e-telco5g-sno-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 18 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -838,7 +871,8 @@ tests:
       - observers-resource-watch
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 7 * * 0-5
   restrict_network_access: false
   steps:
@@ -851,7 +885,8 @@ tests:
       - observers-resource-watch
     workflow: telco5g-ptp
 - as: e2e-telco5g-hcp-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 10 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -1699,14 +1734,14 @@ tests:
     workflow: rosa-aws-sts-conformance
   timeout: 6h0m0s
 - as: e2e-rosa-sts-hypershift-ovn
-  cluster: build09
+  cluster: build10
   cron: '@daily'
   steps:
     cluster_profile: aws-perfscale-qe
     workflow: rosa-aws-sts-hcp-conformance
   timeout: 6h0m0s
 - as: e2e-osd-ccs-gcp
-  cluster: build09
+  cluster: build10
   cron: '@daily'
   steps:
     cluster_profile: gcp-qe
