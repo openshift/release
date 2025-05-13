@@ -7,6 +7,8 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
+
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
@@ -62,6 +64,46 @@ EOF
   set -x
   oc -n ${SPOKE_CLUSTER_NAME} get secret ${ai_dp_secret_name}
   set +x
+}
+
+function get_hfs_helper {
+  oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings ${hostname_with_base_domain} && \
+  [ "$(oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings ${hostname_with_base_domain} -ojson \
+    | jq -r -c '.status.settings')" != "null" ]
+}
+
+function generate_host_firmware_settings_manifest {
+
+  if [ "${BIOS_SETTINGS}" != "{}" ] ; then
+
+    local hostname_with_base_domain
+    hostname_with_base_domain="$(cat ${SHARED_DIR}/hostname_with_base_domain)"
+
+    echo "************ telcov10n Setup BIOS settings ************"
+
+    wait_until_command_is_ok "get_hfs_helper" 10s 100
+
+    echo
+    echo "${hostname_with_base_domain} HostFirmwareSettings before patch:"
+    echo "-----------------------------------------------------------------"
+    set -x
+    oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
+    set +x
+    echo
+
+    oc patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
+spec:
+  settings: $(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
+EO-hfs-patch
+
+    echo
+    echo "${hostname_with_base_domain} HostFirmwareSettings after patch:"
+    echo "-----------------------------------------------------------------"
+    set -x
+    oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
+    set +x
+    echo
+  fi
 }
 
 function generate_baremetal_secret {
@@ -201,6 +243,7 @@ function main {
   create_spoke_namespace
   generate_assisted_deployment_pull_secret
   generate_baremetal_secret
+  generate_host_firmware_settings_manifest
   checking_installation_progress "${REFRESH_TIME}"
   get_and_save_kubeconfig_and_creds
 
