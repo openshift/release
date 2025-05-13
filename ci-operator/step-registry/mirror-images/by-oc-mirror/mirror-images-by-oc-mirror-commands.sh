@@ -17,7 +17,7 @@ if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
   echo "users specifically do not use oc-mirror to run mirror"
   exit 0
 fi
-
+set -x
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
