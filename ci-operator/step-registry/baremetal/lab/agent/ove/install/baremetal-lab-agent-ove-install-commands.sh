@@ -60,7 +60,11 @@ case "${BOOT_MODE}" in
       iso_path="${IP_ADDRESS}/isos/agent-ove.x86_64.iso"
     else
       # Assuming HTTP or HTTPS
-      iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove.x86_64.iso"
+      if [ -z "${OVE_ISO_FILE}" ]; then
+        iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove.x86_64.iso"
+      else
+        iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${OVE_ISO_FILE}"
+      fi
     fi
     mount_virtual_media "${host}" "${iso_path}"
   done
