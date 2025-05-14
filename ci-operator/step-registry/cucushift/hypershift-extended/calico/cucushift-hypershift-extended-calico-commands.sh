@@ -49,7 +49,7 @@ find $calico_dir -name "00*" -print0 | xargs -0 -n1 oc apply -f
 # Install operator
 find $calico_dir -name "02*" -print0 | xargs -0 -n1 oc apply -f
 
-timeout 15m bash -c 'until oc get crd installations.operator.tigera.io; do sleep 15; done'
+timeout 45m bash -c 'until oc get crd installations.operator.tigera.io; do sleep 15; done'
 oc wait --for condition=established --timeout=60s crd installations.operator.tigera.io
 
 timeout 15m bash -c 'until oc get crd apiservers.operator.tigera.io; do sleep 15; done'
