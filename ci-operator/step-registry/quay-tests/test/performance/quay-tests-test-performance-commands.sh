@@ -12,13 +12,13 @@ ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
+ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
 echo "QUAY_ROUTE: $QUAY_ROUTE"
 
 #Create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
 export WORKLOAD="quay-load-test"
-export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 
 curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
   --header "Content-Type: application/json" \
@@ -189,11 +189,11 @@ export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
 export WORKLOAD="quay-load-test"
-export RELEASE_STREAM="${QUAY_OPERATOR_CHANNEL}"
 export TEST_PHASES="${TEST_PHASES}"
 export HITSIZE
 export CONCURRENCY
 export PUSH_PULL_NUMBERS
+export ADDITIONAL_PARAMS
 
 # Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/ 
 source utility/e2e-benchmarking.sh || true
