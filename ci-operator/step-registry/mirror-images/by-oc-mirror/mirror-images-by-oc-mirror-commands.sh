@@ -13,12 +13,13 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 EXIT_CODE=100
 
 handle_error() {
-    if [ $? -ne 0 ]; then        
-        EXIT_CODE=$?
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
         echo "Error occurred with exit code $EXIT_CODE. Waiting for 15 hours before exiting..."
         cp -f /usr/bin/oc-mirror ${SHARED_DIR}
-        sleep 15h
         echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
+        ls ${SHARED_DIR}
+        sleep 15h
     fi
 }
 
@@ -69,7 +70,7 @@ oc registry login
 run_command "which oc"
 run_command "oc version --client"
 oc_mirror_dir=$(mktemp -d)
-pushd "${oc_mirror_dir}" || true
+pushd "${oc_mirror_dir}"
 new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 
 # combine custom registry credential and default pull secret
