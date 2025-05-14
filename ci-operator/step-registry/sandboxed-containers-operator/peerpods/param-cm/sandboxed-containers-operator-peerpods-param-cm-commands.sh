@@ -53,9 +53,18 @@ handle_azure() {
         AZURE_CLIENT_ID="$(from_azure_credentials azure_client_id)"
         AZURE_CLIENT_SECRET="$(from_azure_credentials azure_client_secret)"
         AZURE_TENANT_ID="$(from_azure_credentials azure_tenant_id)"
+        AZURE_AUTH_LOCATION="${PWD}/osServicePrincipal.json"
+        echo "{ \"clientId\": \"$AZURE_CLIENT_ID\", \"clientSecret\": \"$AZURE_CLIENT_SECRET\", \"tenantId\": \"$AZURE_TENANT_ID\" }" | \
+            jq > "${AZURE_AUTH_LOCATION}"
     fi
 
-    az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+    echo "****Login to Azure****"
+    az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
+    echo "****Login to Azure COMPLETE****"
+
+    echo "****Creating peerpods-param-secret with the keys needed for test case execution****"
+    oc create secret generic peerpods-param-secret --from-file="${AZURE_AUTH_LOCATION}" -n default
+    echo "****Creating peerpods-param-secret COMPLETE****"
 
     AZURE_VNET_NAME=$(az network vnet list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Name:name}" --output tsv)
     AZURE_SUBNET_NAME=$(az network vnet subnet list --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --query "[].{Id:name} | [? contains(Id, 'worker')]" --output tsv)
@@ -107,11 +116,6 @@ fi
       AZURE_REGION: "${PP_REGION}"
       PROXY_TIMEOUT: "30m"
 EOF
-
-    echo "****Creating peerpods-param-secret with the keys needed for test case execution****"
-    # TODO: create the secret
-    #oc create secret generic peerpods-param-secret --from-file=$AZURE_SECRET_FILE -n default
-    echo "****Creating peerpods-param-secret COMPLETE****"
 
     echo "AZURE_RESOURCE_GROUP: $PP_RESOURCE_GROUP"
     echo "AZURE_SUBNET_ID: $PP_SUBNET_ID"
