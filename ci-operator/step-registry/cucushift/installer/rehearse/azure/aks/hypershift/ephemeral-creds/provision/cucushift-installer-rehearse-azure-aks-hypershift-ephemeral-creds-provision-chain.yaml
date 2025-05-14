@@ -2,10 +2,9 @@ chain:
   as: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-provision
   steps:
   - chain: cucushift-installer-rehearse-azure-aks-provision
-  - ref: azure-provision-vault-key
+  - ref: hypershift-azure-aks-attach-kv
   - ref: azure-provision-vnet-hypershift
   - ref: azure-provision-resourcegroup
-  - ref: azure-provision-service-principal-hypershift
   - ref: cucushift-hypershift-extended-enable-qe-pull-secret-day-one
   - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
   - ref: cucushift-hypershift-extended-install-private
@@ -16,8 +15,6 @@ chain:
   env:
   - name: AKS_ADDONS
     default: "azure-keyvault-secrets-provider"
-  - name: AZURE_KEYVAULT_USE_AKS_RG
-    default: "true"
   - name: ENABLE_ICSP
     default: "true"
   - name: HYPERSHIFT_AZURE_CP_MI
@@ -46,6 +43,10 @@ chain:
     default: "ARO-HCP"
   - name: HYPERSHIFT_OPERATOR_PULL_SECRET
     default: "true"
+  - name: HYPERSHIFT_AZURE_FIPS
+    default: "true"
+  - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
+    default: "true"
   documentation: |-
     Creates an AKS management cluster and a public hosted cluster, with control plane components authenticated to Azure 
-    via managed identities.
+    via managed identities. It depends on some preserved azure resources.
