@@ -24,12 +24,6 @@ metadata:
   labels:
     dashboards: "grafana"
 spec:
-  client:
-    preferService: true
-  dataStorage:
-    accessModes:
-      - ReadWriteOnce
-    size: 10Gi
   route:
     spec:
       tls:
@@ -53,24 +47,13 @@ spec:
       enabled: "true"
       org_role: Viewer
   deployment:
-    strategy:
-      type: Recreate
-    envFrom:
-      - secretRef:
-          name: external-credentials
-      - configMapRef:
-          name: service-ca-certificate
+    spec:
+      strategy:
+        type: Recreate
   service:
-    name: "grafana"
-    labels:
-      app: "grafana"
-  resources:
-    limits:
-      cpu: 200m
-      memory: 200Mi
-    requests:
-      cpu: 100m
-      memory: 100Mi
+    metadata:
+      labels:
+        app: "grafana"
 ---
 apiVersion: v1
 kind: ConfigMap
