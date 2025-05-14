@@ -6,11 +6,18 @@
 # By default it's going to skip the rpm installation
 [[ "${INSTALL_KATA_RPM}" != "true" ]] && exit 0
 
-BREW_USER=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/BREW_USER)
-BREW_PASSWORD=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/BREW_PASSWORD)
+# Read from secrets
+KATA_RPM_BASE_URL=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/KATA_RPM_BASE_URL)
+
+arch=$(uname -m)
+ver=$(echo "$KATA_RPM_VERSION" | cut -d- -f1)
+build=$(echo "$KATA_RPM_VERSION" | cut -d- -f2)
+brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"
+
+KATA_RPM_BUILD_URL="${KATA_RPM_BASE_URL}/${ver}/${build}/${arch}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
 
 md5sum_file="${KATA_RPM_BUILD_MD5SUM}  kata-containers.rpm"
-curl -L -k -o kata-containers.rpm -u "${BREW_USER}:${BREW_PASSWORD}" "${KATA_RPM_BUILD_URL}"
+curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}"
 echo "${md5sum_file}" | md5sum -c -
 
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
