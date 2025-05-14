@@ -384,6 +384,14 @@ presubmits:
     name: pull-ci-openshift-gcp-pd-csi-driver-release-4.20-e2e-gcp-csi-techpreview-volumeattributesclass
     optional: true
     path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-storage'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-gcp-csi-techpreview-volumeattributesclass
     spec:
       containers:
@@ -536,7 +544,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest

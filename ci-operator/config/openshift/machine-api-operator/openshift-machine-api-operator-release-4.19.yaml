@@ -34,8 +34,7 @@ images:
   to: machine-api-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -76,7 +75,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-azure-ovn
   optional: true
@@ -87,7 +86,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -100,7 +99,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-azure-operator
   optional: true
@@ -256,7 +255,7 @@ tests:
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS: NonHyperShiftHOST
@@ -272,6 +271,12 @@ tests:
     env:
       PROJECT_NAME: machine-api-operator
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

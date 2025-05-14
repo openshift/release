@@ -65,6 +65,8 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.2xlarge
+      CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-aws-ipi
@@ -75,6 +77,8 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6gd.2xlarge
+      CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-netobserv-qe
@@ -601,6 +605,8 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_B8ms
+      CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-azure-ipi
@@ -772,6 +778,8 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.0.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.0.1.0/24
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -781,6 +789,8 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.0.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.0.1.0/24
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -792,6 +802,9 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -801,6 +814,9 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -838,6 +854,9 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.0.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -847,6 +866,9 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.0.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -1168,7 +1190,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
 - as: baremetal-compact-agent-ipv4-static-day2-amd-mixarch-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 53 13 12,26 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1187,7 +1210,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-day2
 - as: baremetal-sno-agent-ipv4-static-disc-day2-arm-mixarch-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 35 18 5,19 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1209,7 +1233,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-disconnected-day2
 - as: baremetal-ipi-ovn-ipv4-amd-f7
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 19 18 4,11,18,25 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1224,7 +1249,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
 - as: baremetal-ipi-ovn-ipv4-arm-f7
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 38 21 4,11,20,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1239,7 +1265,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
 - as: baremetal-ipi-ovn-ipv4-vmedia-amd-f7
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 4 18 6,15,22,29 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1253,7 +1280,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-ipi-ovn-dualstack-arm-vmedia-f7
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 55 19 7,14,21,28 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1269,7 +1297,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-ipi-ovn-ipv4-basecap-none-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 16 14 10 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1286,7 +1315,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
 - as: baremetal-ipi-ovn-ipv4-external-lb-arm-f7
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 2 16 1,8,15,22 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1301,7 +1331,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-external-lb
 - as: baremetal-ipi-ovn-ipv4-vmedia-disruptive-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 42 14 27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1319,7 +1350,8 @@ tests:
     - ref: openshift-extended-test-disruptive
     workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-upi-ovn-ipv4-arm-mixarch-f14-day2-64k-pagesize
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 20 16 9,25 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1341,7 +1373,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
 - as: baremetal-upi-ovn-ipv4-disconnected-arm-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 4 14 10,26 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1361,6 +1394,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: c2-standard-8
+      CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-gcp-ipi

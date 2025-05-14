@@ -32,13 +32,13 @@ build_root:
   image_stream_tag:
     name: builder-priv
     namespace: ocp-private
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.23-openshift-4.20
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
 
-    FROM registry.ci.openshift.org/ocp/4.19:tools
+    FROM this-is-ignored-and-not-used
     ENV ART_DNF_WRAPPER_POLICY=append
     COPY --from=netobservcli /oc-netobserv /usr/bin/
     RUN set -x && \
@@ -164,7 +164,8 @@ images:
   to: tests-private-newpr
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - tests-private-base
     - tests-private-baseui
     - tests-private
@@ -310,6 +311,8 @@ tests:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: debug-disasterrecovery-baremetal-upi
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: test/extended/disaster_recovery/
   steps:

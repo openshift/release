@@ -39,30 +39,6 @@ base_images:
     name: postgresql
     namespace: ci
     tag: postgresql-12-c8s
-  tests:
-    name: "4.19"
-    namespace: ocp
-    tag: tests
-  tests-4.14:
-    name: "4.14"
-    namespace: ocp
-    tag: tests
-  tests-4.15:
-    name: "4.15"
-    namespace: ocp
-    tag: tests
-  tests-4.16:
-    name: "4.16"
-    namespace: ocp
-    tag: tests
-  tests-4.17:
-    name: "4.17"
-    namespace: ocp
-    tag: tests
-  tests-4.18:
-    name: "4.18"
-    namespace: ocp
-    tag: tests
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -403,9 +379,10 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-ai-operator-ztp
+- always_run: false
+  as: e2e-ai-operator-ztp
   cluster: build05
-  run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -430,6 +407,7 @@ tests:
 - always_run: false
   as: e2e-ai-operator-ztp-3masters
   cluster: build05
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -504,9 +482,10 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-disconnected
+- always_run: false
+  as: e2e-ai-operator-ztp-disconnected
   cluster: build05
-  run_if_changed: ^(deploy/operator/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -707,9 +686,10 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
   timeout: 6h0m0s
-- as: e2e-ai-operator-ztp-capi
+- always_run: false
+  as: e2e-ai-operator-ztp-capi
   cluster: build05
-  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -738,9 +718,10 @@ tests:
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal-operator-capi
   timeout: 6h0m0s
-- as: e2e-ai-operator-disconnected-capi
+- always_run: false
+  as: e2e-ai-operator-disconnected-capi
   cluster: build05
-  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -891,9 +872,10 @@ tests:
         IPv4=yes
         OPENSHIFT_VERSION=4.19
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-none-4-19
+- always_run: false
+  as: e2e-metal-assisted-none-4-19
   cluster: build05
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -952,9 +934,10 @@ tests:
         WORKER_DISK=40000000000
         OPENSHIFT_VERSION=4.19
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-4-19
+- always_run: false
+  as: e2e-metal-assisted-4-19
   cluster: build05
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -978,8 +961,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
@@ -993,8 +974,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
@@ -1005,10 +984,9 @@ tests:
 - always_run: false
   as: e2e-metal-assisted-4-14
   cluster: build05
+  optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
@@ -1016,10 +994,9 @@ tests:
 - always_run: false
   as: e2e-metal-assisted-4-15
   cluster: build05
+  optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
@@ -1027,10 +1004,9 @@ tests:
 - always_run: false
   as: e2e-metal-assisted-4-16
   cluster: build05
+  optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.16
@@ -1038,17 +1014,17 @@ tests:
 - always_run: false
   as: e2e-metal-assisted-4-17
   cluster: build05
+  optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.17
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-lvm-4-19
+- always_run: false
+  as: e2e-metal-assisted-lvm-4-19
   cluster: build05
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  pipeline_run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1067,8 +1043,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=osc
@@ -1078,13 +1052,12 @@ tests:
         MASTER_CPU=10
         OPENSHIFT_VERSION=4.19
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-osc-4-19
+- always_run: false
+  as: e2e-metal-assisted-osc-4-19
   cluster: build05
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  pipeline_run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=osc
@@ -1187,8 +1160,9 @@ tests:
         DAY2_CPU_ARCHITECTURE=arm64
         OPENSHIFT_VERSION=4.19-multi
     workflow: assisted-equinix
-- as: e2e-vsphere-assisted-4-19
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
+- always_run: false
+  as: e2e-vsphere-assisted-4-19
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1211,9 +1185,10 @@ tests:
         OPENSHIFT_VERSION=4.19
       PLATFORM: vsphere
     workflow: assisted-vsphere
-- as: e2e-nutanix-assisted-4-19
+- always_run: false
+  as: e2e-nutanix-assisted-4-19
   cluster: build01
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: nutanix
     env:
@@ -1228,6 +1203,7 @@ tests:
 - always_run: false
   as: e2e-nutanix-assisted-2workers-4-19
   cluster: build01
+  optional: true
   steps:
     cluster_profile: nutanix
     env:
@@ -1259,9 +1235,10 @@ tests:
         OCI_COMPUTE_SHAPE="BM.Standard3.64"
         OCI_CONTROL_PLANE_SHAPE="BM.Standard3.64"
     workflow: assisted-oci
-- as: e2e-metal-assisted-external-4-19
+- always_run: false
+  as: e2e-metal-assisted-external-4-19
   cluster: build05
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1272,6 +1249,7 @@ tests:
 - always_run: false
   as: e2e-metal-assisted-5-control-planes-4-19
   cluster: build05
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1343,13 +1321,12 @@ tests:
         LOAD_BALANCER_TYPE=user-managed
       PLATFORM: vsphere
     workflow: assisted-vsphere-external-lb
-- as: e2e-metal-assisted-virtualization-4-18
+- always_run: false
+  as: e2e-metal-assisted-virtualization-4-18
   cluster: build05
-  run_if_changed: ^(internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/nodemaintenance/.*|internal/operators/kubedescheduler/.*|internal/operators/cnv|internal/operators/mtv/.*|internal/operators/nmstate/.*)$
+  pipeline_run_if_changed: ^(internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/nodemaintenance/.*|internal/operators/kubedescheduler/.*|internal/operators/cnv|internal/operators/mtv/.*|internal/operators/nmstate/.*)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
@@ -1362,13 +1339,12 @@ tests:
         WORKER_DISK_COUNT=2
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ai-nvidia-4-18
+- always_run: false
+  as: e2e-metal-assisted-ai-nvidia-4-18
   cluster: build05
-  run_if_changed: ^(internal/operators/authorino/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/nvidiagpu/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  pipeline_run_if_changed: ^(internal/operators/authorino/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/nvidiagpu/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
@@ -1376,13 +1352,12 @@ tests:
         NVIDIA_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ai-amd-4-18
+- always_run: false
+  as: e2e-metal-assisted-ai-amd-4-18
   cluster: build05
-  run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  pipeline_run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh

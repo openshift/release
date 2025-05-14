@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: v1.63.4
   ocp_4.19_cli:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: cli
   ocp_builder_rhel-8-golang-1.23-openshift-4.19:
@@ -36,17 +36,17 @@ images:
   to: kube-compare-artifacts
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -97,6 +97,12 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

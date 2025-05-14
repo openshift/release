@@ -2,9 +2,9 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -30,17 +30,17 @@ images:
   to: gcp-pd-csi-driver
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -98,21 +98,6 @@ tests:
       TEST_ARGS: --run=VolumeAttributesClass
       TEST_SUITE: all
     workflow: openshift-e2e-gcp-csi-custom-worker
-- as: periodic-e2e-gcp-csi-techpreview-volumeattributesclass
-  cron: '@daily'
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n4-standard-4
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --run=VolumeAttributesClass
-      TEST_SUITE: all
-    workflow: openshift-e2e-gcp-csi-custom-worker
-- as: nightly-verify-deps
-  cron: 0 */12 * * *
-  steps:
-    test:
-    - ref: go-verify-deps
 - as: verify-deps
   steps:
     test:

@@ -39,7 +39,6 @@ tests:
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
-      HUNTER_ANALYZE: "true"
       ITERATION_MULTIPLIER_ENV: "15"
       OUTPUT_FORMAT: JUNIT
       RUN_ORION: "true"
@@ -261,6 +260,33 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: aws-ovn-payload-node-density-heavy
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CLUSTER_NETWORK_CIDR: 10.128.0.0/14
+      CLUSTER_NETWORK_HOST_PREFIX: "20"
+      EXTRA_FLAGS: --pods-per-node=250 --pod-ready-threshold=85s
+      ITERATIONS_PER_NAMESPACE: "100"
+      MAX_PODS: "250"
+      PROFILE_TYPE: both
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-custom-cidr
+    - chain: ipi-install
+    - ref: openshift-qe-set-max-pods
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
 - as: control-plane-ipsec-120nodes
   cron: 0 10 11,25 * *
   steps:
