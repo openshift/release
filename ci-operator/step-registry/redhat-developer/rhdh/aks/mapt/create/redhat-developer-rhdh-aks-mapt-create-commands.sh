@@ -21,5 +21,4 @@ mapt azure aks create \
   --conn-details-output "${SHARED_DIR}" \
   --version 1.31 \
   --vmsize "Standard_A4_v2" \
-  --spot \
   --enable-app-routing
