@@ -169,3 +169,14 @@ spec:
 EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+
+echo "DELETEME: Trying to download virtctl binary from the cluster"
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    echo "Setting proxy"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+env
+oc get routes -n openshift-cnv -o yaml || true
+oc get services -n openshift-cnv -o yaml || true
+oc get consoleclidownloads virtctl-clidownloads-kubevirt-hyperconverged -o yaml || true
+curl -Lk $(oc get consoleclidownloads virtctl-clidownloads-kubevirt-hyperconverged -o json | jq -r '.spec.links[0].href') -o /tmp/virtctl
