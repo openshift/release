@@ -25,6 +25,8 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 
 set -x
 
+sleep 6h
+
 RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 
 CLUSTER_AUTOSCALER_ARGS=""
