@@ -78,36 +78,14 @@ registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
 oc registry login --to "${new_pull_secret}"
 
-# This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
-#if ! whoami &> /dev/null; then
-#    user_name=$(id -u)
-#else
-#    user_name=$(whoami)
-#fi
-#for file in /etc/subuid /etc/subgid; do
-#    if grep -q "$user_name" $file; then
-#        echo "$user_name is already set in $file"
-#    else
-#        last_line=$(tail -1 $file)
-#        if [[ -n "$last_line" ]]; then
-#            n=$(echo "$last_line" | awk -F: '{print $2}')
-#            m=$(echo "$last_line" | awk -F: '{print $3}')
-#            start_id=$((n + m))
-#        else
-#            echo "no any existing users in $file"
-#            start_id="100000"
-#        fi
-#        if [[ -w $file ]]; then
-#            echo "${user_name}:${start_id}:65536" >> $file
-#            echo "successfully updated $file"
-#        else
-#            echo "$file is not writeable, and user matching this uid is not found."
-#            exit 1
-#        fi
-#    fi
-#done
+workdir="${SHARED_DIR}/mirror_new"
+mkdir ${workdir}
+#$(oc adm release info $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE  -o=json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name') 
+cd ${workdir}
+oc image extract "registry.build06.ci.openshift.org/ci-ln-877z9fb/stable@sha256:e90596c1461f10206f4e7121c607ddaf23976765705837c346072a80635aa473" --path=/usr/bin/oc-mirror:.
+chmod +x ${workdir}/oc-mirror
 
-oc_mirror_bin="oc-mirror"
+oc_mirror_bin="$workdir/oc-mirror"
 run_command "which '${oc_mirror_bin}'"
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
@@ -130,7 +108,7 @@ cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
 unset REGISTRY_AUTH_PREFERENCE
 
 # execute the oc-mirror command
-run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --V2=true --workspace file://${oc_mirror_dir} --IgnoreReleaseSignature=true"
+run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir} --ignore-release-signature"
 
 # Save output from oc-mirror
 result_folder="${oc_mirror_dir}/working-dir"
