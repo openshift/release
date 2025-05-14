@@ -44,6 +44,7 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
         MC_CLUSTER_INFRA=$(oc --kubeconfig="${SHARED_DIR}/hs-mc.kubeconfig" get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
         if [[ $MC_CLUSTER_INFRA == "AWS" ]]; then
             export MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+            export ES_INDEX=ripsaw-kube-burner
         fi
     fi
 fi
