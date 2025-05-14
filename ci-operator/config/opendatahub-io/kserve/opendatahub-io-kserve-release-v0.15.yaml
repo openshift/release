@@ -1,0 +1,209 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/python-311:1
+
+      # Prow expects to be able to check out a repo under /go
+      USER 0:0
+      WORKDIR /go
+      RUN chown 1001:0 .
+
+      USER 1001:0
+
+      # The VENV that is activated by default conflicts with KServe
+      # scripts. These variables are set to empty to not activate any
+      # VENV by default.
+      ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
+images:
+- dockerfile_path: Dockerfile
+  from: ubi_minimal
+  to: kserve-controller
+- dockerfile_path: agent.Dockerfile
+  from: ubi_minimal
+  to: kserve-agent
+- context_dir: .
+  dockerfile_path: router.Dockerfile
+  to: kserve-router
+- context_dir: python/
+  dockerfile_path: storage-initializer.Dockerfile
+  to: kserve-storage-initializer
+- context_dir: python/
+  dockerfile_path: sklearn.Dockerfile
+  to: sklearn-serving-runtime
+- context_dir: python/
+  dockerfile_path: custom_transformer.Dockerfile
+  to: custom-transformer
+- context_dir: python/
+  dockerfile_path: custom_model_grpc.Dockerfile
+  to: custom-model-grpc
+promotion:
+  to:
+  - excluded_images:
+    - kserve-controller
+    - kserve-agent
+    - kserve-router
+    - kserve-storage-initializer
+    - sklearn-serving-runtime
+    - custom-transformer
+    - custom-model-grpc
+    namespace: opendatahub-io
+    tag: release-v0.15
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-predictor
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-predictor
+      cli: latest
+      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh predictor
+      dependencies:
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: SKLEARN_IMAGE
+        name: sklearn-serving-runtime
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: e2e-path-based-routing
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-path-based-routing
+      cli: latest
+      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh path_based_routing
+      dependencies:
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: SKLEARN_IMAGE
+        name: sklearn-serving-runtime
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: pr-image-mirror-kserve-agent
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-agent
+    env:
+      IMAGE_REPO: kserve-agent
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: pr-image-mirror-kserve-router
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-router
+    env:
+      IMAGE_REPO: kserve-router
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: pr-image-mirror-kserve-controller
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-controller
+    env:
+      IMAGE_REPO: kserve-controller
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: pr-image-mirror-kserve-storage-initializer
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-storage-initializer
+    env:
+      IMAGE_REPO: kserve-storage-initializer
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-agent
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-agent
+    env:
+      IMAGE_REPO: kserve-agent
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-router
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-router
+    env:
+      IMAGE_REPO: kserve-router
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-controller
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-controller
+    env:
+      IMAGE_REPO: kserve-controller
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-storage-initializer
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-storage-initializer
+    env:
+      IMAGE_REPO: kserve-storage-initializer
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: release-v0.15
+  org: opendatahub-io
+  repo: kserve
