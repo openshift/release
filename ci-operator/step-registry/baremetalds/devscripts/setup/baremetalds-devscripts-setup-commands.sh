@@ -164,10 +164,14 @@ if [ -e "$CIRFILE" ] ; then
     fi
 fi
 
+set -xeu
+set -o pipefail
 # Additional mechanism to inject dev-scripts additional variables directly
 # from a multistage step configuration.
 # Backward compatible with the previous approach based on creating the
 # dev-scripts-additional-config file from a multistage step command
+echo "set additional variables from DEVSCRIPTS_CONFIG"
+echo "${DEVSCRIPTS_CONFIG:-}"
 if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
   readarray -t config <<< "${DEVSCRIPTS_CONFIG}"
   for var in "${config[@]}"; do
@@ -176,6 +180,8 @@ if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
     fi
   done
 fi
+set +xeu
+set +o pipefail
 
 # We always want to collect an installer log bundle for bootstrap,
 # even on success
