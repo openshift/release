@@ -130,7 +130,7 @@ cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
 unset REGISTRY_AUTH_PREFERENCE
 
 # execute the oc-mirror command
-run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
+run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --V2=true --workspace file://${oc_mirror_dir} --IgnoreReleaseSignature=true"
 
 # Save output from oc-mirror
 result_folder="${oc_mirror_dir}/working-dir"
