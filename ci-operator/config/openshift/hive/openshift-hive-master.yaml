@@ -243,6 +243,26 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-vsphere
+- as: e2e-nutanix
+  run_if_changed: nutanix
+  steps:
+    cluster_profile: nutanix
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        source $SHARED_DIR/nutanix_context.sh
+        GO_COMPLIANCE_INFO=0 CLOUD=nutanix make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-nutanix
 zz_generated_metadata:
   branch: master
   org: openshift
