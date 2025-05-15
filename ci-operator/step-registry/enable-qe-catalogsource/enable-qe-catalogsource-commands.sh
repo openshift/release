@@ -94,7 +94,7 @@ function update_global_auth () {
 
 # create ICSP for connected env.
 function create_icsp_connected () {
-    cat <<EOF | oc create -f -
+    cat <<EOF | oc apply -f -
     apiVersion: operator.openshift.io/v1alpha1
     kind: ImageContentSourcePolicy
     metadata:
