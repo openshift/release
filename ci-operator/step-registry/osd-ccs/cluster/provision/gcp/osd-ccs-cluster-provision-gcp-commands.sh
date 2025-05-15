@@ -149,6 +149,19 @@ OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 logger "INFO" "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
+#Only for test
+make -h
+ocmTempDir=$(mktemp -d)
+cd $ocmTempDir
+wget https://gitlab.cee.redhat.com/service/ocm-backend-tests/-/archive/master/ocm-backend-tests-master.tar.gz --no-check-certificate
+tar -zxf ocm-backend-tests-master.tar.gz
+cd ocm-backend-tests-master/
+make cmds
+chmod +x ./testcmd/*
+cp ./testcmd/* $ocmTempDir/
+export PATH=$ocmTempDir:$PATH
+ocmqe -h
+
 # Check whether the cluster with the same cluster name existes.
 OLD_CLUSTER_ID=$(ocm list clusters --columns=id --parameter search="name is '${CLUSTER_NAME}'" | tail -n 1)
 if [[ "$OLD_CLUSTER_ID" != ID* ]]; then
