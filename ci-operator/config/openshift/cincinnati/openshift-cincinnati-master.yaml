@@ -7,10 +7,7 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-binary_build_commands: |
-  cargo build --release
-  mkdir -p /go/bin/
-  cp target/release/graph-builder target/release/policy-engine target/release/metadata-helper /go/bin/
+binary_build_commands: bin_folder="/go/bin" just build --release
 build_root:
   image_stream_tag:
     name: rust
@@ -24,10 +21,11 @@ images:
     RUN dnf update -y \
         && dnf install -y git gcc openssl-devel \
         && dnf clean all \
-        && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+        && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /root/.cargo/bin
     COPY . /root/cincinnati/
     WORKDIR /root/cincinnati
-    RUN cargo build --release
+    RUN just build --release
   from: ubi
   to: rustup-build
 - dockerfile_literal: |
@@ -48,6 +46,7 @@ images:
     COPY --from=pipeline:test-bin /opt/cincinnati/bin/e2e /usr/bin/cincinnati-e2e-test
     COPY --from=pipeline:test-bin /opt/cincinnati/bin/prometheus_query /usr/bin/cincinnati-prometheus_query-test
     COPY --from=pipeline:test-bin /opt/cincinnati/bin/slo /usr/bin/cincinnati-e2e-slo
+    COPY Justfile Justfile
     COPY hack/e2e.sh hack/vegeta.targets hack/
     COPY dist/openshift/cincinnati-deployment.yaml \
          dist/openshift/cincinnati-e2e.yaml \
@@ -79,14 +78,14 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-test_binary_build_commands: hack/build_e2e.sh
+test_binary_build_commands: just build_e2e
 tests:
 - as: cargo-test
   steps:
     pre:
     - as: prepare-credentials
       commands: |
-        env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_CI_PUBLIC_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE}" dist/prepare_ci_credentials.sh
+        env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_CI_PUBLIC_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE}" just prepare_ci_credentials
       credentials:
       - mount_path: /usr/local/ci-secrets/cincy-credentials
         name: cincy-credentials
@@ -116,7 +115,7 @@ tests:
     test:
     - as: cargo-test
       commands: |
-        env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_TEST_CREDENTIALS_PATH="${SHARED_DIR}/${CINCINNATI_TEST_CREDENTIALS_FILE}" dist/cargo_test.sh
+        env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_TEST_CREDENTIALS_PATH="${SHARED_DIR}/${CINCINNATI_TEST_CREDENTIALS_FILE}" just cargo_test
       credentials:
       - mount_path: /usr/local/ci-secrets/cincy-credentials
         name: cincy-credentials
@@ -136,7 +135,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: yaml-lint
-  commands: dist/prow_yaml_lint.sh
+  commands: just yamllint
   container:
     from: src
 - as: rustfmt
@@ -154,7 +153,7 @@ tests:
   steps:
     test:
     - as: openshift-e2e-test
-      commands: bash ./hack/e2e.sh
+      commands: just run_e2e
       dependencies:
       - env: CINCINNATI_IMAGE
         name: deploy
