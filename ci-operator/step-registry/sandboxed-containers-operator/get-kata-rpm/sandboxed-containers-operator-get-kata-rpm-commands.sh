@@ -6,6 +6,8 @@
 # By default it's going to skip the rpm installation
 [[ "${INSTALL_KATA_RPM}" != "true" ]] && exit 0
 
+cd /tmp || exit 1
+
 # Read from secrets
 KATA_RPM_BASE_URL=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/KATA_RPM_BASE_URL)
 
