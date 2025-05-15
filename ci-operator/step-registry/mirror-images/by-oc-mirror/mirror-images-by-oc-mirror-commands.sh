@@ -82,7 +82,7 @@ workdir="${SHARED_DIR}/mirror_new"
 mkdir ${workdir}
 #$(oc adm release info $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE  -o=json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name') 
 cd ${workdir}
-oc image extract "registry.build06.ci.openshift.org/ci-ln-877z9fb/stable@sha256:e90596c1461f10206f4e7121c607ddaf23976765705837c346072a80635aa473" --path=/usr/bin/oc-mirror:.
+oc image extract "registry.build06.ci.openshift.org/ci-ln-3xs31i2/stable@sha256:2b9977a69332a80ef24a65a4f985030f79b03baf01b80669de5e19eaac25abba" --path=/usr/bin/oc-mirror:.
 chmod +x ${workdir}/oc-mirror
 
 oc_mirror_bin="$workdir/oc-mirror"
