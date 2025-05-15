@@ -48,5 +48,16 @@ spec:
   calicoNetwork:
     nodeAddressAutodetectionV4:
       kubernetes: NodeInternalIP
-    mtu: 1480
+    mtu: 1440
+EOF
+
+cat > "${SHARED_DIR}/manifest_01-cr-felix.yaml" << EOF
+apiVersion: projectcalico.org/v3
+kind: FelixConfiguration
+metadata:
+  name: default
+spec:
+  ipv6Support: false
+  ipipMTU: 1440
+  chainInsertMode: Append
 EOF
