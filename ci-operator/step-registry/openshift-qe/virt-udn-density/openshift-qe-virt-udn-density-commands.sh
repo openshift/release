@@ -30,8 +30,7 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 ES_SERVER="" EXTRA_FLAGS="--layer3=${ENABLE_L3} --iteration=${current_worker_count}" CHURN=false ./run.sh
 
 # The measurable run
-ITERATIONS=$((current_worker_count * ITERATIONS_PER_NODE))
-EXTRA_FLAGS="--gc-metrics=true --iteration=$ITERATIONS --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD} --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS="--gc-metrics=true --iteration=${ITERATIONS} --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD} --profile-type=${PROFILE_TYPE}"
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
@@ -45,7 +44,7 @@ rm -f ${SHARED_DIR}/index.json
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+jq ".iterations = ${ITERATIONS}" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
