@@ -47,6 +47,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.19"
+  tests-private-burner:
+    name: tests-private-burner
+    namespace: ci
+    tag: "4.19"
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -324,6 +328,22 @@ tests:
     test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f14-stress-olm
+  cron: 34 22 1,15 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: gcp-ipi-f14-stress-olm
+  cron: 26 16 9,23 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: aws-ipi-tp-ocl-f7
   cron: 19 21 4,11,18,27 * *
   steps:
@@ -2290,6 +2310,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-sno-agent-dualstack-dynamic-f14-stress-olm
+  capabilities:
+  - intranet
+  cron: 53 15 10,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "true"
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress
+    workflow: baremetal-lab-agent-install-network-dynamic
 - as: baremetal-ha-agent-dualstack-dynamic-fips-f14
   capabilities:
   - intranet
