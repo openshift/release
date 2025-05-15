@@ -1,0 +1,60 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  kiali-cypress-tests-runner:
+    name: kiali-cypress-tests
+    namespace: ci
+    tag: v2.4
+  kiali-int-tests-runner:
+    name: kiali-int-tests
+    namespace: ci
+    tag: v2.4
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: servicemesh-interop-aws
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","servicemesh-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mkralik@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Sail","QE"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator3", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
+        ]
+      USER_TAGS: |
+        scenario servicemesh
+    test:
+    - ref: install-operators
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: release-3.0
+  org: openshift-service-mesh
+  repo: sail-operator
+  variant: ocp-4.19-lp-interop
