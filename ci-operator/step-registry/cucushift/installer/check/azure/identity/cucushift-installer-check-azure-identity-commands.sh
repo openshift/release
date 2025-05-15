@@ -4,11 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=101
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
+
 function check_vm_identity()
 {
 
-    local node_type=$1 expected_identity=$2 nodes_list ret=0
-    nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/${node_type} -o json | jq -r '.items[].metadata.name')
+    local node_type=$1 expected_identity=$2 node_filter=${3:-} nodes_list ret=0
+    nodes_list=$(oc get nodes --selector ${node_filter}node-role.kubernetes.io/${node_type} -o json | jq -r '.items[].metadata.name')
     expected_identity=${expected_identity//resourcegroups/resourceGroups}
     if [[ ${node_type} == "worker" ]]; then
         expected_identity=$(echo ${expected_identity} | awk '{print $1}')
@@ -161,8 +169,14 @@ fi
 
 # Check that specified identity should be attached on each node
 echo "-------------Check that identity is attached on each node-------------"
-check_vm_identity "master" "${control_plane_identity_id}" || check_result=1
-check_vm_identity "worker" "${compute_identity_id}" || check_result=1
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+node_filter=""
+if (( ${ocp_minor_version} < 19 )); then
+    # No rhel worker is provisioned on 4.19+
+    node_filter="node.openshift.io/os_id=rhcos,"
+fi
+check_vm_identity "master" "${control_plane_identity_id}" "${node_filter}" || check_result=1
+check_vm_identity "worker" "${compute_identity_id}" "${node_filter}" || check_result=1
 
 #Currently, only one identity is attached to work nodes and configured in object machine/machineset/controlplanmachineset in cluster
 control_plane_identity_id=$(echo "${control_plane_identity_id}" | awk '{print $1}')
