@@ -39,6 +39,16 @@ new_pull_secret="${SHARED_DIR}/new_pull_secret"
 install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
 cluster_mirror_conf_file="${SHARED_DIR}/local_registry_mirror_file.yaml"
 
+RELEASE_IMAGE_INTERMEDIATE1="registry.ci.openshift.org/ocp/release:4.16.0-0.nightly-2025-04-17-181855"
+RELEASE_IMAGE_INTERMEDIATE2="registry.ci.openshift.org/ocp/release:4.17.0-0.nightly-2025-04-26-033346"
+RELEASE_IMAGE_INTERMEDIATE3="registry.ci.openshift.org/ocp/release:4.18.0-0.nightly-2025-04-26-080749"
+RELEASE_IMAGE_TARGET="registry.ci.openshift.org/ocp/release:4.19.0-0.nightly-2025-04-24-005837"
+
+echo "${RELEASE_IMAGE_INTERMEDIATE1},${RELEASE_IMAGE_INTERMEDIATE2},${RELEASE_IMAGE_INTERMEDIATE3},${RELEASE_IMAGE_TARGET}" | tee ${SHARED_DIR}/upgrade-edge
+
+echo "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE},${RELEASE_IMAGE_INTERMEDIATE1},${RELEASE_IMAGE_INTERMEDIATE2},${RELEASE_IMAGE_INTERMEDIATE3},${RELEASE_IMAGE_TARGET}" | tee ${SHARED_DIR}/mirror-list
+
+
 # private mirror registry host
 # <public_dns>:<port>
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
@@ -55,28 +65,32 @@ fi
 
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+#echo "Extract the latest oc  client... ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+#oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+#   --command=oc --to=/tmp --insecure=true
+
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
 unset KUBECONFIG
-oc registry login
+oc  registry login
 
-readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
-echo "readable_version: $readable_version"
+#readable_version=$(oc  adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
+#echo "readable_version: $readable_version"
 
 # target release
-target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
-target_release_image_repo="${target_release_image%:*}"
-target_release_image_repo="${target_release_image_repo%@sha256*}"
+#target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
+#target_release_image_repo="${target_release_image%:*}"
+#target_release_image_repo="${target_release_image_repo%@sha256*}"
 # ensure mirror release image by tag name, refer to https://github.com/openshift/oc/pull/1331
-target_release_image="${target_release_image_repo}:${readable_version}"
+#target_release_image="${target_release_image_repo}:${readable_version}"
 
-echo "target_release_image: $target_release_image"
-echo "target_release_image_repo: $target_release_image_repo"
+#echo "target_release_image: $target_release_image"
+#echo "target_release_image_repo: $target_release_image_repo"
 
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
-oc registry login --to "${new_pull_secret}"
+oc  registry login --to "${new_pull_secret}"
 
 mirror_crd_type='icsp'
 regex_keyword_1="imageContentSources"
@@ -85,31 +99,13 @@ if [[ "${ENABLE_IDMS}" == "yes" ]]; then
     regex_keyword_1="imageDigestSources"
 fi
 
-# set the release mirror args
-args=(
-    --from="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-    --to-release-image="${target_release_image}"
-    --to="${target_release_image_repo}"
-    --insecure=true
-)
+
+
 
 run_command "which oc"
-run_command "oc version --client"
+run_command "oc  version --client"
 
-# check whether the oc command supports extra options and add them to the args array.
-if oc adm release mirror -h | grep -q -- --keep-manifest-list; then
-    echo "Adding --keep-manifest-list to the mirror command."
-    args+=(--keep-manifest-list=true)
-else
-    echo "This version of oc does not support --keep-manifest-list, skip it."
-fi
 
-if oc adm release mirror -h | grep -q -- --print-mirror-instructions; then
-    echo "Adding --print-mirror-instructions to the mirror command."
-    args+=(--print-mirror-instructions="${mirror_crd_type}")
-else
-    echo "This version of oc does not support --print-mirror-instructions=, skip it."
-fi
 
 # For disconnected or otherwise unreachable mirrors, we want to
 # have steps use an HTTP(S) proxy to reach the mirror. This proxy
@@ -122,15 +118,49 @@ then
         source "${SHARED_DIR}/mirror-proxy-conf.sh"
 fi
 
-# execute the mirror command
-cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} | tee '${mirror_output}'"
-run_command "$cmd"
+release_string="$(< "${SHARED_DIR}/mirror-list")"
+# shellcheck disable=SC2207
+TARGET_RELEASES=($(echo "$release_string" | tr ',' ' '))
+echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 
-line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
-install_end_line_num=$(expr ${line_num} - 3) &&
-upgrade_start_line_num=$(expr ${line_num} + 2) &&
-sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" > "${install_config_mirror_patch}"
-sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_conf_file}"
+for target in "${TARGET_RELEASES[@]}"; do
 
-run_command "cat '${install_config_mirror_patch}'"
+    readable_version=$(oc adm release info "${target}" -o jsonpath='{.metadata.version}' -a "${new_pull_secret}")
+    echo "readable_version: $readable_version"
+
+    # target release
+    target_release_image="${MIRROR_REGISTRY_HOST}/${target#*/}"
+    target_release_image_repo="${target_release_image%:*}"
+    target_release_image_repo="${target_release_image_repo%@sha256*}"
+    # ensure mirror release image by tag name, refer to https://github.com/openshift/oc/pull/1331
+    target_release_image="${target_release_image_repo}:${readable_version}"
+
+    echo "target_release_image: $target_release_image"
+    echo "target_release_image_repo: $target_release_image_repo"
+
+    # set the release mirror args
+    args=(
+        --from="${target}"
+        --to-release-image="${target_release_image}"
+        --to="${target_release_image_repo}"
+        --insecure=true
+        --keep-manifest-list=true
+        --print-mirror-instructions="${mirror_crd_type}"
+    )
+
+    # execute the mirror command
+    cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} --max-per-registry=10 | tee '${mirror_output}'"
+    run_command "$cmd"
+
+    line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
+    install_end_line_num=$(expr ${line_num} - 3) &&
+    upgrade_start_line_num=$(expr ${line_num} + 2) &&
+    sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" >> "${install_config_mirror_patch}"
+    sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" >> "${cluster_mirror_conf_file}"
+
+    run_command "cat '${install_config_mirror_patch}'"
+
+done
+
+
 rm -f "${new_pull_secret}"
