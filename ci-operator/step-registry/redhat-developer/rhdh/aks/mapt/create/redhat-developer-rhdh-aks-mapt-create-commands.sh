@@ -20,6 +20,6 @@ mapt azure aks create \
   --backed-url "azblob://${AZURE_STORAGE_BLOB}/aks-${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
   --version 1.31 \
-  --vmsize "Standard_D4s_v3" \
+  --vmsize "Standard_D4as_v4" \
   --spot \
   --enable-app-routing
