@@ -79,13 +79,10 @@ all:
       ansible_user: kni
       ansible_ssh_common_args: '-i "${SSH_KEY}" ${SSHOPTS[*]} -o ProxyCommand="ssh -W %h:%p ${SSHOPTS[*]} -i "${SSH_KEY}" -q ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}"'
       artifacts_dir: "${ARTIFACT_DIR}"
-  children:
-    infra:
-      hosts:
-        tb2slcm1:
-          ansible_host: ${TB2SLCM1}
-          ansible_user: kni
-          ansible_ssh_common_args: '-i "${SSH_KEY}" ${SSHOPTS[*]} -o ProxyCommand="ssh -W %h:%p ${SSHOPTS[*]} -i "${SSH_KEY}" -q ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}"'
+    tb2slcm1:
+      ansible_host: ${TB2SLCM1}
+      ansible_user: kni
+      ansible_ssh_common_args: '-i "${SSH_KEY}" ${SSHOPTS[*]} -o ProxyCommand="ssh -W %h:%p ${SSHOPTS[*]} -i "${SSH_KEY}" -q ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}"'
 END_INVENTORY
 
 ## VARs
