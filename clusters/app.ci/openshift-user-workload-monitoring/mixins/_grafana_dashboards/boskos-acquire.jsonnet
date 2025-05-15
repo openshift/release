@@ -85,9 +85,9 @@ dashboard.new(
         legend_sort='avg',
         legend_sortDesc=true,
     ) + legendConfig)
-    .addTarget(histogramQuantileDuration('0.99','{path=~"${type}", status=~"${state}", dest=~="${dest}", has_request_id=~"${has_request_id}"}'))
-    .addTarget(histogramQuantileDuration('0.95','{path=~"${type}", status=~"${state}", dest=~="${dest}", has_request_id=~"${has_request_id}"}'))
-    .addTarget(histogramQuantileDuration('0.5','{path=~"${type}", status=~"${state}", dest=~="${dest}", has_request_id=~"${has_request_id}"}')), gridPos={
+    .addTarget(histogramQuantileDuration('0.99','{path=~"${type}", status=~"${state}", dest=~"${dest}", has_request_id=~"${has_request_id}"}'))
+    .addTarget(histogramQuantileDuration('0.95','{path=~"${type}", status=~"${state}", dest=~"${dest}", has_request_id=~"${has_request_id}"}'))
+    .addTarget(histogramQuantileDuration('0.5','{path=~"${type}", status=~"${state}", dest=~"${dest}", has_request_id=~"${has_request_id}"}')), gridPos={
     h: 9,
     w: 24,
     x: 0,
@@ -104,7 +104,7 @@ dashboard.new(
         legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-       'sum(rate(boskos_acquire_duration_seconds_count{path=~"${type}", status=~"${state}", dest=~="${dest}", has_request_id=~"${has_request_id}"}[${range}])) by (type, state) >0',
+       'sum(rate(boskos_acquire_duration_seconds_count{path=~"${type}", status=~"${state}", dest=~"${dest}", has_request_id=~"${has_request_id}"}[${range}])) by (type, state) >0',
        legendFormat='{{type}} {{state}}'
     )), gridPos={
     h: 9,
