@@ -19,6 +19,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -96,6 +100,19 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+- as: installer-rehearse-debug-vsphere
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      LB_TYPE: UserManaged
+      SLEEP_DURATION: 24h
+      VSPHERE_MULTI_NETWORKS: "true"
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-vsphere-ipi-external-lb-pre-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb-provision
 zz_generated_metadata:
   branch: main
   org: openshift
