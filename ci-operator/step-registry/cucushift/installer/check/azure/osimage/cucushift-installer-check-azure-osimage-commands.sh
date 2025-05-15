@@ -98,7 +98,13 @@ worker_generation=$(az vm image show --urn ${worker_image_urn} --query hyperVGen
 critical_check_result=0
 
 echo "---------- Check worker nodes urn and hyperV generation ----------"
-worker_nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/worker -o json | jq -r '.items[].metadata.name')
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+node_filter=""
+if (( ${ocp_minor_version} < 19 )); then
+    # No rhel worker is provisioned on 4.19+
+    node_filter="node.openshift.io/os_id=rhcos,"
+fi
+worker_nodes_list=$(oc get nodes --selector ${node_filter}node-role.kubernetes.io/worker -o json | jq -r '.items[].metadata.name')
 for node in ${worker_nodes_list}; do
     echo "check worker node: ${node}"
     vm_urn_check "${node}" "${worker_image_urn,,}" "${RESOURCE_GROUP}" || critical_check_result=1
@@ -110,7 +116,7 @@ if [[ -f "${SHARED_DIR}/azure_marketplace_image_urn_master" ]]; then
     master_generation=$(az vm image show --urn ${master_image_urn} --query hyperVGeneration -otsv)
 
     echo "---------- Check master nodes urn and hyperV generation ---------"
-    master_nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/master -o json | jq -r '.items[].metadata.name')
+    master_nodes_list=$(oc get nodes --selector node-role.kubernetes.io/master -o json | jq -r '.items[].metadata.name')
     for node in ${master_nodes_list}; do
         echo "check master node: ${node}"
         vm_urn_check "${node}" "${master_image_urn,,}" "${RESOURCE_GROUP}" || critical_check_result=1

@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  yamllint:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: boot-root-1.79.0
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-version-operator
@@ -172,6 +176,12 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: verify-yaml
+  commands: make verify-yaml
+  container:
+    clone: true
+    from: yamllint
+  run_if_changed: (\.yaml|\.yml)$
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv
