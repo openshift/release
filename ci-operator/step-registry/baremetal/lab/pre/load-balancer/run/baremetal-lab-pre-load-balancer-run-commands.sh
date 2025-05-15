@@ -78,7 +78,7 @@ for dev in "${devices[@]}"; do
   bridge=${dev##*.}
   # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
   # eth2 will only get local routes configuration
-  ovs-docker.sh add-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME"
+  ovs-docker.sh add-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME" --mtu=1400
   nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
     /sbin/dhclient -v \
     -pf "/var/run/dhclient.$interface.pid" \

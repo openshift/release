@@ -99,8 +99,13 @@ storage:
           id=${baremetal_iface}
           type=ethernet
           interface-name=${baremetal_iface}
+
+          [ethernet]
+          mtu=1400
+
           [ipv4]
           method=disabled
+
           [ipv6]
           address1=${ipv6}/64,fd99:2222:3456::1
           dns=fd99:2222:3456::1;
