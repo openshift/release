@@ -30,45 +30,47 @@ releases:
       channel: candidate
       version: "4.19"
 resources:
-  "*":
+  '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-  - as: installer-rehearse-debug
-    cron: "@yearly"
-    steps:
-      cluster_profile: azure-qe
-      env:
-        BASE_DOMAIN: qe.azure.devcluster.openshift.com
-        COMPUTE_NODE_REPLICAS: "2"
-        CUSTOM_AZURE_REGION: eastus
-        E2E_RUN_TAGS: "39499"
-        SLEEP_DURATION: 8h
-        SPOT_INSTANCES: "false"
-        TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-        TEST_SCENARIOS: kata
-        TEST_TIMEOUT: "75"
-      post:
-        - ref: cucushift-installer-wait
-        - chain: cucushift-installer-rehearse-azure-ipi-deprovision
-      pre:
-        - chain: cucushift-installer-rehearse-azure-ipi-generation-provision
-      test:
-        - chain: openshift-e2e-test-qe
-  - as: azure-ipi-kata
-    cron: "@yearly"
-    steps:
-      cluster_profile: azure-qe
-      env:
-        BASE_DOMAIN: qe.azure.devcluster.openshift.com
-        E2E_RUN_TAGS: "39499"
-        TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-        TEST_SCENARIOS: kata
-        TEST_TIMEOUT: "75"
-      test:
-        - chain: openshift-e2e-test-qe
-      workflow: cucushift-installer-rehearse-azure-ipi
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      E2E_RUN_TAGS: "39499"
+      SLEEP_DURATION: 8h
+      SPOT_INSTANCES: "false"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: kata
+      TEST_TIMEOUT: "75"
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: ipi-azure-pre
+    - ref: sandboxed-containers-operator-peerpods-param-cm
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-azure-vm-generation
+    test:
+    - chain: openshift-e2e-test-qe
+- as: azure-ipi-kata
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: "39499"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: kata
+      TEST_TIMEOUT: "75"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: tpb
   org: kata-containers
