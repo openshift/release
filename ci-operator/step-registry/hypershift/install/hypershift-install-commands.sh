@@ -77,6 +77,9 @@ if [ "${AKS}" == "true" ]; then
   oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
 fi
 
+# Wait for the resources of Azure k8s to be ready
+sleep 2m
+
 if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --enable-conversion-webhook=false \
