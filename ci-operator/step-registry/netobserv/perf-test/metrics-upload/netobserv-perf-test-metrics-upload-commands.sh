@@ -12,7 +12,6 @@ set -x
 
 export ES_PASSWORD
 export ES_USERNAME
-export GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
 export EMAIL_ID_FOR_RESULTS_SHEET="openshift-netobserv-team@redhat.com"
 NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/$WORKLOAD-index_data.json")
 export NOO_BUNDLE_VERSION=${NOO_BUNDLE_VERSION//\"/}
@@ -90,11 +89,44 @@ function generate_metrics_sheet(){
     cp "/tmp/$WORKLOAD-$UUID/$UUID.csv" "$ARTIFACT_DIR/${UUID}_metrics.csv"
 }
 
-function update_sheet(){
+function generate_sheet(){
+    csvFilepath=$1
+    ops=$2
     cd /scripts/sheets || exit
     enable_venv
+    export GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
     install_requirements requirements.txt
-    python noo_perfsheets_update.py --sheet-id "$1" --uuid1 "$UUID" --uuid2 "$BASELINE_UUID" --service-account "$GSHEET_KEY_LOCATION"
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    # JOB_NAME, JOB_NAME_SAFE, PULL_NUMBER vars are set by prow.
+
+    # check if JOB_PREFIX is a rehearsal of periodic job.
+    if [[ $JOB_NAME =~ ^"rehearse" ]]; then
+        # capture "rehearsal-pr#" from periodic or pull-ci rehearsal 
+        # check if rehearsal is for periodic job
+        JOB_PREFIX=${JOB_NAME%-periodic*}
+        # check if the rehearsal is for pull request job
+        if [[ $JOB_PREFIX == "$JOB_NAME" ]]; then
+            JOB_PREFIX=${JOB_NAME%-pull*}
+        fi
+        
+        SHEET_NAME="$JOB_NAME_SAFE-$JOB_PREFIX-$timestamp"
+    fi
+
+    # check if the job starts from PR of component test
+    if [[ $JOB_NAME =~ ^"pull" ]]; then
+        SHEET_NAME="$JOB_NAME_SAFE-pull-$PULL_NUMBER-$timestamp"
+    fi
+
+    if [[ $JOB_NAME =~ ^"periodic" ]]; then
+        SHEET_NAME="periodic-$JOB_NAME_SAFE-$timestamp"
+    fi
+    
+    if [[ -n $ops && $ops == "comparison" ]]; then
+        python noo_perfsheets_update.py --service-account "$GSHEET_KEY_LOCATION" --name "$SHEET_NAME" --csv-file "$csvFilepath" --comparison
+    else
+        SHEET_NAME+="-metrics"
+        python noo_perfsheets_update.py --service-account "$GSHEET_KEY_LOCATION" --name "$SHEET_NAME" --csv-file "$csvFilepath"
+    fi
 }
 
 function do_comparison(){
@@ -105,16 +137,13 @@ function do_comparison(){
     export COMPARISON_CONFIG="netobserv_touchstone_tolerancy_config.json"
     export ES_SERVER_BASELINE="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
     export GEN_CSV=true
+    # unset the var before so gsheets are not duplicated
+    unset GSHEET_KEY_LOCATION
     cd e2e-benchmarking/utils && source compare.sh
-    COMP_LOG="$ARTIFACT_DIR/benchmark_comp.log"
-    run_benchmark_comparison > "$COMP_LOG"
+    run_benchmark_comparison
     comp_rc=$?
     cp "/tmp/$WORKLOAD-$UUID/$UUID.csv" "$ARTIFACT_DIR/${UUID}_comparison.csv"
-    # get the SHEET ID from the benchmark_comparison run logs
-    if [[ -f $COMP_LOG ]]; then
-        COMP_SHEET_ID=$(grep Google "$COMP_LOG" | awk -F'/' '{print $NF}' | awk '{print $1}')
-        update_sheet "$COMP_SHEET_ID"
-    fi
+    generate_sheet "$ARTIFACT_DIR/${UUID}_comparison.csv" "comparison"
     echo $comp_rc
 }
 
@@ -125,6 +154,7 @@ if [[ $upload_metrics_rc -gt 0 ]]; then
 fi
 
 generate_metrics_sheet
+generate_sheet "$ARTIFACT_DIR/${UUID}_metrics.csv"
 get_baseline
 
 if [[ -n $BASELINE_UUID ]]; then
