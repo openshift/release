@@ -29,18 +29,18 @@ create_icsp_connected() {
 	}
 
 	cat <<EOF | oc apply -f - || {
-  apiVersion: operator.openshift.io/v1alpha1
-  kind: ImageContentSourcePolicy
-  metadata:
-    name: $ICSP_NAME
-  spec:
-	repositoryDigestMirrors:
-	- mirrors:
-		- quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle
-		source: registry.redhat.io/compliance/openshift-file-integrity-operator-bundle
-	- mirrors:
-		- quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator
-		source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: $ICSP_NAME
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle
+    source: registry.redhat.io/compliance/openshift-file-integrity-operator-bundle
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator
+    source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
 EOF
 		echo "!!! fail to create the ICSP"
 		return 1
