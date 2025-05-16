@@ -20,6 +20,12 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
   latest:
     candidate:
       product: ocp
@@ -27,7 +33,7 @@ releases:
       version: "4.18"
   multi-latest:
     candidate:
-      architecture: arm64
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.18"
@@ -68,12 +74,14 @@ tests:
   steps:
     cluster_profile: gcp-qe
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     dependency_overrides:
       OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
     env:
       CREDENTIALS_MODE: Passthrough
-      SLEEP_DURATION: 30m
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-wki1r02/release:latest
+      OCP_ARCH: arm64
+      SLEEP_DURATION: 2h
     post:
     - ref: cucushift-installer-wait
     - ref: storage-destroy-csi-gcp-filestore
