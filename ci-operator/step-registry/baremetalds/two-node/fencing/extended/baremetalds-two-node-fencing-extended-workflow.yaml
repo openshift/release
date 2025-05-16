@@ -1,0 +1,24 @@
+workflow:
+  as: baremetalds-two-node-fencing-extended
+  steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-ocp-metal
+    pre:
+      - chain: baremetalds-ofcir-pre
+    test:
+      - ref: openshift-extended-test
+    post:
+      - chain: baremetalds-ofcir-post
+    env:
+      CLUSTERTYPE: baremetal
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="DevPreviewNoUpgrade"
+      TEST_SCENARIOS: "MCO|ETCD|Cluster_Infrastructure|INSTALLER_GENERAL|Authentication|Workloads"
+      TEST_IMPORTANCE: "Critical"
+      FORCE_SUCCESS_EXIT: "no"
+  documentation: |-
+    This workflow executes a Two Node OpenShift with Fencing (TNF) cluster installation
