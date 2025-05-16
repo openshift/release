@@ -48,18 +48,52 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
+JOB="$(echo "${JOB_SPEC}" | jq '.job')"
+IPI_BOOTSTRAP_IP=""
+
+if [[ "$JOB" =~ "baremetal-ipi" ]]; then
+  cp "${SHARED_DIR}"/ipi_bootstrap_ip_address "${SHARED_DIR}"/ipi_bootstrap_ip_address_fw
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+  IPI_BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address_fw")"
+
+  # copy bootstrap ip to bastion host for use in cleanup
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/ipi_bootstrap_ip_address_fw" "root@${AUX_HOST}:/var/builds/$CLUSTER_NAME/"
+fi
+
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
+  "${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" << 'EOF'
   set -o nounset
   set -o errexit
   INTERNAL_NET_CIDR="${1}"
-  IP_ARRAY="${@:2}"
-  for ip in $IP_ARRAY; do
+  BMC_NETWORK="${2}"
+  IPI_BOOTSTRAP_IP="${3}"
+  IP_ARRAY=("${@:4}")
+  for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
-    # Allow connections on port 22 used by observer pod
-    iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
+    iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
 EOF
+
+#  "${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" << 'EOF'
+#  set -o nounset
+#  set -o errexit
+#  INTERNAL_NET_CIDR="${1}"
+#  BMC_NETWORK="${2}"
+#  IPI_BOOTSTRAP_IP="${3}"
+#  IP_ARRAY=("${@:4}")
+#  for ip in "${IP_ARRAY[@]}"; do
+#    # TODO: change to firewalld or nftables
+#    if [[ -n "${IPI_BOOTSTRAP_IP}" ]]; then
+#      iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
+#    #  iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${ip}" -j ACCEPT
+#    fi
+#    iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+#  done
+#  if [[ -n "${IPI_BOOTSTRAP_IP}" ]]; then
+#    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
+#    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+#  fi
+#EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
 cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"

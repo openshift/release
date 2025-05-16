@@ -13,7 +13,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 [ -z "${PULL_NUMBER:-}" ] && \
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
-    test -f /var/builds/${NAMESPACE}/preserve && \
+    test -f /var/builds/"${NAMESPACE}"/preserve && \
   exit 0
 
 if [ x"${DISCONNECTED}" != x"true" ]; then
@@ -33,14 +33,47 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
+IPI_BOOTSTRAP_IP=""
+
+if [[ -f "${SHARED_DIR}/ipi_bootstrap_ip_address_fw" ]]; then
+  IPI_BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address_fw")"
+fi
+
 echo 'Deprovisioning firewall configuration'
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
+  "${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" << 'EOF'
   set -o nounset
   set -o errexit
   INTERNAL_NET_CIDR="${1}"
-  IP_ARRAY="${@:2}"
-  for ip in $IP_ARRAY; do
-    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
+  BMC_NETWORK="${2}"
+  IPI_BOOTSTRAP_IP="${3}"
+  IP_ARRAY=("${@:4}")
+  for ip in "${IP_ARRAY[@]}"; do
+    # TODO: change to firewalld or nftables
+    iptables -D FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
 EOF
+#  "${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" << 'EOF'
+#  set -o nounset
+#  set -o errexit
+#  INTERNAL_NET_CIDR="${1}"
+#  BMC_NETWORK="${2}"
+#  IPI_BOOTSTRAP_IP="${3}"
+#  IP_ARRAY=("${@:4}")
+#  for ip in "${IP_ARRAY[@]}"; do
+#    # TODO: change to firewalld or nftables
+#    iptables -D FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+#    rule=$(iptables -S FORWARD | grep "${ip}"| grep "${BMC_NETWORK}" | grep ACCEPT | sed 's/^-A /-D /')
+#    [[ -n "${rule}" ]] && read -r -a RULE <<< "${rule}"
+#    [[ "${rule}" =~ D.*$ip.*ACCEPT ]] && iptables "${RULE[@]}"
+#  done
+#  if [[ -n "${IPI_BOOTSTRAP_IP}" ]]; then
+#    rule=$(iptables -S FORWARD | grep "${IPI_BOOTSTRAP_IP}"| grep DROP | sed 's/^-A /-D /')
+#    read -r -a RULE <<< "${rule}"
+#    [[ "${rule}" =~ D.*$IPI_BOOTSTRAP_IP.*DROP ]] && iptables "${RULE[@]}"
+#    while read -r line; do
+#      read -r -a RULE <<< "${line}"
+#      [[ "${line}" =~ D.*$IPI_BOOTSTRAP_IP.*ACCEPT ]] && iptables "${RULE[@]}"
+#    done < <(iptables -S FORWARD | grep "${IPI_BOOTSTRAP_IP}"| grep ACCEPT | sed 's/^-A /-D /')
+#  fi
+#EOF
