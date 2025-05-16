@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-gcp-private
+  steps:
+    env:
+      PUBLISH: Internal
+    pre:
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-gcp
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - chain: ipi-gcp-post
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
+  documentation: |-
+    The Openshift E2E Cilium workflow executes the common end-to-end test suite with a private cluster configuration.
