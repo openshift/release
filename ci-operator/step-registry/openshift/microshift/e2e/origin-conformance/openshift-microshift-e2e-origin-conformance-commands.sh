@@ -70,4 +70,5 @@ status:
   networkType: OVNKubernetes
 EOF
 
+#TODO limit with GOMAXPROCS?
 openshift-tests run "${TEST_SUITE}" -f "${CONFORMANCE_TEST_LIST}" -v 2 --provider=none -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
