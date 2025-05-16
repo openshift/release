@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export PATH="${BIN_FOLDER}:${PATH}"
-
 # Unset the following environment variables to avoid issues with oc command
 unset KUBERNETES_SERVICE_PORT_HTTPS
 unset KUBERNETES_SERVICE_PORT
