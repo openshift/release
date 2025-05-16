@@ -34,6 +34,13 @@ cat > gather_logs.yaml <<-EOF
             -k podman.all -k podman.logs
       ignore_errors: true
 
+      - name: Gather block devices data from all hosts
+        ansible.builtin.shell: >-
+          lsblk -apbJ \
+            -o NAME,MAJ:MIN,RM,SIZE,RO,TYPE,FSTYPE,UUID,LABEL,MOUNTPOINT,MODEL \
+            > "{{ LOGS_DIR }}/block-devices.json"
+      ignore_errors: true
+
     - name: Gather logs and debug information from primary host
       block:
       - name: Copy terraform log
