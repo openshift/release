@@ -1,4 +1,5 @@
 import json
+from typing import Dict, List
 
 import click
 from google.api_core.exceptions import PermissionDenied
@@ -47,32 +48,34 @@ def list_secrets(output: str, collection: str, group: str):
         list_secrets_for_collection(collection, output)
         return
 
-    dict = get_secret_collections()
+    collections_dict = get_secret_collections()
     if group != "":
-        list_collections_for_group(dict, group, output)
+        list_collections_for_group(collections_dict, group, output)
     else:
-        list_all_collections(dict, output)
+        list_all_collections(collections_dict, output)
 
 
-def list_all_collections(dict: dict, output: str):
+def list_all_collections(collections_dict: Dict, output: str):
     if output == "json":
-        click.echo(json.dumps(dict, indent=2))
+        click.echo(json.dumps(collections_dict, indent=2))
     else:
-        for group_name, collections in dict.items():
+        for group_name, collections in collections_dict.items():
             click.echo(f"{group_name}:")
             for c in collections:
                 click.echo(f"- {c}")
 
 
-def list_collections_for_group(dict: dict[str, list[str]], group: str, output: str):
-    if group and group not in dict:
+def list_collections_for_group(
+    collections_dict: Dict[str, List[str]], group: str, output: str
+):
+    if group and group not in collections_dict:
         click.echo(f"Group '{group}' has no secret collections")
         return
 
     if output == "json":
-        click.echo(json.dumps(dict[group], indent=2))
+        click.echo(json.dumps(collections_dict[group], indent=2))
     else:
-        for c in dict[group]:
+        for c in collections_dict[group]:
             click.echo(f"{c}")
 
 

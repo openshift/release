@@ -1,4 +1,5 @@
 import re
+from typing import Dict, List
 
 import click
 import requests
@@ -22,13 +23,13 @@ def ensure_authentication():
     """
     try:
         _, _ = default()
-    except DefaultCredentialsError:
+    except DefaultCredentialsError as e:
         raise click.ClickException(
-            "Credentials for authenticating into google cloud not found. Run `secret-manager login` to authenticate."
-        )
+            "Credentials for authenticating into google cloud not found. Run the `login` command to authenticate."
+        ) from e
 
 
-def validate_collection(ctx, param, value):
+def validate_collection(_ctx, _param, value):
     if not re.fullmatch("[a-z0-9-]*", value):
         raise click.BadParameter(
             "May only contain lowercase letters, numbers or dashes."
@@ -36,7 +37,7 @@ def validate_collection(ctx, param, value):
     return value
 
 
-def validate_secret_name(ctx, param, value):
+def validate_secret_name(_ctx, _param, value):
     if not re.fullmatch("[A-Za-z0-9-]+", value):
         raise click.BadParameter("May only contain letters, numbers or dashes.")
     return value
@@ -106,12 +107,12 @@ def create_payload(from_file: str, from_literal: str) -> bytes:
         raise click.UsageError(f"Failed to read file '{from_file}': {e}")
 
 
-def get_secret_collections() -> dict[str, list[str]]:
+def get_secret_collections() -> Dict[str, List[str]]:
     """
     Returns a dictionary mapping each group to its associated secret collections.
 
     Returns:
-        dict[str,list[str]]: A dictionary where each key is a group name and
+        Dict[str,list[str]]: A dictionary where each key is a group name and
         each value is a list of secret collections associated with that group.
     """
     try:

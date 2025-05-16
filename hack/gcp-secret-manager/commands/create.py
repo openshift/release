@@ -1,5 +1,6 @@
 import re
 import typing
+from typing import Dict
 
 import click
 from google.api_core.exceptions import AlreadyExists, PermissionDenied
@@ -8,9 +9,9 @@ from util import (
     PROJECT_ID,
     create_payload,
     get_secret_name,
-    validate_secret_source,
     validate_collection,
     validate_secret_name,
+    validate_secret_source,
 )
 
 # Metadata keys used when creating secrets:
@@ -93,7 +94,7 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
             f"Access denied: You do not have permission to create secrets in collection '{collection}'"
         )
     except Exception as e:
-        raise click.ClickException(f"Failed to create secret '{secret}': {e}")
+        raise click.ClickException(f"Failed to create secret '{secret}': {e}") from e
 
 
 def prompt_for_labels() -> typing.Dict[str, str]:
@@ -121,7 +122,7 @@ def is_valid_label_value(value: str) -> bool:
     )
 
 
-def prompt_for_annotations() -> typing.Dict[str, str]:
+def prompt_for_annotations() -> Dict[str, str]:
     annotations = {}
 
     click.echo(
@@ -155,7 +156,7 @@ def prompt_for_annotation(msg: str) -> str:
         click.echo("Input cannot be empty. Please enter a value or 'N/A'.")
 
 
-def check_annotations_size(annotations: dict) -> bool:
+def check_annotations_size(annotations: Dict) -> bool:
     size = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
         for key, value in annotations.items()

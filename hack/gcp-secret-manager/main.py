@@ -11,7 +11,6 @@ from commands.update import update
 @click.group()
 def cli():
     """CLI tool to manage Openshift CI secrets."""
-    pass
 
 
 cli.add_command(login)

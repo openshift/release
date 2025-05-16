@@ -37,8 +37,8 @@ def get_service_account(collection: str):
         )
     except Exception as e:
         raise click.ClickException(
-            f"Error while accessing '{secret_id}' secret: {e.message}"
-        )
+            f"Error while accessing '{secret_id}' secret: {e}"
+        ) from e
 
     payload = response.payload.data.decode("UTF-8")
 
