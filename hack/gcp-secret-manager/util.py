@@ -1,3 +1,6 @@
+# Ignore dynamic imports
+# pylint: disable=E0401, C0413
+
 import re
 from typing import Dict, List
 

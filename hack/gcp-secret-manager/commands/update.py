@@ -1,3 +1,6 @@
+# Ignore dynamic imports
+# pylint: disable=E0401, C0413
+
 import click
 from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
