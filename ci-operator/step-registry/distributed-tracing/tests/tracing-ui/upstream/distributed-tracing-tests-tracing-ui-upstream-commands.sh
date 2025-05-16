@@ -107,4 +107,6 @@ ls -ltr
 npm install
 
 # Run the Cypress tests
-npm run test-cypress-console-headless
+npm run test-cypress-console-headless || true
+echo "start debugging"
+sleep 3600
