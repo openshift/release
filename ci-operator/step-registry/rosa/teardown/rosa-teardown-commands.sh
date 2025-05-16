@@ -36,7 +36,7 @@ if [[ -z "$TEST_PROFILE" ]]; then
   log "ERROR: " "TEST_PROFILE is mandatory."
   exit 1
 fi
-
+sleep 3600
 # Deprovision cluster and resources
 rosatest --ginkgo.v --ginkgo.no-color \
   --ginkgo.timeout "1h" \
