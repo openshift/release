@@ -44,6 +44,14 @@ else
   mapfile -d ' ' -t compute_nodes < /srv/compute_node_ips
 fi
 
+# Save openshift version for workarounds
+if [ ! -f /srv/openshift-version ]; then
+  ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+  echo -n "${ocp_minor_version}" > /srv/ocp_minor_version
+else
+  ocp_minor_version=$(cat /srv/ocp_minor_version)
+fi
+
 function run-on-all-nodes {
   for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
@@ -154,14 +162,13 @@ if [ ! -f /tmp/pod-restart-workarounds.sh ]; then
   cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
   set +e
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
-  ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-
-  # Workaround for https://issues.redhat.com/browse/OCPBUGS-42001
-  # Restart OVN / Multus before proceeding
-  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
-  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
-  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+  if [[ ${ocp_minor_version} -le 18 ]]; then
+    # Workaround for https://issues.redhat.com/browse/OCPBUGS-42001
+    # Restart OVN / Multus before proceeding
+    oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+    oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
+    oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+  fi
 EOZ
   chmod a+x /tmp/pod-restart-workarounds.sh
   timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/pod-restart-workarounds.sh "core@${control_nodes[0]}:/tmp/pod-restart-workarounds.sh"

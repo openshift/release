@@ -28,6 +28,9 @@ mapfile -d ' ' -t control_nodes < <( ${OC} get nodes --selector='node-role.kuber
 
 mapfile -d ' ' -t compute_nodes < <( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
+# Save openshift version for workarounds
+ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+
 function run-on-all-nodes {
   for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
@@ -93,9 +96,12 @@ run-on-first-master "
 # Pod restart workarounds
 run-on-first-master "
   export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  # Workaround for https://issues.redhat.com/browse/OCPBUGS-42001
-  # Restart Multus before proceeding
-  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+
+  if [[ ${ocp_minor_version} -le 18 ]]; then
+      # Workaround for https://issues.redhat.com/browse/OCPBUGS-42001
+      # Restart Multus before proceeding
+      oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+  fi
 "
 
 # Wait for operators to stabilize
