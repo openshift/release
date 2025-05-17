@@ -74,6 +74,7 @@ latest_version="v418"
 # define capability dependency
 declare -A dependency_caps
 dependency_caps["marketplace"]="OperatorLifecycleManager"
+dependency_caps["Ingress"]="OperatorLifecycleManager"
 
 declare "v${ocp_major_version}${ocp_minor_version}_set"
 declare "v${ocp_major_version}${ocp_minor_version}"
@@ -122,6 +123,10 @@ if [[ "${selected_cap_set}" != "vCurrent" ]]; then
     for key in "${!dependency_caps[@]}"; do
         #shellcheck disable=SC2076
         if [[ " ${!selected_set} " =~ " ${key} " ]] && [[ ! " ${!selected_set} " =~ " ${dependency_caps[$key]} " ]] && [[ " ${v_current} " =~ " ${dependency_caps[$key]} " ]]; then
+            if (( ocp_minor_version < 19 )) && [[ "${key}" == "Ingress" ]]; then
+                # skip enabling on 4.18 and previouse version, dependency for Ingress is only applicable on 4.19+.
+                continue
+            fi
             echo "capability ${key} in capset '${selected_cap_set}' requires ${dependency_caps[$key]}, enabling ${dependency_caps[$key]}"
             additional_caps="${additional_caps} ${dependency_caps[$key]}"
         fi
