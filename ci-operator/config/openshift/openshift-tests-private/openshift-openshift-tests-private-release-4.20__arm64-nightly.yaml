@@ -857,6 +857,60 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: aws-short-cert-rotation-f10
+  cron: 5 20 5,15,25 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: openshift-e2e-cert-rotation-short
+- as: gcp-short-cert-rotation-f10
+  cron: 17 14 10,20,30 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: azure-short-cert-rotation-f0
+  cron: 34 10 5,15,25 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: baremetal-short-cert-rotation-f10
+  cluster: build05
+  cron: 1 13 3,13,23 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ARCHITECTURE: arm64
+      DEVSCRIPTS_CONFIG: |
+        FEATURE_SET=TechPreviewNoUpgrade
+      NVME_DEVICE: /dev/nvme1n1
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

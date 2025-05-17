@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+#export RELEASE_IMAGE_LATEST="registry.build11.ci.openshift.org/ci-ln-zc411dt/release:latest"
+#export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$RELEASE_IMAGE_LATEST"
+
 function set-cluster-version-spec-update-service() {
     local payload_version
     local jsonpath_flag
