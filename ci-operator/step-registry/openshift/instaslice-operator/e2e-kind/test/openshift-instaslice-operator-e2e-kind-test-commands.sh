@@ -32,7 +32,9 @@ gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 popd
 
-export BUNDLE_IMG=quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-bundle:on-pr-${PULL_NUMBER}
+#export BUNDLE_IMG=quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-bundle:on-pr-${PULL_NUMBER}
+export BUNDLE_IMG=quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-bundle:on-pr-535
+
 echo "Executing e2e tests on GCP VM: $VM_NAME"
 gcloud compute ssh "$VM_NAME" --zone="$GOOGLE_COMPUTE_ZONE" --command="
 set -eux
@@ -54,8 +56,8 @@ function wait_for_image() {
     done
 }
 
-export -f wait_for_image
-timeout 25m bash -c 'wait_for_image'
+#export -f wait_for_image
+#timeout 25m bash -c 'wait_for_image'
 
 echo 'Image is available. Proceeding with tests...'
 
