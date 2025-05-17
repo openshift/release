@@ -137,6 +137,27 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: default-catalog-consistency
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+  steps:
+    test:
+    - as: default-catalog-tests
+      commands: |
+        echo "Preparing temporary directory for test"
+        mkdir -p $HOME/oci-tmp
+        chmod 755 $HOME/oci-tmp
+        echo "Running Default Catalog Tests"
+        cd openshift/default-catalog-consistency
+        TMPDIR=$HOME/oci-tmp REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
+      credentials:
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift
