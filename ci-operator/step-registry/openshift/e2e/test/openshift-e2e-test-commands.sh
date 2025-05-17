@@ -331,6 +331,42 @@ function suite() {
     set +x
 }
 
+function ensureipsecfullenabled() {
+  CUR_NUM_SCHEDULED=$(oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes -o jsonpath='{.status.currentNumberScheduled}' 2>/dev/null || echo 0)
+  CUR_NUM_READY=$(oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes -o jsonpath='{.status.numberReady}' 2>/dev/null || echo 0)
+  until
+    oc wait daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes --for=jsonpath=.status.desiredNumberScheduled="$CUR_NUM_SCHEDULED" --timeout=30s && \
+    oc wait daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes --for=jsonpath=.status.desiredNumberScheduled="$CUR_NUM_READY" --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not available yet"
+    sleep 30s
+    CUR_NUM_SCHEDULED=$(oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes -o jsonpath='{.status.currentNumberScheduled}' 2>/dev/null || echo 0)
+    CUR_NUM_READY=$(oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes -o jsonpath='{.status.numberReady}' 2>/dev/null || echo 0)
+  done
+  ensureclusteroperatorsready
+}
+
+function ensureipsecexternalenabled() {
+  until
+    oc wait --for=delete daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not removed yet"
+    sleep 30s
+  done
+  ensureclusteroperatorsready
+}
+
+function ensureclusteroperatorsready() {
+  until
+    oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+  do
+    echo "Cluster Operators Degraded=True,Progressing=True,or Available=False"
+    sleep 30s
+  done
+}
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 
 oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
@@ -515,6 +551,21 @@ suite-conformance)
     ;;
 suite)
     suite
+    ;;
+ipsec-suite)
+     # Rollout IPsec Full mode and run the suite.
+     echo "Rolling out IPsec Full mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full"}}}}}'
+     ensureipsecfullenabled
+     echo "IPsec Full mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec External mode and run the suite.
+     echo "Rolling out IPsec External mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"External"}}}}}'
+     ensureipsecexternalenabled
+     echo "IPsec External mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"
