@@ -1,0 +1,112 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.18"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: ibmcloud-multi-ppc64le-logging-f7
+  cron: 42 4 1,7,14,21 * *
+  steps:
+    cluster_profile: ibmcloud-multi-ppc64le
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: ppc64le
+      BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
+      GO_VERSION: 1.20.7
+      JQ_VERSION: "1.6"
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
+      LOKI_ENABLED: "false"
+      OCP_VERSION: "4.19"
+      OPERATORS: |
+        [
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      RESOURCE_GROUP: multi-arch-cicd-resource-group
+      SIZE_VARIANT: large
+      TERRAFORM_VERSION: 1.5.5
+      TEST_ADDITIONAL: ""
+      TEST_IMPORTANCE: Critical
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+      WORKERS: "2"
+      WORKFLOW_TYPE: cucushift
+      YQ_VERSION: 4.30.5
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: openshift-e2e-ibmcloud-heterogeneous-test-qe
+- as: baremetal-ha-agent-dualstack-fips-f999-logging
+  cluster: build05
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      FIPS_ENABLED: "true"
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
+      OPERATORS: |
+        [
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      RESERVE_BOOTSTRAP: "false"
+      TEST_ADDITIONAL: ""
+      TEST_IMPORTANCE: Critical
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+      architecture: amd64
+      ipv4_enabled: "false"
+      ipv6_enabled: "true"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: baremetal-lab-agent-install-network-dynamic
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-stable-openshift-logging-6.2
