@@ -111,7 +111,7 @@ set_power_configs() {
       # s922 in heterogeneous node pools, until a permanent fix.
       POWERVS_VSI_SYS_TYPE=$(jq -r '.powervsVSISysType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources-het.json")
   else
-      POWERVS_VSI_SYS_TYPE=$(jq -r '.powervsVSISysType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
+      POWERVS_VSI_SYS_TYPE=s1022
   fi
 
   MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
