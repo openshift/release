@@ -57,10 +57,39 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      BASE_DOMAIN: custom-dns.com
       FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
       FEATURE_SET: CustomNoUpgrade
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
+      SLEEP_DURATION: 24h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns-private-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+- as: installer-rehearse-gcp-confidential-secureboot
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONFIDENTIAL_COMPUTE: IntelTrustedDomainExtensions
+      CONTROL_PLANE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      CONTROL_PLANE_NODE_TYPE: n2d-standard-4
+      CONTROL_PLANE_ON_HOST_MAINTENANCE: Terminate
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      SLEEP_DURATION: 24h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
