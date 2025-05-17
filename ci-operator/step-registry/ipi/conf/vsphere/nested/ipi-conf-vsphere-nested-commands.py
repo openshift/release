@@ -53,6 +53,7 @@ with open(os.path.join(shared_dir, "LEASE_single.json")) as f:
 
 os.environ["VCPUS"]                         = str(lease["spec"]["vcpus"])
 os.environ["MEMORY"]                        = str(lease["spec"]["memory"] * 1024)
+os.environ["DISKGB"]                        = str(4 * 1024)
 os.environ["GOVC_CLUSTER"]                  = os.path.basename(lease["status"]["topology"]["computeCluster"])
 os.environ["GOVC_DATACENTER"]               = lease["status"]["topology"]["datacenter"]
 os.environ["GOVC_DATASTORE"]                = os.path.basename(lease["status"]["topology"]["datastore"])
@@ -80,10 +81,13 @@ if os.environ["VCENTER_VERSION"] == "7":
 else:
     vcenter_version="VC8.0.2.00100-22617221-ESXi8.0u2c"
 
+# Create a copy of the current environment
+# env = os.environ.copy()
+
 try:
     r = ansible_runner.run_command(
         executable_cmd='ansible-playbook',
-        cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=%s' %vcenter_version,'-vvvvvv', '-k'],
+        cmdline_args=['main.yml', '-i', 'hosts', '--extra-var', 'version=%s' %vcenter_version, '--extra-var', 'esxidisk=4096' '-vvvvvv', '-k'],
         input_fd=sys.stdin,
         output_fd=sys.stdout,
         error_fd=sys.stdout,
@@ -136,6 +140,19 @@ if len(vips) == 1:
 else:
     install_config["platform"]["vsphere"]["ingressVIP"] = vips[1].strip()
 
+if os.environ.get("USING_NESTED_SHARED_DATASTORE", "").lower() != "true":
+    try:
+        zone1_host1_ip = inventory["localhost"]["host_group_map"]["zone-1"][0]
+        zone2_host1_ip = inventory["localhost"]["host_group_map"]["zone-2"][0]
+
+        install_config["platform"]["vsphere"]["failureDomains"][0]["topology"]["datastore"] = (
+            f"/cidatacenter-nested-0/datastore/Datastore-{zone1_host1_ip}"
+        )
+        install_config["platform"]["vsphere"]["failureDomains"][1]["topology"]["datastore"] = (
+            f"/cidatacenter-nested-0/datastore/Datastore-{zone2_host1_ip}"
+        )
+    except (KeyError, IndexError) as e:
+        print(f"Error updating unshared datastores from inventory: {e}")
 
 with open(os.path.join(shared_dir, "platform.json"), "w") as platform_json_file:
     json.dump(install_config["platform"]["vsphere"], platform_json_file, indent=2)
