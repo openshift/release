@@ -409,7 +409,7 @@ checkout_submodules(){
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
 # Set go version
-if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+if [[ "$T5CI_VERSION" == "4.12" ]]; then
     source $HOME/golang-1.19
 elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
     source $HOME/golang-1.20
@@ -492,7 +492,7 @@ fi
 pushd $CNF_REPO_DIR
 echo "******** Checking out pull request for repository cnf-features-deploy if exists"
 check_for_pr "openshift-kni" "cnf-features-deploy"
-if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.13" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
+if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
@@ -516,7 +516,7 @@ if [[ "$CNF_BRANCH" == *"4."* ]]; then
     skip_function_name="create_tests_temp_skip_list_${function_version}"
 else
     # In case of master branch
-    skip_function_name=create_tests_temp_skip_list_18
+    skip_function_name=create_tests_temp_skip_list_20
 fi
 if declare -f "$skip_function_name" > /dev/null; then
     echo "Executing $skip_function_name for skipping tests"
