@@ -1,0 +1,58 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-0.4.8
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.18.0-0
+        stream: 4-stable
+        upper: 4.19.0-0
+resources:
+  '*':
+    requests:
+      cpu: "8"
+      memory: 8000Mi
+test_binary_build_commands: |
+  git clone https://github.com/stackrox/stackrox.git
+  cd stackrox
+  .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: acs-tests-aws
+  cron: 0 2 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "stackrox-*", "failure_type": "pod_failure", "classification": "ACS Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "stackrox-*", "failure_type": "test_failure", "classification": "ACS Test Failure", "jira_project": "ROX", "jira_assignee": "davidh@redhat.com", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","self-managed-lp","acs-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: rh-ee-dahouse
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      USER_TAGS: |
+        scenario acs
+    test:
+    - ref: stackrox-qa-e2e
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: policy-collection
+  variant: acs
