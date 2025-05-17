@@ -572,6 +572,38 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
+echo "Enabling log forwarding manifests..."
+cat >"manifests/99_vsphere_cloud_controller_manager_namespace.yaml" <<-EOF
+---
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: journal-forwarder-master
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    systemd:
+      units:
+        - name: journal-forwarder.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Forwards journals to log server
+            After=network.target
+            Wants=network-online.target
+
+            [Service]
+            Restart=always
+            Type=simple
+            ExecStart=/bin/sh -c "stdbuf -oL journalctl -f | ncat 10.38.201.249 12345"
+            Environment=
+
+            [Install]
+            WantedBy=multi-user.target
+EOF
+
 # remove channel from CVO
 sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
 
