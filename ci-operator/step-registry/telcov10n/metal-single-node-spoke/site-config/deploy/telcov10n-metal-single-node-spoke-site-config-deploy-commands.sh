@@ -272,7 +272,7 @@ resources:
 
 configMapGenerator:
   - files:
-    - sno-extra-manifest/imageContentSourcePolicy.yaml
+    $(add_icsp_cr_if_exists)
 $(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
     name: extra-manifests-cm
     namespace: ${SPOKE_CLUSTER_NAME}
@@ -280,6 +280,11 @@ $(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
 generatorOptions:
   disableNameSuffixHash: true
 EOK
+}
+
+function add_icsp_cr_if_exists {
+  [ -f "${SHARED_DIR}/imageContentSourcePolicy.yaml" ] && \
+    echo "- sno-extra-manifest/imageContentSourcePolicy.yaml"
 }
 
 function generate_ztp_cluster_manifests {
