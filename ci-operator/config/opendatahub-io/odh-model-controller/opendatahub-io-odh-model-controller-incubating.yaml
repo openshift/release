@@ -13,6 +13,21 @@ images:
   dockerfile_path: Containerfile
   from: ubi_minimal
   to: odh-model-controller
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9/python-311:1
+
+    # Prow expects to be able to check out a repo under /go
+    USER 0:0
+    WORKDIR /test
+    RUN chown 1001:0 .
+
+    USER 1001:0
+
+    # The VENV that is activated by default conflicts with KServe
+    # scripts. These variables are set to empty to not activate any
+    # VENV by default.
+    ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
+  to: kserve-tests
 promotion:
   to:
   - namespace: opendatahub-io
@@ -54,6 +69,32 @@ tests:
       IMAGE_REPO: odh-model-controller
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: kserve-e2e-predictor
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-predictor
+      cli: latest
+      commands: |
+        export HOME=/test
+        git clone https://github.com/opendatahub-io/kserve.git
+        cd kserve
+        ./test/scripts/openshift-ci/run-e2e-tests.sh predictor
+      dependencies:
+      - env: ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      from: kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: incubating
   org: opendatahub-io
