@@ -79,6 +79,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: upi-installer
+  virtctl:
+    name: "4.20"
+    namespace: ocp
+    tag: virtctl
   vsphere-ci-python:
     name: vsphere-python
     namespace: ci
@@ -649,6 +653,16 @@ tests:
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-hybrid-env
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      NETWORK_TYPE: multi-tenant
+    workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
   interval: 168h
