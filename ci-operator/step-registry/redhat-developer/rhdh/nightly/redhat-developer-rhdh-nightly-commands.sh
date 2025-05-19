@@ -146,9 +146,7 @@ fi
 if [[ "$JOB_NAME" == *sealight* ]]; then
     # Create a directory for cosign
     mkdir -p /tmp/cosign-client
-    curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
-    chmod +x /tmp/cosign-client/cosign
-    
+    curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 && chmod +x /tmp/cosign-client/cosign
     export PATH=/tmp/cosign-client:$PATH
 
     COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
