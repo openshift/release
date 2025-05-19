@@ -94,6 +94,7 @@ approve_agents() {
 	done
 
 	if [ $agentsApproved != ${HYPERSHIFT_NODE_COUNT} ]; then
+		sleep 2h
 		echo "Approved agents does not match the num of workers count, agents approved: ${agentsApproved}, num of workers: ${HYPERSHIFT_NODE_COUNT}"
 		echo "exiting ..."
 		exit 1
