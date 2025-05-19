@@ -71,6 +71,9 @@ chain:
       default: "false"
       documentation: |-
         If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
+    - name: HYPERSHIFT_DYNAMIC_DNS
+      default: ""
+      documentation: "Set dynamic dns for kube-apiserver"
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
@@ -111,6 +114,7 @@ chain:
         --release-image ${RELEASE_IMAGE}
         --annotations=hypershift.openshift.io/skip-release-image-validation=true
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+        --kas-dns-name=${HYPERSHIFT_DYNAMIC_DNS}
         --auto-node=${HYPERSHIFT_AUTONODE}
       )
       
@@ -197,7 +201,7 @@ chain:
       else
         set +e
         export CLUSTER_NAME
-        timeout 25m bash -c '
+        timeout 45m bash -c '
           until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
               sleep 15
           done
@@ -240,7 +244,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 35m0s
+    timeout: 1h10m0s
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
