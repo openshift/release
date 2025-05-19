@@ -1498,6 +1498,80 @@ presubmits:
     - ^release-4\.21$
     - ^release-4\.21-
     cluster: build06
+    context: ci/prow/e2e-aws-ovn-serial-publicnet
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.21-e2e-aws-ovn-serial-publicnet
+    optional: true
+    rerun_command: /test e2e-aws-ovn-serial-publicnet
+    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-serial-publicnet
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-publicnet,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.21$
+    - ^release-4\.21-
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     labels:
@@ -4456,7 +4530,7 @@ presubmits:
     context: ci/prow/e2e-metal-ovn-single-node-live-iso
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: equinix-edge-enablemnt
+      ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -4529,7 +4603,7 @@ presubmits:
     context: ci/prow/e2e-metal-ovn-single-node-with-worker-live-iso
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: equinix-edge-enablemnt
+      ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -4604,7 +4678,7 @@ presubmits:
     decoration_config:
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: equinix-edge-enablemnt
+      ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
@@ -4680,7 +4754,7 @@ presubmits:
     decoration_config:
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: equinix-edge-enablemnt
+      ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
@@ -4828,6 +4902,8 @@ presubmits:
     cluster: build06
     context: ci/prow/e2e-openstack-serial
     decorate: true
+    decoration_config:
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost

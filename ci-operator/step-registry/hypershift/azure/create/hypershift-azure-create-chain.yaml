@@ -117,6 +117,9 @@ chain:
     - name: DNS_ZONE_RG_NAME
       default: "os4-common"
       documentation: "dns zone resource group"
+    - name: HYPERSHIFT_INSTANCE_TYPE
+      default: ""
+      documentation: "Instance type for the nodepool vm size"
     commands: |-
       set -exuo pipefail
 
@@ -301,6 +304,10 @@ chain:
       if [[ $ASSIGN_SERVICE_PRINCIPAL_ROLES == "true" ]]; then
         COMMAND+=(--assign-service-principal-roles=true)
         COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
+      fi
+      
+      if [[ -n "${HYPERSHIFT_INSTANCE_TYPE}" ]]; then
+        COMMAND+=(--instance-type=${HYPERSHIFT_INSTANCE_TYPE})
       fi
       
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
