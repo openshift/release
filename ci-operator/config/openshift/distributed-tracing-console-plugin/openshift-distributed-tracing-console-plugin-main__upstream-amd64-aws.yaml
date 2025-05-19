@@ -1,24 +1,25 @@
+base_images:
+  rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
 images:
 - dockerfile_path: Dockerfile
+  inputs:
+    rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.23
   to: distributed-tracing-console-plugin
 - dockerfile_path: Dockerfile.test
   to: distributed-tracing-console-plugin-test
 - context_dir: .
   dockerfile_path: tests/Dockerfile
   to: tracing-ui-tests-runner
-promotion:
-  to:
-  - excluded_images:
-    - distributed-tracing-console-plugin
-    - distributed-tracing-console-plugin-test
-    - tracing-ui-tests-runner
-    name: latest
-    namespace: observability-ui
 resources:
   '*':
     limits:
@@ -48,8 +49,6 @@ tests:
     timeout: 1h0m0s
     version: "4.19"
   steps:
-    env:
-      CYPRESS_COO_UI_INSTALL: "true"
     test:
     - ref: distributed-tracing-tests-tracing-ui-upstream
     workflow: generic-claim
