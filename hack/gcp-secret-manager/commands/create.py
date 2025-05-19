@@ -2,14 +2,14 @@
 # pylint: disable=E0401, C0413
 
 import re
-import typing
 from typing import Dict
 
 import click
-from google.api_core.exceptions import AlreadyExists, PermissionDenied, NotFound
+from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
+    check_if_collection_exists,
     create_payload,
     get_secret_name,
     validate_collection,
@@ -60,8 +60,14 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
     """Create a new secret in the specified collection."""
 
     validate_secret_source(from_file, from_literal)
+    if not check_if_collection_exists(collection):
+        raise click.ClickException(
+            f"Collection '{collection}' doesn't exist.  "
+            "To create it, add it to the configuration file in the release repository. "
+            "See: https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/"
+        )
     client = secretmanager.SecretManagerServiceClient()
-    check_if_already_exists(collection, secret, client)
+    check_if_secret_already_exists(collection, secret, client)
 
     click.echo(
         "To help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
@@ -97,11 +103,10 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
         raise click.ClickException(f"Failed to create secret '{secret}': {e}") from e
 
 
-def check_if_already_exists(
+def check_if_secret_already_exists(
     collection: str, secret: str, client: secretmanager.SecretManagerServiceClient
 ):
     name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
-    click.echo(f"getting name: {name}")
     try:
         client.get_secret(request={"name": name})
         raise click.ClickException(
@@ -111,7 +116,7 @@ def check_if_already_exists(
         return
 
 
-def prompt_for_labels() -> typing.Dict[str, str]:
+def prompt_for_labels() -> Dict[str, str]:
     click.echo(
         "Enter team JIRA project associated with this secret (e.g. 'ART' for issues.redhat.com/browse/ART).\n"
         "Test Platform may open tickets in this project to help handle incidents requiring secret rotation."
@@ -177,4 +182,6 @@ def check_annotations_size(annotations: Dict) -> bool:
     )
     # The total size of annotation keys and values must be less than 16KiB.
     if size > (16 * 1024):
-        raise click.ClickException("Total annotations size exceeds the allowed limit (16KiB).")
+        raise click.ClickException(
+            "Total annotations size exceeds the allowed limit (16KiB)."
+        )
