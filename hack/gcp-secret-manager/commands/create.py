@@ -6,7 +6,7 @@ import typing
 from typing import Dict
 
 import click
-from google.api_core.exceptions import AlreadyExists, PermissionDenied
+from google.api_core.exceptions import AlreadyExists, PermissionDenied, NotFound
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
@@ -60,6 +60,9 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
     """Create a new secret in the specified collection."""
 
     validate_secret_source(from_file, from_literal)
+    client = secretmanager.SecretManagerServiceClient()
+    check_if_already_exists(collection, secret, client)
+
     click.echo(
         "To help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
         "If a field does not apply to your case, type 'none' to continue.\n"
@@ -68,8 +71,6 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
     annotations = prompt_for_annotations()
 
     try:
-        client = secretmanager.SecretManagerServiceClient()
-
         gcp_secret = client.create_secret(
             request={
                 "parent": f"projects/{PROJECT_ID}",
@@ -88,16 +89,26 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
             },
         )
         click.echo(f"Secret '{secret}' created")
-    except AlreadyExists:
-        raise click.ClickException(
-            f"Secret '{secret}' already exists in collection '{collection}'."
-        )
     except PermissionDenied:
         raise click.ClickException(
             f"Access denied: You do not have permission to create secrets in collection '{collection}'"
         )
     except Exception as e:
         raise click.ClickException(f"Failed to create secret '{secret}': {e}") from e
+
+
+def check_if_already_exists(
+    collection: str, secret: str, client: secretmanager.SecretManagerServiceClient
+):
+    name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
+    click.echo(f"getting name: {name}")
+    try:
+        client.get_secret(request={"name": name})
+        raise click.ClickException(
+            f"Secret '{secret}' already exists in collection '{collection}'."
+        )
+    except NotFound:
+        return
 
 
 def prompt_for_labels() -> typing.Dict[str, str]:
