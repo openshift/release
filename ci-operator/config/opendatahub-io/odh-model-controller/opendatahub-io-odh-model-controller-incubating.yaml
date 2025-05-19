@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  kserve-tests:
+    name: kserve-tests
+    namespace: opendatahub-io
+    tag: "latest"
 build_root:
   image_stream_tag:
     name: release
@@ -13,21 +17,6 @@ images:
   dockerfile_path: Containerfile
   from: ubi_minimal
   to: odh-model-controller
-- dockerfile_literal: |-
-    FROM registry.access.redhat.com/ubi9/python-311:1
-
-    # Prow expects to be able to check out a repo under /go
-    USER 0:0
-    WORKDIR /go
-    RUN chown 1001:0 .
-
-    USER 1001:0
-
-    # The VENV that is activated by default conflicts with KServe
-    # scripts. These variables are set to empty to not activate any
-    # VENV by default.
-    ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
-  to: kserve-tests
 promotion:
   to:
   - namespace: opendatahub-io
