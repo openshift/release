@@ -177,4 +177,4 @@ def check_annotations_size(annotations: Dict) -> bool:
     )
     # The total size of annotation keys and values must be less than 16KiB.
     if size > (16 * 1024):
-        raise click.ClickException("Total annotations size exceeds the allowed limit.")
+        raise click.ClickException("Total annotations size exceeds the allowed limit (16KiB).")
