@@ -48,5 +48,7 @@ spec:
   calicoNetwork:
     nodeAddressAutodetectionV4:
       kubernetes: NodeInternalIP
-    mtu: 1480
+    ipPools:
+      - cidr: 10.128.0.0/14
+        encapsulation: IPIPCrossSubnet
 EOF
