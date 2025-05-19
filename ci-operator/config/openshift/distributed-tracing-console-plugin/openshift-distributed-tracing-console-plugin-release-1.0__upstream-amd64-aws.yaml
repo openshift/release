@@ -1,28 +1,25 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+  rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.23
   to: distributed-tracing-console-plugin
 - dockerfile_path: Dockerfile.test
   to: distributed-tracing-console-plugin-test
-promotion:
-  to:
-  - excluded_images:
-    - distributed-tracing-console-plugin-test
-    name: "0.2"
-    namespace: observability-ui
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: tracing-ui-tests-runner
 resources:
   '*':
     limits:
@@ -42,11 +39,21 @@ tests:
     test:
     - ref: fips-check-image-scan
 - as: e2e
-  commands: echo "test"
-  container:
-    from: distributed-tracing-console-plugin-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-tracing
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.19"
+  steps:
+    test:
+    - ref: distributed-tracing-tests-tracing-ui-upstream
+    workflow: generic-claim
 zz_generated_metadata:
-  branch: release-0.2
+  branch: release-1.0
   org: openshift
   repo: distributed-tracing-console-plugin
   variant: upstream-amd64-aws
