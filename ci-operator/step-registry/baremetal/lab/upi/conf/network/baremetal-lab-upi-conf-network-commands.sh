@@ -58,5 +58,5 @@ networking:
   machineNetwork:
   ${PRIMARY_NET_MACHINE:+- ${PRIMARY_NET_MACHINE}}
   ${SECONDARY_NET_MACHINE:+- ${SECONDARY_NET_MACHINE}}
-  mtu: 1400
+  mtu: 9000
 EOF

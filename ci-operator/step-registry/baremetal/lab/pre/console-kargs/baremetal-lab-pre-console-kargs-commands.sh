@@ -101,7 +101,7 @@ storage:
           interface-name=${baremetal_iface}
 
           [ethernet]
-          mtu=1400
+          mtu=9000
 
           [ipv4]
           method=disabled
