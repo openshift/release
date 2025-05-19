@@ -36,7 +36,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.23-openshift-4.19:
@@ -48,7 +48,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
   ocp_os:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: rhel-coreos
 build_root:
@@ -86,17 +86,17 @@ promotion:
   - excluded_images:
     - custom-os-image
     - zacks-toolbox
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -121,7 +121,7 @@ tests:
   as: e2e-aws-ovn-fips-op
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -152,7 +152,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-azure-ovn-upgrade
   optional: true
@@ -177,7 +177,7 @@ tests:
 - as: e2e-aws-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: verify
   commands: |
@@ -266,13 +266,13 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-upgrade-out-of-change
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -287,14 +287,14 @@ tests:
 - as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       PLATFORM_VERSION: "8.4"
     workflow: openshift-e2e-aws-ovn-workers-rhel
 - as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-disruption
 - as: e2e-vsphere-ovn-upi
   optional: true
@@ -353,7 +353,7 @@ tests:
 - as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-assisted
   cluster: build05
@@ -374,7 +374,7 @@ tests:
 - as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-gcp-rt
@@ -443,6 +443,15 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-hypershift-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-openstack-dualstack
@@ -528,7 +537,7 @@ tests:
   as: e2e-aws-ovn-ocb-techpreview
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -572,6 +581,12 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-aws
   timeout: 5h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

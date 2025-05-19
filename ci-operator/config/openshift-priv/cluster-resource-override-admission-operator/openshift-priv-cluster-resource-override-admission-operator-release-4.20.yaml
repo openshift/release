@@ -27,9 +27,22 @@ images:
       as:
       - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: cluster-resource-override-admission-operator-registry
+operator:
+  bundles:
+  - as: cluster-resource-override-admission-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/placeholder/operator.*
+    with: pipeline:cluster-resource-override-admission-operator
+  - pullspec: quay.io/placeholder/operand.*
+    with: stable:cluster-resource-override-admission
 promotion:
   to:
-  - name: 4.20-priv
+  - additional_images:
+      cluster-resource-override-admission-operator-bundle: cluster-resource-override-admission-operator-bundle
+    disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -106,6 +119,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

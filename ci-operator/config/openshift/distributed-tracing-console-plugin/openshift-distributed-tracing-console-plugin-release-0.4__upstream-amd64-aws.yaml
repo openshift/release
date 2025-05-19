@@ -17,10 +17,14 @@ images:
   to: distributed-tracing-console-plugin
 - dockerfile_path: Dockerfile.test
   to: distributed-tracing-console-plugin-test
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: tracing-ui-tests-runner
 promotion:
   to:
   - excluded_images:
     - distributed-tracing-console-plugin-test
+    - tracing-ui-tests-runner
     name: "0.4"
     namespace: observability-ui
 resources:
@@ -42,9 +46,19 @@ tests:
     test:
     - ref: fips-check-image-scan
 - as: e2e
-  commands: echo "test"
-  container:
-    from: distributed-tracing-console-plugin-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-tracing
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  steps:
+    test:
+    - ref: distributed-tracing-tests-tracing-ui-upstream
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-0.4
   org: openshift

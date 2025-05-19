@@ -30,6 +30,36 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
+  cluster: build03
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build03-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build03` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.17:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
   cluster: build06
   cron: 30 7 * * 1-5
   decorate: true
@@ -60,19 +90,79 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build09
+  cluster: build07
   cron: 30 7 * * 1-5
   decorate: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-build09-upgrade
+  name: periodic-build07-upgrade
   reporter_config:
     slack:
       channel: '#ops-testplatform'
       job_states_to_report:
       - failure
       report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
-        `build09` has not been completed over 24 hours. Please check if anything blocks
+        `build07` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.17:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
+  cluster: build10
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build10-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build10` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.17:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
+  cluster: build11
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build11-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build11` has not been completed over 24 hours. Please check if anything blocks
         the process.
   spec:
     containers:
@@ -935,7 +1025,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250512-8cd4af136
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -970,7 +1060,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250512-8cd4af136
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -992,7 +1082,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  - base_ref: openshift-4.19
+  - base_ref: openshift-4.20
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1010,8 +1100,8 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.19
-      - --future-release=4.20
+      - --current-release=4.20
+      - --future-release=4.21
       - --self-approve=true
       - --assign=openshift/test-platform
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -1296,7 +1386,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250512-8cd4af136
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1353,7 +1443,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250512-8cd4af136
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1411,7 +1501,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250512-8cd4af136
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1480,7 +1570,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20250512-8cd4af136
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1510,8 +1600,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.19
-      - --future-release=4.20
+      - --current-release=4.20
+      - --future-release=4.21
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -1595,8 +1685,8 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --dry-run=false
       - --config-dir=./ci-operator/config/
-      - --current-release=4.19
-      - --future-release=4.20
+      - --current-release=4.20
+      - --future-release=4.21
       command:
       - blocking-issue-creator
       image: blocking-issue-creator:latest
@@ -1870,7 +1960,7 @@ periodics:
   cron: '@yearly'
   decorate: true
   extra_refs:
-  - base_ref: openshift-4.19
+  - base_ref: openshift-4.20
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1885,7 +1975,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --ocp-build-data-repo-dir=./
       - --create-prs=true
-      - --minor=19
+      - --minor=20
       - --pr-creation-ceiling=1000
       command:
       - /usr/bin/ocp-build-data-enforcer
@@ -1972,7 +2062,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250512-8cd4af136
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2004,7 +2094,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250512-8cd4af136
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2036,7 +2126,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250412-53ab931a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250512-8cd4af136
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2081,6 +2171,8 @@ periodics:
       - '^origin/4.([6-9]|\d\d+):'
       - --ignored-image-stream-tags
       - '^origin/scos-4.([6-9]|\d\d+):'
+      - --ignored-image-stream-tags
+      - cincinnati-ci-public/cincinnati-graph-data:6420f7fbf3724e1e5e329ae8d1e2985973f60c14
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
       - --dry-run=false

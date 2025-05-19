@@ -28,7 +28,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.18_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -50,17 +50,17 @@ images:
   to: cluster-etcd-operator
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -95,7 +95,7 @@ tests:
 - as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-disruption
 - as: e2e-aws-disruptive-ovn
   optional: true
@@ -130,7 +130,7 @@ tests:
 - as: e2e-operator-fips
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -175,17 +175,17 @@ tests:
     workflow: assisted-ofcir-baremetal
 - as: e2e-aws-ovn-single-node
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-single-node-live-iso
   optional: true
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - as: configmap-scale
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-serial
   steps:
@@ -218,29 +218,27 @@ tests:
 - as: e2e-aws-etcd-certrotation
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-etcd-certrotation
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown
   optional: true
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1800"
       CLUSTER_AGE_STEP: "300"
-      PACKET_OS: rocky_9
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown
   optional: true
   steps:
-    cluster_profile: packet-assisted
+    cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1800"
       CLUSTER_AGE_STEP: "300"
-      PACKET_OS: rocky_9
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-aws-cpms
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       commands: make e2e-periodic

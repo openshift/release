@@ -16,7 +16,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -39,17 +39,17 @@ images:
   to: cluster-network-operator
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -74,20 +74,20 @@ tests:
 - always_run: true
   as: e2e-aws-ovn-ipsec-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec-upgrade
 - as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -112,7 +112,7 @@ tests:
 - as: e2e-aws-ovn-serial
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
@@ -120,7 +120,7 @@ tests:
   as: e2e-aws-ovn-ipsec-serial
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec-serial
@@ -145,9 +145,10 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipsec
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -233,7 +234,7 @@ tests:
   as: e2e-aws-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -262,7 +263,7 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-single-node
@@ -318,7 +319,7 @@ tests:
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -326,7 +327,7 @@ tests:
 - as: e2e-aws-hypershift-ovn-kubevirt
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density
@@ -430,6 +431,12 @@ tests:
       HYPERSHIFT_AZURE_LOCATION: eastus2
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-azure-aks-e2e
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift-priv

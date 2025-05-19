@@ -27,10 +27,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: ocp-version-placeholder
-    namespace: ocp
-    tag: tests
 build_root:
   from_repository: true
 images:
@@ -83,9 +79,10 @@ tests:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-- as: e2e-metal-assisted
+- always_run: false
+  as: e2e-metal-assisted
   cluster: build05
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
   steps:
     cluster_profile: packet-assisted
     env:

@@ -59,3 +59,23 @@ for rg_file in "${rg_files[@]}"; do
         fi
     fi
 done
+
+# Remove resource group across subscriptions, and "az account set --subscription <cross subscription>" is used
+# Please better to ensure this is kept at the end of the script.
+if [ -f ${SHARED_DIR}/resourcegroup_cross-sub ]; then
+    # Exit with failure to ensure no leftovers are left unnoticed.  
+    if [[ ! -f "${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json" ]]; then
+        echo "Error: Expected service principal not found. Cannot remove resources across subscriptions."
+        exit 1
+    fi
+    echo "Setting AZURE credential with Contributor role for removing the resource group from cross subscription"
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json"
+    AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+    AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+    AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+    CROSS_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .crossSubscriptionId)"
+    existing_rg=$(cat "${SHARED_DIR}/resourcegroup_cross-sub")
+    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+    az account set --subscription "${CROSS_SUBSCRIPTION_ID}"
+    az group delete -y -n "${existing_rg}"
+fi

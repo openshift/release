@@ -54,7 +54,8 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -90,6 +91,10 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
+- as: e2e-aws-ovn-edge-zones
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-local-gateway
   steps:
     cluster_profile: aws
@@ -238,14 +243,14 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -348,10 +353,10 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 6h0m0s
-- as: e2e-aws-ovn-kubevirt
+- as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: hypershift-kubevirt-conformance
   timeout: 6h0m0s
 - as: security
@@ -424,7 +429,7 @@ tests:
 - as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -433,7 +438,7 @@ tests:
 - as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -537,7 +542,7 @@ tests:
   as: e2e-aws-ovn-virt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       CNV_PRERELEASE_LATEST_CHANNEL: "true"
       COMPUTE_NODE_REPLICAS: "2"
