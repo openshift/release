@@ -67,14 +67,14 @@ fi
 EOF
 
 set +e
-for imagestream in {1..5}
+for retry in {1..5}
 do
-    echo "[$(date)] Retrying ssh connection"
+    echo "[$(date)] Retrying ssh connection - retry #${retry}"
     # Prepare login via root
     LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
         --zone "${GOOGLE_COMPUTE_ZONE}" \
         packer@"${INSTANCE_PREFIX}" \
-        --command "sudo cp ~/.ssh/authorized_keys /root/.ssh && sudo sed 's;PermitRootLogin no;PermitRootLogin yes;g' -i /etc/ssh/sshd_config && sudo systemctl restart sshd"
+        --command "sudo cp ~/.ssh/authorized_keys /root/.ssh && sudo sed 's;PermitRootLogin no;PermitRootLogin yes;g' -i /etc/ssh/sshd_config && sudo systemctl restart sshd" \
     && break
     sleep 15
 done
