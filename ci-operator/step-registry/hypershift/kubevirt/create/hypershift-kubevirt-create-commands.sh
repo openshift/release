@@ -175,6 +175,10 @@ fi
 EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE}"
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
+
+# Workaround for https://issues.redhat.com/browse/OCPBUGS-56492
+oc delete imagecontentsourcepolicy brew-registry || true
+
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
 if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
 
