@@ -17,16 +17,13 @@ NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/$WORKLOAD-index_data.j
 export NOO_BUNDLE_VERSION=${NOO_BUNDLE_VERSION//\"/}
 
 UUID=$(jq '.uuid' < "$SHARED_DIR/$WORKLOAD-index_data.json")
-START_TIME=$(jq '.startDateUnixTimestamp' < "$SHARED_DIR/$WORKLOAD-index_data.json")
-END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/$WORKLOAD-index_data.json")
+START_TIME=$(jq '.startDate' < "$SHARED_DIR/$WORKLOAD-index_data.json" | xargs -I {} date -d {} +%s)
+END_TIME=$(jq '.endDate' < "$SHARED_DIR/$WORKLOAD-index_data.json" | xargs -I {} date -d {} +%s)
 
-INGRESS_PERF_END_TIME=$(jq '.endDateUnixTimestamp' < "$SHARED_DIR/ingress-perf-index_data.json")
+INGRESS_PERF_END_TIME=$(jq '.endDate' < "$SHARED_DIR/ingress-perf-index_data.json" | xargs -I {} date -d {} +%s)
 
 # strip quotes
 export UUID=${UUID//\"/}
-START_TIME=${START_TIME//\"/}
-END_TIME=${END_TIME//\"/}
-INGRESS_PERF_END_TIME=${INGRESS_PERF_END_TIME//\"/}
 
 # cluster-density-v2 takes longer to complete than ingress-perf
 if [[ $WORKLOAD == "node-density-heavy" ]]; then
