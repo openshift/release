@@ -21,6 +21,15 @@ then
    export TEST_KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
 
+if [[ -f "${SHARED_DIR}/cluster-id" ]]; then
+    export CLUSTER_ID="$(< "${SHARED_DIR}/cluster-id")"
+fi
+
+if [[ -z "${CLUSTER_ID:-}" ]]; then
+    echo "CLUSTER_ID is not set. Aborting test execution."
+    exit 1
+fi
+
 export REPORT_DIR="${ARTIFACT_DIR}"
 
 /osde2e test --configs "${CONFIGS}" \
