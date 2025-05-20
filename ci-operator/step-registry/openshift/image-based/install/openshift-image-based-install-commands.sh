@@ -40,6 +40,8 @@ set -euo pipefail
 
 export SEED_IMAGE="${SEED_IMAGE}"
 export SEED_VERSION="${SEED_VERSION}"
+export RELEASE_VERSION="${SEED_VERSION}"
+export IBI_RELEASE_REGISTRY=""
 export IBI_VM_NAME="${TARGET_VM_NAME}"
 export OPENSHIFT_INSTALLER_BIN="/usr/bin/openshift-install"
 
