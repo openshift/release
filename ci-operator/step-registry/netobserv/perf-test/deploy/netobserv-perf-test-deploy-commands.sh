@@ -33,7 +33,7 @@ LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpat
 KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
 opm --help
 if [[ $INSTALLATION_SOURCE == "Internal" || -n $DOWNSTREAM_IMAGE ]]; then
-    NOO_BUNDLE_INFO=$(scripts/build_info.sh)
+    NOO_BUNDLE_INFO="1.9-Internal-0520"
 elif [[ $INSTALLATION_SOURCE == "Source" ]]; then
     if [[ -n $UPSTREAM_IMAGE ]]; then
         NOO_BUNDLE_INFO=${UPSTREAM_IMAGE##*:}
