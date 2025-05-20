@@ -87,6 +87,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  splat-ci-virtctl:
+    name: splat-virtctl
+    namespace: ci
+    tag: latest
   vsphere-ci-python:
     name: vsphere-python
     namespace: ci
@@ -208,6 +212,27 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-oc
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    COPY virtctl /usr/bin/virtctl
+    COPY openshift-install /usr/bin/openshift-install
+  from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    splat-ci-virtctl:
+      paths:
+      - destination_dir: .
+        source_path: /virtctl
+    upi-installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/openshift-install
+  to: virtctl
 promotion:
   to:
   - disabled: true
@@ -950,6 +975,18 @@ tests:
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-ovn-hybrid-env
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      NETWORK_TYPE: multi-tenant
+    workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 6h0m0s
 - always_run: false
   as: e2e-crc
