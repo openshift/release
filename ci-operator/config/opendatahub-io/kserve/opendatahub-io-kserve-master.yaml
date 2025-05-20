@@ -47,6 +47,21 @@ images:
 - context_dir: python/
   dockerfile_path: error_404_isvc.Dockerfile
   to: error-404-isvc
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9/python-311:1
+
+    # Prow expects to be able to check out a repo under /go
+    USER 0:0
+    WORKDIR /go
+    RUN chown 1001:0 .
+
+    USER 1001:0
+
+    # The VENV that is activated by default conflicts with KServe
+    # scripts. These variables are set to empty to not activate any
+    # VENV by default.
+    ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
+  to: kserve-tests
 promotion:
   to:
   - excluded_images:
