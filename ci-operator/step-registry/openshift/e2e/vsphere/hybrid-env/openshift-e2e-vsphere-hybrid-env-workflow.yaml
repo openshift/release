@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-vsphere-hybrid-env
+  steps:
+    pre:
+    - chain: ipi-vsphere-pre-hybrid-env
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    - ref: ipi-deprovision-vsphere-virt
+    env:
+      TEST_SKIPS: >-
+        PVC Protection Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable\|
+        PVC Protection Verify that PVC in active use by a pod is not removed immediately\|
+        Image info should display information about images\|
+        Networking should provide Internet connection for containers\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured\|
+        Alerts shouldn't report any alerts in firing or pending state apart from Watchdog and AlertmanagerReceiversNotConfigured and have no gaps in Watchdog firing
+  documentation: |-
+     The origin E2E vsphere executes the common end-to-end test suite with an IPI installed vSphere cluster with bare metal node added as a compute node.

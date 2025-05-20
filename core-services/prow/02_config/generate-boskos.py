@@ -181,6 +181,9 @@ CONFIG = {
         'westus2': 10,
         'centralus': 10
     },
+    'azure-observability-quota-slice': {
+        'centralus': 30
+    },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
         'eastus': 5,

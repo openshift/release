@@ -203,13 +203,17 @@ expected_master_diag_type="Managed"
 # default boot diagnostics is disabled on compute nodes
 expected_worker_diag_type=""
 master_sa_name=""
+master_sa_rg=""
 worker_sa_name=""
+worker_sa_rg=""
 if [[ -n "${default_diagnostics_type}" ]]; then
     expected_master_diag_type="${default_diagnostics_type}"
     expected_worker_diag_type="${default_diagnostics_type}"
     if [[ "${default_diagnostics_type}" == "UserManaged" ]]; then
         master_sa_name=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.defaultMachinePlatform.bootDiagnostics.storageAccountName')
         worker_sa_name=${master_sa_name}
+        master_sa_rg=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.defaultMachinePlatform.bootDiagnostics.resourceGroup')
+        worker_sa_rg="${master_sa_rg}"
     fi
 fi
 
@@ -217,6 +221,7 @@ if [[ -n "${master_diagnostics_type}" ]]; then
     expected_master_diag_type="${master_diagnostics_type}"
     if [[ "${master_diagnostics_type}" == "UserManaged" ]]; then
         master_sa_name=$(yq-go r "${INSTALL_CONFIG}" 'controlPlane.platform.azure.bootDiagnostics.storageAccountName')
+        master_sa_rg=$(yq-go r "${INSTALL_CONFIG}" 'controlPlane.platform.azure.bootDiagnostics.resourceGroup')
     else
         master_sa_name=""
     fi
@@ -226,24 +231,11 @@ if [[ -n "${worker_diagnostics_type}" ]]; then
     expected_worker_diag_type="${worker_diagnostics_type}"
     if [[ "${worker_diagnostics_type}" == "UserManaged" ]]; then
         worker_sa_name=$(yq-go r "${INSTALL_CONFIG}" 'compute[0].platform.azure.bootDiagnostics.storageAccountName')
+        worker_sa_rg=$(yq-go r "${INSTALL_CONFIG}" 'compute[0].platform.azure.bootDiagnostics.resourceGroup')
     else
         worker_sa_name=""
     fi
 fi
-
-case "${cloud_name}" in
-AzureUSGovernment)
-    storage_endpoint="https://STORAGENAME.blob.core.usgovcloudapi.net"
-    ;;
-AzureStackCloud)
-    # update later when ash portal can be accessed
-    storage_endpoint="https://STORAGENAME.xxxx.xxxx.xxxxx.xxx"
-    ;;
-*)
-    # default cloud is AzurePublicCloud
-    storage_endpoint="https://STORAGENAME.blob.core.windows.net"
-    ;;
-esac
 
 check_result=0
 
@@ -254,10 +246,14 @@ if [[ -z "${expected_master_diag_type}" ]]; then
     expected_master_diag_type="Managed"
 fi
 if [[ -n "${master_sa_name}" ]]; then
-    master_storage_uri=${storage_endpoint/STORAGENAME/${master_sa_name}}
+    master_storage_uri=$(az storage account show -n ${master_sa_name} -g ${master_sa_rg} --query primaryEndpoints.blob -otsv)
+    master_storage_uri=${master_storage_uri::-1}
 else
     master_storage_uri=""
 fi
+
+echo "Expected master diagnostics type: ${expected_master_diag_type}"
+echo "Expected master storage uri: ${master_storage_uri}"
 echo "Checking options setting on master machines..."
 check_boot_diagnostics_enabled "${master_nodes_list}" "${expected_master_diag_type}" "${master_storage_uri}" || check_result=1
 if [[ "${expected_master_diag_type}" != "Disabled" ]]; then
@@ -274,10 +270,14 @@ if [[ -z "${expected_worker_diag_type}" ]]; then
     expected_worker_diag_type="Disabled"
 fi
 if [[ -n "${worker_sa_name}" ]]; then
-    worker_storage_uri=${storage_endpoint/STORAGENAME/${worker_sa_name}}
+    worker_storage_uri=$(az storage account show -n ${worker_sa_name} -g ${worker_sa_rg} --query primaryEndpoints.blob -otsv)
+    worker_storage_uri=${worker_storage_uri::-1}
 else
     worker_storage_uri=""
 fi
+
+echo "Expected worker diagnostics type: ${expected_worker_diag_type}"
+echo "Expected worker storage uri: ${worker_storage_uri}"
 echo "Checking options setting on worker machines..."
 check_boot_diagnostics_enabled "${worker_nodes_list}" "${expected_worker_diag_type}" "${worker_storage_uri}" || check_result=1
 if [[ "${expected_worker_diag_type}" != "Disabled" ]]; then
