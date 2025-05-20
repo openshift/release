@@ -32,11 +32,15 @@ NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*
 LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
 KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
 opm --help
-if [[ $INSTALLATION_SOURCE == "Internal" ]]; then
+if [[ $INSTALLATION_SOURCE == "Internal" || -n $DOWNSTREAM_IMAGE ]]; then
     NOO_BUNDLE_INFO=$(scripts/build_info.sh)
-else
-    # Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
-    NOO_BUNDLE_INFO="v0.0.0-sha-main"
+elif [[ $INSTALLATION_SOURCE == "Source" ]]; then
+    if [[ -n $UPSTREAM_IMAGE ]]; then
+        NOO_BUNDLE_INFO=${UPSTREAM_IMAGE##*:}
+    else
+        # Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
+        NOO_BUNDLE_INFO="v0.0.0-sha-main"
+    fi
 fi
 
 
