@@ -2,7 +2,7 @@
 # pylint: disable=E0401, C0413
 
 import re
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import click
 import requests
@@ -110,7 +110,7 @@ def create_payload(from_file: str, from_literal: str) -> bytes:
         raise click.UsageError(f"Failed to read file '{from_file}': {e}")
 
 
-def get_secret_collections() -> Dict[str, List[str]]:
+def get_group_collections() -> Dict[str, List[str]]:
     """
     Returns a dictionary mapping each group to its associated secret collections.
 
@@ -132,3 +132,36 @@ def get_secret_collections() -> Dict[str, List[str]]:
             result[group_name] = sorted(collections)
 
     return result
+
+
+def get_collections() -> Set[str]:
+    """
+    Returns a set of all existing collections.
+
+    Returns:
+        Set[str]: A set containing all secret collections.
+    """
+    colls_dict = get_group_collections()
+    colls_set = set()
+
+    for _, collections in colls_dict.items():
+        for c in collections:
+            colls_set.add(c)
+
+    return colls_set
+
+
+def check_if_collection_exists(collection: str) -> bool:
+    """
+    Verifies that the collection exists in the configuration file
+    in the release repository (source of truth).
+
+    Args:
+        collection (str): Name of the collection to check.
+
+    Returns:
+        bool: True if collection is one of the defined collections
+        in the configuration file, False otherwise.
+    """
+    s = get_collections()
+    return collection in s

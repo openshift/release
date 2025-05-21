@@ -1,0 +1,68 @@
+ref:
+  as: openshift-qe-virt-udn-density
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-virt-udn-density-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  - namespace: test-credentials
+    name: ocp-perfscale-horreum-poc
+    mount_path: /horreum-secret
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Add args for e2e-benchmarking kube-burner-ocp cmd.
+  - name: E2E_VERSION
+    default: "v2.3.0"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: VMI_READY_THRESHOLD
+    default: "90s"
+    documentation: |-
+      VMI ready timeout threshold
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: ENABLE_L3
+    default: "false"
+    documentation: |-
+      False by default, which means UDN layer2 is used instead by default.
+  - name: ITERATIONS
+    default: "100"
+    documentation: |-
+      Number of namespaces with P-UDN to be created, each namespace comes with 2 VMs
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local-indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resouce
+  documentation: >-
+    This step runs the perfscale virt-density-udn workload in the deployed cluster, needs CNV to be deployed.

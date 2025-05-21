@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-JIRA_TOKEN="$(</var/run/bugwatcher/jira-token)"
+JIRA_TOKEN="$(</var/run/ghira/jira-token)"
 GITHUB_TOKEN="$(</var/run/ghira/github-token)"
 PEOPLE="$(</var/run/team/people.yaml)"
 TEAM="$(</var/run/team/team.yaml)"
