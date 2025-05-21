@@ -222,25 +222,11 @@ function copy_spoke_kubeconfig_to_bastion_location {
 
 }
 
-function test_kpis {
-
-  echo "************ telcov10n Run KPIs tests ************"
-
-  # TODO: Run all KPIs testing from this point onward
-
-  copy_spoke_kubeconfig_to_bastion_location
-
-  echo
-  echo "Running KPIs tests..."
-  echo
-
-}
-
 function main {
   set_spoke_cluster_kubeconfig
   install_test_tools
   test_spoke_deployment
-  test_kpis
+  copy_spoke_kubeconfig_to_bastion_location
 }
 
 main
