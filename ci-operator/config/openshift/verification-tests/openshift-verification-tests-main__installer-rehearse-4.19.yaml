@@ -40,10 +40,15 @@ tests:
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-usgov-qe
     env:
-      CUSTOM_REGION_LIST: ap-southeast-7
-    workflow: cucushift-installer-rehearse-aws-cases-all-regions
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace-provision
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
