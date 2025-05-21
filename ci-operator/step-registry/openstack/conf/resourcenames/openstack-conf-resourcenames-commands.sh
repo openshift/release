@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # Set the LEASED_RESOURCE as the CLUSTER_TYPE in case of 
 # using openstack-vh-bm-rhos static pool of resources
 # https://issues.redhat.com/browse/OSASINFRA-3795
-[[ "$LEASED_RESOURCE" == openstack* ]] && CLUSTER_TYPE="${LEASED_RESOURCE}"
+[[ "${LEASED_RESOURCE:-}" == openstack* ]] && CLUSTER_TYPE="${LEASED_RESOURCE}"
 
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
 
