@@ -6,19 +6,40 @@ set -x
 
 LAB_CLOUD="${LAB_CLOUD:-}"
 
-SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 if [ -z "${RUNLOCAL:-}" ]; then
   bastion=$(cat "/bm/address")
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 else
-  bastion=localhost
+  bastion=$BASTION
+  SSH_ARGS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 fi
 
-REPO_NAME=${REPO_NAME:-}
-PULL_NUMBER=${PULL_NUMBER:-}
+#regulus_repo="/root/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
+regulus_repo="/root/regulus-${LAB_CLOUD}"
+crucible_install="/root/crucible-internal"
 
-regulus_repo="/root/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
+install-crucible() {
+  # Setup Bastion
+  ssh ${SSH_ARGS} root@${bastion} "
+    set -e
+    set -o pipefail
 
-function install-regulus {
+    if [ -d  /opt/crucible ] ; then
+        rm -fr /opt/crucible
+    fi
+    if [ -d  ${crucible_install} ] ; then
+        rm -fr  ${crucible_install}
+    fi
+    git clone -c http.sslVerify=false https://gitlab.cee.redhat.com/atheurer/crucible-internal.git ${crucible_install}
+    if [ -d  /root/.crucible ] ; then
+        rm -fr  /root/.crucible
+    fi
+    mkdir -p /root/.crucible && echo -e \"CRUCIBLE_NAME=cpt\nCRUCIBLE_EMAIL=cpt@example.com\" > /root/.crucible/identity
+    cd  ${crucible_install} && bash ./rh-install-crucible.sh
+  "
+}
+
+install-regulus() {
   # Setup Bastion
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
@@ -26,21 +47,31 @@ function install-regulus {
     if [ -d  ${regulus_repo} ] ; then
         rm -fr  ${regulus_repo}
     fi
+    dnf install -y bc
     git clone https://github.com/HughNhan/regulus.git --depth=1 --branch=${REG_BRANCH:-main} ${regulus_repo}
     cd ${regulus_repo}
     # REG_PR or PULL_NUMBER can't be set at the same time
     if [[ -n '${REG_PR}' ]]; then
-     git pull origin pull/${REG_PR}/head:${REG_PR} --rebase
-     git switch ${REG_PR}
+        git pull origin pull/${REG_PR}/head:${REG_PR} --rebase
+        git switch ${REG_PR}
     elif [[ -n '${PULL_NUMBER}' ]] && [[ '${REPO_NAME}' == 'regulus' ]]; then
-     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
-     git switch ${PULL_NUMBER}
+        git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+        git switch ${PULL_NUMBER}
     fi
+
     git branch
   "
 }
 
-install-regulus
+# Install Crucible if it has not been
+if ssh ${SSH_ARGS} root@${bastion} 'command -v ccrucible >/dev/null'; then
+    echo "crucible exists"
+else
+    echo "crucible not found"
+    install-crucible
+fi
+
+install-regulus # Always install fresh Regulus
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Generate Regulus lab.config 
@@ -87,7 +118,7 @@ for v in "${vars[@]}"; do
     val="${!v:-}"
   fi
 
-  # Expand var=~/something to /root/something
+  # Expand var=~/something to /root/something. Example  KUBECONFIG_PATH=~/mno/kubeconfig
   if [[ "$val" == ~* ]]; then
     val="${val/#\~\//\/root/}"
   fi
@@ -98,23 +129,20 @@ for v in "${vars[@]}"; do
 done
 
 # ───────────────────────────────────────────────────────────────────────────
-# Init Regulus and execute test suite. See jobs.config of $REG_BRANCH
+# Launch Regulus (tests are spec'ed in repo's jobs.config)
 # ───────────────────────────────────────────────────────────────────────────
-
-function run-regulus {
+run-regulus() {
   echo scp -q ${SSH_ARGS} /tmp/lab.config  root@${bastion}:${regulus_repo}/ 
   scp -q ${SSH_ARGS} /tmp/lab.config  root@${bastion}:${regulus_repo}/ 
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
     set -o pipefail
     cd ${regulus_repo}
-    source bootstrap.sh
-    make init-lab 
-    make init-jobs 
-    #make jobs
+    bash ./run_cpt.sh
   "
 }
 
+# echo skip 
 run-regulus
 
 # EOF
