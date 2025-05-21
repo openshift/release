@@ -2,34 +2,32 @@
 
 set -e
 
-echoerr() {
-    printf '%s\n' "$*" 1>&2
-}
-
 _curl_qm() {
-    curl -s --resolve "$endpoint_resolve" --cacert "$queue_manager_tls_crt" -H "Authorization: Bearer $queue_manager_auth_token" "$@" 2>/dev/null
+    curl \
+        -s \
+        --resolve "${queue_manager_tls_host}:443:${queue_manager_tls_ip}" \
+        --cacert "$queue_manager_tls_crt" \
+        -H "Authorization: Bearer $queue_manager_auth_token" \
+        "$@" \
+        2>/dev/null
 }
 
 _curl_jobs_submit() {
-    _curl_qm -X POST "$queue_url/jobs/submit?pullnumber=$1&pull_pull_sha=$2&pickup=1"
+    _curl_qm -X POST "https://$queue_manager_tls_host/jobs/submit?pullnumber=$1&pull_pull_sha=$2&pickup=1"
 }
 
 _curl_jobs_retrieve() {
-    _curl_qm -X POST "${queue_url}/jobs/retrieve?uuid=$1"
+    _curl_qm -X POST "https://$queue_manager_tls_host/jobs/retrieve?uuid=$1"
 }
 
 _json_get() {
-    printf '%s' "$1" | jq -r "$2"
+    printf '%s' "$1" | jq -r "$2" 2>/dev/null
 }
 
 queue_manager_tls_host=$(cat "/var/run/token/e2e-test/queue-manager-tls-host")
 queue_manager_tls_ip=$(cat "/var/run/token/e2e-test/queue-manager-tls-ip")
 queue_manager_auth_token=$(cat "/var/run/token/jenkins-secrets/queue-manager-auth-token")
 queue_manager_tls_crt="/var/run/token/jenkins-secrets/queue-manager-tls-crt"
-
-queue_url="https://$queue_manager_tls_host"
-endpoint_resolve="${queue_manager_tls_host}:443:${queue_manager_tls_ip}"
-
 
 echo "Handling pull request https://github.com/openshift/dpu-operator/pull/$PULL_NUMBER , git-sha=$PULL_PULL_SHA"
 
