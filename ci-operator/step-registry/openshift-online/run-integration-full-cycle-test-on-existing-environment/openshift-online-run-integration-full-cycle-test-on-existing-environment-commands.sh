@@ -18,4 +18,4 @@ export TEST_SUPPORT_OFFLINE_TOKEN; TEST_SUPPORT_OFFLINE_TOKEN=$(cat /var/run/int
 export TEST_USER_ACCESS_KEY_ID; TEST_USER_ACCESS_KEY_ID=$(cat /var/run/integration-tokens/TEST_USER_ACCESS_KEY_ID)
 export TEST_USER_SECRET; TEST_USER_SECRET=$(cat /var/run/integration-tokens/TEST_USER_SECRET)
 
-./run_integration_tests.sh
+./run_integration_full_cycle_tests.sh
