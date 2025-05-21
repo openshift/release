@@ -57,6 +57,9 @@ chain:
     - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
       default: "false"
       documentation: "If true, render artifacts to ${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE
+      default: "false"
+      documentation: "When used along --render it enables rendering of secrets."
     - name: HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE
       default: "false"
       documentation: "If set to true, it sets the --node-upgrade-type flag to InPlace"
@@ -147,7 +150,11 @@ chain:
       fi
       
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
-        "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+        COMMAND+=(--render)
+        if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
+          COMMAND+=(--render-sensitive)
+        fi
+        "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
       
