@@ -1,0 +1,43 @@
+base_images:
+  ci_cli-ocm_latest:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  origin_4.16_cli:
+    name: "4.16"
+    namespace: origin
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+images:
+- dockerfile_literal: |
+    FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
+  inputs:
+    ci_cli-ocm_latest:
+      as:
+      - registry.ci.openshift.org/ci/cli-ocm:latest
+    origin_4.16_cli:
+      as:
+      - registry.ci.openshift.org/origin/4.16:cli
+    src:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+  to: ocm-cli
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+    tag_by_commit: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: ocm-cli
+  variant: images
