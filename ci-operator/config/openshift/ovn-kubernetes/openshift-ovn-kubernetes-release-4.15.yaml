@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
 build_root:
   image_stream_tag:
     name: release
@@ -355,6 +359,15 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     workflow: openshift-e2e-aws-sdn
   timeout: 4h0m0s
+- as: e2e-aws-ovn-fdp-qe
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PARALLEL: "1"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
