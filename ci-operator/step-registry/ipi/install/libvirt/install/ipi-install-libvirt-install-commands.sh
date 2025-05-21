@@ -217,6 +217,7 @@ then
 		# We need to save the individual return codes for the pipes
 		printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE}
 	} &
+	sleep 1201
 	wait "$!"
 
 	# shellcheck source=/dev/null
