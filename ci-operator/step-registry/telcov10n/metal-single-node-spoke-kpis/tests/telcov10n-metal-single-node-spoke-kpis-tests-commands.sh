@@ -189,6 +189,16 @@ function test_spoke_deployment {
   echo "-----------------------------------------------------"
   oc get clusterversion
   echo
+
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    echo
+    echo "------------------------ Spoke Details --------------------------------------------------------"
+    echo "kubeconfig: export KUBECONFIG=${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
+    echo "Console: $(oc --kubeconfig ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml whoami --show-console)"
+    secret_adm_pass=${SPOKE_CLUSTER_NAME}-admin-password
+    cat ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml || echo
+    echo
+  fi
 }
 
 function copy_spoke_kubeconfig_to_bastion_location {
