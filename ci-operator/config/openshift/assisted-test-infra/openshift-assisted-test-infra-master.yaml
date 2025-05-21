@@ -370,6 +370,27 @@ tests:
       TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
+  as: e2e-metal-assisted-kube-api-late-binding-sno-4-18
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
+        WORKER_CPU=3
+        WORKER_MEMORY=10240
+        OPENSHIFT_VERSION=4.18
+      CLUSTERTYPE: assisted_large_el9
+      POST_INSTALL_COMMANDS: |
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
+        export SET_INFRAENV_VERSION=true
+        make deploy_assisted_operator test_kube_api_parallel
+    workflow: assisted-ofcir-baremetal
+- always_run: false
   as: e2e-metal-assisted-kube-api-late-binding-sno-4-19
   cluster: build05
   optional: true

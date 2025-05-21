@@ -79,6 +79,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: upi-installer
+  virtctl:
+    name: "4.20"
+    namespace: ocp
+    tag: virtctl
   vsphere-ci-python:
     name: vsphere-python
     namespace: ci
@@ -268,7 +272,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-virtualmedia
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 168h
@@ -339,6 +343,8 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
         FEATURE_SET=TechPreviewNoUpgrade
     observers:
       enable:
@@ -380,6 +386,9 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
+        PROVISIONING_NETWORK="172.23.0.0/16"
         FEATURE_SET=TechPreviewNoUpgrade
     observers:
       enable:
@@ -437,14 +446,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
-- as: metal-ovn-network-flow-matrix-bm-single-node
-  cron: 0 23 * * 0,2,4,6
-  steps:
-    cluster_profile: equinix-edge-enablement
-    test:
-    - ref: network-flow-matrix-tests
-    - ref: baremetalds-sno-test
-    workflow: baremetalds-sno
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -645,6 +646,16 @@ tests:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
   timeout: 6h0m0s
+- as: e2e-vsphere-ovn-hybrid-env
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      NETWORK_TYPE: multi-tenant
+    workflow: openshift-e2e-vsphere-hybrid-env
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -832,7 +843,7 @@ tests:
         CNF_E2E_TESTS=false
         CNF_ORIGIN_TESTS=true
       T5CI_JOB_TYPE: origintests
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     observers:
       enable:
       - observers-resource-watch
@@ -840,7 +851,7 @@ tests:
 - as: e2e-telco5g-cnftests
   capabilities:
   - intranet
-  cron: 00 18 */1 * 1-5
+  cron: 00 10 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -848,7 +859,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     observers:
       enable:
       - observers-resource-watch
@@ -865,7 +876,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     observers:
       enable:
       - observers-resource-watch
@@ -879,7 +890,7 @@ tests:
     env:
       SKIP_OCP_INSTALL: "false"
       T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     observers:
       enable:
       - observers-resource-watch
@@ -895,11 +906,27 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     observers:
       enable:
       - observers-resource-watch
     workflow: telco5g-hcp-cnf
+- as: e2e-telco5g-sno-ztp-cnftests
+  capabilities:
+  - intranet
+  cron: 00 20 */1 * 1-5
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: sno-ztp-cnftests
+      T5CI_VERSION: "4.20"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-sno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
   cron: 0 23 * * 2,5
@@ -907,7 +934,7 @@ tests:
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-bm
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     observers:
       enable:
       - observers-resource-watch
@@ -919,7 +946,7 @@ tests:
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-single-node-bm
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     observers:
       enable:
       - observers-resource-watch
@@ -1102,12 +1129,16 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
-- as: e2e-agent-single-node-ipv6
+- as: e2e-agent-single-node-ipv6-conformance
   cluster: build05
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-sno-ipv6
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
 - as: e2e-agent-ha-dualstack-conformance
   cluster: build05

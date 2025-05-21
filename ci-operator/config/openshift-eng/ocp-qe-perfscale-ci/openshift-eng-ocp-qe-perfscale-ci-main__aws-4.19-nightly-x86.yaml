@@ -39,6 +39,7 @@ tests:
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      IGNORE_JOB_ITERATIONS: "true"
       ITERATION_MULTIPLIER_ENV: "15"
       OUTPUT_FORMAT: JUNIT
       RUN_ORION: "true"
@@ -174,6 +175,19 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-heavy-ipsec-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 5h0m0s
 - always_run: false
   as: payload-node-density-heavy-6nodes
@@ -395,6 +409,53 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: openshift-qe-workers-scale
     workflow: openshift-qe-udn-density-pods
+  timeout: 8h0m0s
+- always_run: false
+  as: udn-density-l2-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_LAYER_3: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      VERSION: "4.19"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
+- always_run: false
+  as: udn-density-l3-ipsec-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ITERATION_MULTIPLIER_ENV: "3"
+      VERSION: "4.19"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
+- always_run: false
+  as: udn-density-l2-ipsec-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_LAYER_3: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      VERSION: "4.19"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main

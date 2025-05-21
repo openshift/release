@@ -44,6 +44,8 @@ helm_gitea_values=$(mktemp --dry-run)
 gitea_admin_pass="$(cat /var/run/telcov10n/ztp-left-shifting/gitea-admin-pass)"
 
 cat <<EOF > ${helm_gitea_values}
+replicaCount: 1
+
 image:
   registry: "${GITEA_REGISTRY}"
   repository: "${GITEA_REPO}"

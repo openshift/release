@@ -126,6 +126,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-fips-serial
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: gcp-3
     env:
@@ -304,6 +305,20 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial
 - always_run: false
+  as: e2e-aws-ovn-serial-publicnet
+  optional: true
+  shard_count: 2
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-serial
+- always_run: false
   as: e2e-aws-ovn-virt-techpreview
   optional: true
   steps:
@@ -453,6 +468,7 @@ tests:
 - as: e2e-metal-ipi-serial
   cluster: build05
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -463,6 +479,7 @@ tests:
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -614,6 +631,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-openstack-ipi
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-cgroupsv2
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -690,6 +708,7 @@ tests:
 - always_run: false
   as: e2e-gcp-ovn-techpreview-serial
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: gcp
     env:
