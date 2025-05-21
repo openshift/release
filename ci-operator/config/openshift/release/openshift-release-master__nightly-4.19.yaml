@@ -268,7 +268,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-virtualmedia
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 168h
@@ -442,14 +442,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
-- as: metal-ovn-network-flow-matrix-bm-single-node
-  cron: 0 23 * * 0,2,4,6
-  steps:
-    cluster_profile: equinix-edge-enablement
-    test:
-    - ref: network-flow-matrix-tests
-    - ref: baremetalds-sno-test
-    workflow: baremetalds-sno
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -1135,12 +1127,16 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
-- as: e2e-agent-single-node-ipv6
+- as: e2e-agent-single-node-ipv6-conformance
   cluster: build05
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-sno-ipv6
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
 - as: e2e-agent-ha-dualstack-conformance
   cluster: build05
