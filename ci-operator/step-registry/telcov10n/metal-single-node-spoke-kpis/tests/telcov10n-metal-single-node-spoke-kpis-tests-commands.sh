@@ -233,6 +233,13 @@ function test_kpis {
   echo "Running KPIs tests..."
   echo
 
+  kpi_test_code=/tmp/kpi_tests_repo
+
+  if [ ! -d ${kpi_test_code} ]; then
+    GIT_SSL_NO_VERIFY=true git clone https://gitlab.cee.redhat.com/ran/ran-integration.git ${kpi_test_code} || echo
+  fi
+
+  ls -l ${kpi_test_code}/scripts/test_oslat.sh || echo
 }
 
 function main {
