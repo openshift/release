@@ -5,6 +5,7 @@ set -o pipefail
 set -x
 
 LAB_CLOUD="${LAB_CLOUD:-}"
+BASTION="${BASTION:-}"
 
 if [ -z "${RUNLOCAL:-}" ]; then
   bastion=$(cat "/bm/address")
