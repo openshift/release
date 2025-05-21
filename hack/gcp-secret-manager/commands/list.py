@@ -10,7 +10,7 @@ from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
     ensure_authentication,
-    get_secret_collections,
+    get_group_collections,
     validate_collection,
 )
 
@@ -51,7 +51,7 @@ def list_secrets(output: str, collection: str, group: str):
         list_secrets_for_collection(collection, output)
         return
 
-    collections_dict = get_secret_collections()
+    collections_dict = get_group_collections()
     if group != "":
         list_collections_for_group(collections_dict, group, output)
     else:
