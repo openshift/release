@@ -1,111 +1,63 @@
 base_images:
-  tests-base:
+  ansible:
     name: "4.19"
     namespace: ocp
-    tag: tests
-binary_build_commands: |
-  # The CentOS 8 build root does not have golang package installed so that we
-  # use the golang installed by Kata Containers setup script. Here it is
-  # ensured the tools are searcheable.
-  export GOPATH=/go
-  export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
-build_root:
-  project_image:
-    dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
-images:
-- dockerfile_literal: |
-    FROM bin
-    RUN dnf install -y --nobest gettext jq
-  from: bin
-  to: with-deps
-- dockerfile_literal: |
-    FROM tests-base
-    RUN mv /usr/bin/openshift-tests /usr/bin/openshift-tests-original
-    ADD https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/kata-containers/kata-containers/wrapped-openshift-tests.sh /
-    RUN cat /wrapped-openshift-tests.sh | tr -d '\r' > /usr/bin/openshift-tests
-    RUN chmod +x /usr/bin/openshift-tests
-  from: tests-base
-  to: tests
+    tag: ansible
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  openstack-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 releases:
-  initial:
-    integration:
-      name: "4.19"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.19"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.19"
 resources:
   '*':
     requests:
       cpu: 100m
-      memory: 2Gi
+      memory: 200Mi
 tests:
-- as: e2e-tests
-  cron: 2 7 * * *
+- as: azure-ipi-kata
+  cron: '@yearly'
   steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    cluster_profile: azure4
+    cluster_profile: azure-qe
     env:
-      TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --run ^\[sig-node\].*|^\[sig-network\] '
-      TEST_SKIPS: \[sig-node\] Pods Extended Pod Container Status should never report\|\[sig-node\]
-        Sysctls.*should support sysctls\|\[sig-node\] Pods Extended Pod Container
-        Status should never report success for a pending container\|\[sig-node\] Security
-        Context should support seccomp runtime/default\|\[sig-node\] Variable Expansion
-        should allow substituting values in a volume subpath\|\[k8s.io\] Probing container
-        should be restarted with a docker exec liveness probe with timeout\|\[sig-node\]
-        Pods Extended Pod Container lifecycle evicted pods should be terminal\|\[sig-node\]
-        PodOSRejection \[NodeConformance\] Kubelet should reject pod when the node
-        OS doesn't match pod's OS\|\[sig-network\].*for evicted pods\|\[sig-network\].*HAProxy
-        router should override the route\|\[sig-network\].*HAProxy\|\[sig-network\].*all
-        sysctl on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
-        pods should successfully create sandboxes by adding pod to network\|\[sig-network\].*should
-        create pingable pods with vlan interface on an in-container master\|\[sig-network\].*should
-        create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
-        create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
-        in writing subpaths in container
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_AZURE_REGION: eastus
+      SLEEP_DURATION: 2h
+      SPOT_INSTANCES: "false"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;41566
+      TEST_SCENARIOS: Kata
+      TEST_TIMEOUT: "75"
+    post:
+    - ref: cucushift-installer-wait
+    - chain: ipi-azure-post
     pre:
-    - chain: ipi-azure-pre
-    - as: kata-containers-e2e-pre
-      cli: latest
-      commands: |
-        # oc is made available to this script via cli configuration, but
-        # kubectl is not. Since kubectl is used by kata-webhook scripts,
-        # thus it is created a symlink to oc.
-        pushd "$CLI_DIR"
-        if [ ! -f kubectl ]; then
-            ln -s oc kubectl
-        fi
-        popd
-        # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
-        # which causes openshift-tests to fail.
-        export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
-
-        # Get the current latest kata-containers image
-        TAGS="$(curl https://quay.io/api/v1/repository/kata-containers/kata-deploy-ci/tag/?onlyActiveTags=true)"
-        DIGEST=$(echo "$TAGS" | jq -r '.tags[] | select(.name | contains("kata-containers-latest-amd64")) | .manifest_digest')
-        export KATA_DEPLOY_IMAGE="quay.io/kata-containers/kata-deploy-ci:$(echo "$TAGS" | jq -r '.tags[] | select(.manifest_digest | contains("'"$DIGEST"'")) | .name' | grep -v "kata-containers-latest-amd64")"
-        echo "KATA_DEPLOY_IMAGE=$KATA_DEPLOY_IMAGE"
-
-        # The installer is instructed to configure kata containers to use
-        # QEMU from the RHCOS extension and host's kernel.
-        export KATA_WITH_SYSTEM_QEMU="yes"
-        export KATA_WITH_HOST_KERNEL="yes"
-        export KATA_RUNTIME="kata-qemu"
-        # Install Kata Containers and run a smoke test.
-        ci/openshift-ci/test.sh
-
-        # Deploy the kata-webhook so that the tests ran on next step of the
-        # workflow will use the kata runtime.
-        ci/openshift-ci/cluster/deploy_webhook.sh
-      from: with-deps
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-azure
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    test:
+    - chain: openshift-e2e-test-qe
 zz_generated_metadata:
   branch: main
   org: kata-containers

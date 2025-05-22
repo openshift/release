@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build07
-  cron: 2 7 * * *
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -11,21 +11,10 @@ periodics:
     repo: kata-containers
   labels:
     ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kata-containers-kata-containers-main-e2e-tests
-  reporter_config:
-    slack:
-      channel: '#kata-ocp-ci-reports'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
+  name: periodic-ci-kata-containers-kata-containers-main-azure-ipi-kata
   spec:
     containers:
     - args:
@@ -34,7 +23,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-tests
+      - --target=azure-ipi-kata
       command:
       - ci-operator
       image: ci-operator:latest
