@@ -23,13 +23,31 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
-# # download kube-burner-ocp
-# KUBE_BURNER_VERSION=1.6.8
+# ES_SERVER=${ES_SERVER=https://USER:PASSWORD@HOSTNAME:443}
+LOG_LEVEL=${LOG_LEVEL:-debug}
 
-git clone https://github.com/kube-burner/kube-burner-ocp.git --branch main --depth 1
-pushd kube-burner-ocp
-make build
-./bin/amd64/kube-burner-ocp olm -h
+# download kube-burner-ocp
+KUBE_DIR=${KUBE_DIR:-/tmp}
+KUBE_BURNER_VERSION=${KUBE_BURNER_VERSION:-1.6.8}
+PERFORMANCE_PROFILE=${PERFORMANCE_PROFILE:-default}
+CHURN=${CHURN:-true}
+PPROF=${PPROF:-true}
+ARCHIVE=${ARCHIVE:-true}
+WORKLOAD=${WORKLOAD:?}
+QPS=${QPS:-20}
+BURST=${BURST:-20}
+GC=${GC:-true}
+EXTRA_FLAGS=${EXTRA_FLAGS:-}
+UUID=${UUID:-$(uuidgen)}
+
+
+KUBE_BURNER_URL="https://github.com/kube-burner/kube-burner-ocp/releases/download/v${KUBE_BURNER_VERSION}/kube-burner-ocp-V${KUBE_BURNER_VERSION}-linux-x86_64.tar.gz"
+curl --fail --retry 8 --retry-all-errors -sS -L "${KUBE_BURNER_URL}" | tar -xzC "${KUBE_DIR}/" kube-burner-ocp
+
+# git clone https://github.com/kube-burner/kube-burner-ocp.git --branch main --depth 1
+# pushd kube-burner-ocp
+# make build
+# ./bin/amd64/kube-burner-ocp olm -h
 
 # REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 # LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
@@ -41,6 +59,18 @@ make build
 export ITERATIONS=30
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
+  METADATA=$(cat << EOF
+{
+"uuid": "${UUID}",
+"workload": "${WORKLOAD}",
+"mgmtClusterName": "${MC_NAME}",
+"hostedClusterName": "${HC_NAME}",
+"timestamp": "$(date +%s%3N)"
+}
+EOF
+)
+
+
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
@@ -51,7 +81,7 @@ export ADDITIONAL_PARAMS
 
 export WORKLOAD=olm LOG_LEVEL=debug
 
-cmd="./bin/amd64/kube-burner-ocp ${WORKLOAD} --log-level=${LOG_LEVEL} --qps=${QPS} --burst=${BURST} --gc=${GC} --uuid ${UUID} --iterations=${ITERATIONS}"
+cmd="${KUBE_DIR}/kube-burner-ocp ${WORKLOAD} --log-level=${LOG_LEVEL} --qps=${QPS} --burst=${BURST} --gc=${GC} --uuid ${UUID} --iterations=${ITERATIONS}"
 
 # If ES_SERVER is specified
 if [[ -n ${ES_SERVER} ]]; then
@@ -102,4 +132,3 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
 fi
 
 echo "OLMv1 benchmark test finised"
-
