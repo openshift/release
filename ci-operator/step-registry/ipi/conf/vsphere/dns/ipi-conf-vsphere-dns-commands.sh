@@ -28,7 +28,7 @@ dns_reserve_and_defer_cleanup() {
     \"Action\": \"DELETE\",
     \"ResourceRecordSet\": {
       \"Name\": \"$hostname\",
-      \"Type\": \"A\",
+      \"Type\": \"$recordtype\",
       \"TTL\": 60,
       \"ResourceRecords\": [{\"Value\": \"$record\"}]
     }

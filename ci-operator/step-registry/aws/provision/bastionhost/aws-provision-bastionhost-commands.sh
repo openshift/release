@@ -75,10 +75,19 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   fi
   #Use 4.18 RHCOS image as the boot image of bastion by default
   bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
-  curl -sL "${bastion_image_list_url}" -o /tmp/bastion-image.json
+  if ! curl -sSLf --retry 3 --connect-timeout 30 --max-time 60 -o /tmp/bastion-image.json "${bastion_image_list_url}"; then
+    echo "ERROR: Failed to download RHCOS image list from ${bastion_image_list_url}" >&2
+    exit 1
+  fi
+
+  if ! jq empty /tmp/bastion-image.json &>/dev/null; then
+    echo "ERROR: Downloaded file is not valid JSON" >&2
+    exit 1
+  fi
+
   ami_id=$(jq -r --arg r ${REGION} '.architectures.x86_64.images.aws.regions[$r].image // ""' /tmp/bastion-image.json)
   if [[ ${ami_id} == "" ]]; then
-    echo "Bastion host AMI was found in region ${REGION}, exit now." && exit 1
+    echo "Bastion host AMI was NOT found in region ${REGION}, exit now." && exit 1
   fi
 
   ign_location="s3://${s3_bucket_name}/bastion.ign"
