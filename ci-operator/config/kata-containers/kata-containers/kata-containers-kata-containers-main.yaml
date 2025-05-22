@@ -1,26 +1,26 @@
 base_images:
   ansible:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: ansible
   cli:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: cli
   openstack-installer:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: openstack-installer
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.18"
+    tag: "4.19"
   tools:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -28,7 +28,7 @@ releases:
     release:
       architecture: amd64
       channel: candidate
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -42,7 +42,9 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_AZURE_REGION: eastus
       SLEEP_DURATION: 2h
+      SPOT_INSTANCES: "false"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;41566
       TEST_SCENARIOS: Kata
       TEST_TIMEOUT: "75"
@@ -50,7 +52,10 @@ tests:
     - ref: cucushift-installer-wait
     - chain: ipi-azure-post
     pre:
-    - chain: ipi-azure-pre
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
     test:
     - chain: openshift-e2e-test-qe
 zz_generated_metadata:
