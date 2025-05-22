@@ -30,10 +30,14 @@ tests:
   steps:
     test:
     - ref: openshift-online-run-integration-test-on-existing-environment
+- as: integration-full-cycle
+  steps:
+    test:
+    - ref: openshift-online-run-integration-full-cycle-test-on-existing-environment
 - as: unit-as-ginkgo
   commands: |
     unset GOFLAGS
-    make test ginkgo_junit_report=${ARTIFACT_DIR}/junit-ginkgo-unit-junit.xml
+    make test ginkgo_junit_report=${ARTIFACT_DIR}/junit-ginkgo-unit-junit.xml artifact_dir=${ARTIFACT_DIR}
     # Ensure generated junit has a useful suite name
     sed -i 's/\(<testsuite.*\)name=""/\1 name="ginkgo-unit"/' "${ARTIFACT_DIR}/junit-ginkgo-unit-junit.xml"
   container:

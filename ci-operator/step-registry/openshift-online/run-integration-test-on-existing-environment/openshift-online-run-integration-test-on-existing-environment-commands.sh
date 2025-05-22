@@ -7,8 +7,6 @@ set -o verbose
 
 unset GOFLAGS
 
-ls -alh /var/run/integration-tokens
-
 export OSD_ADMIN_ACCESS_KEY_ID; OSD_ADMIN_ACCESS_KEY_ID=$(cat /var/run/integration-tokens/OSD_ADMIN_ACCESS_KEY_ID)
 export OSD_ADMIN_SECRET; OSD_ADMIN_SECRET=$(cat /var/run/integration-tokens/OSD_ADMIN_SECRET)
 export SHARED_VPC_ACCESS_KEY_ID; SHARED_VPC_ACCESS_KEY_ID=$(cat /var/run/integration-tokens/SHARED_VPC_ACCESS_KEY_ID)
