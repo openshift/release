@@ -210,3 +210,61 @@ $ oc get secrets --selector=ci.openshift.io/managed=true --export -o yaml -n ci 
 $ oc get secrets --selector=ci.openshift.io/managed=true --export -o yaml -n $TEST_NS > proposed.yaml
 $ diff prod.yaml proposed.yaml
 ```
+
+## Using Secrets to retrieve Credentials
+
+You need a pull secret to access registries or services that require authentication.
+Below are examples of how to use the available credentials to pull images from the 
+Red Hat registry.
+
+### If your container has OpenShift installed
+
+The credentials are already available at:
+
+```shell
+/var/run/secrets/ci.openshift.io/cluster-profile/pull-secret
+```
+
+**Example:**
+```shell
+podman pull --authfile /var/run/secrets/ci.openshift.io/cluster-profile/pull-secret registry.redhat.io/<image>:<tag>
+```
+
+### If your container does **not** run on OpenShift
+
+You can mount the credentials manually in your pod like this:
+
+```yaml
+- as: my-example-job
+  steps:
+    test:
+      - as: my-example-job
+        commands: |
+          REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test
+        credentials:
+          - mount_path: /var/run/secrets/ci-pull-credentials
+            name: ci-pull-credentials
+            namespace: ci
+        from: src
+        resources:
+          requests:
+            cpu: 100m
+```
+
+Then, the credentials will be available at:
+
+```shell
+/var/run/secrets/ci-pull-credentials/.dockerconfigjson
+```
+
+**Example:**
+
+```shell
+podman pull --authfile /var/run/secrets/ci-pull-credentials/.dockerconfigjson registry.redhat.io/<image>:<tag>
+```
+
+### Credentials used in CI jobs
+
+They are set up in this config file:
+
+[core-services/ci-secret-bootstrap/_config.yaml](./../core-services/ci-secret-bootstrap/_config.yaml)
