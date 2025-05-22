@@ -48,5 +48,5 @@ spec:
   calicoNetwork:
     ipPools:
       - cidr: 10.128.0.0/14
-        encapsulation: IPIPCrossSubnet
+        encapsulation: None
 EOF
