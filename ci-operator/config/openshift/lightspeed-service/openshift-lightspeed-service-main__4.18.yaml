@@ -3,6 +3,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
 build_root:
   project_image:
     dockerfile_literal: |
@@ -300,12 +304,17 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-observability
     env:
+      OPERATORS: |
+        [
+            {"name": "lightspeed-operator", "source": "cs-redhat-operator-index", "channel": "alpha", "install_namespace": "openshift-lightspeed","target_namespaces": ""},
+        ]
       SELF_MANAGED_ADDITIONAL_CA: "true"
       SELF_MANAGED_REGISTRY_CERT: "true"
     post:
     - ref: gather-must-gather
     test:
     - ref: openshift-lightspeed-service-install-disconnected
+    - ref: install-operators
     - as: e2e
       cli: latest
       commands: |
@@ -326,6 +335,8 @@ tests:
         export MODEL=gpt-3.5-turbo-1106
 
         export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
+
+        export DISCONNECTED="true"
 
         tests/scripts/test-e2e-cluster-periodics.sh
       credentials:
