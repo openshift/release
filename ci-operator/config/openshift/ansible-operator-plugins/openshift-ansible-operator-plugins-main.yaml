@@ -22,6 +22,24 @@ images:
 - dockerfile_path: openshift/ci/dockerfiles/ansible-e2e.Dockerfile
   from: openshift-ansible-operator-plugins
   to: ansible-operator-e2e
+- dockerfile_path: openshift/Dockerfile.requirements
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+  to: build-requirements
+- dockerfile_literal: |
+    FROM build-requirements AS builder
+
+    FROM src
+    RUN rm openshift/requirements*.txt
+    COPY --from=builder requirements*.txt openshift/
+  from: src
+  inputs:
+    build-requirements:
+      as:
+      - build-requirements
+  to: get-requirements
 promotion:
   to:
   - name: "4.20"
@@ -75,6 +93,12 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: verify-requirements
+  commands: |
+    git diff --exit-code
+  container:
+    from: get-requirements
+  run_if_changed: ^(images/ansible-operator/Pipfile*|openshift/install-ansible.sh|openshift/requirements*.txt|openshift/Dockerfile.requirements)$
 zz_generated_metadata:
   branch: main
   org: openshift
