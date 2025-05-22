@@ -177,71 +177,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
-- as: aws-ipi-disc-priv-sts-oc-mirror-basecap-none-f28-destructive
-  cron: 18 2 27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      MIRROR_BIN: oc-mirror
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-basecap-none-f14
-  cron: 15 11 5,19 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-mini-perm-f28-destructive
-  cron: 4 15 3 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.20
-    env:
-      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
-- as: aws-ipi-disc-priv-sts-efs-mini-perm-f14
-  cron: 27 21 16,30 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.20
-    env:
-      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-fips-f14
   cron: 31 9 10,26 * *
   steps:
@@ -255,7 +190,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-disc-priv-sts-ep-fips-f28-destructive
+- as: aws-ipi-disc-priv-sts-ep-oc-mirror-fips-f28-destructive
   cron: 8 16 15 * *
   steps:
     cluster_profile: aws-qe
@@ -264,6 +199,7 @@ tests:
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      MIRROR_BIN: oc-mirror
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -481,7 +417,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn
-- as: aws-ipi-localzone-byo-subnet-role-sts-mini-perm-f14
+- as: aws-ipi-localzone-byo-subnet-role-sts-kms-mini-perm-f14
   cron: 4 6 13,27 * *
   steps:
     cluster_profile: aws-1-qe
@@ -514,14 +450,15 @@ tests:
       ZONES_COUNT: "3"
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service
-- as: aws-ipi-localzone-byo-subnet-role-sts-f28-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service-byo-kms
+- as: aws-ipi-localzone-byo-subnet-role-sts-kms-f28-destructive
   cron: 44 14 16 * *
   steps:
     cluster_profile: aws-1-qe
     env:
       ASSIGN_ROLES_TO_SUBNETS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      EDGE_ZONES_LIST: us-east-1-mia-1a
       SUBNET_ROLES: |-
         [
           [
@@ -546,7 +483,7 @@ tests:
       ZONES_COUNT: "3"
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service-byo-kms
 - as: aws-ipi-localzone-fips-mini-perm-f14
   cron: 26 16 13,27 * *
   steps:
@@ -1034,7 +971,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn
-- as: aws-ipi-wavelength-byo-subnet-role-sts-mini-perm-f14
+- as: aws-ipi-wavelength-byo-subnet-role-sts-kms-mini-perm-f14
   cron: 42 14 10,26 * *
   steps:
     cluster_profile: aws-1-qe
@@ -1068,8 +1005,8 @@ tests:
       ZONES_COUNT: "3"
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service
-- as: aws-ipi-wavelength-byo-subnet-role-sts-f28-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service-byo-kms
+- as: aws-ipi-wavelength-byo-subnet-role-sts-kms-f28-destructive
   cron: 14 20 16 * *
   steps:
     cluster_profile: aws-1-qe
@@ -1077,6 +1014,7 @@ tests:
       ASSIGN_ROLES_TO_SUBNETS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       EDGE_ZONE_TYPES: wavelength-zone
+      EDGE_ZONES_LIST: us-east-1-mia-1a
       SUBNET_ROLES: |-
         [
           [
@@ -1101,7 +1039,7 @@ tests:
       ZONES_COUNT: "3"
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service-byo-kms
 - as: aws-ipi-wavelength-byo-subnet-ovn-mtu-day2-f7
   cron: 13 20 7,14,21,28 * *
   steps:
@@ -3247,6 +3185,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe
     env:
+      API_CALL_TIMEOUT: "30"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_GATES: '["NutanixMultiSubnets=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -3259,6 +3198,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe
     env:
+      API_CALL_TIMEOUT: "30"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_GATES: '["NutanixMultiSubnets=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -3403,6 +3343,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe-zone
     env:
+      API_CALL_TIMEOUT: "30"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_GATES: '["NutanixMultiSubnets=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -3415,6 +3356,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe-zone
     env:
+      API_CALL_TIMEOUT: "30"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_GATES: '["NutanixMultiSubnets=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -3588,6 +3530,9 @@ tests:
   cron: 20 8 3,10,19,26 * *
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      MULTI_STAGE_OVERRIDE_CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      MULTI_STAGE_OVERRIDE_NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
