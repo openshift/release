@@ -216,6 +216,8 @@ fi
 # This check is applicable for all CAPI install*
 # For now, it will be enabled for 4.19+ only.*
 # We will enable the check on the previous versions depending on the backport
+#
+# C2S/SC2S emulator uses single AZ, skip check for them.
 # ----------------------------------------------------------
 
 all_equal() {
@@ -241,7 +243,7 @@ if [ -f "${SHARED_DIR}/unset-proxy.sh" ] ; then
   source "${SHARED_DIR}/unset-proxy.sh"
 fi
 
-if ((ocp_major_version == 4 && ocp_minor_version >= 19)); then
+if ((ocp_major_version == 4 && ocp_minor_version >= 19)) && [[ ! "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
 
   echo "Check if instances match CPMS spec ... "
 
