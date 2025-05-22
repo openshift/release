@@ -19,10 +19,12 @@ echo "SHARED_DIR=${SHARED_DIR}"
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "KUBECONFIG=${KUBECONFIG}"
 
+ROX_SCANNER_V4:${ROX_SCANNER_V4_ENABLED:-true}
+echo "ROX_SCANNER_V4:${ROX_SCANNER_V4}"
+
 export SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
+echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS}"
 SCANNER_V4_MATCHER_READINESS_MAX_WAIT=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:-60m}
-echo "ROX_SCANNER_V4:${ROX_SCANNER_V4:-}"
-echo "SCANNER_V4_MATCHER_READINESS:${SCANNER_V4_MATCHER_READINESS:-}"
 
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
@@ -60,7 +62,9 @@ function retry() {
 function wait_deploy() {
   retry oc -n stackrox rollout status deploy/"$1" --timeout=300s \
     || {
+      echo "oc describe -n stackrox deploy/$1"
       oc describe -n stackrox deploy/"$1" || true
+      echo "oc logs -n stackrox --selector=\"app==$1\" --all-containers --pod-running-timeout=30s --tail=20"
       oc logs -n stackrox --selector="app==$1" --all-containers --pod-running-timeout=30s --tail=20
       return 1
     }
@@ -170,7 +174,7 @@ function install_central_with_helm() {
     installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
   fi
 
-  if [[ "${ROX_SCANNER_V4:-true}" != "true" ]]; then
+  if [[ "${ROX_SCANNER_V4}" != "true" ]]; then
     installflags+=('--set' 'scannerV4.disable=true')
   else
     installflags+=('--set' 'scannerV4.disable=false')
@@ -193,7 +197,7 @@ function install_central_with_helm() {
       installflags+=('--set' 'scannerV4.db.resources.limits.cpu=1000m')
       installflags+=('--set' 'scannerV4.db.resources.limits.memory=2500Mi')
     fi
-    if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+    if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
       # stackrox helm template _metadata.tpl parses 'customize' into values for target matching:
       # https://github.com/stackrox/stackrox/blob/ae87894195796f9a88295af39a83451dbbb96c51/image/templates/helm/shared/templates/_metadata.tpl#L160-L181
       # matched for "scanner-v4-matcher" in matcher deployment template:
@@ -246,7 +250,7 @@ function configure_scanner_readiness() {
   set +e  # ignore errors
   kubectl wait --for condition=established --timeout=120s deploy/scanner-v4-matcher --namespace stackrox --timeout=120s || true
   if kubectl describe -n stackrox deploy/scanner-v4-matcher \
-    | grep "SCANNER_V4_MATCHER_READINESS.*${SCANNER_V4_MATCHER_READINESS:-}"; then
+    | grep "SCANNER_V4_MATCHER_READINESS.*${SCANNER_V4_MATCHER_READINESS}"; then
     echo 'scanner-v4-matcher readiness is set'
     return
   fi
@@ -257,7 +261,7 @@ function configure_scanner_readiness() {
   kubectl -n stackrox rollout status deploy/scanner-v4-matcher --timeout=30s
   kubectl -n stackrox describe deploy/scanner-v4-matcher | grep SCANNER_V4_MATCHER_READINESS \
     || kubectl describe deploy scanner-v4-matcher --namespace stackrox
-  echo ">>> Finished scanner-v4-matcher configuration readiness=${SCANNER_V4_MATCHER_READINESS:-}."
+  echo ">>> Finished scanner-v4-matcher configuration readiness=${SCANNER_V4_MATCHER_READINESS}."
   set -e
 }
 
@@ -269,7 +273,7 @@ install_helm
 
 install_central_with_helm
 
-if [[ "${ROX_SCANNER_V4:-true}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+if [[ "${ROX_SCANNER_V4}" == "true" && -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
   configure_scanner_readiness &
   scanner_readiness_configure_pid=$!
 fi
@@ -314,11 +318,11 @@ done
 kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
 rm "${SCRATCH}/port_forward_pid"
 
-if [[ "${ROX_SCANNER_V4:-true}" == "true" ]]; then
+if [[ "${ROX_SCANNER_V4}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
-  if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+  if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
     echo '>>> Follow scanner-v4-matcher logs until ready state'
     ps -p "${scanner_readiness_configure_pid}" \
       && wait "${scanner_readiness_configure_pid}" || true
