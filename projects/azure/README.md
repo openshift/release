@@ -23,7 +23,7 @@ in our CI. Namely:
 
   This tool is responsible for running [jobs](#ci-operator-jobs) by using Openshift resources.
   There are a bunch of useful docs in the `ci-operator` repo, it is suggested to
-  go through at least [ONBOARD.md](https://github.com/openshift/ci-tools/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-tools/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-tools/blob/master/CONFIGURATION.md).
+  go through at least [ONBOARD.md](https://github.com/openshift/ci-tools/blob/main/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-tools/blob/main/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-tools/blob/main/CONFIGURATION.md).
   You should ensure you familiarize yourself with `ci-operator`.
 
 * [Prow](https://github.com/kubernetes/test-infra/blob/master/prow/getting_started_deploy.md)
