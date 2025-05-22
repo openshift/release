@@ -139,9 +139,12 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_des_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.osDisk.diskEncryptionSet')
     install_config_des_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.osDisk.diskEncryptionSet')
     install_config_des_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.osDisk.diskEncryptionSet')
-    install_config_identity_user_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
-    install_config_identity_user_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
-    install_config_identity_user_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
+    install_config_identity_type_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
+    install_config_user_identity_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.userAssignedIdentities')
+    install_config_identity_type_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
+    install_config_user_identity_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.userAssignedIdentities')
+    install_config_identity_type_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
+    install_config_user_identity_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.userAssignedIdentities')
     install_config_outbound_type=$(yq-go r ${CONFIG} 'platform.azure.outboundType')
     install_config_publish_strategy=$(yq-go r ${CONFIG} 'publish')
     install_config_customer_managed_key=$(yq-go r ${CONFIG} 'platform.azure.customerManagedKey')
@@ -284,7 +287,24 @@ ${required_permissions}
     fi
 
     # Starting from 4.19, user-assigned identity created by installer is removed, related permissions are not required any more.
-    if (( ocp_minor_version <=18 && ocp_major_version == 4 )); then
+    # The default behavior is changed to create an identity via installer#9735, will change back once future upstream changes land
+    # optional permissions are not required with below configurations
+    # * identity type is set to None
+    # * identity type is set to UserAssigned without precreated user-assigned identity
+    identity_permission_flag="false"
+    if [[ -z "${install_config_identity_type_master}" ]] && [[ -z "${install_config_identity_type_compute}" ]] && [[ -z "${install_config_identity_type_default}" ]]; then
+        identity_permission_flag="true"
+    fi
+    if [[ "${install_config_identity_type_default}" == "UserAssigned" ]] && [[ -z "${install_config_user_identity_default}" ]]; then
+        identity_permission_flag="true"
+    fi
+    if [[ "${install_config_identity_type_master}" == "UserAssigned" ]] && [[ -z "${install_config_user_identity_master}" ]]; then
+        identity_permission_flag="true"
+    fi
+    if [[ "${install_config_identity_type_compute}" == "UserAssigned" ]] && [[ -z "${install_config_user_identity_compute}" ]]; then
+        identity_permission_flag="true"
+    fi
+    if [[ "${identity_permission_flag}" == "true" ]]; then
         required_permissions="""
 \"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
 \"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
@@ -297,8 +317,8 @@ ${required_permissions}
 """
     fi
 
-    # optional permissions when specifying UserAssigned identity
-    if [[ "${install_config_identity_user_default}" == "UserAssigned" ]] || [[ "${install_config_identity_user_master}" == "UserAssigned" ]] || [[ "${install_config_identity_user_compute}" == "UserAssigned" ]]; then
+    # optional permissions when specifying identity type as UserAssigned with precreated user-assigned identity
+    if [[ -n "${install_config_user_identity_default}" ]] || [[ -n "${install_config_user_identity_master}" ]] || [[ -n "${install_config_user_identity_compute}" ]]; then
         required_permissions="""
 \"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
 \"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
