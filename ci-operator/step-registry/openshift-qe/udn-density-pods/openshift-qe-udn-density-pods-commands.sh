@@ -79,4 +79,4 @@ if [ ${BAREMETAL} == "true" ]; then
   pkill ssh
 fi
 # echo "sleep time to add the fixed rpms"
-#sleep 7200
+sleep 7200
