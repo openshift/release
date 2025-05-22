@@ -29,9 +29,9 @@ acr_password="$(</var/run/vault/acr-pull-credentials/password)"
 acr_auth="$(echo -n "${acr_user}:${acr_password}" | base64 -w 0)"
 
 echo "Merging extra auth info into the existing pull secret"
-extra_auth="{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\
+extra_auth="{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\
 \"registry.stage.redhat.io\": {\"auth\": \"${stage_registry_auth}\"},\
-\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\
+\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\
 \"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\
 \"${acr_login_server}\": {\"auth\": \"${acr_auth}\"}}"
 pull_secret_path="/var/run/vault/ci-pull-credentials/.dockerconfigjson"
