@@ -32,6 +32,8 @@ echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 ACS_VERSION_TAG=""
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 
+SMALL_INSTALL=${SMALL_INSTALL:-true}
+
 SCRATCH=$(mktemp -d)
 echo "SCRATCH=${SCRATCH}"
 cd "${SCRATCH}"
@@ -156,7 +158,7 @@ function install_central_with_helm() {
   # copied from https://github.com/stackrox/stackrox/blob/7e49062da60fbe153d811e42dbcedf8df10bef5a/scripts/quick-helm-install.sh#L31
   installflags=('--set' 'central.persistence.none=true')
   installflags+=('--set' 'imagePullSecrets.allowNone=true')
-  SMALL_INSTALL=true
+
   if [[ "${SMALL_INSTALL}" == "true" ]]; then
     installflags+=('--set' 'central.resources.requests.memory=1Gi')
     installflags+=('--set' 'central.resources.requests.cpu=1')
@@ -172,13 +174,7 @@ function install_central_with_helm() {
     installflags+=('--set' 'scanner.resources.requests.cpu=500m')
     installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
     installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
-  fi
-
-  if [[ "${ROX_SCANNER_V4}" != "true" ]]; then
-    installflags+=('--set' 'scannerV4.disable=true')
-  else
-    installflags+=('--set' 'scannerV4.disable=false')
-    if [[ "${SMALL_INSTALL}" == "true" ]]; then
+    if [[ "${ROX_SCANNER_V4}" == "true" ]]; then
       installflags+=('--set' 'scannerV4.scannerComponent=Enabled')
       installflags+=('--set' 'scannerV4.indexer.scaling.autoScaling=Disabled')
       installflags+=('--set' 'scannerV4.indexer.scaling.replicas=1')
@@ -197,6 +193,12 @@ function install_central_with_helm() {
       installflags+=('--set' 'scannerV4.db.resources.limits.cpu=1000m')
       installflags+=('--set' 'scannerV4.db.resources.limits.memory=2500Mi')
     fi
+  fi
+
+  if [[ "${ROX_SCANNER_V4}" != "true" ]]; then
+    installflags+=('--set' 'scannerV4.disable=true')
+  else
+    installflags+=('--set' 'scannerV4.disable=false')
     if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
       # stackrox helm template _metadata.tpl parses 'customize' into values for target matching:
       # https://github.com/stackrox/stackrox/blob/ae87894195796f9a88295af39a83451dbbb96c51/image/templates/helm/shared/templates/_metadata.tpl#L160-L181
