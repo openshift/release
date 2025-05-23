@@ -160,11 +160,13 @@ EOF
     echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${DATACENTERS[$i]} and destroy"
     DATACENTER=$(echo -n "${DATACENTERS[$i]}" | tr -d '\n')
     for portgroup in "${portgroup_list[@]}"; do
+      set -x
       govc ls -json "/${DATACENTER}/network/${portgroup}" |
         jq '.elements[]?.Object.Vm[]?.Value' |
         xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
         jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
         xargs -I {} --no-run-if-empty govc vm.destroy {}
+      set +x
     done
   done
   set -e
