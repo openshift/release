@@ -64,6 +64,9 @@ INSTALL_DIR="/tmp/installer"
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.19.0-rc.3-multi"
+export MULTI_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.19.0-rc.3-multi"
+
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 
