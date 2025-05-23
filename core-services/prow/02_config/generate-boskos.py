@@ -474,6 +474,20 @@ CONFIG = {
         'us-east-1': 20,
         'us-west-1': 20,
     },
+    'aws-quay-qe-quota-slice': {
+        'us-east-1': 30,
+        'us-east-2': 30,
+        'us-west-1': 30,
+        'us-west-2': 30,
+    },
+    'gcp-quay-qe-quota-slice': {
+        'us-central1': 30,
+    },
+    'azure-quay-qe-quota-slice': {
+        'northcentralus': 10,
+        'westus2': 10,
+        'centralus': 10
+    },
     'aws-edge-infra-quota-slice': {
         'us-east-1': 5,
         'us-east-2': 5,
