@@ -189,6 +189,15 @@ function test_spoke_deployment {
   echo "-----------------------------------------------------"
   oc get clusterversion
   echo
+
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    echo
+    echo "------------------------ Spoke Details --------------------------------------------------------"
+    echo "kubeconfig: export KUBECONFIG=${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
+    echo "Console: $(oc --kubeconfig ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml whoami --show-console)"
+    secret_adm_pass=${SPOKE_CLUSTER_NAME}-admin-password
+    cat ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml || echo
+  fi
 }
 
 function copy_spoke_kubeconfig_to_bastion_location {
@@ -224,6 +233,13 @@ function test_kpis {
   echo "Running KPIs tests..."
   echo
 
+  kpi_test_code=/tmp/kpi_tests_repo
+
+  if [ ! -d ${kpi_test_code} ]; then
+    GIT_SSL_NO_VERIFY=true git clone https://gitlab.cee.redhat.com/ran/ran-integration.git ${kpi_test_code} || echo
+  fi
+
+  ls -l ${kpi_test_code}/scripts/test_oslat.sh || echo
 }
 
 function main {
