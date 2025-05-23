@@ -145,6 +145,85 @@ tests:
     - ref: openshift-qe-cluster-density-v2
     workflow: openshift-qe-upgrade
   timeout: 8h0m0s
+- as: loaded-upgrade-417to418-3nodes-udn
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "1"
+      WORKER_REPLICA_COUNT: "3"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-upgrade
+  timeout: 7h55m0s
+- as: loaded-upgrade-418to419-3nodes-udn
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "3"
+      WORKER_REPLICA_COUNT: "3"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-upgrade
+  timeout: 7h0m0s
+- as: loaded-upgrade-418to419-24nodes-udn
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "3"
+      RUN_ORION: "false"
+      WORKER_REPLICA_COUNT: "24"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-upgrade
+  timeout: 7h55m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
