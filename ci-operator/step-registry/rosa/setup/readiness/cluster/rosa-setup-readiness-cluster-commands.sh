@@ -7,7 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-60}
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-90}
 CLUSTER_TIMEOUT_M="${CLUSTER_TIMEOUT}m"
 
 log(){
@@ -84,6 +84,21 @@ fi
 cluster_info_json=$(mktemp)
 
 record_cluster "timers" "status" "claim"
+
+#Temporary step
+vpcID=$(cat "${SHARED_DIR}/vpc_id")
+public_subnet_ids=$(aws ec2 describe-subnets \
+    --filters Name=vpc-id,Values=$vpcID Name=tag:PublicSubnet,Values=true \
+    --query "Subnets[*].SubnetId" \
+    --output text)
+
+read -a public_array <<< "$public_subnet_ids"
+for s in "${public_array[@]}"; do
+    echo "Adding tag for public subet"
+    aws ec2 create-tags --resources $s --tags Key=kubernetes.io/cluster/unmanaged,Value=true
+done
+
+
 
 rosatest --ginkgo.v --ginkgo.no-color \
   --ginkgo.timeout $CLUSTER_TIMEOUT_M \
