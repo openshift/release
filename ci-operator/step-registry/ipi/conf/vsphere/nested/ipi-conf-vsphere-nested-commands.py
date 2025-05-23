@@ -136,6 +136,19 @@ if len(vips) == 1:
 else:
     install_config["platform"]["vsphere"]["ingressVIP"] = vips[1].strip()
 
+if os.environ.get("USING_NESTED_SHARED_DATASTORE", "").lower() != "true":
+    try:
+        zone1_host1_ip = inventory["localhost"]["host_group_map"]["zone-1"][0]
+        zone2_host1_ip = inventory["localhost"]["host_group_map"]["zone-2"][0]
+
+        install_config["platform"]["vsphere"]["failureDomains"][0]["topology"]["datastore"] = (
+            f"/cidatacenter-nested-0/datastore/Datastore-{zone1_host1_ip}"
+        )
+        install_config["platform"]["vsphere"]["failureDomains"][1]["topology"]["datastore"] = (
+            f"/cidatacenter-nested-0/datastore/Datastore-{zone2_host1_ip}"
+        )
+    except (KeyError, IndexError) as e:
+        print(f"Error updating unshared datastores from inventory: {e}")
 
 with open(os.path.join(shared_dir, "platform.json"), "w") as platform_json_file:
     json.dump(install_config["platform"]["vsphere"], platform_json_file, indent=2)
