@@ -86,7 +86,6 @@ spec:
             version: ""
           kind: AzureMachineProviderSpec
           location: ${AZURE_REGION}
-          managedIdentity: ${Infra_ID}-identity
           metadata: {}
           networkResourceGroup: ${CLUSTER_NAME}-rg
           osDisk:
