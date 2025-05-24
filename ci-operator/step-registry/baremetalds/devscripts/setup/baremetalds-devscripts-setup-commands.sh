@@ -374,6 +374,8 @@ then
   echo "export ASSETS_EXTRA_FOLDER=/root/manifests" >> /root/dev-scripts/config_root.sh
 fi
 
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.19.0-rc.2-x86_64"
+
 if [[ "${ARCHITECTURE}" == "arm64" ]]; then
   echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> /root/dev-scripts/config_root.sh
   ## Look into making the following IRONIC_IMAGE change a default behavior within 'dev-scripts'
