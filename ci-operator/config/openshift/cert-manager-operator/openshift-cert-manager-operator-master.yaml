@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -46,12 +50,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -137,6 +141,59 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-operator-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        # operator-sdk seemingly doesn't honor the REGISTRY_AUTH_FILE env var, workaround by using DOCKER_CONFIG
+        export REGISTRY_AUTH_FILE=/var/run/secrets/ci.openshift.io/cluster-profile/pull-secret
+        export DOCKER_CONFIG=/tmp/.docker && mkdir -p $DOCKER_CONFIG && cp $REGISTRY_AUTH_FILE $DOCKER_CONFIG/config.json
+
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --security-context-config=restricted --verbose -n cert-manager-operator quay.io/swghosh/cert-manager-operator:v1.15.1-swg-ec.1-bundle # registry.redhat.io/cert-manager/cert-manager-operator-bundle:v1.15.0
+        oc wait --timeout=10m --for=condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+
+        for d in cert-manager cert-manager-cainjector cert-manager-webhook; do
+          oc wait --timeout=2m --for=create -n cert-manager deployment "$d" || true
+          oc wait --timeout=2m --for=condition=Available -n cert-manager deployment "$d" || true
+        done
+        oc get event -n cert-manager-operator
+        oc get event -n cert-manager
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --security-context-config=restricted --verbose -n cert-manager-operator "$OO_BUNDLE"
+        oc wait --timeout=10m --for=condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+
+        for d in cert-manager cert-manager-cainjector cert-manager-webhook; do
+          oc wait --timeout=2m --for=create -n cert-manager deployment "$d" || true
+          oc wait --timeout=2m --for=condition=Available -n cert-manager deployment "$d" || true
+        done
+        oc get event -n cert-manager-operator
+        oc get event -n cert-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
