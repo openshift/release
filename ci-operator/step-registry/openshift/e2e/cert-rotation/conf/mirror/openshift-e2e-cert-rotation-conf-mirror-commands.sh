@@ -214,7 +214,7 @@ export LOCAL_REPO='ocp/openshift4'
 
 # Mirror release
 set +e
-for imagestream in $(seq 1 5)
+for retry in {1..5}
 do
     echo "[$(date)] Retrying mirror"
     oc adm release mirror -a ~/pull-secret \
