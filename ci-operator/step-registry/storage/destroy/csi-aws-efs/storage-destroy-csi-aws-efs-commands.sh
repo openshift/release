@@ -7,7 +7,8 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export STORAGECLASS_LOCATION=${SHARED_DIR}/efs-sc.yaml
 
 REGION=${REGION:-$LEASED_RESOURCE}
-FILESYSTEM_ID=$(yq-go r "${STORAGECLASS_LOCATION}" 'parameters.fileSystemId')
+# FILESYSTEM_ID=$(yq-go r "${STORAGECLASS_LOCATION}" 'parameters.fileSystemId')
+FILESYSTEM_ID=$(cat "${SHARED_DIR}"/fileSystemId)
 
 # Special setting for C2S/SC2S
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
@@ -58,6 +59,12 @@ function wait_for_mount_targets_deleted() {
         fi
     done
 }
+
+
+if [[ -f "${SHARED_DIR}/fileSystemId" ]]; then
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  echo "Using shared AWS account."
+fi
 
 # Delete each Access Point
 for ap in $(aws efs describe-access-points --region "${REGION}" --file-system-id "${FILESYSTEM_ID}" --query 'AccessPoints[*].AccessPointId' --output text); do
