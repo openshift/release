@@ -56,7 +56,7 @@ oc_wait_for_pods() {
             echo "All pods in '${ns}' are in state Running or Completed"
             break
         fi
-        sleep 20
+        sleep 40
     done
     if [[ -n "${pods}" ]]; then
         echo "ERROR: Some pods in '${ns}' are not in state Running or Completed"
