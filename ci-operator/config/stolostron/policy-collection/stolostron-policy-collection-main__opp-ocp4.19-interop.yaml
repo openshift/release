@@ -50,6 +50,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  git clone https://github.com/stackrox/stackrox.git
+  cd stackrox/
+  .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: openshift-plus-interop-aws
   cron: 0 1 * * 3
@@ -94,6 +98,8 @@ tests:
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.13", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       ZONES_COUNT: "3"
+      USER_TAGS: |
+        scenario acs
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
@@ -123,6 +129,7 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     - ref: quay-tests-quay-interop-test
     - ref: acm-opp-app
+    - ref: stackrox-qa-e2e
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
