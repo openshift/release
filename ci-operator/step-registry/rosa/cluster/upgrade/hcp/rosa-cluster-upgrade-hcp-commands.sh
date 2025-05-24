@@ -203,6 +203,9 @@ else
   exit 1
 fi
 
+if [[ -z "$CHANNEL_GROUP" ]];then
+  CHANNEL_GROUP=$(rosa describe cluster -c $cluster_id -o json | jq -r '.version.channel_group')
+fi
 
 if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
   log "Get the latest version!"

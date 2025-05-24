@@ -9,20 +9,15 @@ images:
     RUN dnf install -y skopeo git && dnf clean all
   from: src
   to: instaslice-base-src
-promotion:
-  to:
-  - name: "4.19"
-    namespace: ocp
 releases:
   initial:
-    integration:
-      name: "4.18"
-      namespace: ocp
+    release:
+      channel: stable
+      version: "4.18"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.18"
-      namespace: ocp
+    release:
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -126,7 +121,11 @@ tests:
         make deploy-nfd-ocp
         make deploy-nvidia-ocp
 
-        oc new-project instaslice-system
+        mkdir /tmp/oci-image && pushd /tmp/oci-image
+        skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
+        umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
+        oc create -f bundle/rootfs/manifests || true
+        popd
 
         echo "Creating OperatorGroup"
         oc create -f - <<EOF
@@ -137,11 +136,7 @@ tests:
                 namespace: "instaslice-system"
         EOF
 
-        mkdir /tmp/oci-image && pushd /tmp/oci-image
-        skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
-        umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
-        oc create -f bundle/rootfs/manifests
-        popd
+        sleep 30
 
         make test-e2e-ocp
       from: instaslice-base-src
@@ -150,6 +145,24 @@ tests:
           cpu: 300m
           memory: 500Mi
     workflow: ipi-gcp-single-node
+- as: e2e-kind-gpu
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: a2-highgpu-1g
+      CONTROL_PLANE_ZONES: '[us-central1-f]'
+    post:
+    - ref: openshift-instaslice-operator-e2e-kind-cleanup
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: single-node-conf-gcp
+    - ref: ipi-conf-gcp-zones
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: single-node-conf-e2e
+    - ref: openshift-instaslice-operator-e2e-kind
+    test:
+    - ref: openshift-instaslice-operator-e2e-kind-test
 zz_generated_metadata:
   branch: main
   org: openshift

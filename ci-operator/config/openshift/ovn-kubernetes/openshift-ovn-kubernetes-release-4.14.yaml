@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 build_root:
   image_stream_tag:
     name: release
@@ -214,7 +218,7 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-aws-ovn-kubevirt
+- as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
     cluster_profile: aws
@@ -292,6 +296,15 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: ovn-kubernetes
     workflow: openshift-ci-security
+- as: e2e-aws-ovn-fdp-qe
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PARALLEL: "1"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

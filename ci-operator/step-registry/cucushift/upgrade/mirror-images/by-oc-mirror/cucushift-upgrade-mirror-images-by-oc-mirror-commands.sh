@@ -18,12 +18,12 @@ function run_command() {
 }
 
 function check_signed() {
-    local digest algorithm hash_value response try max_retries
-    if [[ "${TARGET}" =~ "@sha256:" ]]; then
-        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries payload="${1}"
+    if [[ "${payload}" =~ "@sha256:" ]]; then
+        digest="$(echo "${payload}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
     else
-        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
         echo "The target image is using tagname pullspec, its digest is ${digest}"
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -38,9 +38,9 @@ function check_signed() {
         sleep 60
     done
     if (( response == 200 )); then
-        echo "${TARGET} is signed" && return 0
+        echo "${payload} is signed" && return 0
     else
-        echo "Seem like ${TARGET} is not signed" && return 1
+        echo "Seem like ${payload} is not signed" && return 1
     fi
 }
 
@@ -126,7 +126,7 @@ if [[ "${MIRROR_GRAPH_DATA}" == "true" ]]; then
     run_command "ls '${result_folder}'"
     
     export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
-    if ! check_signed; then
+    if ! check_signed "${TARGET}"; then
         echo "You're mirroring an unsigned images, don't apply signature"
     else
         echo "You're mirroring a signed images, will apply signature"

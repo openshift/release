@@ -15,6 +15,10 @@ base_images:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -54,12 +58,7 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
-      CHURN: "true"
-      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "true"
-      TELEMETRY_GROUP: prow-ocp-4.18
       USER_TAGS: |
         TicketId 419
     observers:
@@ -69,7 +68,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-aws
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - as: krkn-hub-tests
   cron: 0 4 5 * *
@@ -89,14 +88,10 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - as: krkn-hub-node-tests
   cron: 0 4 29 * *
@@ -145,7 +140,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-console-tests
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
-    workflow: openshift-qe-installer-aws
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - as: krkn-hub-node-tests-udn
   cron: 0 4 * * 1
@@ -168,7 +163,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-cluster-disruption
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
-    workflow: openshift-qe-installer-aws
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - as: gcp-fipsetcd-krkn-hub-tests
   cron: 0 4 28 * *
@@ -188,7 +183,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+    workflow: redhat-chaos-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 6h0m0s
 - as: gcp-fipsetcd-krkn-hub-node-tests
   cron: 0 4 27 * *
@@ -210,8 +205,56 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
-    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+    workflow: redhat-chaos-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 6h0m0s
+- always_run: false
+  as: vsphere-krkn-hub-tests-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      ALERTS_PATH: ./node-disruptions/etcd_warning_slos
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      WORKER_REPLICA_COUNT: "10"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: vsphere-krkn-hub-node-tests-10nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      ALERTS_PATH: ./node-disruptions/etcd_warning_slos
+      CHURN: "true"
+      CLOUD_TYPE: vsphere
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      WAIT_DURATION: "1000"
+      WORKER_REPLICA_COUNT: "10"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
 - always_run: false
   as: krkn-hub-syn-flood
   steps:
@@ -223,7 +266,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-syn-flood
-    workflow: openshift-qe-installer-aws-compact
+    workflow: redhat-chaos-installer-aws-compact
   timeout: 6h0m0s
 - as: krkn-hub-tests-azure-node
   cron: 29 5 26 * *
@@ -246,7 +289,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
-    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+    workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
   timeout: 6h0m0s
 - as: krkn-hub-tests-azure
   cron: 29 5 25 * 2
@@ -271,7 +314,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+    workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
   timeout: 6h0m0s
 - as: krkn-hub-tests-compact
   cron: 0 4 2 * *
@@ -292,7 +335,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-aws-compact
+    workflow: redhat-chaos-installer-aws-compact
   timeout: 6h0m0s
 - as: krkn-hub-node-tests-compact
   cron: 0 4 * * 1
@@ -313,7 +356,7 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-node-tests
-    workflow: openshift-qe-installer-aws-compact
+    workflow: redhat-chaos-installer-aws-compact
   timeout: 6h0m0s
 - as: krkn-hub-tests-aro
   cron: 0 8 18 * *
@@ -338,7 +381,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-etcd-tests
     - chain: redhat-chaos-krkn-hub-console-tests
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
-    workflow: openshift-qe-installer-azure-aro-upi
+    workflow: redhat-chaos-installer-azure-aro-upi
   timeout: 5h0m0s
 - as: krkn-hub-tests-aro-node
   cron: 0 8 19 * *
@@ -363,7 +406,7 @@ tests:
     - ref: redhat-chaos-network-chaos
     - ref: redhat-chaos-pod-network-chaos
     - chain: redhat-chaos-hog-scenarios
-    workflow: openshift-qe-installer-azure-aro-upi
+    workflow: redhat-chaos-installer-azure-aro-upi
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

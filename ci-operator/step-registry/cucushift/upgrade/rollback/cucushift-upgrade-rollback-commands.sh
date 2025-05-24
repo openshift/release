@@ -98,7 +98,7 @@ function run_command() {
 function rollback() {
     res=$(env "OC_ENABLE_CMD_UPGRADE_ROLLBACK=true" oc adm upgrade rollback 2>&1 || true)
     out="Requested rollback from ${SOURCE_VERSION} to ${TARGET_VERSION}"
-    local testcase="rollback"
+    local testcase="OCP-70838"
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     if [[ ${res} == *"${out}"* ]]; then
         echo "Rolling back cluster from ${SOURCE_VERSION} to ${TARGET_VERSION} started..."
@@ -141,7 +141,7 @@ function check_rollback_status() {
 
 # Check version, state in history
 function check_history() {
-    local version state testcase="cvo"
+    local version state testcase="OCP-70838"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"

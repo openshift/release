@@ -26,7 +26,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -144,7 +144,6 @@ promotion:
   to:
   - additional_images:
       artifacts: artifacts
-    disabled: true
     excluded_images:
     - rhel-coreos
     name: "4.19"
@@ -399,6 +398,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   optional: true
@@ -506,8 +518,6 @@ tests:
     cluster_profile: aws-2
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
-      TEST_ARGS: ""
-      TEST_SKIPS: ""
     observers:
       enable:
       - observers-resource-watch

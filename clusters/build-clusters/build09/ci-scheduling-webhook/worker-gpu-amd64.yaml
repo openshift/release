@@ -2,27 +2,27 @@ apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
   labels:
-    machine.openshift.io/cluster-api-cluster: build09-x99t2
-  name: build09-x99t2-worker-gpu-amd64-us-east-2a
+    machine.openshift.io/cluster-api-cluster: build09-kcxpl
+  name: build09-kcxpl-worker-gpu-amd64--us-east-2a
   namespace: openshift-machine-api
 spec:
   selector:
     matchLabels:
-      machine.openshift.io/cluster-api-cluster: build09-x99t2
-      machine.openshift.io/cluster-api-machineset: build09-x99t2-worker-gpu-amd64-us-east-2a
+      machine.openshift.io/cluster-api-cluster: build09-kcxpl
+      machine.openshift.io/cluster-api-machineset: build09-kcxpl-worker-gpu-amd64--us-east-2a
   template:
     metadata:
       labels:
-        machine.openshift.io/cluster-api-cluster: build09-x99t2
+        machine.openshift.io/cluster-api-cluster: build09-kcxpl
         machine.openshift.io/cluster-api-machine-role: worker-gpu
         machine.openshift.io/cluster-api-machine-type: worker-gpu
-        machine.openshift.io/cluster-api-machineset: build09-x99t2-worker-gpu-amd64-us-east-2a
+        machine.openshift.io/cluster-api-machineset: build09-kcxpl-worker-gpu-amd64--us-east-2a
     spec:
       metadata: {}
       providerSpec:
         value:
           ami:
-            id: ami-071da668451fce4d0
+            id: ami-0b04071739ccf4af2
           apiVersion: machine.openshift.io/v1beta1
           blockDevices:
           - ebs:
@@ -36,7 +36,7 @@ spec:
             name: aws-cloud-credentials
           deviceIndex: 0
           iamInstanceProfile:
-            id: build09-x99t2-worker-profile
+            id: build09-kcxpl-worker-profile
           instanceType: g6.2xlarge
           kind: AWSMachineProviderConfig
           metadata:
@@ -50,14 +50,15 @@ spec:
           - filters:
             - name: tag:Name
               values:
-              - build09-x99t2-worker-sg
-          subnet:
-            filters:
+              - build09-kcxpl-node
+          - filters:
             - name: tag:Name
               values:
-              - build09-x99t2-private-us-east-2a
+              - build09-kcxpl-lb
+          subnet:
+            id: subnet-012f18fd204246496
           tags:
-          - name: kubernetes.io/cluster/build09-x99t2
+          - name: kubernetes.io/cluster/build09-kcxpl
             value: owned
           userDataSecret:
             name: worker-user-data
@@ -69,7 +70,7 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build09-x99t2-worker-gpu-amd64-us-east-2a
+  name: build09-kcxpl-worker-gpu-amd64--us-east-2a
   namespace: openshift-machine-api
 spec:
   maxReplicas: 1
@@ -77,4 +78,4 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build09-x99t2-worker-gpu-amd64-us-east-2a
+    name: build09-kcxpl-worker-gpu-amd64--us-east-2a
