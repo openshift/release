@@ -610,6 +610,18 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-capacity-reservation-gpu-guest-f999
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      NODEPOOL_CAPACITY_RESERVATION: CapacityBlocks
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-advanced
 - as: aws-ipi-ovn-hypershift-fips-guest-openldap-f14
   cron: 18 20 6,20 * *
   steps:
@@ -686,6 +698,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
       HYPERSHIFT_NODE_COUNT: "1"
+      NODEPOOL_CAPACITY_RESERVATION: On-demand
+      NODEPOOL_CAPACITY_RESERVATION_ZONE: us-east-1a
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
