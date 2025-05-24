@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build01
+    cluster: build11
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -78,7 +78,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build01
+    cluster: build11
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     labels:
@@ -151,7 +151,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/e2e-gcp
     decorate: true
     labels:
@@ -224,7 +224,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
@@ -296,7 +296,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/images
     decorate: true
     labels:
@@ -311,7 +311,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -350,7 +349,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/security
     decorate: true
     labels:
@@ -411,7 +410,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/unit
     decorate: true
     labels:
@@ -465,7 +464,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/verify
     decorate: true
     labels:
@@ -514,3 +513,63 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build07
+    context: ci/prow/verify-deps
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-route-controller-manager-release-4.20-verify-deps
+    rerun_command: /test verify-deps
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=verify-deps
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)

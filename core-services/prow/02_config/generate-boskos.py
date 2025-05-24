@@ -13,7 +13,7 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-1-qe-quota-slice': {
-        'us-east-1': 5,
+        'us-east-1': 10,
     },
     'aws-2-quota-slice': {
         'us-east-1': 50,
@@ -36,8 +36,8 @@ CONFIG = {
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 25,
-        'ap-northeast-1': 10,
+        'us-east-1': 30,
+        'ap-northeast-1': 15,
     },
     'aws-autorelease-qe-quota-slice': {
         'us-east-1': 7,
@@ -105,7 +105,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 5,
+        'us-east-1': 15,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -181,6 +181,9 @@ CONFIG = {
         'westus2': 10,
         'centralus': 10
     },
+    'azure-observability-quota-slice': {
+        'centralus': 30
+    },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
         'eastus': 5,
@@ -207,10 +210,10 @@ CONFIG = {
         'usgovtexas': 5
     },
     'azure-sustaining-autorelease-412-quota-slice': {
-        'eastus': 10,
+        'eastus': 15,
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 90,
+        'default': 110,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -237,7 +240,7 @@ CONFIG = {
         'us-central1': 7,
     },
     'gcp-sustaining-autorelease-412-quota-slice': {
-        'us-east1': 12,
+        'us-east1': 15,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -304,6 +307,11 @@ CONFIG = {
     },
     'openstack-vh-mecha-az0-quota-slice': {
         'default': 3,
+    },
+    'openstack-vh-bm-rhos-quota-slice': {
+        'openstack-vh-mecha-central': 3,
+        'openstack-vh-mecha-az0': 3,
+        'openstack-hwoffload': 3,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
@@ -465,6 +473,20 @@ CONFIG = {
     'quay-aws-quota-slice': {
         'us-east-1': 20,
         'us-west-1': 20,
+    },
+    'aws-quay-qe-quota-slice': {
+        'us-east-1': 30,
+        'us-east-2': 30,
+        'us-west-1': 30,
+        'us-west-2': 30,
+    },
+    'gcp-quay-qe-quota-slice': {
+        'us-central1': 30,
+    },
+    'azure-quay-qe-quota-slice': {
+        'northcentralus': 10,
+        'westus2': 10,
+        'centralus': 10
     },
     'aws-edge-infra-quota-slice': {
         'us-east-1': 5,

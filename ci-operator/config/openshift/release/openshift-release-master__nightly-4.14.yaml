@@ -101,19 +101,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ovn-assisted
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: assisted-baremetal
 - as: e2e-aws-ovn-single-node-workers-serial
   interval: 168h
   steps:
@@ -153,12 +140,12 @@ tests:
 - as: e2e-metal-ovn-single-node-live-iso
   interval: 168h
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   interval: 168h
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
@@ -750,7 +737,8 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 - as: e2e-telco5g
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 10 08 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -765,8 +753,9 @@ tests:
       - observers-resource-watch
     workflow: telco5g-origin
 - as: e2e-telco5g-cnftests
-  cluster: build05
-  cron: 00 10 */1 * 1-5
+  capabilities:
+  - intranet
+  cron: 00 10 * * 6,0
   restrict_network_access: false
   steps:
     env:
@@ -780,27 +769,14 @@ tests:
       - observers-resource-watch
     workflow: telco5g-cnf
   timeout: 6h0m0s
-- as: e2e-telco5g-sno-cnftests
-  cluster: build05
-  cron: 00 10 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.14"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
-  cluster: build05
-  cron: 0 21 * * 1,3,5
+  capabilities:
+  - intranet
+  cron: 0 21 * * 0,2,4
   restrict_network_access: false
   steps:
     env:
+      SKIP_OCP_INSTALL: "false"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.14"
     observers:

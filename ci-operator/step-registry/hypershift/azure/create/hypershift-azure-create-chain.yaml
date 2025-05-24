@@ -108,6 +108,18 @@ chain:
     - name: AZURE_SA_TOKEN_ISSUER_KEY_PATH
       default: ""
       documentation: "The file location of the  private key for the service account token issuer"
+    - name: HYPERSHIFT_AZURE_FIPS
+      default: "false"
+      documentation: "Enable fips"
+    - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
+      default: "false"
+      documentation: "Assign the service principal roles to the managed identities"
+    - name: DNS_ZONE_RG_NAME
+      default: "os4-common"
+      documentation: "dns zone resource group"
+    - name: HYPERSHIFT_INSTANCE_TYPE
+      default: ""
+      documentation: "Instance type for the nodepool vm size"
     commands: |-
       set -exuo pipefail
 
@@ -128,7 +140,9 @@ chain:
             break
           fi
         done < "$AZURE_OIDC_ISSUER_URL_LOCATION"
-      
+      else
+        AZURE_OIDC_ISSUER_URL="$(cat /etc/hypershift-aro-azurecreds/oidc-issuer-url)"
+        AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-aro-azurecreds/oidc-signer-private"
       fi
       
       HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
@@ -140,7 +154,11 @@ chain:
       
       ENCRYPTION_KEY_ID=""
       if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
-        ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
+        if [[ -f "${SHARED_DIR}/azure_active_key_url" ]]; then
+          ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
+        else
+          ENCRYPTION_KEY_ID="$(cat "/etc/hypershift-aro-azurecreds/encryption-key-url")"
+        fi
       fi
       
       DISK_ENCRYPTION_SET_ID=""
@@ -203,7 +221,8 @@ chain:
         if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
           COMMAND+=(--managed-identities-file "/etc/hypershift-ci-jobs-azurecreds/managed-identities.json" --data-plane-identities-file "/etc/hypershift-ci-jobs-azurecreds/dataplane-identities.json")
         else
-          COMMAND+=(--managed-identities-file "${SHARED_DIR}/hypershift_azure_mi_file.json")
+          # using qe azure creds
+          COMMAND+=(--managed-identities-file "/etc/hypershift-aro-azurecreds/managed-identities.json" --data-plane-identities-file "/etc/hypershift-aro-azurecreds/dataplane-identities.json")
         fi
       fi
       
@@ -278,6 +297,19 @@ chain:
         COMMAND+=(${EXTRA_ARGS})
       fi
       
+      if [[ $HYPERSHIFT_AZURE_FIPS == "true" ]]; then
+        COMMAND+=(--fips=true)
+      fi
+      
+      if [[ $ASSIGN_SERVICE_PRINCIPAL_ROLES == "true" ]]; then
+        COMMAND+=(--assign-service-principal-roles=true)
+        COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
+      fi
+      
+      if [[ -n "${HYPERSHIFT_INSTANCE_TYPE}" ]]; then
+        COMMAND+=(--instance-type=${HYPERSHIFT_INSTANCE_TYPE})
+      fi
+      
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
@@ -288,7 +320,7 @@ chain:
       fi
       
       "${COMMAND[@]}"
-
+      
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
@@ -320,7 +352,7 @@ chain:
         oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
           echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
           oc get clusterversion 2>/dev/null || true
-          sleep 1s
+          sleep 10s
       done
     from: hypershift-operator
     grace_period: 5m0s
@@ -335,6 +367,9 @@ chain:
       namespace: test-credentials
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
       name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-aro-azurecreds
+      name: hypershift-aro-azurecreds
       namespace: test-credentials
     dependencies:
     - name: "release:latest"

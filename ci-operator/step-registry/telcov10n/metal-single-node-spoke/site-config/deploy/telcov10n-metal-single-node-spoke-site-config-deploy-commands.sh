@@ -103,7 +103,193 @@ function generate_site_config {
 
   echo "************ telcov10n Generate SiteConfig file from template ************"
 
-  site_config_file=$(mktemp --dry-run)
+  # shellcheck disable=SC2154
+  cat << EOF > ${ztp_cluster_manifest_file}
+apiVersion: ran.openshift.io/v1
+kind: SiteConfig
+metadata:
+  name: "site-plan-${SPOKE_CLUSTER_NAME}"
+  namespace: ${SPOKE_CLUSTER_NAME}
+spec:
+  baseDomain: "${SPOKE_BASE_DOMAIN}"
+  pullSecretRef:
+    name: "${SPOKE_CLUSTER_NAME}-pull-secret"
+  clusterImageSetNameRef: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
+  sshPublicKey: "$(cat ${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE}.pub)"
+  clusters:
+  - clusterName: "${SPOKE_CLUSTER_NAME}"
+    networkType: "OVNKubernetes"
+    # See: oc get clusterversion version -o json | jq -rc .status.capabilities
+    # installConfigOverrides: '$(jq --compact-output '.[]' <<< "${INSTALL_CONFIG_OVERRIDES}")'
+    extraManifestPath: sno-extra-manifest/
+    clusterType: sno
+    clusterProfile: du
+    clusterLabels:
+      du-profile: "${DU_PROFILE}"
+      group-du-sno: ""
+      common: "true"
+      sites: "${SPOKE_CLUSTER_NAME}"
+      prowId: "${SPOKE_CLUSTER_NAME}"
+    clusterNetwork:
+      - cidr: "10.128.0.0/14"
+        hostPrefix: 23
+    machineNetwork:
+      - cidr: ${INTERNAL_NET_CIDR}
+    serviceNetwork:
+      - "172.30.0.0/16"
+    additionalNTPSources:
+      - ${AUX_HOST}
+    ignitionConfigOverride: '$(echo ${GLOBAL_IGNITION_CONF_OVERRIDE} | jq --compact-output)'
+    cpuPartitioningMode: AllNodes
+    nodes:
+      - hostName: "${name:?}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
+        bmcAddress: "${redfish_scheme:?}://${bmc_address:?}${redfish_base_uri:?}"
+        # disableCertificateVerification: true
+        bmcCredentialsName:
+          name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
+        bootMACAddress: "${mac:?}"
+        bootMode: "UEFI"
+        rootDeviceHints:
+          ${root_device:+deviceName: ${root_device}}
+          ${root_dev_hctl:+hctl: ${root_dev_hctl}}
+        # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
+        # ${ignition_config_override:+ignitionConfigOverride: "'${ignition_config_override}'"}
+        nodeNetwork:
+          interfaces:
+            - name: "${baremetal_iface}"
+              macAddress: "${mac}"
+          config:
+            ${network_config}
+EOF
+
+  ztp_cluster_kustomization="${ztp_cluster_manifest_file}_kustomization.yaml"
+  cat <<EOK > "${ztp_cluster_kustomization}"
+generators:
+  - clusterinstance.yaml
+EOK
+}
+
+function generate_extracted_list_of_extra_manifest_paths {
+
+  local emf_basepath
+  emf_basepath=${1}
+
+  pushd . > /dev/null
+  cd $HOME/ztp/extra-manifest/
+  while IFS= read -r filename; do
+    echo "    - ${emf_basepath}/${filename}"
+  done < <(find -maxdepth 1 -type f -printf '%P\n'| grep -E '\.yaml$')
+  popd > /dev/null
+
+  echo "    - ${emf_basepath}/enable-crun.yaml"
+}
+
+function generate_cluster_instance {
+
+  echo "************ telcov10n Generate Cluster Instance file from template ************"
+
+  cat << EOF > ${ztp_cluster_manifest_file}
+# ---
+# apiVersion: v1
+# kind: Namespace
+# metadata:
+#   name: ${SPOKE_CLUSTER_NAME}
+---
+apiVersion: siteconfig.open-cluster-management.io/v1alpha1
+kind: ClusterInstance
+metadata:
+  name: "site-plan-${SPOKE_CLUSTER_NAME}"
+  namespace: ${SPOKE_CLUSTER_NAME}
+spec:
+  additionalNTPSources:
+    - ${AUX_HOST}
+  baseDomain: "${SPOKE_BASE_DOMAIN}"
+  clusterImageSetNameRef: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
+  clusterName: "${SPOKE_CLUSTER_NAME}"
+  pullSecretRef:
+    name: "${SPOKE_CLUSTER_NAME}-pull-secret"
+  sshPublicKey: "$(cat ${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE}.pub)"
+  networkType: "OVNKubernetes"
+  clusterNetwork:
+    - cidr: "10.128.0.0/14"
+      hostPrefix: 23
+  machineNetwork:
+    - cidr: ${INTERNAL_NET_CIDR}
+  serviceNetwork:
+    - cidr: "172.30.0.0/16"
+  cpuPartitioningMode: AllNodes
+  extraLabels:
+    ManagedCluster:
+      du-profile: "${DU_PROFILE}"
+      group-du-sno: ""
+      common: "true"
+      sites: "${SPOKE_CLUSTER_NAME}"
+      prowId: "${SPOKE_CLUSTER_NAME}"
+  holdInstallation: false
+  # See: oc get clusterversion version -o json | jq -rc .status.capabilities
+  # installConfigOverrides: '$(jq --compact-output '.[]' <<< "${INSTALL_CONFIG_OVERRIDES}")'
+  templateRefs:
+    - name: ai-cluster-templates-v1
+      namespace: ${MCH_NAMESPACE}
+  extraManifestsRefs:
+    - name: extra-manifests-cm
+  ignitionConfigOverride: '$(echo ${GLOBAL_IGNITION_CONF_OVERRIDE} | jq --compact-output)'
+  nodes:
+    - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
+      automatedCleaningMode: "disabled"
+      bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
+      # disableCertificateVerification: true
+      bmcCredentialsName:
+        name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
+      bootMACAddress: "${mac}"
+      bootMode: "UEFI"
+      role: "master"
+      rootDeviceHints:
+        ${root_device:+deviceName: ${root_device}}
+        ${root_dev_hctl:+hctl: ${root_dev_hctl}}
+      # ${ignition_config_override:+ignitionConfigOverride: "'${ignition_config_override}'"}
+      nodeNetwork:
+        interfaces:
+          - name: "${baremetal_iface}"
+            macAddress: "${mac}"
+        config:
+          ${network_config}
+      templateRefs:
+        - name: ai-node-templates-v1
+          namespace: ${MCH_NAMESPACE}
+EOF
+
+  ztp_cluster_kustomization="${ztp_cluster_manifest_file}_kustomization.yaml"
+  cat <<EOK > "${ztp_cluster_kustomization}"
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # - ns.yaml
+  # - secrets.yaml
+  - clusterinstance.yaml
+
+configMapGenerator:
+  - files:
+    $(add_icsp_cr_if_exists)
+$(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
+    name: extra-manifests-cm
+    namespace: ${SPOKE_CLUSTER_NAME}
+
+generatorOptions:
+  disableNameSuffixHash: true
+EOK
+}
+
+function add_icsp_cr_if_exists {
+  [ -f "${SHARED_DIR}/imageContentSourcePolicy.yaml" ] && \
+    echo "- sno-extra-manifest/imageContentSourcePolicy.yaml"
+}
+
+function generate_ztp_cluster_manifests {
+
+  ztp_cluster_manifest_file=$(mktemp --dry-run)
 
   # From ${SHARED_DIR}/hosts.yaml file are retrived the following values:
   #   - name
@@ -144,66 +330,61 @@ function generate_site_config {
       fi
     fi
 
-    cat << EOF > ${site_config_file}
-apiVersion: ran.openshift.io/v1
-kind: SiteConfig
-metadata:
-  name: "site-plan-${SPOKE_CLUSTER_NAME}"
-  namespace: ${SPOKE_CLUSTER_NAME}
-spec:
-  baseDomain: "${SPOKE_BASE_DOMAIN}"
-  pullSecretRef:
-    name: "${SPOKE_CLUSTER_NAME}-pull-secret"
-  clusterImageSetNameRef: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
-  sshPublicKey: "$(cat ${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE}.pub)"
-  clusters:
-  - clusterName: "${SPOKE_CLUSTER_NAME}"
-    networkType: "OVNKubernetes"
-    # See: oc get clusterversion version -o json | jq -rc .status.capabilities
-    # installConfigOverrides: '$(jq --compact-output '.[]' <<< "${INSTALL_CONFIG_OVERRIDES}")'
-    extraManifestPath: sno-extra-manifest/
-    clusterType: sno
-    clusterProfile: du
-    clusterLabels:
-      du-profile: "${DU_PROFILE}"
-      group-du-sno: ""
-      common: true
-      sites: "${SPOKE_CLUSTER_NAME}"
-    clusterNetwork:
-      - cidr: "10.128.0.0/14"
-        hostPrefix: 23
-    machineNetwork:
-      - cidr: ${INTERNAL_NET_CIDR}
-    serviceNetwork:
-      - "172.30.0.0/16"
-    additionalNTPSources:
-      - ${AUX_HOST}
-    ignitionConfigOverride: '$(echo ${GLOBAL_IGNITION_CONF_OVERRIDE} | jq --compact-output)'
-    cpuPartitioningMode: AllNodes
-    nodes:
-      - hostName: "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}"
-        bmcAddress: "${redfish_scheme}://${bmc_address}${redfish_base_uri}"
-        # disableCertificateVerification: true
-        bmcCredentialsName:
-          name: "${SPOKE_CLUSTER_NAME}-bmc-secret"
-        bootMACAddress: "${mac}"
-        bootMode: "UEFI"
-        rootDeviceHints:
-          ${root_device:+deviceName: ${root_device}}
-          ${root_dev_hctl:+hctl: ${root_dev_hctl}}
-        # cpuset: "0-1,20-21"    # OCPBUGS-13301 - may require ACM 2.9
-        # ${ignition_config_override:+ignitionConfigOverride: "'${ignition_config_override}'"}
-        nodeNetwork:
-          interfaces:
-            - name: "${baremetal_iface}"
-              macAddress: "${mac}"
-          config:
-            ${network_config}
-EOF
-
-  cat $site_config_file
+    if [ "${SITE_CONFIG_VERSION}" == "v2" ]; then
+      generate_cluster_instance
+    else
+      generate_site_config
+    fi
 
   done
+
+  cat $ztp_cluster_manifest_file
+}
+
+function extract_extra_manifests {
+
+  extra_manifests_path=${1}
+
+  pushd . > /dev/null
+  cd $HOME/ztp/extra-manifest/
+  while IFS= read -r filename; do
+    emf="${extra_manifests_path}/$filename"
+    echo "mkdir -pv $(dirname ${emf})"
+    echo "cat <<EO-emf >| $emf"
+    sed 's#\$#\\\$#g' ${filename}
+    echo "EO-emf"
+  done < <(find -maxdepth 1 -type f -printf '%P\n'| grep -E '\.yaml$')
+  popd > /dev/null
+
+  # It is strongly recommended to include crun manifests as part of the additional install-time manifests for 4.13+.
+  enable_crun='---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: ContainerRuntimeConfig
+metadata:
+  name: enable-crun-master
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/master: ""
+  containerRuntimeConfig:
+    defaultRuntime: crun
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: ContainerRuntimeConfig
+metadata:
+  name: enable-crun-worker
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/worker: ""
+  containerRuntimeConfig:
+    defaultRuntime: crun'
+
+  emf="${extra_manifests_path}/enable-crun.yaml"
+  echo "mkdir -pv $(dirname ${emf})"
+  echo "cat <<EO-emf >| $emf"
+  echo -e "${enable_crun}"
+  echo "EO-emf"
 }
 
 function push_site_config {
@@ -228,29 +409,33 @@ ztp_repo_dir=\$(mktemp -d --dry-run)
 git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
-mkdir -pv \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest
+mkdir -pv \${ztp_repo_dir}/clusters/${SPOKE_CLUSTER_NAME}/sno-extra-manifest
 mkdir -pv \${ztp_repo_dir}/site-policies
-cat <<EOS > \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/site-config.yaml
-$(cat ${site_config_file})
+cat <<EOS > \${ztp_repo_dir}/clusters/${SPOKE_CLUSTER_NAME}/clusterinstance.yaml
+$(cat ${ztp_cluster_manifest_file})
 EOS
-cat <<EOK > \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/kustomization.yaml
-generators:
-  - site-config.yaml
+cat <<EOK > \${ztp_repo_dir}/clusters/${SPOKE_CLUSTER_NAME}/kustomization.yaml
+$(cat ${ztp_cluster_kustomization})
 EOK
 
 ts="$(date -u +%s%N)"
-echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/.cluster-image-set-used.\${ts}
-cat <<EO-ICSP >| \${ztp_repo_dir}/site-configs/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/imageContentSourcePolicy.yaml
+extra_manifest_path=\${ztp_repo_dir}/clusters/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/
+echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${extra_manifest_path}/.cluster-image-set-used.\${ts}
+cat <<EO-ICSP >| \${extra_manifest_path}/imageContentSourcePolicy.yaml
 $(cat ${SHARED_DIR}/imageContentSourcePolicy.yaml || echo "---")
 EO-ICSP
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-policies/.cluster-image-set-used.\${ts}
 
-if [ -f \${ztp_repo_dir}/site-configs/kustomization.yaml ]; then
-  if [ "\$(grep "${SPOKE_CLUSTER_NAME}" \${ztp_repo_dir}/site-configs/kustomization.yaml)" == "" ]; then
-    sed -i '/^resources:$/a\  - ${SPOKE_CLUSTER_NAME}' \${ztp_repo_dir}/site-configs/kustomization.yaml
+############## BEGIN of ArgoCD extra manifest extration #####################################################
+$(extract_extra_manifests "\${extra_manifest_path}")
+############## END of ArgoCD extra manifest extration #######################################################
+
+if [ -f \${ztp_repo_dir}/clusters/kustomization.yaml ]; then
+  if [ "\$(grep "${SPOKE_CLUSTER_NAME}" \${ztp_repo_dir}/clusters/kustomization.yaml)" == "" ]; then
+    sed -i '/^resources:$/a\  - ${SPOKE_CLUSTER_NAME}' \${ztp_repo_dir}/clusters/kustomization.yaml
   fi
 else
-  cat <<EOK > \${ztp_repo_dir}/site-configs/kustomization.yaml
+  cat <<EOK > \${ztp_repo_dir}/clusters/kustomization.yaml
 resources:
   - ${SPOKE_CLUSTER_NAME}
 EOK
@@ -263,6 +448,10 @@ GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git pull -r origin main &&
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main ; }
 EOF
+
+  # cat ${run_script}
+  # echo
+  # echo ${run_script}
 
   gitea_project="${GITEA_NAMESPACE}"
 
@@ -412,6 +601,8 @@ function wait_until_assisted_service_is_ready {
     oc -n multicluster-engine wait --for=condition=Available deployment/assisted-service --timeout=30m ;
   } || {
     oc -n multicluster-engine get sc,pv,deploy,pod,pvc ;
+    oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service ;
+    echo ;
     oc -n multicluster-engine logs assisted-image-service-0 assisted-image-service | grep "${iso_url}" ;
     exit 1 ;
   }
@@ -565,7 +756,7 @@ function main {
   check_hub_cluster_is_alive
   extract_rhcos_images
   generate_agent_service_config
-  generate_site_config
+  generate_ztp_cluster_manifests
   push_site_config
 }
 

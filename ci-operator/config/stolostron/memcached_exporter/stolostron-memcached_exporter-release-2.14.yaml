@@ -3,14 +3,22 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  stolostron_builder_go1.23-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.23-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.23-linux
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.prow
   from: base
+  inputs:
+    stolostron_builder_go1.23-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: memcached-exporter
 promotion:
   to:
@@ -25,13 +33,6 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
-- as: common-test
-  commands: |
-    export SELF="make -f Makefile"
-    make -f Makefile build
-    make -f Makefile common-test
-  container:
-    from: src
 - as: pr-image-mirror
   steps:
     dependencies:
@@ -40,25 +41,6 @@ tests:
       IMAGE_REPO: memcached-exporter
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: publish
   postsubmit: true
   steps:

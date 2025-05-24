@@ -15,8 +15,18 @@ set -x
 
 export PS4='[$(date "+%Y-%m-%d %H:%M:%S")] '
 
+if [ -f "${SHARED_DIR}/cluster-type" ] ; then
+  CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
+  if [[ "$CLUSTER_TYPE" == "rosa" ]]; then
+    CONSOLE_HOST="$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get route console -n openshift-console -o=jsonpath='{.spec.host}')"
+  else
+    echo "It is only for HCP cluster that cluster type is rosa"
+  fi
+else
+  CONSOLE_HOST="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get route console -n openshift-console -o=jsonpath='{.spec.host}')"
+fi
+
 CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
-CONSOLE_HOST="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get route console -n openshift-console -o=jsonpath='{.spec.host}')"
 CONSOLE_CALLBACK_URI="https://${CONSOLE_HOST}/auth/callback"
 CONSOLE_REDIRECT_URIS="$(az ad app show --id "$CONSOLE_CLIENT_ID" --query 'web.redirectUris' -o tsv | paste -s -d ' ' -)"
 

@@ -382,6 +382,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-agent-sno-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(deploy/.*|hack/.*|src/.*|vendor/.*|Dockerfile.*|Makefile|go\.mod|go\.sum|\.dockerignore)$
     branches:
     - ^master$
     - ^master-
@@ -398,7 +400,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-master-edge-e2e-ai-operator-ztp
     rerun_command: /test edge-e2e-ai-operator-ztp
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -459,6 +460,8 @@ presubmits:
     trigger: (?m)^/test( | .* )edge-e2e-ai-operator-ztp,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(deploy/.*|hack/.*|src/.*|vendor/.*|Dockerfile.*|Makefile|go\.mod|go\.sum|\.dockerignore)$
     branches:
     - ^master$
     - ^master-
@@ -475,7 +478,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-master-edge-e2e-metal-assisted-4-19
     rerun_command: /test edge-e2e-metal-assisted-4-19
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1579,7 +1581,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1704,3 +1706,63 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/verify-deps
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-installer-master-verify-deps
+    rerun_command: /test verify-deps
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=verify-deps
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)

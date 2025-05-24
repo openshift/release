@@ -23,26 +23,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: "4.19"
-    namespace: ocp
-    tag: tests
-  tests-4.14:
-    name: "4.14"
-    namespace: ocp
-    tag: tests
-  tests-4.15:
-    name: "4.15"
-    namespace: ocp
-    tag: tests
-  tests-4.16:
-    name: "4.16"
-    namespace: ocp
-    tag: tests
-  tests-4.18:
-    name: "4.18"
-    namespace: ocp
-    tag: tests
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -181,8 +161,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
@@ -192,8 +170,6 @@ tests:
   cron: 30 04 * * 2
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
@@ -205,8 +181,6 @@ tests:
   cron: 30 05 * * 1,4
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
@@ -219,8 +193,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
@@ -230,8 +202,6 @@ tests:
   cron: 00 03 * * 1,4
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.16
@@ -244,8 +214,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.16
@@ -315,8 +283,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=osc
@@ -334,8 +300,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=osc
@@ -404,6 +368,27 @@ tests:
         OPENSHIFT_VERSION=4.19
       CLUSTERTYPE: assisted_medium_el9
       TEST_TYPE: minimal
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-late-binding-sno-4-18
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
+        WORKER_CPU=3
+        WORKER_MEMORY=10240
+        OPENSHIFT_VERSION=4.18
+      CLUSTERTYPE: assisted_large_el9
+      POST_INSTALL_COMMANDS: |
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        export MASTER_CPU=5
+        export MASTER_MEMORY=18432
+        export SET_INFRAENV_VERSION=true
+        make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-binding-sno-4-19
@@ -688,8 +673,6 @@ tests:
   cron: 30 07 * * 2
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
@@ -703,8 +686,6 @@ tests:
   cron: 30 08 * * 2
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
@@ -719,8 +700,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
@@ -734,8 +713,6 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
@@ -918,8 +895,6 @@ tests:
   cron: 30 06 * * 1,4
   steps:
     cluster_profile: nutanix
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -1063,8 +1038,6 @@ tests:
   cluster: build05
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
@@ -1082,8 +1055,6 @@ tests:
   cluster: build05
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
@@ -1096,8 +1067,6 @@ tests:
   cluster: build05
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh
@@ -1110,8 +1079,6 @@ tests:
   cron: 30 11 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
@@ -1129,8 +1096,6 @@ tests:
   cron: 30 12 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
@@ -1143,8 +1108,6 @@ tests:
   cron: 30 13 * * 0,2,4
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh

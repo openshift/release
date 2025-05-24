@@ -4,13 +4,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-nofips-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-nofips-openshift-4.19
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/metallb
@@ -20,26 +20,26 @@ images:
     ocp_4.19_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-nofips-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-nofips-openshift-4.19
   to: metallb
 promotion:
   to:
   - disabled: true
     name: metallb-4.18
     namespace: origin
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -68,6 +68,12 @@ tests:
       PROJECT_NAME: metallb
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv

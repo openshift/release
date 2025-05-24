@@ -1,0 +1,83 @@
+ref:
+  as: openshift-qe-kube-burner-ingress-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-kube-burner-ingress-perf-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  env:
+  - name: INSTALLATION_SOURCE
+    default: "Source"
+    documentation: "Source that netobserv was installed from: Source or Internal"
+  - name: E2E_VERSION
+    default: "v2.3.5"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: PODS_PER_NODE
+    default: "200"
+    documentation: |-
+      Define the maximum number of pods to deploy on each labeled node.
+  - name: NAMESPACED_ITERATIONS
+    default: "true"
+    documentation: |-
+      Run each number of jobs iterations in a distinct namespace.
+  - name: ITERATIONS_PER_NAMESPACE
+    default: "1000"
+    documentation: |-
+      Iterations per namespace.
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Extra flags that will be appended to the underlying kube-burner ocp command, by default empty.
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: PPROF
+    default: "true"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: INGRESS_PERF_VERSION
+    default: "default"
+    documentation: |-
+      Override the ingress-perf version
+  - name: CONFIG
+    default: "config/standard.yml"
+    documentation: |-
+      Defaults to "config/standard.yml"
+  - name: LOG_LEVEL
+    default: "info"
+    documentation: |-
+      Default LOG_LEVEL is set info
+  - name: ITERATIONS
+    default: "5"
+    documentation: |-
+      Defaults to 5 Iterations
+  - name: WORKLOAD
+    default: ""
+    documentation: |-
+      kube-burner workload to trigger
+  - name: ITERATION_MULTIPLIER_ENV
+    default: "9"
+    documentation: |-
+      The number of iterations per worker nodes to create, applicable for cluster-density
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is true, which means the workload with delete and recreate a set number of namespaces
+  timeout: 7h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    This step will run kube-burner workload and ingress-perf in parallel.

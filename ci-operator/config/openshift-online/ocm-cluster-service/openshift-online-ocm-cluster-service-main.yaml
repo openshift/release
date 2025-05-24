@@ -1,0 +1,57 @@
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-nofips-openshift-4.19
+promotion:
+  to:
+  - name: "4.19"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: integration
+  steps:
+    test:
+    - ref: openshift-online-run-integration-test-on-existing-environment
+- as: integration-full-cycle
+  steps:
+    test:
+    - ref: openshift-online-run-integration-full-cycle-test-on-existing-environment
+- as: unit-as-ginkgo
+  commands: |
+    unset GOFLAGS
+    make test ginkgo_junit_report=${ARTIFACT_DIR}/junit-ginkgo-unit-junit.xml artifact_dir=${ARTIFACT_DIR}
+    # Ensure generated junit has a useful suite name
+    sed -i 's/\(<testsuite.*\)name=""/\1 name="ginkgo-unit"/' "${ARTIFACT_DIR}/junit-ginkgo-unit-junit.xml"
+  container:
+    from: src
+- as: unit
+  commands: |
+    unset GOFLAGS
+    go install gotest.tools/gotestsum@latest
+    gotestsum --junitfile ${ARTIFACT_DIR}/junit-unit-junit.xml -- -race ./...
+    # Ensure generated junit has a useful suite name
+    sed -i 's/\(<testsuite.*\)name=""/\1 name="go-unit"/' "${ARTIFACT_DIR}/junit-unit-junit.xml"
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: ocm-cluster-service

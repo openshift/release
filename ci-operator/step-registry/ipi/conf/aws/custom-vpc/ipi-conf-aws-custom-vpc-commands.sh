@@ -24,6 +24,10 @@ set -x
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 REGION="${LEASED_RESOURCE}"
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+  source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+  REGION=$source_region
+fi
 
 az_file="${SHARED_DIR}/availability_zones"
 pub_subnets_file="${SHARED_DIR}/public_subnet_ids"
@@ -109,7 +113,7 @@ if [[ ${ADD_ZONES} == "yes" ]]; then
   # but if it’s required, we need to remove zone configurations added by ipi-conf-aws step to avoid conflicts
   yq-v4 -i 'del(.controlPlane.platform.aws.zones)' $CONFIG
   yq-v4 -i 'del(.compute[0].platform.aws.zones)' $CONFIG
-  patch_az $CONFIG $(jq -r '.|join(" ")' "${az_file}")
+  patch_az $CONFIG $(yq-v4 e -o=json '.' "${az_file}" | jq -r '.|join(" ")')
 fi
 
 if ((ocp_major_version == 4 && ocp_minor_version <= 18)); then

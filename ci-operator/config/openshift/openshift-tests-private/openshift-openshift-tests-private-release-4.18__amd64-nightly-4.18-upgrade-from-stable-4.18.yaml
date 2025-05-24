@@ -98,34 +98,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-disc-priv-sts-basecap-none-f60
-  cron: 32 16 4 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-mini-perm-f60
-  cron: 58 3 12 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
-    env:
-      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-fips-f60
   cron: 33 17 29 1,3,5,7,9,11 *
   steps:
@@ -690,11 +662,12 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-confidential-secureboot-mini-perm-f60
+- as: gcp-ipi-confidential-secureboot-fips-mini-perm-f60
   cron: 14 9 18 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
+      FIPS_ENABLED: "true"
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test

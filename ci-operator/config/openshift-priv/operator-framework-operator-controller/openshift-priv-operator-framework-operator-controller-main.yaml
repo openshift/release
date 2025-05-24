@@ -2,9 +2,9 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -46,17 +46,17 @@ promotion:
   to:
   - excluded_images:
     - e2e-test-registry
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -138,6 +138,24 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: default-catalog-consistency
+  optional: true
+  run_if_changed: ^(openshift/default-catalog-consistency/|openshift/catalogd/kustomize/overlays/openshift/catalogs/)
+  steps:
+    test:
+    - as: default-catalog-tests
+      commands: |
+        echo "Running Default Catalog Tests"
+        cd openshift/default-catalog-consistency
+        REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
+      credentials:
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift-priv

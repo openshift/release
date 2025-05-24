@@ -100,34 +100,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-disc-priv-sts-basecap-none-fips-f28
-  cron: 4 15 30 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      ENABLE_OTA_TEST: OCP-66839
-      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST: ImageRegistry MachineAPI
-      FIPS_ENABLED: "true"
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CCO_MANUAL_MODE: oidc
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-f28
-  cron: 3 13 12 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.13
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-fips-f28
   cron: 43 18 2 * *
   steps:
@@ -234,16 +206,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disc-oidc-f28
-  cron: 7 5 6 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f28
   cron: 50 2 3 * *
   steps:
@@ -342,21 +304,12 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: gcp-ipi-confidential-fips-mini-perm-f28
-  cron: 13 4 4 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FIPS_ENABLED: "true"
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
-- as: gcp-ipi-confidential-secureboot-mini-perm-f28
+- as: gcp-ipi-confidential-secureboot-fips-mini-perm-f28
   cron: 23 14 8 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      FIPS_ENABLED: "true"
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test

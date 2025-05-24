@@ -7,13 +7,18 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
-SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-bastion=$(cat "/secret/address")
-CRUCIBLE_URL=$(cat "/secret/crucible_url")
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
+BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
+LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+export LAB_CLOUD
+LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -87,7 +92,7 @@ if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
     echo "Modifying PXE loader of server $i ..."
-    hammer -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
+    hammer --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
   done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
@@ -155,7 +160,7 @@ ssh ${SSH_ARGS} root@${bastion} "
 "
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
-scp -q ${SSH_ARGS} /secret/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
 
