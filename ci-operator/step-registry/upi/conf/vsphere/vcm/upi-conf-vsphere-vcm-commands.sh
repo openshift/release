@@ -572,6 +572,73 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
+echo "Enabling log forwarding manifests..."
+cat >"manifests/99_journal_forward_machine_config_master.yaml" <<-EOF
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: journal-forwarder-master
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    systemd:
+      units:
+        - name: journal-forwarder.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Forwards the journal to log server
+            After=network.target
+            Wants=network-online.target
+
+            [Service]
+            Restart=always
+            Type=simple
+            RestartSec=30
+            ExecStart=/bin/sh -c "stdbuf -oL journalctl -f | ncat log-gather.vmc.ci.openshift.org 12345"
+            Environment=
+
+            [Install]
+            WantedBy=multi-user.target
+EOF
+
+cat >"manifests/99_journal_forward_machine_config_compute.yaml" <<-EOF
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: compute
+  name: journal-forwarder-compute
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    systemd:
+      units:
+        - name: journal-forwarder.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Forwards the journal to log server
+            After=network.target
+            Wants=network-online.target
+
+            [Service]
+            Restart=always
+            Type=simple
+            RestartSec=30
+            ExecStart=/bin/sh -c "stdbuf -oL journalctl -f | ncat log-gather.vmc.ci.openshift.org 12345"
+            Environment=
+
+            [Install]
+            WantedBy=multi-user.target
+EOF
+
 # remove channel from CVO
 sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
 
