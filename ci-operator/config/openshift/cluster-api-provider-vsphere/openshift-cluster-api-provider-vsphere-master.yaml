@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   commitchecker:
     name: commitchecker
     namespace: ci
@@ -14,7 +18,11 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: latest
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
 binary_build_commands: go build -o cluster-api-provider-vsphere main.go
 build_root:
   from_repository: true
@@ -88,13 +96,16 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_FILTERS: CAPI
-      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+      TEST_TIMEOUT: "35"
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-vsphere-ipi
+  timeout: 5h30m0s
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}
