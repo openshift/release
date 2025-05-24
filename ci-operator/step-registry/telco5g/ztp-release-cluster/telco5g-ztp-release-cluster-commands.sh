@@ -34,9 +34,9 @@ cp $SHARED_DIR/inventory inventory/billerica_inventory
 pip3 install dnspython netaddr
 ansible-galaxy collection install -r ansible-requirements.yaml
 
-ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
-    -i $SHARED_DIR/inventory \
-    $SHARED_DIR/delete-sno.yml || true
+# ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+#     -i $SHARED_DIR/inventory \
+#     $SHARED_DIR/delete-sno.yml || true
 
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
