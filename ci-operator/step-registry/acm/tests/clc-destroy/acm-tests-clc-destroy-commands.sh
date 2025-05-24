@@ -35,6 +35,8 @@ CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
 export CLOUD_PROVIDERS
 
 # run the test execution script
-./execute_clc_interop_commands.sh || :
+#./execute_clc_interop_commands.sh || :
+# run the destroy script
+bash -x ./start-tests.sh
 
 cp -r reports $ARTIFACT_DIR/
