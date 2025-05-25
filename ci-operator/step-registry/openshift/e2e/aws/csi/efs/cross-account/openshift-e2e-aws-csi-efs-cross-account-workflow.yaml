@@ -1,0 +1,32 @@
+workflow:
+  as: openshift-e2e-aws-csi-efs-cross-account
+  steps:
+    pre:
+    - chain: ipi-aws-pre
+    - ref: aws-provision-vpc-shared
+    - ref: storage-create-csi-shared-aws-efs
+    - ref: optional-operators-subscribe
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-conf-storageclass-set-default-storageclass
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-aws-post
+    - ref: storage-destroy-csi-aws-efs
+    - ref: aws-deprovision-stacks
+    env:
+     ENABLE_SHARED_VPC: "yes"
+     TEST_SUITE: openshift/csi
+     TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
+     TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-aws-efs.yaml
+     VPC_CIDR: 172.20.0.0/16
+     REQUIRED_DEFAULT_STORAGECLASS: efs-sc
+     CLUSTERCSIDRIVER: efs.csi.aws.com
+     OO_PACKAGE: aws-efs-csi-driver-operator
+     OO_CHANNEL: stable
+     OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+     OO_TARGET_NAMESPACES: '!all'
+     TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+
+  documentation: |-
+    The Openshift E2E AWS `csi` workflow executes the `openshift/csi` end-to-end test suite on AWS EFS CSI driver that was installed during cluster setup.
