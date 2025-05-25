@@ -140,6 +140,8 @@ SUBNETS=$(aws ec2 describe-subnets \
   --filters Name=vpc-id,Values="${AWS_ACCOUNT_A_VPC_ID}" \
   | jq -r '.Subnets[].SubnetId')
 
+sleep 8h
+
 for subnet in $SUBNETS; do
   # Get route table associated with this subnet (specific or main)
   RTB=$(aws ec2 describe-route-tables \
