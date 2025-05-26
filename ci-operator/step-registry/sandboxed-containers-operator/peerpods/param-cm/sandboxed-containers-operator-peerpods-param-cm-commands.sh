@@ -5,6 +5,9 @@ if [ "$ENABLEPEERPODS" != "true" ]; then
     exit 0
 fi
 
+# Switch to a directory with rw permission
+cd /tmp || exit 1
+
 # Create the parameters configmap file in the shared directory so that others steps
 # can reference it.
 PP_CONFIGM_PATH="${SHARED_DIR:-$(pwd)}/peerpods-param-cm.yaml"
@@ -38,6 +41,7 @@ handle_azure() {
 
     AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
 
+    oc -n kube-system get secret azure-credentials -o json > azure_credentials.json
     if [ -n "${CLUSTER_PROFILE_DIR:-}" ]; then
         AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
         AZURE_CLIENT_ID="$(jq -r .clientId "${AZURE_AUTH_LOCATION}")"
@@ -45,26 +49,40 @@ handle_azure() {
         AZURE_TENANT_ID="$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")"
     else
         # Useful when testing this script outside of ci-operator
-        oc -n kube-system get secret azure-credentials -o json > azure_credentials.json
         AZURE_CLIENT_ID="$(jq -r .data.azure_client_id azure_credentials.json|base64 -d)"
         AZURE_CLIENT_SECRET="$(jq -r .data.azure_client_secret azure_credentials.json|base64 -d)"
         AZURE_TENANT_ID="$(jq -r .data.azure_tenant_id azure_credentials.json|base64 -d)"
-        rm -f azure_credentials.json
 
         AZURE_AUTH_LOCATION="${PWD}/osServicePrincipal.json"
         echo "{ \"clientId\": \"$AZURE_CLIENT_ID\", \"clientSecret\": \"$AZURE_CLIENT_SECRET\", \"tenantId\": \"$AZURE_TENANT_ID\" }" | \
             jq > "${AZURE_AUTH_LOCATION}"
     fi
+    AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
+    rm -f azure_credentials.json
 
     echo "****Login to Azure****"
     az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
     echo "****Login to Azure COMPLETE****"
+    # Recommended on az sites to refresh the subscription
+    az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
+    # This command still sometimes fails directly after login
+    for I in {1..30}; do
+	    AZURE_VNET_NAME=$(az network vnet list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Name:name}" --output tsv ||:)
+	    if [[ -z "${AZURE_VNET_NAME}" ]]; then
+		    sleep "${I}"
+	    else	# VNET set, we are done
+		    break
+	    fi
+    done
+    if [[ -z "${AZURE_VNET_NAME}" ]]; then
+	    echo "Failed to get AZURE_VNET_NAME in 30 iterations"
+	    exit 1
+    fi
 
     echo "****Creating peerpods-param-secret with the keys needed for test case execution****"
     oc create secret generic peerpods-param-secret --from-file="${AZURE_AUTH_LOCATION}" -n default
     echo "****Creating peerpods-param-secret COMPLETE****"
 
-    AZURE_VNET_NAME=$(az network vnet list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Name:name}" --output tsv)
     AZURE_SUBNET_NAME=$(az network vnet subnet list --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --query "[].{Id:name} | [? contains(Id, 'worker')]" --output tsv)
     AZURE_SUBNET_ID=$(az network vnet subnet list --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --query "[].{Id:id} | [? contains(Id, 'worker')]" --output tsv)
     AZURE_NSG_ID=$(az network nsg list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Id:id}" --output tsv)
