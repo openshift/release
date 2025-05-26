@@ -3,6 +3,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Debug DSC deployment
+sleep 24h
+
 echo "Deploying a DataScience Cluster"
 csv=$(oc get csv -n default -o json | jq -r '.items[] | select(.metadata.name | startswith("rhods-operator"))')
 if [[ -z "${csv}" ]]; then
