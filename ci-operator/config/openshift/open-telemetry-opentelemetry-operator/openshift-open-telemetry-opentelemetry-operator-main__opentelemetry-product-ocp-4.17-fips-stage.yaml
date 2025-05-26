@@ -3,6 +3,14 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: cli
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -28,9 +36,9 @@ tests:
 - always_run: false
   as: opentelemetry-stage-tests-fips
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: azure-observability
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
       FIPS_ENABLED: "true"
       OPERATORS: |
         [
@@ -43,16 +51,15 @@ tests:
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
         ]
       OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927215
-      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-targetallocator/targetallocator-prometheuscr
-        tests/e2e-otel/awscloudwatchlogsexporter tests/e2e-otel/awsxrayexporter tests/e2e-otel/oidcauthextension
-        tests/e2e-openshift/export-to-cluster-logging-lokistack
+      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/awscloudwatchlogsexporter
+        tests/e2e-otel/*aws* tests/e2e-otel/oidcauthextension tests/e2e-openshift/export-to-cluster-logging-lokistack
       TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928251
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
