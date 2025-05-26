@@ -1,0 +1,105 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  tempo-bundle-old:
+    name: tempo-operator-bundle
+    namespace: ci
+    tag: old
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.23-openshift-4.19
+canonical_go_repository: github.com/grafana/tempo-operator
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: tempo-operator
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: tempo-tests-runner
+operator:
+  bundles:
+  - as: tempo-bundle
+    context_dir: ./bundle/openshift
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: ghcr.io/grafana/tempo-operator/tempo-operator:.*
+    with: pipeline:tempo-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tempo-operator-upgrade
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      OPERATORS: |
+        [
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
+        ]
+      SKIP_TESTS: tests/e2e-openshift-object-stores/*sts* tests/e2e-openshift-object-stores/*ibm*
+        tests/e2e-openshift-object-stores/*azure* tests/e2e-openshift-object-stores/*aws*
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-tempo-operator
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-tempo-operator "$OO_BUNDLE_OLD"
+        oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE_OLD
+        name: tempo-bundle-old
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: install-operators
+    - ref: distributed-tracing-tests-tempo-pre-upgrade
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller
+      dependencies:
+      - env: OO_BUNDLE
+        name: tempo-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: distributed-tracing-tests-tempo-upstream
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: grafana-tempo-operator
+  variant: upstream-ocp-4.18-amd64-gcp
