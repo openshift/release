@@ -386,8 +386,8 @@ function upgrade() {
             echo "Current cluster is on ${cluster_src_ver}"
         fi
         echo "Negative Testing: upgrade to an unsigned image without --force option"
-        admin_ack
-        cco_annotation
+        admin_ack "${SOURCE_VERSION}" "${TARGET_VERSION}"
+        cco_annotation "${SOURCE_VERSION}" "${TARGET_VERSION}"
         run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade"
         error_check_invalid_image
         clear_upgrade
@@ -440,17 +440,6 @@ function check_upgrade_status() {
     echo -e "Upgrade checking start at $(date "+%F %T")\n"
     start_time=$(date "+%s")
 
-    # https://issues.redhat.com//browse/OTA-861
-    # When upgrade is processing, Upgradeable will be set to false
-    sleep 60 # while waiting for condition to populate
-    local case_id="OCP-25473"
-    if [[ "$TARGET_MINOR_VERSION" -gt 18 ]] && [[ "$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].status}')" != "False" ]]; then
-        echo "Error: ${case_id} As OTA-861 designed, Upgradeable should be set to False when an upgrade is in progress, but actually not"
-        export UPGRADE_FAILURE_TYPE="${case_id}"
-        export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
-        return 1
-    fi
-
     # print once to log (including full messages)
     oc adm upgrade || true
     # log oc adm upgrade (excluding garbage messages)
@@ -478,6 +467,17 @@ function check_upgrade_status() {
             end_time=$(date "+%s")
             echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
+        fi
+        if [[ ${progress} == "True" ]] && \
+            [[ "$TARGET_MINOR_VERSION" -gt 18 ]] && \
+            [[ "$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].status}')" != "False" ]]; then
+            # https://issues.redhat.com//browse/OTA-861
+            # When upgrade is processing, Upgradeable will be set to false
+            local case_id="OCP-25473"
+            echo "Error: ${case_id} As OTA-861 designed, Upgradeable should be set to False when an upgrade is in progress, but actually not"
+            export UPGRADE_FAILURE_TYPE="${case_id}"
+            export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
+            return 1
         fi
         if [ "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" ] &&  check_ota_case_enabled "OCP-73352"; then
             # "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" is used to make sure run check_upgrade_recommend_when_upgrade_inprogress once
