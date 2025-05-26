@@ -9,11 +9,6 @@ fi
 # can reference it.
 PP_CONFIGM_PATH="${SHARED_DIR:-$(pwd)}/peerpods-param-cm.yaml"
 
-from_azure_credentials() {
-        data="$1"
-        oc -n kube-system get secret azure-credentials -o jsonpath="{.data.${data}}" | base64 -d
-}
-
 handle_azure() {
     local AZURE_RESOURCE_GROUP
     local AZURE_AUTH_LOCATION
@@ -50,9 +45,12 @@ handle_azure() {
         AZURE_TENANT_ID="$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")"
     else
         # Useful when testing this script outside of ci-operator
-        AZURE_CLIENT_ID="$(from_azure_credentials azure_client_id)"
-        AZURE_CLIENT_SECRET="$(from_azure_credentials azure_client_secret)"
-        AZURE_TENANT_ID="$(from_azure_credentials azure_tenant_id)"
+        oc -n kube-system get secret azure-credentials -o json > azure_credentials.json
+        AZURE_CLIENT_ID="$(jq -r .data.azure_client_id azure_credentials.json|base64 -d)"
+        AZURE_CLIENT_SECRET="$(jq -r .data.azure_client_secret azure_credentials.json|base64 -d)"
+        AZURE_TENANT_ID="$(jq -r .data.azure_tenant_id azure_credentials.json|base64 -d)"
+        rm -f azure_credentials.json
+
         AZURE_AUTH_LOCATION="${PWD}/osServicePrincipal.json"
         echo "{ \"clientId\": \"$AZURE_CLIENT_ID\", \"clientSecret\": \"$AZURE_CLIENT_SECRET\", \"tenantId\": \"$AZURE_TENANT_ID\" }" | \
             jq > "${AZURE_AUTH_LOCATION}"
