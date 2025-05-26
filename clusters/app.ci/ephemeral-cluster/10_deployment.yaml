@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-controller-manager\")].image"}]'
+  labels:
+    app: ephemeral-cluster
+  name: ephemeral-cluster
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ephemeral-cluster
+  template:
+    metadata:
+      annotations:
+        ci-workload-autoscaler.openshift.io/scale: "false"
+      labels:
+        app: ephemeral-cluster
+    spec:
+      tolerations:
+      - key: manual-provision
+        operator: Exists
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - image: dptp-controller-manager
+        name: ephemeral-cluster
+        args:
+        - --leader-election-namespace=ci
+        - --leader-election-suffix=ec
+        - --release-repo-git-sync-path=/var/repo/release
+        - --enable-controller=ephemeral_cluster_provisioner
+        - --dry-run=false
+        - --kubeconfig-dir=/var/kubeconfigs
+        - --kubeconfig-suffix=config
+        ports:
+        - name: metrics
+          containerPort: 8080
+        volumeMounts:
+        - name: kubeconfigs
+          mountPath: /var/kubeconfigs
+        - name: release
+          mountPath: /var/repo
+      serviceAccountName: dptp-controller-manager
+      volumes:
+      - name: kubeconfigs
+        secret:
+          secretName: dptp-controller-manager
+      - name: release
+        emptyDir: {}
