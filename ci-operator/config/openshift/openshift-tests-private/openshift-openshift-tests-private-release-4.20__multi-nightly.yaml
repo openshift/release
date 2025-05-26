@@ -2321,6 +2321,60 @@ tests:
       WORKFLOW_TYPE: cucushift
       YQ_VERSION: 4.30.5
     workflow: openshift-e2e-ibmcloud-heterogeneous-test-qe
+- as: azure-short-cert-rotation-arm-f9
+  cron: 13 11 9,18,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: aws-short-cert-rotation-arm-f9
+  cron: 0 13 1,10,22 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6gd.2xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: openshift-e2e-cert-rotation-short
+- as: gcp-short-cert-rotation-arm-f9
+  cron: 22 9 4,16,25 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: baremetal-short-cert-rotation-arm-f0
+  capabilities:
+  - intranet
+  cron: 2 16 5,14,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: baremetal-lab-ipi
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
