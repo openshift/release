@@ -1,16 +1,8 @@
 base_images:
   cli:
-    name: "4.12"
+    name: "4.19"
     namespace: ocp
     tag: cli
-  tools:
-    name: "4.12"
-    namespace: ocp
-    tag: tools
-  upi-installer:
-    name: "4.12"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -26,7 +18,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -35,10 +27,17 @@ resources:
 tests:
 - always_run: false
   as: tempo-stage-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.19"
   steps:
-    cluster_profile: azure-observability
     env:
-      BASE_DOMAIN: observability.azure.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -47,19 +46,18 @@ tests:
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927218
-      SKIP_TESTS: tests/e2e-openshift/monitoring tests/e2e-openshift-ossm/ossm-tempostack
-        tests/e2e-openshift-object-stores/*sts* tests/e2e-openshift-object-stores/*ibm*
-        tests/e2e-openshift-object-stores/*gcs* tests/e2e-openshift-object-stores/*aws*
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928201
+      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927217
+      SKIP_TESTS: tests/e2e-openshift-object-stores/*sts* tests/e2e-openshift-object-stores/*ibm*
+        tests/e2e-openshift-object-stores/*azure* tests/e2e-openshift-object-stores/*gcs*
+      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928198
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: tempo-product-ocp-4.12-stage
+  variant: tempo-product-ocp-4.19-stage
