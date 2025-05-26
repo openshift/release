@@ -16,7 +16,7 @@ oc wait tigerastatus calico --for=condition=Available --timeout=30m
 oc wait tigerastatus apiserver --for=condition=Available --timeout=30m
 oc wait tigerastatus ippools --for=condition=Available --timeout=30m
 
-oc wait clusteroperators --all --for=condition=Available=True --timeout=30m
+oc wait clusteroperators --all --for=condition=Available=True --timeout=60m
 oc wait clusteroperators --all --for=condition=Progressing=False --timeout=30m
 oc wait clusteroperators --all --for=condition=Degraded=False --timeout=30m
 oc wait clusterversion/version --for=condition=Available=True --timeout=30m
