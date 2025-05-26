@@ -9,8 +9,6 @@ oc version
 terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
-sleep 3h
-
 #Create Artifact Directory:
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p $ARTIFACT_DIR
