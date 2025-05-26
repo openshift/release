@@ -22,11 +22,11 @@ echo "⏳ Wait for DataScientCluster to be deployed"
 oc wait --for=jsonpath='{.status.phase}'=Ready datasciencecluster/${DSC_NAME} --timeout=9000s 
 
 # Verify RHOAI operator installation
-namespace="openshift-operators"
 timeout=400s
-label_selectors=("control-plane=authorino-operator" "name=istio-operator")
 
-# Add authorino-component label-selector only for tech-preview-v1 channel
+namespace="openshift-operators"
+label_selectors=("control-plane=authorino-operator" "name=istio-operator")
+authorino_channel=$(oc get subscription authorino-operator -n $namespace -o=jsonpath='{.spec.channel}{"\n"}')
 if [[ "$authorino_channel" == "tech-preview-v1" ]]; then
   label_selectors+=("authorino-component=authorino-webhooks")
 fi
