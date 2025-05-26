@@ -139,9 +139,12 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_des_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.osDisk.diskEncryptionSet')
     install_config_des_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.osDisk.diskEncryptionSet')
     install_config_des_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.osDisk.diskEncryptionSet')
-    install_config_identity_user_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
-    install_config_identity_user_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
-    install_config_identity_user_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
+    install_config_identity_type_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
+    install_config_user_identity_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.userAssignedIdentities')
+    install_config_identity_type_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
+    install_config_user_identity_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.userAssignedIdentities')
+    install_config_identity_type_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.type')
+    install_config_user_identity_compute=$(yq-go r ${CONFIG} 'compute[0].platform.azure.identity.userAssignedIdentities')
     install_config_outbound_type=$(yq-go r ${CONFIG} 'platform.azure.outboundType')
     install_config_publish_strategy=$(yq-go r ${CONFIG} 'publish')
     install_config_customer_managed_key=$(yq-go r ${CONFIG} 'platform.azure.customerManagedKey')
@@ -284,7 +287,37 @@ ${required_permissions}
     fi
 
     # Starting from 4.19, user-assigned identity created by installer is removed, related permissions are not required any more.
-    if (( ocp_minor_version <=18 && ocp_major_version == 4 )); then
+    # The default behavior is changed to create an identity via installer#9735, will change back once future upstream changes land
+    # optional permissions are not required with below configurations
+    # * identity type is set to None
+    # * identity type is set to UserAssigned without precreated user-assigned identity
+    default_identity_type="UserAssigned"
+    master_identity_type=${default_identity_type}
+    master_user_identity=""
+    worker_identity_type=${default_identity_type}
+    worker_user_identity=""
+    if [[ -n "${install_config_identity_type_default}" ]]; then
+        master_identity_type="${install_config_identity_type_default}"
+        worker_identity_type="${install_config_identity_type_default}"
+        if [[ -n "${install_config_user_identity_default}" ]]; then
+            master_user_identity="${install_config_user_identity_default}"
+            worker_user_identity="${install_config_user_identity_default}"
+        fi
+    fi
+    if [[ -n "${install_config_identity_type_master}" ]]; then
+        master_identity_type="${install_config_identity_type_master}"
+        if [[ -n "${install_config_user_identity_master}" ]]; then
+            master_user_identity="${install_config_user_identity_master}"
+        fi
+    fi
+    if [[ -n "${install_config_identity_type_compute}" ]]; then
+        worker_identity_type="${install_config_identity_type_compute}"
+        if [[ -n "${install_config_user_identity_compute}" ]]; then
+            worker_user_identity="${install_config_user_identity_compute}"
+        fi
+    fi
+
+    if [[ "${master_identity_type}" == "UserAssigned" && -z "${master_user_identity}" ]] || [[ "${worker_identity_type}" == "UserAssigned" && -z "${worker_user_identity}" ]]; then
         required_permissions="""
 \"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
 \"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
@@ -295,11 +328,9 @@ ${required_permissions}
 \"Microsoft.Authorization/roleAssignments/delete\",
 ${required_permissions}
 """
-    fi
-
-    # optional permissions when specifying UserAssigned identity
-    if [[ "${install_config_identity_user_default}" == "UserAssigned" ]] || [[ "${install_config_identity_user_master}" == "UserAssigned" ]] || [[ "${install_config_identity_user_compute}" == "UserAssigned" ]]; then
-        required_permissions="""
+    # Optional permissions when configuring identity type to UserAssigned with precreated user-assigend identity
+    elif [[ -n "${master_user_identity}" ]] || [[ -n "${worker_user_identity}" ]]; then
+    required_permissions="""
 \"Microsoft.ManagedIdentity/userAssignedIdentities/assign/action\",
 \"Microsoft.ManagedIdentity/userAssignedIdentities/read\",
 ${required_permissions}

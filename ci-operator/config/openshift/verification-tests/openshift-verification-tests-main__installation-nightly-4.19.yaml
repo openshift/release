@@ -674,31 +674,74 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private-sshkey
-- as: azure-ipi-user-assigned-identity-f14
-  cron: 31 21 16,30 * *
+- as: azure-ipi-byo-user-assigned-identity-arm-f14
+  cron: 32 0 3,17 * *
   steps:
     cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AZURE_IDENTITY_TYPE_COMPUTE: UserAssigned
+      AZURE_IDENTITY_TYPE_CONTROL_PLANE: UserAssigned
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: UserAssigned
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       BOOT_DIAGNOSTICS: "false"
-      ENABLE_AZURE_IDENTITY_COMPUTE: "true"
-      ENABLE_AZURE_IDENTITY_CONTROL_PLANE: "true"
-      ENABLE_AZURE_IDENTITY_DEFAULT_MACHINE: "true"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-identity
-- as: azure-ipi-multi-user-assigned-identity-mini-perm-f28
-  cron: 54 13 29 * *
+- as: azure-ipi-byo-multi-user-assigned-identity-mini-perm-arm-f28
+  cron: 35 8 2 * *
   steps:
     cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: UserAssigned
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       AZURE_USER_ASSIGNED_IDENTITY_NUMBER: "2"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       BOOT_DIAGNOSTICS: "false"
-      ENABLE_AZURE_IDENTITY_DEFAULT_MACHINE: "true"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       FEATURE_GATES: '["MachineAPIMigration=true"]'
       FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-identity
+- as: azure-ipi-identity-default-arm-f28
+  cron: 30 15 14 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AZURE_IDENTITY_TYPE_COMPUTE: UserAssigned
+      AZURE_IDENTITY_TYPE_CONTROL_PLANE: UserAssigned
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: UserAssigned
+      AZURE_USER_ASSIGNED_IDENTITY_NUMBER: "0"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BOOT_DIAGNOSTICS: "false"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-identity
+- as: azure-ipi-identity-default-mini-perm-arm-f28
+  cron: 32 4 27 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: UserAssigned
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_USER_ASSIGNED_IDENTITY_NUMBER: "0"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BOOT_DIAGNOSTICS: "false"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-identity

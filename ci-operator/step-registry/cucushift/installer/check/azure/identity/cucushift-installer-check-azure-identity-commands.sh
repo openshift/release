@@ -112,59 +112,88 @@ check_result=0
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 cluster_identity_id=$(az identity list -g "${RESOURCE_GROUP}" --query "[].id" -otsv)
 cluster_identity_name=$(az identity list -g "${RESOURCE_GROUP}" --query "[].name" -otsv)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 19 )) && [[ -z "${cluster_identity_id}" ]]; then
-    echo "On 4.18 and previous version, user-assigned identity is created by installer, but not find, exit..."
+#ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+#if (( ${ocp_minor_version} < 19 )) && [[ -z "${cluster_identity_id}" ]]; then
+#    echo "On 4.18 and previous version, user-assigned identity is created by installer, but not find, exit..."
+#    exit 1
+#elif (( ${ocp_minor_version} >= 19 )) && [[ -n "${cluster_identity_id}" ]]; then
+#    echo "On 4.19+, installer does not create user-assigned identity any more, but find it ${cluster_identity_id}, exit..."
+#    exit 1
+#fi
+
+install_config_identity_type_default=$(yq-go r ${INSTALL_CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
+install_config_identity_type_master=$(yq-go r ${INSTALL_CONFIG} 'controlPlane.platform.azure.identity.type')
+install_config_identity_type_worker=$(yq-go r ${INSTALL_CONFIG} 'compute[0].platform.azure.identity.type')
+
+default_identity_type="UserAssigned"
+expected_identity_type_master="${default_identity_type}"
+expected_identity_type_worker="${default_identity_type}"
+expected_identity_id_master="${cluster_identity_id}"
+expected_identity_id_worker="${cluster_identity_id}"
+
+end_number=$((AZURE_USER_ASSIGNED_IDENTITY_NUMBER - 1))
+if [[ -n "${install_config_identity_type_default}" ]]; then
+    expected_identity_type_master="${install_config_identity_type_default}"
+    expected_identity_type_worker="${install_config_identity_type_default}"
+    if [[ "${install_config_identity_type_default}" == "UserAssigned" ]] && [[ ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER} -gt 0 ]]; then
+        expected_identity_id_master=""
+        expected_identity_id_worker=""
+        for num in $(seq 0 ${end_number}); do
+            subscrption=$(yq-go r ${INSTALL_CONFIG} "platform.azure.defaultMachinePlatform.identity.userAssignedIdentities[$num].subscription")
+            name=$(yq-go r ${INSTALL_CONFIG} "platform.azure.defaultMachinePlatform.identity.userAssignedIdentities[$num].name")
+            rg=$(yq-go r ${INSTALL_CONFIG} "platform.azure.defaultMachinePlatform.identity.userAssignedIdentities[$num].resourceGroup")
+            expected_identity_id_master+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
+            expected_identity_id_worker+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
+        done
+    fi
+fi
+
+if [[ -n "${install_config_identity_type_master}" ]]; then
+    expected_identity_type_master="${install_config_identity_type_master}"
+    if [[ "${install_config_identity_type_master}" == "UserAssigned" ]] && [[ ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER} -gt 0 ]]; then
+        expected_identity_id_master=""
+        for num in $(seq 0 ${end_number}); do
+            subscrption=$(yq-go r ${INSTALL_CONFIG} "controlPlane.platform.azure.identity.userAssignedIdentities[$num].subscription")
+            name=$(yq-go r ${INSTALL_CONFIG} "controlPlane.platform.azure.identity.userAssignedIdentities[$num].name")
+            rg=$(yq-go r ${INSTALL_CONFIG} "controlPlane.platform.azure.identity.userAssignedIdentities[$num].resourceGroup")
+            expected_identity_id_master+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
+        done
+    fi
+fi
+
+if [[ -n "${install_config_identity_type_worker}" ]]; then
+    expected_identity_type_worker="${install_config_identity_type_worker}"
+    if [[ "${install_config_identity_type_worker}" == "UserAssigned" ]] && [[ ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER} -gt 0 ]]; then
+        expected_identity_id_worker=""
+        for num in $(seq 0 ${end_number}); do
+            subscrption=$(yq-go r ${INSTALL_CONFIG} "compute[0].platform.azure.identity.userAssignedIdentities[$num].subscription")
+            name=$(yq-go r ${INSTALL_CONFIG} "compute[0].platform.azure.identity.userAssignedIdentities[$num].name")
+            rg=$(yq-go r ${INSTALL_CONFIG} "compute[0].platform.azure.identity.userAssignedIdentities[$num].resourceGroup")
+            expected_identity_id_worker+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
+        done
+    fi
+fi
+
+echo "expected_identity_type_master: ${expected_identity_type_master}"
+echo "expected_identity_id_master: ${expected_identity_id_master}"
+echo "expected_identity_type_worker: ${expected_identity_type_worker}"
+echo "expected_identity_id_worker: ${expected_identity_id_worker}"
+echo "cluster_identity_id: ${cluster_identity_id}"
+echo "AZURE_USER_ASSIGNED_IDENTITY_NUMBER: ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER}"
+
+if [[ "${expected_identity_type_master}" == "UserAssigned" ]] && [[ -z "${expected_identity_id_master}" ]]; then
+    echo "ERROR: control plane's identity type is UserAssigned, but expected identity ids created by installer or user are empty, please check..."
     exit 1
-elif (( ${ocp_minor_version} >= 19 )) && [[ -n "${cluster_identity_id}" ]]; then
-    echo "On 4.19+, installer does not create user-assigned identity any more, but find it ${cluster_identity_id}, exit..."
+fi
+
+if [[ "${expected_identity_type_worker}" == "UserAssigned" ]] && [[ -z "${expected_identity_id_worker}" ]]; then
+    echo "ERROR: compute's identity type is UserAssigned, but expected identity ids created by installer or user are empty, please check..."
     exit 1
 fi
 
-control_plane_identity_id="${cluster_identity_id}"
-compute_identity_id="${cluster_identity_id}"
-identity_type_default=$(yq-go r ${INSTALL_CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
-if [[ "${identity_type_default}" == "UserAssigned" ]]; then
-    end_number=$((AZURE_USER_ASSIGNED_IDENTITY_NUMBER - 1))
-    control_plane_identity_id=""
-    compute_identity_id=""
-    for num in $(seq 0 ${end_number}); do
-        subscrption=$(yq-go r ${INSTALL_CONFIG} "platform.azure.defaultMachinePlatform.identity.userAssignedIdentities[$num].subscription")
-        name=$(yq-go r ${INSTALL_CONFIG} "platform.azure.defaultMachinePlatform.identity.userAssignedIdentities[$num].name")
-        rg=$(yq-go r ${INSTALL_CONFIG} "platform.azure.defaultMachinePlatform.identity.userAssignedIdentities[$num].resourceGroup")
-        control_plane_identity_id+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
-        compute_identity_id+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
-    done
-fi
-identity_type_control_plane=$(yq-go r ${INSTALL_CONFIG} 'controlPlane.platform.azure.identity.type')
-if [[ "${identity_type_control_plane}" == "UserAssigned" ]]; then
-    end_number=$((AZURE_USER_ASSIGNED_IDENTITY_NUMBER - 1))
-    control_plane_identity_id=""
-    for num in $(seq 0 ${end_number}); do
-        subscrption=$(yq-go r ${INSTALL_CONFIG} "controlPlane.platform.azure.identity.userAssignedIdentities[$num].subscription")
-        name=$(yq-go r ${INSTALL_CONFIG} "controlPlane.platform.azure.identity.userAssignedIdentities[$num].name")
-        rg=$(yq-go r ${INSTALL_CONFIG} "controlPlane.platform.azure.identity.userAssignedIdentities[$num].resourceGroup")
-        control_plane_identity_id+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
-    done
-fi
-identity_type_compute=$(yq-go r ${INSTALL_CONFIG} 'compute[0].platform.azure.identity.type')
-if [[ "${identity_type_compute}" == "UserAssigned" ]]; then
-    end_number=$((AZURE_USER_ASSIGNED_IDENTITY_NUMBER - 1))
-    compute_identity_id=""
-    for num in $(seq 0 ${end_number}); do
-        subscrption=$(yq-go r ${INSTALL_CONFIG} "compute[0].platform.azure.identity.userAssignedIdentities[$num].subscription")
-        name=$(yq-go r ${INSTALL_CONFIG} "compute[0].platform.azure.identity.userAssignedIdentities[$num].name")
-        rg=$(yq-go r ${INSTALL_CONFIG} "compute[0].platform.azure.identity.userAssignedIdentities[$num].resourceGroup")
-        compute_identity_id+=" /subscriptions/${subscrption}/resourceGroups/${rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}"
-    done
-fi
-
-echo "control_plane_identity_id: ${control_plane_identity_id}"
-echo "compute_identity_id: ${compute_identity_id}"
-
-if [[ -z "${control_plane_identity_id}" ]] && [[ -z "${compute_identity_id}" ]] && (( ${ocp_minor_version} >= 19 )); then
-    echo "No identity is specified in install-config and no user-assigned identity is created by default on 4.19+, skip the check..."
-    exit 0
+if [[ "${expected_identity_type_master}" == "None" ]] && [[ "${expected_identity_type_worker}" == "None" ]] && [[ -n "${cluster_identity_id}" ]]; then
+    echo "ERROR: identity type for both control plane and compute is set to None, installer does not create any identity, but found it, exit..."
+    exit 1
 fi
 
 # Check that specified identity should be attached on each node
@@ -175,43 +204,56 @@ if (( ${ocp_minor_version} < 19 )); then
     # No rhel worker is provisioned on 4.19+
     node_filter="node.openshift.io/os_id=rhcos,"
 fi
-check_vm_identity "master" "${control_plane_identity_id}" "${node_filter}" || check_result=1
-check_vm_identity "worker" "${compute_identity_id}" "${node_filter}" || check_result=1
 
-#Currently, only one identity is attached to work nodes and configured in object machine/machineset/controlplanmachineset in cluster
-control_plane_identity_id=$(echo "${control_plane_identity_id}" | awk '{print $1}')
-compute_identity_id=$(echo "${compute_identity_id}" | awk '{print $1}')
+if [[ "${expected_identity_type_master}" == "None" ]]; then
+    echo "INFO: identity type is set to None for control plane nodes, skip the check..."
+else
+    check_vm_identity "master" "${expected_identity_id_master}" "${node_filter}" || check_result=1
 
-# machine
-echo "-------------Check identity in machine spec-------------"
-check_machine_managedIdentity "master" "${control_plane_identity_id}" "${cluster_identity_name}"|| check_result=1
-check_machine_managedIdentity "worker" "${compute_identity_id}" "${cluster_identity_name}" || check_result=1
+    #Currently, only one identity is attached to work nodes and configured in object machine/machineset/controlplanmachineset in cluster
+    expected_identity_id_master=$(echo "${expected_identity_id_master}" | awk '{print $1}')
+    # machine
+    echo "-------------Check identity in machine/master spec-------------"
+    check_machine_managedIdentity "master" "${expected_identity_id_master}" "${cluster_identity_name}"|| check_result=1
 
-# machinset
-echo "-------------Check identity in machineset spec-------------"
-machineset_list=$(oc get machineset.m -n openshift-machine-api -ojson | jq -r '.items[].metadata.name')
-for machineset in ${machineset_list}; do
-    echo "checking machineset ${machineset}..."
-    machineset_identity=$(oc get machineset.m -n openshift-machine-api ${machineset} -ojson | jq -r '.spec.template.spec.providerSpec.value.managedIdentity')
-    if [[ "${machineset_identity}" == "${compute_identity_id}" ]] || [[ "${machineset_identity}" == "${cluster_identity_name}" ]]; then
-        echo "INFO: expected identity is configured in machineset spec!"
+    echo "-------------Check identity in controlplanemachineset spec-------------"
+    cpms_identity=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.managedIdentity')
+    echo "checking controlplanemachineset cluster..."
+    if [[ "${cpms_identity}" == "${expected_identity_id_master}" ]] || [[ "${cpms_identity}" == "${cluster_identity_name}" ]]; then
+        echo "INFO: expected identity is configured in cpms spec!"
     else
-        echo "ERROR: expected identity 4.18- with name ${cluster_identity_name} or 4.19+ with id ${compute_identity_id} is not configured in machineset spec, unexpected!"
-        echo "identity in machineset spec: ${machineset_identity}"
+        echo "ERROR: expected identity 4.18- with name ${cluster_identity_name} or 4.19+ with id ${expected_identity_id_master} ${cluster_identity_name} is not configured in cpms spec, unexpected!"
+        echo "identity in cpms spec: ${cpms_identity}"
         check_result=1
     fi
-done
+fi
 
-# controlplanemachineset
-echo "-------------Check identity in controlplanemachineset spec-------------"
-cpms_identity=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.managedIdentity')
-echo "checking controlplanemachineset cluster..."
-if [[ "${cpms_identity}" == "${control_plane_identity_id}" ]] || [[ "${cpms_identity}" == "${cluster_identity_name}" ]]; then
-    echo "INFO: expected identity is configured in cpms spec!"
+if [[ "${expected_identity_type_worker}" == "None" ]]; then
+    echo "INFO: identity type is set to None for worker nodes, skip the check..."
 else
-    echo "ERROR: expected identity 4.18- with name ${cluster_identity_name} or 4.19+ with id ${control_plane_identity_id} ${cluster_identity_name} is not configured in cpms spec, unexpected!"
-    echo "identity in cpms spec: ${cpms_identity}"
-    check_result=1
+    check_vm_identity "worker" "${expected_identity_id_worker}" "${node_filter}" || check_result=1
+
+    #Currently, only one identity is attached to work nodes and configured in object machine/machineset/controlplanmachineset in cluster
+    expected_identity_id_worker=$(echo "${expected_identity_id_worker}" | awk '{print $1}')
+
+    # machine
+    echo "-------------Check identity in machine/worker spec-------------"
+    check_machine_managedIdentity "worker" "${expected_identity_id_worker}" "${cluster_identity_name}" || check_result=1
+
+    # machinset
+    echo "-------------Check identity in machineset spec-------------"
+    machineset_list=$(oc get machineset.m -n openshift-machine-api -ojson | jq -r '.items[].metadata.name')
+    for machineset in ${machineset_list}; do
+        echo "checking machineset ${machineset}..."
+        machineset_identity=$(oc get machineset.m -n openshift-machine-api ${machineset} -ojson | jq -r '.spec.template.spec.providerSpec.value.managedIdentity')
+        if [[ "${machineset_identity}" == "${expected_identity_id_worker}" ]] || [[ "${machineset_identity}" == "${cluster_identity_name}" ]]; then
+            echo "INFO: expected identity is configured in machineset spec!"
+        else
+            echo "ERROR: expected identity 4.18- with name ${cluster_identity_name} or 4.19+ with id ${expected_identity_id_worker} is not configured in machineset spec, unexpected!"
+            echo "identity in machineset spec: ${machineset_identity}"
+            check_result=1
+        fi
+    done
 fi
 
 exit ${check_result}
