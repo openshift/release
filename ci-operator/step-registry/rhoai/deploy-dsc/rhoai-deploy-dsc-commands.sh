@@ -24,7 +24,13 @@ oc wait --for=jsonpath='{.status.phase}'=Ready datasciencecluster/${DSC_NAME} --
 # Verify RHOAI operator installation
 namespace="openshift-operators"
 timeout=400s
-label_selectors=("control-plane=authorino-operator" "authorino-component=authorino-webhooks" "name=istio-operator")
+label_selectors=("control-plane=authorino-operator" "name=istio-operator")
+
+# Add authorino-component label-selector only for tech-preview-v1 channel
+if [[ "$authorino_channel" == "tech-preview-v1" ]]; then
+  label_selectors+=("authorino-component=authorino-webhooks")
+fi
+
 echo "Wait For Pods To Be Ready"
 for label_selector in "${label_selectors[@]}"; do
   oc wait --for=condition=ready=true pod -l ${label_selector} -n ${namespace} --timeout=${timeout}
