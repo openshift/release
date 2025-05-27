@@ -3,6 +3,14 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: cli
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -25,17 +33,9 @@ resources:
       memory: 400Mi
 tests:
 - as: cluster-density-v2-kepler-minimal
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-powermon
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.18"
   cron: 00 04 * * 2
   steps:
+    cluster_profile: gcp-observability
     env:
       ADDITIONAL_PARAMS: '{"layeredProduct": "kepler-minimal"}'
       ENABLE_LOCAL_INDEX: "true"
@@ -67,19 +67,11 @@ tests:
           cpu: 200m
           memory: 400Mi
     - chain: openshift-qe-cluster-density-v2
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: node-density-heavy-kepler-minimal
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-powermon
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.18"
   cron: 00 08 * * 2
   steps:
+    cluster_profile: gcp-observability
     env:
       ADDITIONAL_PARAMS: '{"layeredProduct": "kepler-minimal"}'
       ENABLE_LOCAL_INDEX: "true"
@@ -113,19 +105,11 @@ tests:
           cpu: 200m
           memory: 400Mi
     - chain: openshift-qe-node-density-heavy
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: mixed-workload-kepler-minimal
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-powermon
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.18"
   cron: 00 12 * * 2
   steps:
+    cluster_profile: gcp-observability
     env:
       ADDITIONAL_PARAMS: '{"layeredProduct": "kepler-minimal", "mixedWorkload": "true"}'
       ENABLE_LOCAL_INDEX: "true"
@@ -160,15 +144,15 @@ tests:
           memory: 400Mi
     - chain: openshift-qe-stress-ng
     - chain: openshift-qe-cluster-density-v2
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - always_run: false
   as: cluster-density-v2-kepler-estimator
   cluster_claim:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -211,8 +195,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -257,8 +241,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -305,8 +289,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -349,8 +333,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -395,8 +379,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -443,8 +427,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -487,8 +471,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -533,8 +517,8 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-    owner: obs-powermon
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 4h0m0s
     version: "4.18"
@@ -576,17 +560,9 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     workflow: generic-claim
 - as: cluster-density-v2-no-kepler
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-powermon
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.18"
   cron: 00 16 * * 2
   steps:
+    cluster_profile: gcp-observability
     env:
       ADDITIONAL_PARAMS: '{"layeredProduct": "no-kepler"}'
       ENABLE_LOCAL_INDEX: "true"
@@ -596,19 +572,11 @@ tests:
       USER_METADATA: layeredProduct=no-kepler
     test:
     - chain: openshift-qe-cluster-density-v2
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: node-density-heavy-no-kepler
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-powermon
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.18"
   cron: 00 20 * * 2
   steps:
+    cluster_profile: gcp-observability
     env:
       ADDITIONAL_PARAMS: '{"layeredProduct": "no-kepler"}'
       ENABLE_LOCAL_INDEX: "true"
@@ -620,19 +588,11 @@ tests:
       USER_METADATA: layeredProduct=no-kepler
     test:
     - chain: openshift-qe-node-density-heavy
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: mixed-workload-no-kepler
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-powermon
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.18"
   cron: 00 00 * * 2
   steps:
+    cluster_profile: gcp-observability
     env:
       ADDITIONAL_PARAMS: '{"layeredProduct": "no-kepler", "mixedWorkload": "true"}'
       ENABLE_LOCAL_INDEX: "true"
@@ -645,7 +605,7 @@ tests:
     test:
     - chain: openshift-qe-stress-ng
     - chain: openshift-qe-cluster-density-v2
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift-power-monitoring
