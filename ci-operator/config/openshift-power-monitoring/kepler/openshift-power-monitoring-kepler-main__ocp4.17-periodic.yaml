@@ -3,6 +3,14 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: cli
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -27,17 +35,9 @@ resources:
       memory: 400Mi
 tests:
 - as: kepler-e2e-aws
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-powermon
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
   cron: 00 22 * * 1,3,5
   steps:
+    cluster_profile: gcp-observability
     test:
     - as: deploy-kepler
       cli: latest
@@ -54,7 +54,7 @@ tests:
           cpu: 200m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-kepler
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift-power-monitoring
