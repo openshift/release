@@ -184,7 +184,7 @@ a team, organization or something similar.
 
 ## `periodic-openshift-release-fast-forward`
 
-This job runs [repo-brancher](https://github.com/openshift/ci-tools/tree/master/cmd/repo-brancher) in `fast-forward` mode
+This job runs [repo-brancher](https://github.com/openshift/ci-tools/tree/main/cmd/repo-brancher) in `fast-forward` mode
 in an attempt to fast-forward git content from the current development branch to the future branches if they already exist.
 
 #### Useful links
@@ -214,7 +214,7 @@ The repo is in a bad state where someone has pushed directly to the future relea
 
 ## `periodic-check-gh-automation`
 
-This job runs [`check-gh-automation`](https://github.com/openshift/ci-tools/tree/master/cmd/check-gh-automation) in order 
+This job runs [`check-gh-automation`](https://github.com/openshift/ci-tools/tree/main/cmd/check-gh-automation) in order 
 to verify that all repos with CI configured are accessible by our automation. It checks that `openshift-merge-robot` and `openshift-ci-robot`
 are collaborators in each repo that has a directory in the [prow config](https://github.com/openshift/release/tree/master/core-services/prow/02_config).
 
@@ -246,7 +246,7 @@ additional `ignore` parameter.
 
 ## `periodic-openshift-release-private-org-sync`
 
-This job runs [`private-org-sync`](https://github.com/openshift/ci-tools/tree/master/cmd/private-org-sync) to
+This job runs [`private-org-sync`](https://github.com/openshift/ci-tools/tree/main/cmd/private-org-sync) to
 sync `openshift-priv`
 mirror repos with their respective "public" repos.
 

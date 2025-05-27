@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.12"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -27,17 +31,10 @@ resources:
 tests:
 - always_run: false
   as: tempo-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-tracing
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   steps:
+    cluster_profile: azure-observability
     env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -47,13 +44,16 @@ tests:
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927218
+      SKIP_TESTS: tests/e2e-openshift/monitoring tests/e2e-openshift-ossm/ossm-tempostack
+        tests/e2e-openshift-object-stores/*sts* tests/e2e-openshift-object-stores/*ibm*
+        tests/e2e-openshift-object-stores/*gcs* tests/e2e-openshift-object-stores/*aws*
       TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928201
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -74,16 +74,8 @@ resources:
       memory: 200Mi
 tests:
 - as: opentelemetry-operator-upgrade
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-tracing
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
   steps:
+    cluster_profile: gcp-observability
     env:
       OPERATORS: |
         [
@@ -94,6 +86,7 @@ tests:
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"}
         ]
+      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws*
     test:
     - ref: install-operators
     - as: install
@@ -126,9 +119,9 @@ tests:
           cpu: 1000m
           memory: 400Mi
     - ref: distributed-tracing-tests-opentelemetry-upstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: upstream-upgrade-ocp-4.18-amd64-aws
+  variant: upstream-ocp-4.18-amd64-gcp
