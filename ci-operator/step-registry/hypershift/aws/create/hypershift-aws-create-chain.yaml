@@ -71,6 +71,9 @@ chain:
       default: "false"
       documentation: |-
         If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
+    - name: HYPERSHIFT_DYNAMIC_DNS
+      default: ""
+      documentation: "Set dynamic dns for kube-apiserver"
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
@@ -146,6 +149,10 @@ chain:
         COMMAND+=(--kms-key-arn="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
       fi
       
+      if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
+        COMMAND+=(--kas-dns-name="${HYPERSHIFT_DYNAMIC_DNS}")
+      fi
+
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
