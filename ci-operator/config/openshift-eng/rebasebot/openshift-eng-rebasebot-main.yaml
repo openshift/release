@@ -38,8 +38,8 @@ tests:
     - as: cloud-provider-aws
       commands: |
         rebasebot --source https://github.com/kubernetes/cloud-provider-aws:master \
-                  --dest openshift/cloud-provider-aws:master \
-                  --rebase openshift-cloud-team/cloud-provider-aws:rebase-bot-master \
+                  --dest openshift/cloud-provider-aws:main \
+                  --rebase openshift-cloud-team/cloud-provider-aws:rebase-bot-main \
                   --update-go-modules \
                   --slack-webhook /secrets/rebasebot/slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
@@ -55,10 +55,190 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
+- as: cluster-api-provider-azure
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-azure
+      commands: |
+        rebasebot --source-repo kubernetes-sigs/cluster-api-provider-azure \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api-provider-azure:master \
+                  --rebase openshift-cloud-team/cluster-api-provider-azure:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+- as: cluster-api-provider-aws
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-aws
+      commands: |
+        rebasebot --source-repo kubernetes-sigs/cluster-api-provider-aws \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api-provider-aws:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-aws:rebase-bot-main \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+- as: cluster-api-provider-gcp
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-gcp
+      commands: |
+        rebasebot --source-repo kubernetes-sigs/cluster-api-provider-gcp \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api-provider-gcp:master \
+                  --rebase openshift-cloud-team/cluster-api-provider-gcp:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+- as: cluster-api-provider-vsphere
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-vsphere
+      commands: |
+        rebasebot --source-repo kubernetes-sigs/cluster-api-provider-vsphere \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api-provider-vsphere:master \
+                  --rebase openshift-cloud-team/cluster-api-provider-vsphere:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+- as: cluster-api-provider-ibmcloud
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-ibmcloud
+      commands: |
+        rebasebot --source-repo kubernetes-sigs/cluster-api-provider-ibmcloud \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api-provider-ibmcloud:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-ibmcloud:rebase-bot-main \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+- as: cluster-api
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api
+      commands: |
+        rebasebot --source-repo kubernetes-sigs/cluster-api \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api:master \
+                  --rebase openshift-cloud-team/cluster-api:rebase-bot-master \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
 - as: cloud-provider-ibm
   cron: 10 12 * * Mon,Thu
   steps:
@@ -68,7 +248,7 @@ tests:
         export BRANCH_NAME=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/IBM-Cloud/cloud-provider-ibm/branches" | grep -E '"name": "release-[0-9]+\.[0-9]+"' | awk -F'"' '{print $4}' | sort -V | tail -n 1)
         rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
                   --dest openshift/cloud-provider-ibm:main \
-                  --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-master \
+                  --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-main \
                   --update-go-modules \
                   --slack-webhook /secrets/rebasebot/slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
@@ -84,10 +264,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-vpc-controller
   cron: 20 12 * * Mon,Thu
   steps:
@@ -112,10 +292,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-powervs
   cron: 10 12 * * Mon,Thu
   steps:
@@ -141,10 +321,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-azure
   cron: 30 12 * * Mon,Thu
   steps:
@@ -153,7 +333,7 @@ tests:
       commands: |
         rebasebot --source https://github.com/kubernetes-sigs/cloud-provider-azure:master \
                   --dest openshift/cloud-provider-azure:main \
-                  --rebase openshift-cloud-team/cloud-provider-azure:rebase-bot-master \
+                  --rebase openshift-cloud-team/cloud-provider-azure:rebase-bot-main \
                   --update-go-modules \
                   --slack-webhook /secrets/rebasebot/slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
@@ -169,10 +349,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-gcp
   cron: 40 12 * * Mon,Thu
   steps:
@@ -181,7 +361,7 @@ tests:
       commands: |
         rebasebot --source https://github.com/kubernetes/cloud-provider-gcp:master \
                   --dest openshift/cloud-provider-gcp:main \
-                  --rebase openshift-cloud-team/cloud-provider-gcp:rebase-bot-master \
+                  --rebase openshift-cloud-team/cloud-provider-gcp:rebase-bot-main \
                   --update-go-modules \
                   --slack-webhook /secrets/rebasebot/slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
@@ -197,10 +377,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-vsphere
   cron: 50 12 * * Mon,Thu
   steps:
@@ -209,7 +389,7 @@ tests:
       commands: |
         rebasebot --source https://github.com/kubernetes/cloud-provider-vsphere:master \
                   --dest openshift/cloud-provider-vsphere:main \
-                  --rebase openshift-cloud-team/cloud-provider-vsphere:rebase-bot-master \
+                  --rebase openshift-cloud-team/cloud-provider-vsphere:rebase-bot-main \
                   --update-go-modules \
                   --slack-webhook /secrets/rebasebot/slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
@@ -225,10 +405,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-nutanix
   cron: 10 13 * * Mon,Thu
   steps:
@@ -253,10 +433,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: openstack-sushy
   cron: 00 10 * * Mon,Wed,Fri
   steps:
@@ -415,8 +595,8 @@ tests:
       commands: |
         UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes/autoscaler/releases" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | grep -E 'cluster-autoscaler-[0-9.]+' | sort -V | tail -n1)
         rebasebot --source https://github.com/kubernetes/autoscaler:"${UPSTREAM_VERSION}" \
-                  --dest openshift/kubernetes-autoscaler:master \
-                  --rebase openshift-cloud-team/kubernetes-autoscaler:rebase-bot-master \
+                  --dest openshift/kubernetes-autoscaler:main \
+                  --rebase openshift-cloud-team/kubernetes-autoscaler:rebase-bot-main \
                   --slack-webhook /secrets/rebasebot/slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
@@ -433,7 +613,7 @@ tests:
         limits:
           memory: 4Gi
         requests:
-          cpu: 100m
+          cpu: 400m
           memory: 200Mi
 - as: kubernetes-nmstate
   cron: 30 5 * * 1-5
@@ -450,7 +630,8 @@ tests:
                   --github-cloner-key /secrets/metal-net-cloner-bot/private-key \
                   --git-username metal-net-bot \
                   --git-email metal-networking@redhat.com \
-                  --tag-policy=none
+                  --tag-policy=none \
+                  --post-rebase-hook git:dest/master:hack/ocp-update-bundle-manifests.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:go-deps.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:git.sh
       credentials:
       - mount_path: /secrets/metal-net-merge-bot
         name: metal-net-merge-bot-private-key
@@ -463,8 +644,8 @@ tests:
         limits:
           memory: 4Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: tempo-operator
   cron: 0 23 * * 1-5
   steps:
@@ -492,10 +673,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: opentelemetry-operator
   cron: 0 23 * * 1-5
   steps:
@@ -523,10 +704,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: jaeger-operator
   cron: 0 23 * * 1-5
   steps:
@@ -554,10 +735,10 @@ tests:
       from: rebasebot
       resources:
         limits:
-          memory: 4Gi
+          memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 400m
+          memory: 1Gi
 - as: topolvm
   cron: 0 23 * * 1-5
   steps:
@@ -585,6 +766,37 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: autoscaling-karpenter-provider-aws
+  cron: 0 12 * * Mon
+  steps:
+    test:
+    - as: autoscaling-karpenter-provider-aws
+      commands: |
+        export MOST_RECENT_UPSTREAM_RELEASE=$(git ls-remote https://github.com/aws/karpenter-provider-aws release-v* | cut -f 2  | grep -v '\.x' | sort | tail -n 1 | sed 's#refs/heads/##')
+        rebasebot --source https://github.com/aws/karpenter-provider-aws:$MOST_RECENT_UPSTREAM_RELEASE \
+                          --dest openshift/aws-karpenter-provider-aws:main \
+                          --rebase openshift/aws-karpenter-provider-aws:rebase-bot-main \
+                          --update-go-modules \
+                          --slack-webhook /secrets/rebasebot/autoscaling-team-bot-spam-slack-incoming-webhook \
+                          --github-app-id 1183368 \
+                          --github-cloner-id 1183368 \
+                          --github-app-key /secrets/rebasebot/autoscaling-team-rebasebot-github-application-key \
+                          --github-cloner-key /secrets/rebasebot/autoscaling-team-rebasebot-github-application-key \
+                          --git-username autoscaling-team-rebase-bot \
+                          --git-email autoscaling-team-rebase-bot@redhat.com \
+                          --bot-emails autoscaling-team-rebase-bot@redhat.com \
+                          --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: autoscaling-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
 - as: unit
   commands: make deps && make unittests
   container:

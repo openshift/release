@@ -46,12 +46,12 @@ tests:
   commands: GO_COMPLIANCE_INFO=0 make test
   container:
     from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify
   commands: GO_COMPLIANCE_INFO=0 make verify
   container:
     from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -73,7 +73,7 @@ tests:
     mount_path: /tmp/secret
     name: hive-codecov-token
 - as: security
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
@@ -90,7 +90,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -135,7 +135,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -220,7 +220,19 @@ tests:
         source $SHARED_DIR/vsphere_context.sh
         source $SHARED_DIR/govc.sh
         source $SHARED_DIR/additional_cluster.sh
+
+        export CLUSTER_NAME=$ADDITIONAL_CLUSTER_NAME
+        export VSPHERE_API_VIP=$ADDITIONAL_CLUSTER_API_VIP
+        export VSPHERE_INGRESS_VIP=$ADDITIONAL_CLUSTER_INGRESS_VIP
+        export VSPHERE_MACHINE_NETWORK=$(<"${SHARED_DIR}"/machinecidr.txt)
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        export VSPHERE_INSTALLER_PLATFORM_SPEC_JSON=$(<"${SHARED_DIR}"/platform.json)
+
         GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
+      credentials:
+      - mount_path: /var/run/vault/vsphere-ibmcloud-ci
+        name: vsphere-ibmcloud-ci
+        namespace: test-credentials
       dependencies:
       - env: HIVE_IMAGE
         name: hive

@@ -90,7 +90,7 @@ function classic_rosa_upgrade_postcheck(){
   exit 0 #upgrade succ and post-check succ
 }
 
-git clone -b upgrade https://github.com/openshift-qe/ocp-qe-perfscale-ci.git --depth=1
+git clone -b upgrade https://github.com/openshift-eng/ocp-qe-perfscale-ci.git --depth=1
 cd ocp-qe-perfscale-ci/upgrade_scripts 
 source common.sh
 

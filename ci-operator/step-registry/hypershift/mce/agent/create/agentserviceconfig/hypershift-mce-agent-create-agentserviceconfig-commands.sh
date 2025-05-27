@@ -12,7 +12,7 @@ if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-CLUSTER_VERSION=$(oc adm release info "$RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
+CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
 
 function registry_config() {
   src_image=${1}
@@ -70,7 +70,10 @@ END
 }
 
 function deploy_mirror_config_map() {
-  oc get configmap -n openshift-config user-ca-bundle -o json | jq -r '.data."ca-bundle.crt"' | awk '{ print "    " $0 }' > /tmp/ca-bundle-crt
+  if [ "${DISCONNECTED}" = "true" ]; then
+    oc get configmap -n openshift-config user-ca-bundle -o json | \
+      jq -r '.data."ca-bundle.crt"' | awk '{ print "    " $0 }' > /tmp/ca-bundle-crt
+  fi
   oc apply -f - <<END
 apiVersion: v1
 kind: ConfigMap

@@ -10,6 +10,17 @@ debug() {
   oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
 }
 
+support_n-2() {
+  curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  local extra_flags=""
+  if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+    extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+  fi
+  extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+  extra_flags+="&& oc apply -f /tmp/hc.yaml"
+  echo "$extra_flags"
+}
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -74,25 +85,29 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   source "${SHARED_DIR}/packet-conf.sh"
   # disconnected requires the additional trust bundle containing the local registry certificate
   scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
-  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes "
+  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt "
   EXTRA_ARGS+=" --olm-disable-default-sources "
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+fi
+
+if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
+  EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
+eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
-  --agent-namespace="${AGENT_NAMESPACE}" \
+  --agent-namespace=${AGENT_NAMESPACE} \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
-  --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
-  --ssh-key="${SHARED_DIR}/id_rsa.pub" \
-  --release-image ${RELEASE_IMAGE}
+  --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
+  --ssh-key=${SHARED_DIR}/id_rsa.pub \
+  --release-image ${RELEASE_IMAGE} $(support_n-2)"
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"

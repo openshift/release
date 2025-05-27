@@ -39,7 +39,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay313-ocp417-upgrade
+- as: quay314-ocp417-upgrade
   cron: 0 23 12 * *
   steps:
     cluster_profile: aws-qe
@@ -48,15 +48,30 @@ tests:
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
       ODF_OPERATOR_CHANNEL: stable-4.17
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:894318
-      QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:973360
+      QUAY_OPERATOR_CHANNEL: stable-3.14
       QUAY_UPGRADE_TESTCASE: Quay-Upgrade-High|Quay-Upgrade-Medium
-      QUAYREGISTRY_QUAY_VERSION: "3.13"
+      QUAY_VERSION: "3.14"
     test:
     - ref: quay-tests-resource-provisioning-storage-odf
     - ref: quay-tests-test-quay-upgrade
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
+- as: cso-quay314-ocp417-upgrade
+  cron: 0 22 12 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CSO_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:961090
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_UPGRADE_TESTCASE: Quay-Upgrade-CSO-High
+      QUAY_VERSION: "3.14"
+    test:
+    - ref: quay-tests-test-quay-upgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay

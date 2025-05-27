@@ -3,59 +3,57 @@ kind: Namespace
 metadata:
   name: ci-grafana
 ---
-apiVersion: integreatly.org/v1alpha1
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: grafana-operator
+  namespace: ci-grafana
+spec:
+  channel: v5
+  installPlanApproval: Automatic
+  name: grafana-operator
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: grafana-operator.v5.17.1
+---
+apiVersion: grafana.integreatly.org/v1beta1
 kind: Grafana
 metadata:
   name: ci
   namespace: ci-grafana
+  labels:
+    dashboards: "grafana"
 spec:
-  client:
-    preferService: true
-  dataStorage:
-    accessModes:
-      - ReadWriteOnce
-    size: 10Gi
-  ingress:
-    enabled: true
-    pathType: Prefix
-    path: "/"
+  route:
+    spec:
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      port:
+        targetPort: 3000
+      to:
+        kind: Service
+        name: ci-service
   config:
     log:
       mode: "console"
       level: "error"
     log.frontend:
-      enabled: true
+      enabled: "true"
     auth:
-      disable_login_form: true
-      disable_signout_menu: true
+      disable_login_form: "true"
+      disable_signout_menu: "true"
     auth.anonymous:
-      enabled: true
+      enabled: "true"
       org_role: Viewer
   deployment:
-    strategy:
-      type: Recreate
-    envFrom:
-      - secretRef:
-          name: external-credentials
-      - configMapRef:
-          name: service-ca-certificate
+    spec:
+      strategy:
+        type: Recreate
   service:
-    name: "grafana"
-    labels:
-      app: "grafana"
-  dashboardLabelSelector:
-  - matchExpressions:
-    - key: app
-      operator: In
-      values:
-        - grafana
-  resources:
-    limits:
-      cpu: 200m
-      memory: 200Mi
-    requests:
-      cpu: 100m
-      memory: 100Mi
+    metadata:
+      labels:
+        app: "grafana"
 ---
 apiVersion: v1
 kind: ConfigMap

@@ -38,6 +38,7 @@ promotion:
   to:
   - additional_images:
       console-tests: src
+    disabled: true
     name: 4.20-priv
     namespace: ocp-private
 releases:
@@ -71,12 +72,18 @@ resources:
     requests:
       cpu: "1"
       memory: 10Gi
-test_binary_build_commands: ./build.sh
+test_binary_build_commands: |
+  ./build-frontend.sh
+  ./build-demos.sh
 tests:
 - as: backend
-  commands: ./test-backend.sh
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    mkdir -p ${ARTIFACT_DIR} ${XDG_CACHE_HOME}
+    go install -mod= github.com/jstemmer/go-junit-report@latest
+    /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: test-bin
+    from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |

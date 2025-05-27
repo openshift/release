@@ -144,7 +144,8 @@ tests:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 26 21 20 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -162,7 +163,8 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 17 13 24 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -180,7 +182,8 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-sno-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 52 17 10 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -198,7 +201,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
-- as: gcp-ipi-disc-priv-odic-f28
+- as: gcp-ipi-disc-priv-odic-mini-perm-f28
   cron: 48 1 20 * *
   steps:
     cluster_profile: gcp-qe
@@ -206,7 +209,9 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: cucushift-installer-check-cluster-health

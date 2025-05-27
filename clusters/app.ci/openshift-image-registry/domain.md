@@ -47,7 +47,7 @@ default-route               default-route-openshift-image-registry.apps.ci.l2s4.
 registry-ci-openshift-org   registry.ci.openshift.org                                                         image-registry   <all>   reencrypt     None
 ```
 
-We can pull image, e.g., `podman pull registry.ci.openshift.org/ci/applyconfig:latest`.
+We can pull image, e.g., `podman pull quay-proxy.ci.openshift.org/openshift/ci:ci_applyconfig_latest`.
 
 * Disable the `defaultRoute` and add it as _almost-default-route_:
 

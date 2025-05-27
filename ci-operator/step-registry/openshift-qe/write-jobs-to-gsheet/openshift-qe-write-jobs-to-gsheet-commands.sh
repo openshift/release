@@ -15,7 +15,7 @@ ls /secret/ga-gsheet
 GSHEET_KEY_LOCATION="/secret/ga-gsheet/gcp-sa-account"
 export GSHEET_KEY_LOCATION
 
-git clone https://github.com/openshift-qe/ocp-qe-perfscale-ci.git -b main
+git clone https://github.com/openshift-eng/ocp-qe-perfscale-ci.git -b main
 
 pushd ocp-qe-perfscale-ci/prow/generate_jobs_in_gsheet
 

@@ -1,0 +1,27 @@
+workflow:
+  as: baremetalds-two-node-arbiter-upgrade
+  steps:
+    pre:
+      - chain: baremetalds-ipi-pre
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ipi-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      PACKET_OS: rocky_9
+      CLUSTERTYPE: baremetal
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        ENABLE_ARBITER=true
+        FEATURE_SET="TechPreviewNoUpgrade"
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+  documentation: |-
+    This workflow executes a Two Node OpenShift with Arbiter (TNA) cluster installation and upgrade

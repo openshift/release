@@ -1,0 +1,33 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: self-sched
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-selfsched
+    post:
+    - chain: openshift-qe-installer-bm-self-sched-terminate
+    test:
+    - chain: openshift-qe-installer-bm-self-sched
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-selfsched-x86

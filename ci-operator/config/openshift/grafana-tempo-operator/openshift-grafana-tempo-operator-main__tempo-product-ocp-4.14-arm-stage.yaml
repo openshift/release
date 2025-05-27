@@ -5,9 +5,9 @@ base_images:
     tag: cli
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.22-openshift-4.17
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.23-openshift-4.19
 canonical_go_repository: github.com/grafana/tempo-operator
 images:
 - context_dir: .
@@ -41,11 +41,10 @@ tests:
 - always_run: false
   as: tempo-stage-tests
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-observability
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -65,7 +64,7 @@ tests:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

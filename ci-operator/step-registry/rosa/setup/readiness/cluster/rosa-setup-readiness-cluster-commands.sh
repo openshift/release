@@ -6,17 +6,25 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-
-HOSTED_CP=${HOSTED_CP:-false}
-BYO_OIDC=${BYO_OIDC:-false}
-ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
-ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-60}
+CLUSTER_TIMEOUT_M="${CLUSTER_TIMEOUT}m"
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
+
+source ./tests/prow_ci.sh
+
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
+# functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
+#configure aws
+aws_region=${REGION:-$LEASED_RESOURCE}
+configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
+configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -38,23 +46,6 @@ function record_cluster() {
     echo $payload | jq "$location += {\"$key\":\"$value\"}" > $cluster_config_file
   fi
 }
-
-# Configure aws
-CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
-  CLOUD_PROVIDER_REGION="${REGION}"
-fi
-
-AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-if [[ -f "${AWSCRED}" ]]; then
-  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
-else
-  echo "Did not find compatible cloud provider cluster_profile"
-  exit 1
-fi
-
-export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 
 read_profile_file() {
   local file="${1}"
@@ -95,23 +86,15 @@ cluster_info_json=$(mktemp)
 record_cluster "timers" "status" "claim"
 
 rosatest --ginkgo.v --ginkgo.no-color \
-  --ginkgo.timeout "60m" \
+  --ginkgo.timeout $CLUSTER_TIMEOUT_M \
   --ginkgo.label-filter "day1-readiness" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
-
-# Verify the subnets of the cluster to remove the 'Inflight Checks' warning
-if [[ "$ENABLE_BYOVPC" == "true" ]]; then
-  verify_cmd=$(rosa verify network -c ${CLUSTER_ID} | grep 'rosa verify network' || true)
-  if [[ ! -z "$verify_cmd" ]]; then
-    echo -e "Force verifying the network of the cluster to remove the 'Inflight Checks' warning\n$verify_cmd"
-    eval $verify_cmd
-  fi
-fi
 
 # Output
 cluster_info_json=$(mktemp)
 rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
 API_URL=$(cat $cluster_info_json | jq -r '.api.url')
 CONSOLE_URL=$(cat $cluster_info_json | jq -r '.console.url')
+HOSTED_CP=$(cat $cluster_info_json | jq -r '.hypershift.enabled')
 if [[ "${API_URL}" == "null" ]]; then
   port="6443"
   if [[ "$HOSTED_CP" == "true" ]]; then

@@ -20,25 +20,32 @@ pushd orion
 
 pip install -r requirements.txt
 
-if [[ ${ES_TYPE} == "qe" ]]; then
-    ES_PASSWORD=$(cat "/secret/qe/password")
-    ES_USERNAME=$(cat "/secret/qe/username")
-    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-else
-    ES_PASSWORD=$(cat "/secret/internal/password")
-    ES_USERNAME=$(cat "/secret/internal/username")
-    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
-fi
+case "$ES_TYPE" in
+  qe)
+    ES_PASSWORD=$(<"/secret/qe/password")
+    ES_USERNAME=$(<"/secret/qe/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    ;;
+  quay-qe)
+    ES_PASSWORD=$(<"/secret/quay-qe/password")
+    ES_USERNAME=$(<"/secret/quay-qe/username")
+    ES_HOST=$(<"/secret/quay-qe/hostname")
+    ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    ;;
+  *)
+    ES_PASSWORD=$(<"/secret/internal/password")
+    ES_USERNAME=$(<"/secret/internal/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    ;;
+esac
+
+export ES_SERVER
 
 pip install .
-export EXTRA_FLAGS=" --lookback ${LOOKBACK}d"
+export EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [[ ! -z "$UUID" ]]; then
     export EXTRA_FLAGS+=" --uuid ${UUID}"
-fi
-
-if [ ${HUNTER_ANALYZE} == "true" ]; then
-    export EXTRA_FLAGS+=" --hunter-analyze"
 fi
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
@@ -53,8 +60,18 @@ else
     exit 1
 fi
 
-if [[ ! -z "$ORION_CONFIG" ]]; then
-    export CONFIG="${ORION_CONFIG}"
+if [[ -n "$ORION_CONFIG" ]]; then
+    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
+        fileBasename="${ORION_CONFIG##*/}"
+        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+            export CONFIG="$ARTIFACT_DIR/$fileBasename"
+        else
+            echo "Error: Failed to download $ORION_CONFIG" >&2
+            exit 1
+        fi
+    else
+        export CONFIG="$ORION_CONFIG"
+    fi
 fi
 
 if [[ ! -z "$ACK_FILE" ]]; then
@@ -83,12 +100,14 @@ if [[ -n "${LOOKBACK_SIZE}" ]]; then
 fi
 
 set +e
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
+set -o pipefail
+FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
-  cp *.xml ${ARTIFACT_DIR}/
+  cp *.csv *.xml ${ARTIFACT_DIR}/
 fi
 
 exit $orion_exit_status

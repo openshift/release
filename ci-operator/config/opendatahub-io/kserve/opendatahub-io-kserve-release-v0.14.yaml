@@ -2,11 +2,11 @@ base_images:
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi8/python-39:1
+      FROM registry.access.redhat.com/ubi9/python-311:1
 
       # Prow expects to be able to check out a repo under /go
       USER 0:0
@@ -41,6 +41,12 @@ images:
 - context_dir: python/
   dockerfile_path: custom_model_grpc.Dockerfile
   to: custom-model-grpc
+- context_dir: python/
+  dockerfile_path: success_200_isvc.Dockerfile
+  to: success-200-isvc
+- context_dir: python/
+  dockerfile_path: error_404_isvc.Dockerfile
+  to: error-404-isvc
 promotion:
   to:
   - excluded_images:
@@ -51,6 +57,8 @@ promotion:
     - sklearn-serving-runtime
     - custom-transformer
     - custom-model-grpc
+    - error-404-isvc
+    - success-200-isvc
     namespace: opendatahub-io
     tag: release-v0.14
 releases:
@@ -201,6 +209,28 @@ tests:
       SOURCE_IMAGE_REF: kserve-storage-initializer
     env:
       IMAGE_REPO: kserve-storage-initializer
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-success-200-isvc
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: success-200-isvc
+    env:
+      IMAGE_REPO: success-200-isvc
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-error-404-isvc
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: error-404-isvc
+    env:
+      IMAGE_REPO: error-404-isvc
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:

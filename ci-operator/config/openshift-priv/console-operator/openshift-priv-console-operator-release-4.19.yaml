@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -23,8 +27,7 @@ images:
   to: console-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -52,7 +55,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -87,8 +90,19 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
+- as: e2e-hypershift-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

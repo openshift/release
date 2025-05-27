@@ -10,32 +10,19 @@ build_root:
     tag: latest
 canonical_go_repository: github.com/openshift/os
 images:
-- dockerfile_literal: |
-    FROM overridden
-    WORKDIR /src
-    # Tell the build scripts that we have setup a directory for unprivileged build
-    ENV COSA_DIR=/tmp/cosa
-    RUN mkdir -p "${COSA_DIR}"
-    # Copy the source code
-    COPY . .
-    # We need to make sure that root can read / write to the COSA_DIR so that
-    # when this container is actually run, we have permissions to read and
-    # write to the COSA_DIR to allow the Kola tests to run.
-    USER root
-    RUN chgrp -Rf root "${COSA_DIR}" && \
-      chmod -Rf g+w "${COSA_DIR}"
-    # Go back to unprivileged user for COSA
-    USER builder
-    WORKDIR /tmp/cosa
-  from: root
-  to: build-image
 - build_args:
   - name: OPENSHIFT_CI
     value: "1"
   dockerfile_path: Containerfile
-  from: rhel-coreos-base
+  inputs:
+    rhel-coreos-base:
+      as:
+      - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
   to: rhel-coreos
-- dockerfile_path: extensions/Dockerfile
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "1"
+  dockerfile_path: extensions/Dockerfile
   inputs:
     rhel-coreos:
       as:
@@ -44,156 +31,32 @@ images:
 promotion:
   to:
   - excluded_images:
-    - build-image
     - rhel-coreos
     - rhel-coreos-extensions
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-  rhcos-9-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  rhcos-9-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  rhcos-9next-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  rhcos-9next-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  rhcos-10-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  rhcos-10-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  scos-9-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  scos-9-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  scos-10-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  scos-10-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
 tests:
-- as: validate
-  commands: ci/prow-entrypoint.sh validate
-  container:
-    from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: rhcos-9-build-test-qemu
-  commands: /src/ci/prow-entrypoint.sh rhcos-9-build-test-qemu
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 4h0m0s
-- as: rhcos-9-build-test-metal
-  commands: /src/ci/prow-entrypoint.sh rhcos-9-build-test-metal
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 3h0m0s
-- as: rhcos-9next-build-test-qemu
-  commands: /src/ci/prow-entrypoint.sh rhcos-9next-build-test-qemu
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 4h0m0s
-- as: rhcos-9next-build-test-metal
-  commands: /src/ci/prow-entrypoint.sh rhcos-9next-build-test-metal
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 3h0m0s
-- as: scos-9-build-test-qemu
-  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-qemu
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 4h0m0s
-- as: scos-9-build-test-metal
-  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-metal
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 3h0m0s
-- as: scos-10-build-test-qemu
-  commands: /src/ci/prow-entrypoint.sh scos-10-build-test-qemu
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 4h0m0s
-- as: scos-10-build-test-metal
-  commands: /src/ci/prow-entrypoint.sh scos-10-build-test-metal
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  timeout: 3h0m0s
 - always_run: false
   as: e2e-aws
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master

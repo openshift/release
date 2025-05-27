@@ -69,7 +69,6 @@ base_images:
     tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
   inputs:
@@ -670,11 +669,12 @@ tests:
     workflow: openshift-e2e-gcp-crc
   timeout: 6h0m0s
 - as: e2e-metal-assisted
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
   timeout: 6h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
@@ -687,7 +687,7 @@ tests:
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
   timeout: 6h0m0s
 - as: e2e-aws-ovn-fips

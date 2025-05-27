@@ -1,16 +1,69 @@
 presubmits:
   openshift/cluster-resource-override-admission-operator:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build07
+    context: ci/prow/ci-bundle-cluster-resource-override-admission-operator-bundle
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-resource-override-admission-operator-release-4.16-ci-bundle-cluster-resource-override-admission-operator-bundle
+    rerun_command: /test ci-bundle-cluster-resource-override-admission-operator-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cluster-resource-override-admission-operator-bundle
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-bundle-cluster-resource-override-admission-operator-bundle,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-aws-olm
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-resource-override-admission-operator-release-4.16-e2e-aws-olm
@@ -78,12 +131,12 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-aws-operator
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-resource-override-admission-operator-release-4.16-e2e-aws-operator
@@ -151,7 +204,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build07
     context: ci/prow/images
     decorate: true
     labels:
@@ -167,6 +220,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
+        - --target=cluster-resource-override-admission-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -205,7 +259,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build07
     context: ci/prow/security
     decorate: true
     labels:
@@ -267,7 +321,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build07
     context: ci/prow/unit
     decorate: true
     labels:
@@ -321,7 +375,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build07
     context: ci/prow/verify
     decorate: true
     labels:

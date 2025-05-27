@@ -39,6 +39,11 @@ releases:
       product: ocp
       stream: ci
       version: "4.19"
+  latest-4-18:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
   multi-initial:
     candidate:
       architecture: multi
@@ -71,7 +76,7 @@ tests:
       AWS_MULTI_ARCH: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aks
-  cron: 0 4 * * *
+  cron: 0 */6 * * *
   steps:
     cluster_profile: hypershift
     env:
@@ -79,7 +84,9 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
-  cron: 0 */6 * * *
+  capabilities:
+  - build-tmpfs
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: hypershift
     env:
@@ -103,6 +110,48 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
+- as: e2e-aws-upgrade
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_PREVIOUS: release:latest-4-18
+    env:
+      CI_TESTS_RUN: ^TestUpgradeControlPlane.*
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-conformance-cilium
+  minimum_interval: 168h
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-conformance-cilium-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
+      TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
+        access to server in CIDR block \[Feature:NetworkPolicy\] \[Suite:openshift/conformance/parallel\]
+        \[Suite:k8s\]\| Netpol NetworkPolicy between server and client should ensure
+        an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed \[Feature:NetworkPolicy\]
+        \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\| Services should serve
+        endpoints on same port and different protocols \[Conformance\] \[Suite:openshift/conformance/parallel/minimal\]
+        \[Suite:k8s\]\| Netpol NetworkPolicy between server and client should enforce
+        except clause while egress access to server in CIDR block \[Feature:NetworkPolicy\]
+        \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP \[Suite:openshift/conformance/parallel\]\| Unidling with
+        Deployments \[apigroup:route.openshift.io\] should work with TCP (when fully
+        idled) \[Suite:openshift/conformance/parallel\]\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled) \[Suite:openshift/conformance/parallel\]\|
+        Unidling with Deployments \[apigroup:route.openshift.io\] should work with
+        UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
+        the local DNS endpoint \[Suite:openshift/conformance/parallel\]
+    test:
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-aws-ipi-cilium-hypershift-private-guest
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:
@@ -131,7 +180,7 @@ tests:
 - as: e2e-kubevirt-metal-ovn
   cron: 0 4 * * *
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
@@ -168,14 +217,14 @@ tests:
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       HYPERSHIFT_NODE_COUNT: "2"
-      ODF_OPERATOR_CHANNEL: stable-4.17
+      ODF_OPERATOR_CHANNEL: stable-4.18
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance
 - as: e2e-kubevirt-aws-ovn
   cron: 0 0,6,12,18 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal

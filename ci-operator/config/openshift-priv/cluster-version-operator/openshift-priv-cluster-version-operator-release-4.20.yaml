@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  yamllint:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: boot-root-1.79.0
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-version-operator
@@ -34,7 +38,8 @@ images:
   to: cluster-version-operator
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -115,7 +120,7 @@ tests:
 - as: e2e-aws-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -128,21 +133,6 @@ tests:
     test:
     - as: e2e-test
       commands: hack/test-integration.sh
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-azure
-- as: e2e-agnostic-usc-devpreview
-  optional: true
-  run_if_changed: pkg/updatestatus/
-  steps:
-    cluster_profile: azure4
-    test:
-    - as: e2e-test
-      cli: latest
-      commands: hack/test-usc-integration.sh
       from: src
       resources:
         requests:
@@ -166,6 +156,33 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
+- as: e2e-agnostic-operator-devpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: DevPreviewNoUpgrade
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- as: verify-yaml
+  commands: make verify-yaml
+  container:
+    clone: true
+    from: yamllint
+  run_if_changed: (\.yaml|\.yml)$
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

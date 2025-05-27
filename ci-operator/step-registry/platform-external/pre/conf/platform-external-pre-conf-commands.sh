@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-
 #
 # Enable CCM
 #
@@ -42,12 +40,22 @@ if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" == "yes" ]]; then
   CONFIG_PLATFORM_EXTERNAL_CCM="External"
 fi
 
+# Setting the baseDomain from profile or leave the default.
 #
-# Render the install-config.yaml
+if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  CLUSTER_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+  echo "Using baseDomain from CI Profile, value: ${CLUSTER_BASE_DOMAIN}"
+else
+  CLUSTER_BASE_DOMAIN="${BASE_DOMAIN}"
+  echo "Using baseDomain from default,value: ${BASE_DOMAIN}"
+fi
+
+#
+# Patch the install-config.yaml
 #
 log "Creating install-config.yaml patch"
 cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${CLUSTER_BASE_DOMAIN}
 platform:
   external:
     platformName: ${PROVIDER_NAME}

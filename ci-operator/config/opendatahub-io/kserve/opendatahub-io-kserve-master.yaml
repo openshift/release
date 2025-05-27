@@ -2,11 +2,11 @@ base_images:
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi8/python-39:1
+      FROM registry.access.redhat.com/ubi9/python-311:1
 
       # Prow expects to be able to check out a repo under /go
       USER 0:0
@@ -41,6 +41,27 @@ images:
 - context_dir: python/
   dockerfile_path: custom_model_grpc.Dockerfile
   to: custom-model-grpc
+- context_dir: python/
+  dockerfile_path: success_200_isvc.Dockerfile
+  to: success-200-isvc
+- context_dir: python/
+  dockerfile_path: error_404_isvc.Dockerfile
+  to: error-404-isvc
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9/python-311:1
+
+    # Prow expects to be able to check out a repo under /go
+    USER 0:0
+    WORKDIR /go
+    RUN chown 1001:0 .
+
+    USER 1001:0
+
+    # The VENV that is activated by default conflicts with KServe
+    # scripts. These variables are set to empty to not activate any
+    # VENV by default.
+    ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
+  to: kserve-tests
 promotion:
   to:
   - excluded_images:
@@ -51,6 +72,8 @@ promotion:
     - sklearn-serving-runtime
     - custom-transformer
     - custom-model-grpc
+    - error-404-isvc
+    - success-200-isvc
     namespace: opendatahub-io
     tag: latest
 releases:
@@ -67,6 +90,40 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- always_run: false
+  as: e2e-graph
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-graph
+      cli: latest
+      commands: |-
+        export GITHUB_SHA=stable
+        ./test/scripts/openshift-ci/run-e2e-tests.sh graph
+      dependencies:
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: SKLEARN_IMAGE
+        name: sklearn-serving-runtime
+      - env: SUCCESS_200_ISVC_IMAGE
+        name: success-200-isvc
+      - env: ERROR_404_ISVC_IMAGE
+        name: error-404-isvc
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-predictor
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
@@ -201,6 +258,28 @@ tests:
       SOURCE_IMAGE_REF: kserve-storage-initializer
     env:
       IMAGE_REPO: kserve-storage-initializer
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-success-200-isvc
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: success-200-isvc
+    env:
+      IMAGE_REPO: success-200-isvc
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-error-404-isvc
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: error-404-isvc
+    env:
+      IMAGE_REPO: error-404-isvc
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:

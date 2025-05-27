@@ -11,8 +11,11 @@ chain:
           default: "3"
           documentation: "The number nodes to automatically create and join to the cluster."
         - name: HYPERSHIFT_BASE_DOMAIN
-          default: "origin-ci-int-aws.dev.rhcloud.com"
+          default: "ci.hypershift.devcluster.openshift.com"
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
+        - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+          default: "HighlyAvailable"
+          documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
         - name: HYPERSHIFT_AWS_REGION
           default: "us-east-1"
           documentation: "The AWS region of the cluster."
@@ -35,9 +38,22 @@ chain:
         trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
         
         debug() {
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+          oc get pod -n local-cluster-${CLUSTER_NAME}
           oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
           oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
           oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
+        }
+
+        support_np_skew() {
+          curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+          local extra_flags=""
+          if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+            extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+          fi
+          extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+          extra_flags+="&& oc apply -f /tmp/hc.yaml"
+          echo "$extra_flags"
         }
 
         MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
@@ -78,13 +94,22 @@ chain:
           PULL_SECRET_PATH="/tmp/.dockerconfigjson"
         fi
         
+        if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
+          HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
+        fi
+        
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        if [[ $HYPERSHIFT_BASE_DOMAIN == "ci.hypershift.devcluster.openshift.com" ]]; then
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+        fi
+        
         CRED_COMMAND=""
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
           echo "MCE version is less than 2.6, use --aws-creds command"
-          CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
+          CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
         else
           set +x
-          export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+          export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
           /tmp/hs-cli/hypershift-no-cgo create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
           aws sts get-session-token --output json > ${SHARED_DIR}/sts-creds.json
@@ -95,16 +120,17 @@ chain:
           sleep 60
         fi
       
-        /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
+        eval "/tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
+        --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --instance-type ${HYPERSHIFT_INSTANCE_TYPE} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
         --region ${HYPERSHIFT_AWS_REGION} \
         --pull-secret ${PULL_SECRET_PATH} \
         --namespace local-cluster \
-        --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}
+        --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} $(support_np_skew)"
         
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
           echo "MCE version is less than 2.4"
@@ -168,8 +194,13 @@ chain:
         - mount_path: /var/run/brew-pull-secret
           name: cnv-ci-brew-pull-secret
           namespace: test-credentials
+        - mount_path: /etc/hypershift-ci-jobs-awscreds
+          name: hypershift-ci-jobs-awscreds
+          namespace: test-credentials
       dependencies:
         - name: "release:latest"
           env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
+        - name: "release:latest"
+          env: NODEPOOL_RELEASE_IMAGE_LATEST
         - name: hypershift-operator
           env: HYPERSHIFT_RELEASE_LATEST

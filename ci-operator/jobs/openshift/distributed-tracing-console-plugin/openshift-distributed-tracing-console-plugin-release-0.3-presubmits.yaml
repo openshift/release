@@ -6,15 +6,73 @@ presubmits:
     - ^release-0\.3$
     - ^release-0\.3-
     cluster: build06
-    context: ci/prow/fips-image-scan
+    context: ci/prow/upstream-amd64-aws-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: upstream-amd64-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-distributed-tracing-console-plugin-release-0.3-fips-image-scan
-    rerun_command: /test fips-image-scan
+    name: pull-ci-openshift-distributed-tracing-console-plugin-release-0.3-upstream-amd64-aws-e2e
+    rerun_command: /test upstream-amd64-aws-e2e
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=e2e
+        - --variant=upstream-amd64-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )upstream-amd64-aws-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-0\.3$
+    - ^release-0\.3-
+    cluster: build06
+    context: ci/prow/upstream-amd64-aws-fips-image-scan
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: upstream-amd64-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-distributed-tracing-console-plugin-release-0.3-upstream-amd64-aws-fips-image-scan
+    rerun_command: /test upstream-amd64-aws-fips-image-scan
     spec:
       containers:
       - args:
@@ -22,6 +80,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=fips-image-scan
+        - --variant=upstream-amd64-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,22 +113,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )fips-image-scan,?($|\s.*)
+    trigger: (?m)^/test( | .* )upstream-amd64-aws-fips-image-scan,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-0\.3$
     - ^release-0\.3-
     cluster: build06
-    context: ci/prow/images
+    context: ci/prow/upstream-amd64-aws-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: upstream-amd64-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-distributed-tracing-console-plugin-release-0.3-images
-    rerun_command: /test images
+    name: pull-ci-openshift-distributed-tracing-console-plugin-release-0.3-upstream-amd64-aws-images
+    rerun_command: /test upstream-amd64-aws-images
     spec:
       containers:
       - args:
@@ -77,6 +137,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=upstream-amd64-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -109,22 +170,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )upstream-amd64-aws-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-0\.3$
     - ^release-0\.3-
     cluster: build06
-    context: ci/prow/lint
+    context: ci/prow/upstream-amd64-aws-lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: upstream-amd64-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-distributed-tracing-console-plugin-release-0.3-lint
-    rerun_command: /test lint
+    name: pull-ci-openshift-distributed-tracing-console-plugin-release-0.3-upstream-amd64-aws-lint
+    rerun_command: /test upstream-amd64-aws-lint
     spec:
       containers:
       - args:
@@ -132,6 +194,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=lint
+        - --variant=upstream-amd64-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -164,4 +227,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
+    trigger: (?m)^/test( | .* )upstream-amd64-aws-lint,?($|\s.*)

@@ -7,12 +7,28 @@ ref:
       cpu: 1000m
       memory: 500Mi
   env:
+  - name: SITE_CONFIG_VERSION
+    default: "v2"
+    documentation: |-
+      The SiteConfig API version to be used. Note that the Hub cluster only
+      support 'v1' (deprecated) or 'v2' (default) for all deployments.
   - name: INTERNAL_NET_CIDR
     default: "192.168.80.0/22"
     documentation: |-
       CIDR is the IP block address pool for machines within the cluster
   - name: INSTALL_CONFIG_OVERRIDES
-    default: ""
+    default: |-
+        {
+          "capabilities": {
+            "baselineCapabilitySet": "None",
+            "additionalEnabledCapabilities": [
+              "marketplace",
+              "NodeTuning",
+              "OperatorLifecycleManager",
+              "Ingress"
+            ]
+          }
+        }
     documentation: |-
       InstallConfigOverrides allows to pass install config parameters to be added as
       annotation in the AgentClusterInstall CR. The values provided at InstallConfigOverrides
@@ -25,9 +41,44 @@ ref:
       DU profile cluster label is one of the label to be used to specify the the day2 configuration policies
       that will get applied on the cluster.
   - name: GLOBAL_IGNITION_CONF_OVERRIDE
-    default: ""
+    default: |-
+        {
+          "ignition": {
+            "version": "3.2.0"
+          },
+          "storage": {
+            "files": [
+              {
+                "overwrite": true,
+                "path": "/etc/containers/policy.json",
+                "contents": {
+                  "source": "data:text/plain;base64,ewogICAgImRlZmF1bHQiOiBbCiAgICAgICAgewogICAgICAgICAgICAidHlwZSI6ICJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIgogICAgICAgIH0KICAgIF0sCiAgICAidHJhbnNwb3J0cyI6CiAgICAgICAgewogICAgICAgICAgICAiZG9ja2VyLWRhZW1vbiI6CiAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgIiI6IFt7InR5cGUiOiJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIn1dCiAgICAgICAgICAgICAgICB9CiAgICAgICAgfQp9Cgo="
+                }
+              }
+            ]
+          }
+        }
     documentation: |-
       Json formatted string containing the user overrides for the initial ignition config.
+  - name: NODE_IGNITION_CONF_OVERRIDE
+    default: |-
+        {
+          "ignition": {
+            "version": "3.2.0"
+          },
+          "storage": {
+            "disks": [
+              {
+                "device": "${root_device}",
+                "wipeTable": true,
+                "partitions": []
+              }
+            ]
+          }
+        }
+    documentation: |-
+      Json formatted string containing the user overrides for the initial ignition config
+      for each node.
   - name: SHARED_HUB_CLUSTER_PROFILE
     default: "ztp-hub-preserved-prod-cluster_profile_dir"
     documentation: |-
@@ -39,16 +90,16 @@ ref:
     default: "ztp-gitea"
     documentation: |-
       Gitea k8s namespace where all its k8s related objects will be created
-  - name: GITEA_HELPER_IMG
-    default: "quay.io/ccardenosa/sno-spoke-helper"
-    documentation: |-
-      Gitea helper image to connect to the Git repo via SSH
   - name: AUX_HOST
     default: ""
-  - name: RHCOS_IMG_ROOTFS_URL
-    default: ""
+    documentation: |
+      The Bastion host where jobs can share synchronised data and run remote aux scripts and playbooks
   - name: RHCOS_ISO_URL
     default: ""
+  - name: MCH_NAMESPACE
+    default: "ocm"
+    documentation: |-
+      default namespace for applying multicluster hub. Override this in your config env if you want to change it.
   documentation: |-
     This step allows to generate and push the SiteConfig CR needed to deploy a ZTP SNO Spoke cluster
     For further details about site-config CDR, see:

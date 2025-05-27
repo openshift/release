@@ -28,7 +28,7 @@ postsubmits:
             secretKeyRef:
               key: url
               name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -66,7 +66,7 @@ postsubmits:
             secretKeyRef:
               key: url
               name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -115,7 +115,7 @@ postsubmits:
             secretKeyRef:
               key: url
               name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -153,6 +153,12 @@ postsubmits:
         - --confirm=true
         command:
         - applyconfig
+        env:
+        - name: build03_id
+          valueFrom:
+            secretKeyRef:
+              key: build03-id
+              name: build03-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -177,44 +183,6 @@ postsubmits:
     cluster: app.ci
     decorate: true
     labels:
-      ci.openshift.io/build-farm: build04
-      ci.openshift.io/generator: cluster-init
-      ci.openshift.io/role: infra
-    max_concurrency: 1
-    name: branch-ci-openshift-release-master-build04-apply
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/build04
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        - --confirm=true
-        command:
-        - applyconfig
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.build04.config
-            path: kubeconfig
-          secretName: config-updater
-  - agent: kubernetes
-    branches:
-    - ^master$
-    cluster: app.ci
-    decorate: true
-    labels:
       ci.openshift.io/build-farm: build05
       ci.openshift.io/generator: cluster-init
       ci.openshift.io/role: infra
@@ -229,7 +197,7 @@ postsubmits:
         - --confirm=true
         command:
         - applyconfig
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -273,7 +241,7 @@ postsubmits:
             secretKeyRef:
               key: build06-id
               name: build06-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -317,7 +285,7 @@ postsubmits:
             secretKeyRef:
               key: build07-id
               name: build07-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -385,6 +353,50 @@ postsubmits:
     cluster: app.ci
     decorate: true
     labels:
+      ci.openshift.io/build-farm: build10
+      ci.openshift.io/generator: cluster-init
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-master-build10-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build10
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        - --confirm=true
+        command:
+        - applyconfig
+        env:
+        - name: build10_id
+          valueFrom:
+            secretKeyRef:
+              key: build10-id
+              name: build10-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build10.config
+            path: kubeconfig
+          secretName: config-updater
+  - agent: kubernetes
+    branches:
+    - ^master$
+    cluster: app.ci
+    decorate: true
+    labels:
       ci.openshift.io/build-farm: build11
       ci.openshift.io/generator: cluster-init
       ci.openshift.io/role: infra
@@ -405,7 +417,7 @@ postsubmits:
             secretKeyRef:
               key: build11-id
               name: build11-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -444,7 +456,7 @@ postsubmits:
         - --dry-run=false
         command:
         - config-change-trigger
-        image: registry.ci.openshift.org/ci/config-change-trigger:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_config-change-trigger_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -483,7 +495,7 @@ postsubmits:
             secretKeyRef:
               key: hosted-mgmt-id
               name: hosted-mgmt-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -552,7 +564,7 @@ postsubmits:
       containers:
       - command:
         - hack/annotate.sh
-        image: registry.ci.openshift.org/ocp/cli-jq:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -579,7 +591,7 @@ postsubmits:
         - --confirm=true
         command:
         - applyconfig
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:

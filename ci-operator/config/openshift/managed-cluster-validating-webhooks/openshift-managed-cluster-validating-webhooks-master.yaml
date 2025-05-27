@@ -3,10 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-  openshift_release_golang-1.22:
+  openshift_release_golang-1.23:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: golang-1.23
 build_root:
   image_stream_tag:
     name: release
@@ -16,9 +16,9 @@ images:
 - dockerfile_path: build/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.22:
+    openshift_release_golang-1.23:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.22
+      - registry.ci.openshift.org/openshift/release:golang-1.23
   to: managed-cluster-validating-webhooks
 resources:
   '*':
@@ -31,42 +31,7 @@ tests:
     make e2e-harness-build
   container:
     from: src
-  run_if_changed: ^(osde2e/.*|go\.mod|go\.sum)$
-- as: pre-leading-zero-check
-  steps:
-    test:
-    - as: check-commit-message
-      commands: |
-        COMMIT_HASH=$(git rev-parse --short HEAD)
-        if [[ $COMMIT_HASH =~ ^0 ]]; then
-            echo "Git commit hash starts with a leading zero. Please generate a dummy commit to generate a new hash."
-            echo "we're doing this due to an OLM bug (https://issues.redhat.com/browse/OSD-13681) and the fix is to add a dummy commit"
-            exit 1
-        fi
-        exit 0
-      from: src
-      resources:
-        requests:
-          cpu: 10m
-          memory: 100Mi
-- as: post-leading-zero-check
-  postsubmit: true
-  steps:
-    test:
-    - as: check-commit-message
-      commands: |
-        COMMIT_HASH=$(git rev-parse --short HEAD)
-        if [[ $COMMIT_HASH =~ ^0 ]]; then
-            echo "Git commit hash starts with a leading zero. Please generate a dummy commit to generate a new hash."
-            echo "we're doing this due to an OLM bug (https://issues.redhat.com/browse/OSD-13681) and the fix is to add a dummy commit"
-            exit 1
-        fi
-        exit 0
-      from: src
-      resources:
-        requests:
-          cpu: 10m
-          memory: 100Mi
+  run_if_changed: ^(test/e2e/.*|go\.mod|go\.sum)$
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -58,7 +58,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-byo-iam-profile-mini-perm-arm-f60
-  cron: 30 12 7 1,3,5,7,9,11 *
+  cron: 0 15 4 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -71,7 +71,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-profile
 - as: aws-ipi-byo-iam-role-efs-mini-perm-arm-f60-custom-cert
-  cron: 41 13 15 1,3,5,7,9,11 *
+  cron: 12 0 4 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
@@ -87,7 +87,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role-efs
 - as: aws-ipi-byo-kms-etcd-encryption-mini-perm-arm-f60
-  cron: 21 5 2 2,4,6,8,10,12 *
+  cron: 11 16 28 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -100,7 +100,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
 - as: aws-ipi-byo-route53-compact-cloudfront-mini-perm-arm-f60
-  cron: 52 22 6 2,4,6,8,10,12 *
+  cron: 55 23 22 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -126,7 +126,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
 - as: aws-ipi-ingress-lbtype-classic-subnets-mini-perm-arm-f60
-  cron: 1 10 13 1,3,5,7,9,11 *
+  cron: 2 2 25 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -139,7 +139,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-classic-subnets-day2
 - as: aws-ipi-ingress-lbtype-nlb-subnets-mini-perm-arm-f60
-  cron: 12 13 1 2,4,6,8,10,12 *
+  cron: 36 7 25 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -152,7 +152,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb-subnets-day2
 - as: aws-ipi-ovn-ipsec-mini-perm-arm-mixarch-f60
-  cron: 1 17 25 2,4,6,8,10,12 *
+  cron: 0 14 2 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -181,8 +181,27 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipv4-subnet
+- as: aws-ipi-priv-sts-basecap-none-mini-perm-arm-f28
+  cron: 46 8 2 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+        Ingress
+      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-private-cco-manual-security-token-service
 - as: aws-ipi-proxy-sts-mini-perm-arm-f28
-  cron: 11 7 17 * *
+  cron: 10 13 8 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -197,7 +216,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-ipi-public-ipv4-pool-mini-perm-arm-f60
-  cron: 13 10 6 1,3,5,7,9,11 *
+  cron: 0 3 5 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws
     env:
@@ -243,7 +262,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: aws-ipi-usertags-custom-sg-mini-perm-arm-f60
-  cron: 7 7 12 1,3,5,7,9,11 *
+  cron: 31 3 4 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -314,6 +333,8 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.0.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.0.1.0/24
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -325,6 +346,9 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -352,6 +376,9 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.0.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -370,7 +397,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-publish-mixed-ingress-internal
 - as: azure-ipi-oidc-mini-perm-arm-f60
-  cron: 5 21 6 1,3,5,7,9,11 *
+  cron: 30 16 22 2,4,6,8,10,12 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -492,7 +519,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
 - as: baremetal-ipi-ovn-ipv4-fips-vmedia-amd-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 18 6 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -507,7 +535,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-ipi-ovn-ipv4-arm-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 54 17 28 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -522,7 +551,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi
 - as: baremetal-ipi-ovn-ipv4-basecap-none-arm-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 29 19 21 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -539,7 +569,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi
 - as: baremetal-ipi-ovn-ipv4-external-lb-arm-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 34 21 12 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -554,7 +585,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi-external-lb
 - as: baremetal-upi-ovn-dual-stack-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 37 14 22 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -567,8 +599,9 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi-dual-stack
 - as: baremetal-upi-ovn-ipv4-disconnected-arm-f60
-  cluster: build05
-  cron: 13 17 27 2,4,6,8,10,12 *
+  capabilities:
+  - intranet
+  cron: 10 16 26 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -579,37 +612,40 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: baremetal-lab-upi-install-disconnected
-- as: gcp-ipi-basecap-none-additionalcaps-arm-f28
-  cron: 4 13 6 * *
+- as: gcp-ipi-basecap-none-additionalcaps-mini-perm-arm-f28
+  cron: 48 3 15 * *
   steps:
     cluster_profile: gcp-qe
     env:
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-capability-additionalcaps
-- as: gcp-ipi-compact-filestore-csi-arm-f60
-  cron: 5 11 11 2,4,6,8,10,12 *
+- as: gcp-ipi-compact-filestore-csi-mini-perm-arm-f60
+  cron: 31 22 6 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     dependency_overrides:
       OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
       SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-disk-encryption-arm-f60
-  cron: 4 12 9 2,4,6,8,10,12 *
+- as: gcp-ipi-disk-encryption-mini-perm-arm-f60
+  cron: 27 0 19 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
@@ -634,60 +670,68 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       RT_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity-minimal-permission
-- as: gcp-ipi-proxy-etcd-encryption-arm-f60
-  cron: 25 14 9 2,4,6,8,10,12 *
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
+- as: gcp-ipi-proxy-etcd-encryption-mini-perm-arm-f60
+  cron: 6 3 25 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
-- as: gcp-ipi-proxy-oidc-arm-f60
-  cron: 12 18 22 1,3,5,7,9,11 *
+- as: gcp-ipi-proxy-oidc-mini-perm-arm-f60
+  cron: 59 18 13 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
-- as: gcp-ipi-proxy-private-arm-f60
-  cron: 36 1 2 1,3,5,7,9,11 *
+- as: gcp-ipi-proxy-private-mini-perm-arm-f60
+  cron: 39 2 2 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-sno-etcd-encryption-arm-f60
-  cron: 15 19 28 2,4,6,8,10,12 *
+- as: gcp-ipi-sno-etcd-encryption-mini-perm-arm-f60
+  cron: 32 5 22 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
-- as: gcp-ipi-sno-tp-arm-f60
-  cron: 11 7 17 1,3,5,7,9,11 *
+- as: gcp-ipi-sno-tp-mini-perm-arm-f60
+  cron: 41 15 7 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       FEATURE_SET: TechPreviewNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test

@@ -43,7 +43,7 @@ releases:
   latest:
     release:
       architecture: multi
-      channel: candidate
+      channel: stable
       version: "4.15"
 resources:
   '*':
@@ -53,14 +53,13 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: azure-ipi-oidc-mixarch-f14-logging
-  cron: 5 3 16,30 * *
+- as: azure-ipi-oidc-mixarch-f28-logging
+  cron: 45 14 5 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      EXTRACT_MANIFEST_INCLUDED: "true"
       FORCE_SUCCESS_EXIT: "true"
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.0
       OCP_ARCH: arm64
@@ -68,10 +67,11 @@ tests:
         [
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
-      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~GCL&
+      TEST_IMPORTANCE: Critical|High|Medium
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"

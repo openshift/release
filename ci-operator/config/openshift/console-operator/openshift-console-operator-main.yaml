@@ -1,6 +1,10 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -22,17 +26,17 @@ images:
   to: console-operator
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -50,7 +54,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -85,8 +89,19 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
+- as: e2e-hypershift-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

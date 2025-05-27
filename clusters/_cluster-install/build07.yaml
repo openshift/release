@@ -31,10 +31,52 @@ onboard:
     imageRegistryPublicHost: registry.build07.ci.openshift.org
   cloudCredential:
     aws: {}
+  ciSchedulingWebhook:
+    patches:
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '.+aarch64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-02e527f3ccc13508b"}]
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '.+amd64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-0e79bb8acc37d2696"}]
+    # volumeType
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: 'ci\-builds\-worker\-(amd64|aarch64)'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/blockDevices/0/ebs/volumeType", "value": "gp2"}]
+    # instanceType aarch64
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: ci-(builds|longtests|prowjobs|tests)-worker-aarch64
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "c6g.4xlarge"}]
+    # instanceType amd64
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: ci-(builds|longtests|prowjobs|tests)-worker-amd64
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "c6a.4xlarge"}]
+  machineSet:
+    patches:
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '.+aarch64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-02e527f3ccc13508b"}]
+    - type: json-patch
+      matches:
+      - kind: MachineSet
+        name: '.+amd64.+'
+      inline: [{"op": "add", "path": "/spec/template/spec/providerSpec/value/ami/id", "value": "ami-0e79bb8acc37d2696"}]
   passthrough:
     patches:
     - type: json-patch
       matches:
       - kind: MultiArchBuildConfig
         name: managed-clonerefs
-      inline: [{"op": "add", "path": "/spec/build_spec/source/images/0/from/name", "value": "us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250224-355743344"}]
+      inline: [{"op": "add", "path": "/spec/build_spec/source/images/0/from/name", "value": "us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250512-8cd4af136"}]

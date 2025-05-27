@@ -18,6 +18,11 @@ EOF
 configure_vm_args=""
 if "${OPTIONAL_RPMS}"; then
   configure_vm_args="--optional-rpms"
+
+  # install all the optional RPMs except those specified in ${SKIPPED_OPTIONAL_RPMS}
+  if [ -n "${SKIPPED_OPTIONAL_RPMS}" ]; then
+    configure_vm_args="${configure_vm_args} --skip-optional-rpms ${SKIPPED_OPTIONAL_RPMS}"
+  fi
 fi
 
 cat <<EOF > /tmp/install.sh
@@ -29,6 +34,15 @@ ci_subscription_register
 
 sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
+if [[ "${JOB_NAME_SAFE}" =~ .*ocp-conformance-optional.* ]]; then
+  # Increase pull QPS for conformance with optional RPMs
+  sudo mkdir -p /etc/microshift/config.d/
+  sudo tee /etc/microshift/config.d/kubelet-qps.yaml >/dev/null <<2EOF2
+kubelet:
+  registryPullQPS: 10
+
+2EOF2
+fi
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
 ./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images ${configure_vm_args} /tmp/pull-secret

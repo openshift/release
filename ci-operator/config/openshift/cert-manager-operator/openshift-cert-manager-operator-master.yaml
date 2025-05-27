@@ -1,16 +1,16 @@
 base_images:
   base-rhel9:
-    name: "4.17"
+    name: "4.18"
     namespace: ocp
     tag: base-rhel9
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
-  ocp-golang-builder:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -18,29 +18,30 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
   inputs:
-    ocp-golang-builder:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
   inputs:
-    ocp-golang-builder:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cert-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-controller:latest
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-webhook:latest
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:latest
     with: pipeline:cert-manager
 releases:
   initial:
@@ -87,7 +88,7 @@ tests:
     - ref: fips-check-image-scan
 - as: e2e-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -104,6 +105,29 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: fips-check-fips-or-die
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-operator-tech-preview
+  optional: true
+  run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
     - ref: fips-check-fips-or-die
     - as: test
       cli: latest

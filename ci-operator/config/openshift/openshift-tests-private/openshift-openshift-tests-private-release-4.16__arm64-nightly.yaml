@@ -92,86 +92,6 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-disc-priv-sts-basecap-none-f28-destructive
-  cron: 41 17 24 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-basecap-none-f28
-  cron: 46 16 24 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-f28-destructive
-  cron: 13 17 11 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
-- as: aws-ipi-disc-priv-sts-efs-f28
-  cron: 42 19 26 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-f28
   cron: 44 11 21 * *
   steps:
@@ -242,8 +162,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-f7-longduration-workload
-  cron: 47 21 6,15,22,29 * *
+- as: aws-ipi-f14-longduration-workload
+  cron: 21 19 10,26 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -276,7 +196,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-sno-etcd-encryption-longduration-apiserver-arm-f28
-  cron: 30 4 5 * *
+  cron: 42 20 18 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -292,7 +212,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-sno-etcd-encryption
 - as: gcp-ipi-sno-longduration-apiserver-arm-f28
-  cron: 11 7 15 * *
+  cron: 34 11 6 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -306,7 +226,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi-sno
 - as: azure-ipi-sno-etcd-encryption-longduration-apiserver-arm-f28
-  cron: 59 11 21 * *
+  cron: 0 22 25 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -335,7 +255,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-longduration-reliability-test-f28
+- as: aws-ipi-f28-sanity-reliability-test
   cron: 33 13 6 * *
   steps:
     cluster_profile: aws-qe
@@ -351,8 +271,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-ovn-ipsec-to-multiarch-f7
-  cron: 27 5 2,9,16,25 * *
+- as: aws-ipi-ovn-ipsec-to-multiarch-f14
+  cron: 11 6 9,23 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -433,8 +353,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-private
-- as: azure-ipi-to-multiarch-f7
-  cron: 41 9 3,10,17,26 * *
+- as: azure-ipi-to-multiarch-f14
+  cron: 41 16 2,16 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -452,7 +372,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-longduration-reliability-test-f28
+- as: azure-ipi-f28-sanity-reliability-test
   cron: 6 0 16 * *
   steps:
     cluster_profile: azure-qe
@@ -468,6 +388,7 @@ tests:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetalds-ipi-ovn-ipv4-f14
+  cluster: build05
   cron: 23 21 13,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -476,12 +397,11 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
-      PACKET_METRO: dc
-      PACKET_PLAN: c3.large.arm64
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-f28-destructive
+  cluster: build05
   cron: 15 18 12 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -490,12 +410,12 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
-      PACKET_PLAN: c3.large.arm64
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetal-compact-agent-ipv4-dynamic-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 21 21 8,24 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -513,7 +433,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-dynamic
 - as: baremetal-compact-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 41 14 13,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -531,7 +452,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-compact-agent-ipv4-static-disc-proxy-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 1 14 7,23 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -549,7 +471,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-disconnected-proxy
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 27 21 20 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -567,7 +490,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 10 18 14 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -585,7 +509,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-sno-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 33 15 23 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -604,7 +529,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-sno-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 51 17 7,23 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -623,7 +549,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-upi-ovn-ipv4-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 11 13 28 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -637,8 +564,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
-- as: gcp-ipi-disc-priv-oidc-f28
-  cron: 53 16 7 * *
+- as: gcp-ipi-disc-priv-oidc-mini-perm-f28
+  cron: 17 1 9 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -646,14 +573,16 @@ tests:
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       E2E_RUN_TAGS: '@disconnected'
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-disc-priv-oidc-f28-destructive
-  cron: 48 12 3 * *
+- as: gcp-ipi-disc-priv-oidc-mini-perm-f28-destructive
+  cron: 22 6 3 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -661,26 +590,29 @@ tests:
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       E2E_RUN_TAGS: '@disconnected'
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-proxy-private-f28-disasterrecovery
-  cron: 27 19 13 * *
+- as: gcp-ipi-proxy-private-mini-perm-f28-disasterrecovery
+  cron: 3 0 11 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-to-multiarch-f28
-  cron: 50 3 27 * *
+- as: gcp-ipi-to-multiarch-mini-perm-f28
+  cron: 3 18 17 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -691,13 +623,54 @@ tests:
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-longduration-reliability-test-f28
+- as: gcp-ipi-f28-compliance
+  cron: 33 11 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      FILTERS_ADDITIONAL: ""
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f28-compliance-destructive
+  cron: 36 14 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "55"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f28-sanity-reliability-test
   cron: 37 0 29 * *
   steps:
     cluster_profile: gcp-qe
@@ -711,6 +684,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: baremetal-ipi-ovn-vmedia-disk-encryption-f14
+  capabilities:
+  - intranet
+  cron: 49 15 1,17 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

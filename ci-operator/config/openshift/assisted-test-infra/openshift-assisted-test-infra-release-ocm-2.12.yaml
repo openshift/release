@@ -23,10 +23,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: "4.17"
-    namespace: ocp
-    tag: tests
   upi-installer:
     name: "4.17"
     namespace: ocp
@@ -70,6 +66,7 @@ tests:
     from: assisted-test-infra-internal
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-binding-single-node-4-17
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -82,9 +79,10 @@ tests:
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-unbinding-single-node-4-17
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -98,9 +96,10 @@ tests:
         export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-net-suite-4-17
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -116,8 +115,9 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
         WORKER_DISK=40000000000
         OPENSHIFT_VERSION=4.17
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-ha-kube-api-4-17-periodic
+  cluster: build05
   cron: 30 05 * * 2,4
   steps:
     cluster_profile: packet-assisted
@@ -129,8 +129,10 @@ tests:
         IPv4=true
         OPENSHIFT_VERSION=4.17
         SERVICE_BASE_REF=release-ocm-2.12
-    workflow: assisted-baremetal
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-ha-kube-api-4-17
+  cluster: build05
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
@@ -144,10 +146,10 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.17
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-ha-kube-api-ipv6-4-17
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -161,7 +163,7 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.17
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-vsphere-assisted-kube-api-4-17
   optional: true
@@ -182,6 +184,7 @@ tests:
     workflow: assisted-vsphere
 - always_run: false
   as: e2e-metal-assisted-kube-api-reclaim-single-node-4-17
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -195,9 +198,10 @@ tests:
         MAKEFILE_TARGET=test
         WORKER_DISK=40000000000
         OPENSHIFT_VERSION=4.17
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-reclaim-4-17
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -211,7 +215,7 @@ tests:
         MAKEFILE_TARGET=test
         WORKER_DISK=40000000000
         OPENSHIFT_VERSION=4.17
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: release-ocm-2.12
   org: openshift

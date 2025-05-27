@@ -1,45 +1,44 @@
 base_images:
-  ocp_4.16_base-rhel9:
+  ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    tag: rhel-8-golang-1.23-openshift-4.19
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/containernetworking-plugins
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: container-networking-plugins
 - dockerfile_path: Dockerfile.microshift
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: containernetworking-plugins-microshift
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -68,6 +67,12 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: containernetworking-plugins
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

@@ -1,0 +1,43 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: weekly-compact-6nodes
+  capabilities:
+  - intranet
+  cron: 0 0 * * 5
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      CRUCIBLE: "false"
+      FOREMAN_OS: RHEL 9.4
+      NUM_NODES: "2"
+      NUM_WORKER_NODES: "0"
+      OCP_VERSION: latest
+      PUBLIC_VLAN: "true"
+      STARTING_NODE: "4"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-poweroff
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-foreman
+    - chain: openshift-qe-cluster-health
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-rhoso-x86

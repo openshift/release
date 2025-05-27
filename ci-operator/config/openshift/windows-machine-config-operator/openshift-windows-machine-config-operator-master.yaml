@@ -1,22 +1,22 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
-  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    tag: rhel-9-golang-1.23-openshift-4.20
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.20:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
+    tag: rhel-9-release-golang-1.23-openshift-4.20
   operator-sdk:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: windows-machine-config-operator-test
 binary_build_commands: make build
@@ -26,12 +26,12 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.20
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.20:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.20
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -46,13 +46,13 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -99,13 +99,14 @@ tests:
   as: aws-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: vsphere-disconnected-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -113,12 +114,14 @@ tests:
     cluster_profile: vsphere-dis-2
     env:
       ENABLE_IDMS: "yes"
+      PAUSE_IMAGE_ORG: test-org
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
     test:
     - ref: windows-e2e-operator-test
     workflow: windows-e2e-operator-test-vsphere-disconnected
+  timeout: 5h0m0s
 - always_run: false
   as: azure-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -131,6 +134,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: gcp-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -141,6 +145,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-gcp-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: vsphere-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -149,6 +154,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+  timeout: 5h0m0s
 - as: vsphere-e2e-ccm-install
   cron: 0 9 * * 1
   steps:
@@ -250,6 +256,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test-byoh
     workflow: windows-e2e-operator-test-platform-none-vsphere
+  timeout: 5h0m0s
 - always_run: false
   as: vsphere-proxy-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -258,6 +265,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
+  timeout: 5h0m0s
 - always_run: false
   as: wicd-unit-vsphere
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -279,8 +287,8 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-4.19
-      SOURCE_BRANCH: release-4.19
+      DESTINATION_BRANCH: community-4.20
+      SOURCE_BRANCH: release-4.20
     workflow: windows-ci-fastforward
 - always_run: false
   as: nutanix-e2e-operator
@@ -291,6 +299,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-nutanix-ovn-hybrid
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

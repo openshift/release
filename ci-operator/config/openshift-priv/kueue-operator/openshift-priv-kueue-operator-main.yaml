@@ -20,9 +20,14 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: kueue-operator
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  to: kueue-operator-src
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 resources:
   '*':
@@ -30,11 +35,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.19-priv
+  name: 4.20-priv
   namespace: ocp-private
 tests:
 - as: test
   commands: make test
+  container:
+    from: src
+- as: test-generate
+  commands: make generate manifests regen-crd
   container:
     from: src
 - as: lint

@@ -1,0 +1,56 @@
+workflow:
+  as: hypershift-aws-conformance-cilium
+  documentation: |-
+    The HyperShift aws conformance workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in the `osd-hypershift` AWS account and is destroyed after tests
+    complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    env:
+      HYPERSHIFT_NETWORK_TYPE: "Other" # Required for Cilium.
+      TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
+        access to server in CIDR block \[Feature:NetworkPolicy\] \[Suite:openshift/conformance/parallel\]
+        \[Suite:k8s\]\| Netpol NetworkPolicy between server and client should ensure
+        an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed \[Feature:NetworkPolicy\]
+        \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\| Services should serve
+        endpoints on same port and different protocols \[Conformance\] \[Suite:openshift/conformance/parallel/minimal\]
+        \[Suite:k8s\]\| Netpol NetworkPolicy between server and client should enforce
+        except clause while egress access to server in CIDR block \[Feature:NetworkPolicy\]
+        \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP \[Suite:openshift/conformance/parallel\]\| Unidling with
+        Deployments \[apigroup:route.openshift.io\] should work with TCP (when fully
+        idled) \[Suite:openshift/conformance/parallel\]\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled) \[Suite:openshift/conformance/parallel\]\|
+        Unidling with Deployments \[apigroup:route.openshift.io\] should work with
+        UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
+        the local DNS endpoint \[Suite:openshift/conformance/parallel\]
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    - ref: cucushift-hypershift-extended-cilium
+    - ref: cucushift-hypershift-extended-cilium-health-check

@@ -1,8 +1,8 @@
 base_images:
-  openshift_release_rhel-8-release-golang-1.19-openshift-4.12:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
   operator-sdk:
     name: "4.14"
     namespace: origin
@@ -14,9 +14,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-8-release-golang-1.19-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -85,9 +85,13 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: azure-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -98,6 +102,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: gcp-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -108,6 +113,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-gcp-ovn-hybrid
+  timeout: 5h0m0s
 - always_run: false
   as: vsphere-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -116,6 +122,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+  timeout: 5h0m0s
 - always_run: false
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
@@ -226,6 +233,7 @@ tests:
     test:
     - ref: windows-e2e-operator-test-byoh
     workflow: windows-e2e-operator-test-platform-none-vsphere
+  timeout: 5h0m0s
 - always_run: false
   as: wicd-unit-vsphere
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$

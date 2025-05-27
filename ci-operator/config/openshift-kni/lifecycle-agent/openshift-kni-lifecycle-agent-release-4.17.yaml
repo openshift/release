@@ -48,12 +48,15 @@ tests:
 - as: ci-job
   commands: |
     unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
   container:
     from: src
 - always_run: false
   as: integration
-  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws-telco
     env:
@@ -73,6 +76,9 @@ tests:
     - as: integration
       cli: latest
       commands: |
+        export XDG_CACHE_HOME=/tmp/.cache
+        export XDG_CONFIG_HOME=/tmp/.config
+        export XDG_DATA_HOME=/tmp/.local/share
         make test
       from: src
       resources:
@@ -88,33 +94,35 @@ tests:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
 - as: ibu-e2e-flow
-  cluster: build02
   optional: true
-  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      LCA_PULL_REF: lifecycle-agent-operator
+      OO_BUNDLE: lifecycle-agent-operator-bundle
     env:
       OCP_BASE_IMAGE_SOURCE: ci
       OCP_BASE_VERSION: "4.17"
       OCP_TARGET_IMAGE_SOURCE: release
       OCP_TARGET_VERSION: "4.16"
+      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.17
       SEED_IMAGE_TAG_FORMAT: release
     workflow: openshift-image-based-upgrade-presubmit
   timeout: 4h0m0s
 - as: ibi-e2e-flow
-  cluster: build02
   optional: true
-  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       INSTALLER_PULL_REF: pipeline:installer
-      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      LCA_PULL_REF: lifecycle-agent-operator
+      OO_BUNDLE: lifecycle-agent-operator-bundle
     env:
       OCP_BASE_IMAGE_SOURCE: ci
       OCP_BASE_VERSION: "4.17"
+      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.17
       SEED_IMAGE_TAG_FORMAT: release
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install

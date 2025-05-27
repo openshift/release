@@ -6,7 +6,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -43,7 +43,7 @@ images:
   to: aws-cloud-controller-manager
 - dockerfile_literal: |
     # This uses the new rhel-coreos base image
-    # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+    # https://github.com/openshift/enhancements/blob/main/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
     FROM quay.io/centos/centos:stream9 as build
     # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
     # in a container https://github.com/coreos/rpm-ostree/issues/4034
@@ -66,7 +66,6 @@ promotion:
   to:
   - additional_images:
       cloud-provider-aws-rpms: rpms
-    disabled: true
     excluded_images:
     - rhel-coreos
     name: "4.19"
@@ -104,7 +103,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-cgroupsv2
   optional: true
@@ -119,7 +118,7 @@ tests:
     workflow: hypershift-aws-e2e-external
 - as: verify-commits
   commands: |
-    commitchecker --start ${PULL_BASE_SHA:-master}
+    commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
   optional: true
@@ -129,6 +128,12 @@ tests:
     env:
       PROJECT_NAME: cloud-provider-aws
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

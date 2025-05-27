@@ -4,15 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
-INSTALL_DIR=/tmp
-mkdir -p ${INSTALL_DIR}/auth || true
-cp -vf $SHARED_DIR/kubeconfig ${INSTALL_DIR}/auth/
-
 source "${SHARED_DIR}/init-fn.sh" || true
+
+# Set up the traps
+trap collect_bootstrap_error_handler TERM INT HUP
+trap collect_bootstrap_error_handler EXIT
+
+make_install_dir
 
 log "Checking and waiting for install-complete"
 OK_COUNT=0

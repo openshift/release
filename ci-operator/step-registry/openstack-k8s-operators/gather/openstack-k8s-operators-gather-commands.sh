@@ -11,4 +11,4 @@ mkdir -p ${ARTIFACT_DIR}/must-gather/
 oc --insecure-skip-tls-verify adm must-gather --image-stream=openshift/must-gather \
     --image=quay.io/openstack-k8s-operators/openstack-must-gather:latest \
     --timeout=$MUST_GATHER_TIMEOUT \
-    --dest-dir ${ARTIFACT_DIR}/must-gather -- ADDITIONAL_NAMESPACES=kuttl,sushy-emulator gather &> ${ARTIFACT_DIR}/must-gather/openstack-must-gather.log
+    --dest-dir ${ARTIFACT_DIR}/must-gather -- ADDITIONAL_NAMESPACES=kuttl,sushy-emulator,crc-storage gather &> ${ARTIFACT_DIR}/must-gather/openstack-must-gather.log

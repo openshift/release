@@ -23,8 +23,7 @@ images:
   to: microshift-test-rpm
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - microshift-test-rpm
     name: "4.19"
     namespace: ocp
@@ -86,10 +85,35 @@ tests:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
+- as: rebase-on-nightlies
+  cron: 0 4 * * 1-5
+  steps:
+    workflow: openshift-microshift-rebase
+- as: e2e-aws-tests-cache-nightly
+  capabilities:
+  - intranet
+  cron: 30 0 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: aws-2
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
+- as: e2e-aws-tests-cache-nightly-arm
+  capabilities:
+  - intranet
+  cron: 30 0 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
@@ -103,20 +127,22 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-cache
-  cluster: build11
+  capabilities:
+  - intranet
   restrict_network_access: false
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests-cache-arm
-  cluster: build11
+  capabilities:
+  - intranet
   restrict_network_access: false
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
@@ -124,7 +150,7 @@ tests:
 - as: e2e-aws-tests-periodic
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
@@ -132,7 +158,7 @@ tests:
 - as: e2e-aws-tests-periodic-arm
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.4
@@ -140,7 +166,7 @@ tests:
 - as: e2e-aws-tests-bootc
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
@@ -156,7 +182,7 @@ tests:
 - as: e2e-aws-tests-bootc-periodic
   run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
@@ -164,7 +190,7 @@ tests:
 - as: e2e-aws-tests-bootc-periodic-arm
   run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.4
@@ -172,7 +198,7 @@ tests:
 - as: ocp-full-conformance-rhel-eus
   run_if_changed: ^(origin/.*|assets/.*|etcd/.*|pkg/.*|vendor/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-origin-conformance
@@ -187,11 +213,20 @@ tests:
 - as: e2e-aws-footprint-and-performance
   run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-footprint-and-performance
+    workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-ai-model-serving
+  run_if_changed: ^(scripts/ci-ai-model-serving/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: g4dn.xlarge
+      MICROSHIFT_OS: rhel-9.4
+      SUITE: ai-model-serving
+    workflow: openshift-microshift-e2e-bare-metal-tests
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

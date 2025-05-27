@@ -12,7 +12,7 @@ fi
 
 git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
-git checkout rhosdt-3-4-downstream
+git checkout rhosdt-3-5
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
@@ -60,6 +60,7 @@ tests/e2e-openshift \
 tests/e2e-prometheuscr \
 tests/e2e-instrumentation \
 tests/e2e-pdb \
+tests/e2e-opampbridge \
 tests/e2e-otel \
 tests/e2e-multi-instrumentation \
 tests/e2e-targetallocator || any_errors=true

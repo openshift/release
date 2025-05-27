@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
@@ -116,6 +120,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -137,7 +144,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-periodic
-  cron: 0 0 * * *
+  cron: 20 4 13,22 * *
   steps:
     cluster_profile: gcp-3
     pre:
@@ -164,6 +171,9 @@ tests:
       - mount_path: /secret/aws/aws-secret-access-key
         name: aws-secret-access-key
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -181,7 +191,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-slow-tests
-  cron: 0 0 * * 6
+  cron: 25 10 8,19 * *
   steps:
     cluster_profile: gcp-3
     pre:
@@ -225,7 +235,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-test-time-periodic
-  cron: 0 0 * * *
+  cron: 49 17 5,24 * *
   steps:
     cluster_profile: gcp
     pre:
@@ -302,6 +312,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -320,8 +333,57 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: hosted-hypershift-insights-operator-e2e-tests
+  cron: 0 0 * * 6
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "not tp_only and not slow and not UI" --junitxml=$(pwd)/test-report.xml
+        --rp_enabled --rp_name=hosted-hypershift-insights-operator-e2e-tests-4.18
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+  timeout: 8h0m0s
 - as: fips-image-scan-operator
-  cron: 0 2 * * 2
+  cron: 50 16 7,15 * *
   steps:
     dependencies:
       SCAN_IMAGE: insights-operator

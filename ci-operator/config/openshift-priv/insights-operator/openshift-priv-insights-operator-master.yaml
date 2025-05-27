@@ -3,12 +3,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
     tag: latest
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -29,17 +33,17 @@ images:
   to: insights-operator
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -106,6 +110,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -161,6 +168,9 @@ tests:
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
         namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -187,6 +197,12 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift-priv

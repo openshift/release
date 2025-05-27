@@ -1,0 +1,60 @@
+ref:
+  as: openshift-qe-workers-scale
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  timeout: 8h0m0s
+  commands: openshift-qe-workers-scale-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Add args for e2e-benchmarking workers-scale cmd.
+  - name: ROSA_LOGIN_ENV
+    default: "staging"
+    documentation: |-
+      The environment for rosa login. The supported values are [production, staging, integration]
+  - name: E2E_VERSION
+    default: "v2.3.5"
+    documentation: |-
+      Override the e2e version
+  - name: WORKERS_SCALE_VERSION
+    default: "default"
+    documentation: |-
+      Override the workers-scale version
+  - name: ADDITIONAL_WORKER_NODES
+    default: "3"
+    documentation: |-
+      Default is 3
+  - name: GARBAGE_COLLECTION
+    default: "false"
+    documentation: |-
+      Default is false
+  - name: DEPLOY_AUTOSCALER
+    default: "false"
+    documentation: |-
+      Default is false
+  - name: METRIC_PROFILES
+    default: " --metrics-profile=metrics-profiles/metrics.yml,metrics-profiles/metrics-report.yml"
+    documentation: |-
+      Default is both the metric profiles
+  - name: START_TIME
+    default: "0"
+    documentation: |-
+      Default is 0, which means it will look for start time in the shared directory
+  - name: END_TIME
+    default: "0"
+    documentation: |-
+      Default is 0, which means it will look for end time in the shared directory
+  documentation: >-
+    This step runs the perfscale loaded-upgrade workload in the deployed cluster

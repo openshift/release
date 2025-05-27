@@ -1,17 +1,17 @@
 base_images:
-  os:
-    name: centos
-    namespace: origin
-    tag: stream8
+  ubi:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: golang-1.23
 images:
 - context_dir: .
   dockerfile_path: Dockerfiles/Dockerfile
-  from: os
+  from: ubi
   to: opendatahub-operator
 operator:
   bundles:
@@ -20,15 +20,10 @@ operator:
   - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
 releases:
-  initial:
-    integration:
-      name: "4.14"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.14"
-      namespace: ocp
+    release:
+      channel: stable
+      version: "4.17"
 resources:
   '*':
     requests:

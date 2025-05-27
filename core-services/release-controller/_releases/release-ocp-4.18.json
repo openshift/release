@@ -8,6 +8,8 @@
   "minCreationIntervalSeconds": 14400,
   "referenceMode": "source",
   "pullSecretName": "source",
+  "alternateImageRepository": "quay.io/openshift-release-dev/dev-release",
+  "alternateImageRepositorySecretName": "release-controller-quay-mirror-secret",
   "check": {
     "OCP and Origin images should match": {
       "consistentImages": {
@@ -16,7 +18,15 @@
     }
   },
   "publish": {
-    "issues": {},
+    "issues": {
+      "verifyIssues": {
+        "previousReleaseTag": {
+          "namespace": "ocp",
+          "name": "release",
+          "tag": "4.17.0-rc.0"
+        }
+      }
+    },
     "tag": {
       "tagRef": {
         "name": "4.18"
@@ -39,7 +49,7 @@
     "agent-single-node-ipv6": {
       "optional": true,
       "prowJob": {
-        "name": "periodic-ci-openshift-release-master-nightly-4.18-e2e-agent-single-node-ipv6"
+        "name": "periodic-ci-openshift-release-master-nightly-4.18-e2e-agent-single-node-ipv6-conformance"
       }
     },
     "aws-ovn-upgrade-4.18-micro": {
@@ -420,12 +430,6 @@
         "name": "periodic-ci-openshift-release-master-nightly-4.18-e2e-metal-ipi-ovn-dualstack-techpreview"
       }
     },
-    "metal-ovn-assisted": {
-      "optional": true,
-      "prowJob": {
-        "name": "periodic-ci-openshift-release-master-nightly-4.18-e2e-metal-ovn-assisted"
-      }
-    },
     "microshift-ovn-conformance-parallel": {
       "maxRetries": 2,
       "prowJob": {
@@ -479,7 +483,7 @@
     "qe-perfscale": {
       "optional": true,
       "prowJob": {
-        "name": "periodic-ci-openshift-qe-ocp-qe-perfscale-ci-main-aws-4.18-nightly-x86-payload-control-plane-6nodes"
+        "name": "periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.18-nightly-x86-payload-control-plane-6nodes"
       }
     },
     "rosa-classic-sts-osde2e": {
@@ -556,10 +560,10 @@
       },
       "upgrade": true,
       "upgradeFromRelease": {
-          "candidate": {
-              "stream": "nightly",
-              "version": "4.17"
-          }
+        "candidate": {
+          "stream": "nightly",
+          "version": "4.17"
+        }
       }
     },
     "vsphere-ovn-upgrade-micro": {

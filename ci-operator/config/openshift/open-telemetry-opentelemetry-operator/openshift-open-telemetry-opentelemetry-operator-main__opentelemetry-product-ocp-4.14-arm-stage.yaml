@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-8-golang-1.23-openshift-4.19
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - context_dir: .
@@ -41,36 +41,32 @@ tests:
 - always_run: false
   as: opentelemetry-stage-tests
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-observability
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      JAEGER_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:870285
       OCP_ARCH: arm64
       OPERATORS: |
         [
-            {"name": "jaeger-product", "source": "jaeger-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:870302
+      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927220
       SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
         tests/e2e-instrumentation/instrumentation-nginx* tests/e2e-instrumentation/instrumentation-dotnet*
-        tests/e2e-instrumentation/instrumentation-apache* tests/e2e/smoke-ip-families
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:872941
+        tests/e2e-instrumentation/instrumentation-apache* tests/e2e-openshift/export-to-cluster-logging-lokistack
+        tests/e2e/smoke-ip-families tests/e2e-targetallocator/targetallocator-prometheuscr
+        tests/e2e-otel/awscloudwatchlogsexporter tests/e2e-otel/awsxrayexporter
+      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928292
     test:
     - ref: idp-htpasswd
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
-    - ref: distributed-tracing-install-jaeger-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

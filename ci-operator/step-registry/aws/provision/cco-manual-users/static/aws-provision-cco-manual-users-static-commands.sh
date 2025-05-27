@@ -133,7 +133,7 @@ cr_json_d=`mktemp -d`
 resources_d=`mktemp -d`
 credentials_requests_files=`mktemp`
 echo "OC Version:"
-export PATH=${CLI_DIR}:$PATH
+export PATH=${CLI_DIR:-}:$PATH
 which oc
 oc version --client
 oc adm release extract --help

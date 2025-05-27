@@ -25,16 +25,14 @@ sudo systemctl stop chronyd
 
 SKEW=${1:-90d}
 OC=${OC:-oc}
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
-  for kubeconfig in $(find ${KUBECONFIG} -type f); do
-    export KUBECONFIG=${kubeconfig}
-  done
+  export KUBECONFIG=$(find "$KUBECONFIG" -type f | head -n 1)
 fi
 
 source /usr/local/share/cert-rotation-functions.sh
@@ -43,7 +41,7 @@ source /usr/local/share/cert-rotation-functions.sh
 run-on-all-nodes "systemctl mask chronyd --now && sudo timedatectl set-time +${SKEW}"
 
 # Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
-# and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
+# and we want to make sure kubelet uses external address as main, instead of DHCP racing to use
 # a random one as primary
 run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
 
@@ -60,11 +58,9 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "shut off"; do
-    echo -n "."
     sleep 10
-  done
+  done | /usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null
 done
 
 # Set date for host
@@ -83,11 +79,9 @@ for vm in ${VMS[@]}; do
   if [[ "${vm}" == "minikube" ]]; then
     continue
   fi
-  echo -n "${vm} - "
   until virsh domstate ${vm} | grep "running"; do
-    echo -n "."
     sleep 10
-  done
+  done | /usr/local/bin/tqdm --desc "Starting ${vm} VM" --null
 done
 set -x
 
@@ -116,6 +110,7 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+  -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
 	/usr/local/bin/time-skew-test.sh \
 	${SKEW}

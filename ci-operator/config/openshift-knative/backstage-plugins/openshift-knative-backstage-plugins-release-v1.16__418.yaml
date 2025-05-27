@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+  openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.22-openshift-4.17
+    tag: rhel-8-release-golang-1.23-openshift-4.19
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -16,7 +16,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-backstage-plugins-eventmesh
@@ -25,7 +25,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-backstage-plugins-migrate
@@ -34,18 +34,23 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-backstage-plugins-test-eventshub
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   to: knative-backstage-plugins-source-image
+promotion:
+  to:
+  - additional_images:
+      backstage-plugins-src: src
+    namespace: openshift
+    tag: knative-v1.16
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.18"
 resources:
   '*':

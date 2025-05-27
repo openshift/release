@@ -224,6 +224,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: baremetalds-ipi-ovn-ipv4-fips-f999
+  cluster: build05
   cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -235,12 +236,14 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: gcp-ipi-disc-priv-oidc-fips-f999
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f999
   cron: 8 8 29 2 *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-upgrade-qe-test-disconnected
@@ -252,19 +255,23 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: gcp-ipi-proxy-private-f999
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: gcp-qe
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-oidc-rt-fips-f999
+- as: gcp-ipi-proxy-private-mini-perm-f999
   cron: 8 8 29 2 *
   steps:
     cluster_profile: gcp-qe
     env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
+- as: gcp-ipi-oidc-rt-fips-mini-perm-f999
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       RT_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test

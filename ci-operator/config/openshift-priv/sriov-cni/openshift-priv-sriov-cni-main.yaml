@@ -1,6 +1,6 @@
 base_images:
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.23-openshift-4.19:
@@ -30,19 +30,19 @@ images:
 promotion:
   to:
   - disabled: true
-    name: sriov-4.19
+    name: sriov-4.20
     namespace: origin
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -52,7 +52,7 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: security
   optional: true
@@ -61,6 +61,12 @@ tests:
       PROJECT_NAME: sriov-cni
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv

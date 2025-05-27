@@ -3,6 +3,14 @@ base_images:
     name: cerberus
     namespace: chaos
     tag: cerberus-prow
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
   prow-scripts.prow:
     name: prow-scripts
     namespace: chaos
@@ -21,6 +29,12 @@ images:
     RUN ls
   from: prow-scripts.prow
   to: prow-scripts-416-up
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   intermediate:
     candidate:
@@ -55,9 +69,11 @@ tests:
       CHURN: "false"
       CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "6"
+      ITERATION_MULTIPLIER_ENV: "10"
       MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
       PAUSED_MCP_NAME: worker infra
+      USER_TAGS: |
+        TicketId 419
       ZONES_COUNT: "3"
     observers:
       enable:
@@ -80,7 +96,7 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     - chain: openshift-upgrade-qe-sanity-cpou
-    workflow: openshift-qe-installer-aws
+    workflow: redhat-chaos-installer-aws
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main

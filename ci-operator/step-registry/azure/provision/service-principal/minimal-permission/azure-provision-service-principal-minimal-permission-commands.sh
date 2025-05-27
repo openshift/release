@@ -87,7 +87,7 @@ fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
-AZURE_AUTH_SUBSCRIPTOIN_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]] || [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
@@ -97,7 +97,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-az account set --subscription ${AZURE_AUTH_SUBSCRIPTOIN_ID}
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
@@ -121,30 +121,35 @@ for sp_type in ${sp_list}; do
     fi
 
     echo "Creating ${sp_type} sp with role ${role_name} granted..."
-    create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${sp_output}"    
-    sp_id=$(jq -r .appId "${sp_output}")
+    create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTION_ID}" "${sp_output}"    
+    sp_app_id=$(jq -r .appId "${sp_output}")
+    sp_id=$(az ad sp show --id ${sp_app_id} --query id -otsv)
     sp_password=$(jq -r .password "${sp_output}")
     sp_tenant=$(jq -r .tenant "${sp_output}")
-    if [[ "${sp_id}" == "" ]] || [[ "${sp_password}" == "" ]]; then
+    if [[ "${sp_app_id}" == "" ]] || [[ "${sp_password}" == "" ]]; then
         echo "Unable to get service principal id or password, exit..."
         exit 1
     fi
 
-    echo "New service principal id: ${sp_id}"
+    echo "New service principal app id: ${sp_app_id}, id: ${sp_id}"
     os_sp_file_name="azure_minimal_permission"
     if [[ "${sp_type}" != "cluster" ]]; then
         os_sp_file_name="azure_minimal_permission_${sp_type}"
     fi
     cat <<EOF > "${SHARED_DIR}/${os_sp_file_name}"
-{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTOIN_ID}","clientId":"${sp_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
+{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTION_ID}","clientId":"${sp_app_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
 EOF
 
     # for destroy
-    echo "${sp_id}" >> "${SHARED_DIR}/azure_sp_id"
+    echo "${sp_app_id}" >> "${SHARED_DIR}/azure_sp_id"
     rm -f ${sp_output}
 
     # ensure that role assignment creation is successful
     echo "Ensure that role ${role_name} assigned successfully"
     cmd="az role assignment list --role '${role_name}'"
     run_cmd_with_retries "${cmd}"
+
+    if [[ "${role_name}" == "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
+        az role assignment list --assignee ${sp_app_id} --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
+    fi
 done

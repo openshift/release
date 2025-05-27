@@ -88,6 +88,28 @@ function gather_bootstrap_and_fail() {
   return 1
 }
 
+function run_command_with_retries()
+{
+    local try=0 cmd="$1" retries="${2:-}" ret=0
+    [[ -z ${retries} ]] && max="20" || max=${retries}
+    echo "Trying ${max} times max to run '${cmd}'"
+
+    eval "${cmd}" || ret=$?
+    while [ X"${ret}" != X"0" ] && [ ${try} -lt ${max} ]; do
+        echo "'${cmd}' did not return success, waiting 60 sec....."
+        sleep 60
+        try=$((try + 1))
+        ret=0
+        eval "${cmd}" || ret=$?
+    done
+    if [ ${try} -eq ${max} ]; then
+        echo "Never succeed or Timeout"
+        return 1
+    fi
+    echo "Succeed"
+    return 0
+}
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -112,6 +134,9 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
   echo "Setting AZURE credential with minimal permissions to install UPI"
   AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission"
+elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+  echo "Setting AZURE credential with Contributor role only to install UPI"
+  export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
 fi
 export AZURE_AUTH_LOCATION
 
@@ -211,13 +236,10 @@ else
   az group create --name $RESOURCE_GROUP --location $AZURE_REGION
 fi
 
-echo "Creating identity"
-az identity create -g $RESOURCE_GROUP -n ${INFRA_ID}-identity
-
 ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
 
 echo "Creating storage account"
-az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
+run_command_with_retries "az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS" "5"
 ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $ACCOUNT_NAME --query "[0].value" -o tsv)
 
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos.json; then
@@ -263,10 +285,16 @@ az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -
 echo "Creating private DNS zone"
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 
-PRINCIPAL_ID=$(az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv)
-echo "Assigning 'Contributor' role to principal ID ${PRINCIPAL_ID}"
-RESOURCE_GROUP_ID=$(az group show -g $RESOURCE_GROUP --query id --out tsv)
-az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
+# The file azure-sp-contributor.json only exists under SHARED_DIR on 4.19+
+# On 4.19+, user-assigned identity is not requried.
+if [[ ! -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+    echo "Creating identity"
+    az identity create -g $RESOURCE_GROUP -n ${INFRA_ID}-identity
+    PRINCIPAL_ID=$(az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv)
+    echo "Assigning 'Contributor' role to principal ID ${PRINCIPAL_ID}"
+    RESOURCE_GROUP_ID=$(az group show -g $RESOURCE_GROUP --query id --out tsv)
+    az role assignment create --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type "ServicePrincipal" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
+fi
 
 pushd /tmp/azure
 

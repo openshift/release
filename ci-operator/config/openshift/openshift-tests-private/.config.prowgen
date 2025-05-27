@@ -6,33 +6,33 @@ slack_reporter:
   - some-old-release
   job_names: # Listing of job names (ci-operator's 'as' field) that this configuration applies to
   - aws-ipi-arm-f7-logging
-  - aws-ipi-f7-disruptive-logging
-  - aws-ipi-f14-disruptive-logging
+  - aws-ipi-f28-logging
+  - aws-ipi-amd-f999-logging
+  - aws-ipi-proxy-sts-arm-f14-logging
   - aws-ipi-f28-disruptive-logging
-  - aws-ipi-ovn-ipsec-arm-mixarch-f7-logging
   - aws-ipi-ovn-ipsec-arm-mixarch-f14-logging
-  - aws-ipi-ovn-ipsec-arm-mixarch-f28-logging
   - aws-ipi-proxy-sts-mixarch-f7-logging
-  - aws-ipi-proxy-sts-mixarch-f14-logging
   - aws-usgov-ipi-private-sts-f7-logging
+  - aws-ipi-private-shared-vpc-phz-sts-f28-logging
   - azure-ipi-arm-f28-logging
-  - azure-ipi-oidc-f28-logging
+  - azure-ipi-amd-f999-logging
+  - azure-ipi-oidc-f7-logging
+  - azure-ipi-oidc-arm-f28-logging
+  - azure-ipi-oidc-mixarch-f14-logging
   - azure-ipi-fips-f60-logging
   - azure-ipi-oidc-mixarch-f7-logging
-  - azure-ipi-oidc-mixarch-f14-logging
-  - azure-ipi-proxy-workers-rhcos-rhel8-f7-logging
-  - azure-ipi-proxy-workers-rhcos-rhel8-f14-logging
+  - azure-ipi-oidc-mixarch-f28-logging
   - azure-ipi-proxy-workers-rhcos-rhel8-f28-logging
   - azure-ipi-proxy-workers-rhcos-rhel8-f60-logging
   - gcp-ipi-fips-f7-logging
-  - gcp-ipi-ovn-ipsec-f7-logging
-  - gcp-ipi-ovn-ipsec-f14-logging
+  - gcp-ipi-fips-f999-logging
+  - gcp-ipi-ovn-ipsec-fips-f14-logging
   - gcp-ipi-proxy-oidc-amd-f7-logging
-  - gcp-ipi-sdn-fips-f7-logging
-  - gcp-ipi-sdn-fips-f14-logging
   - gcp-ipi-sdn-fips-f28-logging
   - gcp-ipi-fips-f28-logging
   - gcp-ipi-sno-arm-f14-logging
+  - baremetal-sno-agent-ipv4-fips-f999-logging
+  - baremetal-ha-agent-dualstack-fips-f999-logging
 
   job_states_to_report: #Accepts any ProwJob status
   - aborted
@@ -80,6 +80,80 @@ slack_reporter:
   - azure-mag-ipi-f28-longduration-hive
   - azure-mag-ipi-f9-longduration-hive
   - vsphere-ipi-f28-longduration-hive
+  job_states_to_report: #Accepts any ProwJob status
+  - error
+  - failure
+  - success
+  report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+                    ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+                    :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+                    logs> :volcano: {{end}}'
+
+- channel: '#forum-prow-hypershift-qe-ci'
+  excluded_variants: # It is possible to exclude notifications from specific variants, for example, when you don't require them from older releases
+  - some-old-release
+  job_names: # Listing of job names (ci-operator's 'as' field) that this configuration applies to
+  - aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f7
+  - aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f14
+  - aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f14-destructive
+  - aws-ipi-ovn-hypershift-arm-nodepool-guest-efs-f28-destructive
+  - aws-ipi-ovn-hypershift-arm-nodepool-mgmt-f7
+  - aws-ipi-ovn-hypershift-arm-nodepool-mgmt-f14
+  - aws-ipi-ovn-hypershift-guest-f7
+  - aws-ipi-ovn-hypershift-guest-f14
+  - aws-ipi-ovn-hypershift-guest-f14-destructive
+  - aws-ipi-ovn-hypershift-guest-f28-destructive
+  - aws-ipi-ovn-hypershift-guest-ext-oidc-f7
+  - aws-ipi-ovn-hypershift-guest-ext-oidc-f14
+  - aws-ipi-ovn-hypershift-mce-guest-f7
+  - aws-ipi-ovn-hypershift-mce-guest-f14
+  - aws-ipi-ovn-hypershift-mce-guest-f14-destructive
+  - aws-ipi-ovn-hypershift-mce-guest-f28-destructive
+  - aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f14
+  - aws-ipi-ovn-hypershift-mce-ibmz-mgmt-critical-f14
+  - aws-ipi-ovn-hypershift-mce-mgmt-f7
+  - aws-ipi-ovn-hypershift-mce-mgmt-f14
+  - aws-ipi-ovn-hypershift-mce-mgmt-f28-longduration
+  - aws-ipi-ovn-hypershift-mce-power-guest-critical-f7
+  - aws-ipi-ovn-hypershift-mce-power-guest-critical-f14
+  - aws-ipi-ovn-hypershift-mce-power-mgmt-critical-f7
+  - aws-ipi-ovn-hypershift-mce-power-mgmt-critical-f14
+  - aws-ipi-ovn-hypershift-mgmt-f7
+  - aws-ipi-ovn-hypershift-mgmt-f14
+  - aws-ipi-ovn-hypershift-private-guest-f7
+  - aws-ipi-ovn-hypershift-private-guest-f14
+  - aws-ipi-ovn-hypershift-private-mgmt-f7
+  - aws-ipi-ovn-hypershift-private-mgmt-f14
+  - baremetalds-agent-hypershift-mce-compact-full-inplace-f7
+  - baremetalds-agent-hypershift-mce-compact-full-inplace-f14
+  - baremetalds-hypershift-agent-mce-disconnected-guest-f7
+  - baremetalds-hypershift-agent-mce-disconnected-guest-f14
+  - baremetalds-hypershift-agent-mce-disconnected-mgmt-f7
+  - baremetalds-hypershift-agent-mce-disconnected-mgmt-f14
+  - baremetalds-hypershift-agent-mce-dualstack-guest-f7-des
+  - baremetalds-hypershift-agent-mce-dualstack-guest-f14-des
+  - baremetalds-hypershift-agent-mce-dualstack-mgmt-f7
+  - baremetalds-hypershift-agent-mce-dualstack-mgmt-f14
+  - baremetalds-agent-hypershift-mce-inplace-f7
+  - baremetalds-agent-hypershift-mce-inplace-f14
+  - baremetalds-agent-hypershift-mce-mceupgrade-inplace-f7
+  - baremetalds-agent-hypershift-mce-mceupgrade-inplace-f14
+  - baremetalds-hypershift-agent-mce-guest-f7
+  - baremetalds-hypershift-agent-mce-guest-f14
+  - baremetalds-hypershift-agent-mce-guest-f14-destructive
+  - baremetalds-hypershift-agent-mce-guest-f28-destructive
+  - baremetalds-hypershift-agent-mce-mgmt-f7
+  - baremetalds-hypershift-agent-mce-mgmt-f14
+  - baremetalds-ipi-ovn-kubevirt-hcp-mce-multinet-guest-f7
+  - baremetalds-ipi-ovn-kubevirt-hcp-mce-multinet-guest-f14
+  - baremetalds-ipi-ovn-kubevirt-hcp-mce-multinet-mgmt-f7
+  - baremetalds-ipi-ovn-kubevirt-hcp-mce-multinet-mgmt-f14
+  - baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f7
+  - baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f14
+  - baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f7-des
+  - baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f14-des
+  - baremetalds-ipi-ovn-kubevirt-hypershift-mce-mgmt-f7
+  - baremetalds-ipi-ovn-kubevirt-hypershift-mce-mgmt-f14
   job_states_to_report: #Accepts any ProwJob status
   - error
   - failure
@@ -168,8 +242,11 @@ slack_reporter:
   - aws-rosa-hcp-byo-kms-oidc-auditlog-stage-full-f14
   - aws-rosa-hcp-byo-kms-oidc-auditlog-stage-full-f28
   - aws-rosa-hcp-capi-private-stage-f7
+  - aws-rosa-hcp-capi-private-stage-f14
   - aws-rosa-hcp-capi-stage-f7
+  - aws-rosa-hcp-capi-stage-f14
   - aws-rosa-hcp-cilium-stage-full-f7
+  - aws-rosa-hcp-cilium-stage-full-f14
   - aws-rosa-hcp-int-full-f14
   - aws-rosa-hcp-int-full-f28
   - aws-rosa-hcp-private-proxy-int-full-f14
@@ -180,11 +257,14 @@ slack_reporter:
   - aws-rosa-hcp-private-proxy-stage-full-f28
   - aws-rosa-hcp-sector-advanced-prod-stable-critical-f28
   - aws-rosa-hcp-sector-byo-kms-oidc-auditlog-prod-critical-f7
+  - aws-rosa-hcp-sector-byo-kms-oidc-auditlog-prod-critical-f14
   - aws-rosa-hcp-sector-byo-kms-oidc-auditlog-prod-critical-f28
   - aws-rosa-hcp-sector-private-proxy-prod-critical-f7
+  - aws-rosa-hcp-sector-private-proxy-prod-critical-f14
   - aws-rosa-hcp-sector-private-proxy-prod-critical-f28
   - aws-rosa-hcp-sector-private-proxy-prod-stable-critical-f28
   - aws-rosa-hcp-sector-prod-critical-f7
+  - aws-rosa-hcp-sector-prod-critical-f14
   - aws-rosa-hcp-sector-prod-critical-f28
   - aws-rosa-hcp-sector-prod-stable-critical-f28
   - aws-rosa-hcp-stage-critical-f14

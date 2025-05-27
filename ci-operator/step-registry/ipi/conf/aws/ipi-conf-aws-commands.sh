@@ -6,6 +6,13 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AWS_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AWS_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
@@ -213,13 +220,14 @@ echo "Using controlPlane node replicas: ${master_replicas}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AWS_BASE_DOMAIN}
 platform:
   aws:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
       clusterName: ${NAMESPACE}-${UNIQUE_HASH}
+      ci-nat-replace: "${CI_NAT_REPLACE:-false}"
 controlPlane:
   architecture: ${CONTROL_ARCH}
   name: master
@@ -288,13 +296,6 @@ rm /tmp/pull-secret
 
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
-if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
-  # TODO: move repo to a more appropriate location
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
-  echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
-fi
-
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
   if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then

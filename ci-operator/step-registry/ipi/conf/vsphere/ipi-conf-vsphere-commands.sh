@@ -112,6 +112,13 @@ VERSION=$(oc adm release info ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.m
 
 set -o errexit
 
+# Ensure at least 3 control planes for vSphere. Single node is not supported.
+CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS:-3}
+if [ "${CONTROL_PLANE_REPLICAS}" -lt 3 ]; then
+  echo "CONTROL_PLANE_REPLICAS must be at least 3 for vSphere"
+  exit 1
+fi
+
 Z_VERSION=1000
 
 if [ ! -z ${VERSION} ]; then

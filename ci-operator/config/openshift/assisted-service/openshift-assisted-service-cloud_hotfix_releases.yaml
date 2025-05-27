@@ -1,56 +1,28 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: "4.18"
-    namespace: ocp
-    tag: tests
-  tests-4.12:
-    name: "4.12"
-    namespace: ocp
-    tag: tests
-  tests-4.13:
-    name: "4.13"
-    namespace: ocp
-    tag: tests
-  tests-4.14:
-    name: "4.14"
-    namespace: ocp
-    tag: tests
-  tests-4.15:
-    name: "4.15"
-    namespace: ocp
-    tag: tests
-  tests-4.16:
-    name: "4.16"
-    namespace: ocp
-    tag: tests
-  tests-4.17:
-    name: "4.17"
-    namespace: ocp
-    tag: tests
 build_root:
   from_repository: true
 images:
@@ -75,7 +47,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -107,9 +79,9 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: verify-generated-code
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
@@ -120,7 +92,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.17"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
@@ -145,135 +117,53 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- always_run: true
-  as: e2e-metal-assisted-single-node-4-18
+- as: e2e-metal-assisted-single-node-4-19
+  cluster: build05
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         NUM_MASTERS=1
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-day2-4-18
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-day2-4-19
+  cluster: build05
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
 - always_run: true
-  as: e2e-metal-assisted-4-12
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.12
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.12
-    workflow: assisted-baremetal
-- always_run: false
-  as: e2e-metal-assisted-4-13
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.13
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.13
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-4-14
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.14
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.14
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-4-15
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.15
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.15
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-4-16
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.16
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.16
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-4-17
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.17
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-4-18
+  as: e2e-metal-assisted-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-static-ip-suite-4-18
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-static-ip-suite-4-19
+  cluster: build05
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         STATIC_IPS=true
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-cnv-4-17
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.17
-        MASTER_MEMORY=18700
-        MASTER_CPU=9
-        WORKER_MEMORY=9216
-        MASTER_DISK_COUNT=2
-        WORKER_DISK_COUNT=2
-        WORKER_CPU=5
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-ipv4v6-4-18
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ipv4v6-4-19
+  cluster: build05
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -281,11 +171,12 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         IPv6=yes
         IPv4=yes
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
 - always_run: true
-  as: e2e-metal-assisted-lvm-4-18
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  as: e2e-metal-assisted-lvm-4-19
+  cluster: build05
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -297,22 +188,115 @@ tests:
         NUM_WORKERS=0
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
-- always_run: true
-  as: e2e-metal-assisted-odf-4-17
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-osc-4-19
+  cluster: build05
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
-        OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.17
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
+        OLM_OPERATORS=osc
+        NUM_MASTERS=3
+        NUM_WORKERS=2
+        MASTER_MEMORY=18432
+        MASTER_CPU=5
+        WORKER_MEMORY=10240
+        WORKER_CPU=3
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-vsphere-assisted-4-19
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.19
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-nutanix-assisted-4-19
+  cluster: build01
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.19
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-metal-assisted-none-4-19
+  cluster: build05
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        PLATFORM=none
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-external-4-19
+  cluster: build05
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        PLATFORM=external
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-virtualization-4-18
+  cluster: build05
+  run_if_changed: ^(internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/nodemaintenance/.*|internal/operators/kubedescheduler/.*|internal/operators/cnv|internal/operators/mtv/.*|internal/operators/nmstate/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
+        OPENSHIFT_VERSION=4.18
+        MASTER_MEMORY=18700
+        MASTER_CPU=10
+        MASTER_DISK_COUNT=2
+        WORKER_CPU=20
+        WORKER_MEMORY=16384
+        WORKER_DISK_COUNT=2
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ai-nvidia-4-18
+  cluster: build05
+  run_if_changed: ^(internal/operators/authorino/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/nvidiagpu/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
+        OPENSHIFT_VERSION=4.18
+        NVIDIA_REQUIRE_GPU=false
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ai-amd-4-18
+  cluster: build05
+  run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh
+        OPENSHIFT_VERSION=4.18
+        AMD_REQUIRE_GPU=false
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: cloud_hotfix_releases
   org: openshift

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build11
+    cluster: build01
     context: ci/prow/413-images
     decorate: true
     decoration_config:
@@ -371,7 +371,7 @@ presubmits:
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build11
+    cluster: build01
     context: ci/prow/416-images
     decorate: true
     decoration_config:
@@ -382,7 +382,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-release-v1.14-416-images
     rerun_command: /test 416-images
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
@@ -430,25 +429,26 @@ presubmits:
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build11
+    cluster: build01
     context: ci/prow/416-test-conformance
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "416"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-release-v1.14-416-test-conformance
     rerun_command: /test 416-test-conformance
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-conformance
@@ -462,14 +462,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -482,12 +482,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -503,25 +506,26 @@ presubmits:
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build11
+    cluster: build01
     context: ci/prow/416-test-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "416"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-release-v1.14-416-test-e2e
     rerun_command: /test 416-test-e2e
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-e2e
@@ -535,14 +539,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -555,12 +559,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -576,25 +583,26 @@ presubmits:
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build11
+    cluster: build01
     context: ci/prow/416-test-encryption-auth-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "416"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-release-v1.14-416-test-encryption-auth-e2e
     rerun_command: /test 416-test-encryption-auth-e2e
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-encryption-auth-e2e
@@ -608,14 +616,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -628,12 +636,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -649,25 +660,26 @@ presubmits:
     branches:
     - ^release-v1\.14$
     - ^release-v1\.14-
-    cluster: build11
+    cluster: build01
     context: ci/prow/416-test-reconciler
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "416"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-release-v1.14-416-test-reconciler
     rerun_command: /test 416-test-reconciler
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-reconciler
@@ -681,14 +693,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -701,12 +713,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

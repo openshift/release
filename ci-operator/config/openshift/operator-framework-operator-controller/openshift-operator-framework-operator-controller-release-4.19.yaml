@@ -2,7 +2,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.19"
     namespace: ocp
@@ -43,8 +43,7 @@ images:
   to: e2e-test-registry
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - e2e-test-registry
     name: "4.19"
     namespace: ocp
@@ -86,28 +85,45 @@ tests:
   commands: commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
+- as: check-sync-pr-valid
+  commands: |
+    cd /tmp
+    curl -sSLfo jq --retry 5 --retry-delay 60 https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64
+    chmod a+x jq
+    pull_labels=$(curl -sSLf --retry 5 --retry-delay 60 "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}")
+    if [ $( echo "$pull_labels" | ./jq -e '.labels[] | select(.name=="kind/sync") | .name' | wc -l ) -gt 0 ]; then
+      remote_base_latest_commit=$(git ls-remote --exit-code -q --refs git@github.com:${REPO_OWNER}/${REPO_NAME}.git refs/heads/${PULL_BASE_REF} | cut -f1)
+      if [ -n "${remote_base_latest_commit}" ] && [ ! $(git merge-base --is-ancestor "${remote_base_latest_commit}" HEAD) ]; then
+        echo "missing commit ${remote_base_latest_commit} from branch ${PULL_HEAD_REF}: branch needs rebase on base branch ${PULL_BASE_REF}";
+        exit 1;
+      fi
+    fi
+  container:
+    from: src
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: aws
-    post:
-    - as: check-sync-pr-valid
-      commands: |
-        cd /tmp
-        curl -sSLfo jq --retry 5 --retry-delay 60 https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64
-        chmod a+x jq
-        pull_labels=$(curl -sSLf --retry 5 --retry-delay 60 "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}")
-        if [ $( echo "$pull_labels" | ./jq -e '.labels[] | select(.name=="kind/sync") | .name' | wc -l ) -gt 0 ]; then
-          remote_base_latest_commit=$(git ls-remote --exit-code -q --refs git@github.com:${REPO_OWNER}/${REPO_NAME}.git refs/heads/${PULL_BASE_REF} | cut -f1)
-          if [ -n "${remote_base_latest_commit}" ] && [ ! $(git merge-base --is-ancestor "${remote_base_latest_commit}" HEAD) ]; then
-            echo "missing commit ${remote_base_latest_commit} from branch ${PULL_HEAD_REF}: branch needs rebase on base branch ${PULL_BASE_REF}";
-            exit 1;
-          fi
-        fi
+    test:
+    - as: upstream-e2e
+      cli: latest
+      commands: make -C openshift test-e2e
+      dependencies:
+      - env: E2E_REGISTRY_IMAGE
+        name: e2e-test-registry
       from: src
       resources:
         requests:
           cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- as: openshift-e2e-aws-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: upstream-e2e
       cli: latest

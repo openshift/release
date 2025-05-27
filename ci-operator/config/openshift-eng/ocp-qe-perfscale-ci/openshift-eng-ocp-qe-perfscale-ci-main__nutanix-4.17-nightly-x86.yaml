@@ -1,0 +1,95 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: control-plane-24nodes
+  capabilities:
+  - sshd-bastion
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe-zone
+    env:
+      COMPUTE_REPLICAS: "24"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-control-plane
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+- always_run: false
+  as: data-path-9nodes
+  capabilities:
+  - sshd-bastion
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe-zone
+    env:
+      COMPUTE_CPU: "8"
+      COMPUTE_MEMORY: "32000"
+      COMPUTE_REPLICAS: "9"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-data-path-tests
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+  timeout: 6h0m0s
+- always_run: false
+  as: node-density-heavy-24nodes
+  capabilities:
+  - sshd-bastion
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe-zone
+    env:
+      COMPUTE_REPLICAS: "24"
+      ITERATIONS_PER_NAMESPACE: "400"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-node-density-heavy
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+  timeout: 6h0m0s
+- always_run: false
+  as: cluster-density-v2-24nodes
+  capabilities:
+  - sshd-bastion
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe-zone
+    env:
+      COMPUTE_REPLICAS: "24"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-cluster-density-v2
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: nutanix-4.17-nightly-x86

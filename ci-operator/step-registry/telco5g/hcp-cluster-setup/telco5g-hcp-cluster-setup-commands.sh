@@ -56,7 +56,8 @@ fi
 if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
     INTERNAL=true
     INTERNAL_ONLY=true
-    CL_SEARCH="computeqe"
+# Using internalbos temporarily 
+    CL_SEARCH="internalbos"
     HOSTS_NUMBER=" --number 2"
 fi
 
@@ -75,7 +76,7 @@ ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno ${HOSTS_NUMBER-}"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
-- name: Grab and run kcli to install openshift cluster
+- name: Find a cluster to run job
   hosts: bastion
   gather_facts: false
   tasks:
@@ -178,6 +179,25 @@ cat << EOF > $SHARED_DIR/delete-sno.yml
 
 EOF
 
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
+---
+- name: Delete cluster if exists
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Remove last run for ${CLUSTER_NAME}_ci
+    shell: kcli delete plan --yes ${CLUSTER_NAME}_ci
+    ignore_errors: yes
+
+  - name: Remove last run for ${ADD_BM_HOST}_ci
+    shell: kcli delete plan --yes ${ADD_BM_HOST}_ci
+    ignore_errors: yes
+
+EOF
+
+
+
 cat << EOF > ~/fetch-information.yml
 ---
 - name: Fetch information about HCP cluster
@@ -223,6 +243,10 @@ echo "Run the playbook to remove SNO management cluster"
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     $SHARED_DIR/delete-sno.yml
 
+echo "Run the playbook to remove possible kcli clusters"
+ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+    $SHARED_DIR/destroy-cluster.yml
+
 # shellcheck disable=SC1083
 SNO_IP=$(ansible-playbook -vv ~/freeip.yml 2>/dev/null | grep '"free_ip": ' | tail -1  | awk {'print $2'} | tr -d '"')
 
@@ -234,9 +258,9 @@ else
     SNO_CLUSTER_API_PORT="6443"
 fi
 
-if [[ "$T5CI_VERSION" == "4.18" ]] || [[ "$T5CI_VERSION" == "4.19" ]]; then
-    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
-    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.17"
+if [[ "$T5CI_VERSION" == "4.19" ]] || [[ "$T5CI_VERSION" == "4.20" ]]; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
 fi
 
 cat << EOF > ~/fetch-kubeconfig.yml

@@ -97,11 +97,14 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
+- as: e2e-aws-ovn-edge-zones
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-local-gateway
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
@@ -244,7 +247,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-ibmcloud-ipi-ovn-periodic
-  cron: 0 0 * * *
+  cron: 1 3 13,15 * *
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-ovn
@@ -257,7 +260,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
+  cron: 52 13 10,15 * *
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -271,7 +274,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
+  cron: 6 11 14,15 * *
   steps:
     cluster_profile: aws
     env:
@@ -294,6 +297,53 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e
   timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: baremetalds-e2e-ovn-bgp-pre
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="extranet"
+        EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
+        EXTRANET_NETWORK_SUBNET_V6='fd2e:6f44:5dd8:ca56::/120'
+      NMSTATE_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local\|CPU Partitioning
+        cluster platform workloads should be annotated correctly for Deployments
+    pre:
+    - ref: baremetalds-devscripts-conf-extranetwork
+    - chain: baremetalds-ofcir-pre
+    - ref: ovn-shared-to-local-gateway-mode-migration
+    - ref: enable-qe-catalogsource
+    - ref: operatorhub-subscribe-nmstate-operator
+    - ref: baremetalds-e2e-ovn-bgp-pre
+    workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-hypershift
   steps:
     cluster_profile: hypershift
@@ -328,7 +378,7 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 6h0m0s
-- as: e2e-aws-ovn-kubevirt
+- as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
     cluster_profile: aws
@@ -440,14 +490,13 @@ tests:
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
       EXTRA_MG_ARGS: --host-network
-      FEATURE: NetworkSegmentation
       ITERATION_MULTIPLIER_ENV: "3"
+      VERSION: "4.18"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    - chain: openshift-qe-installer-featuregate
     workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
 - always_run: false
@@ -461,7 +510,6 @@ tests:
       COMPUTE_NODE_TYPE: m5.xlarge
       ENABLE_LAYER_3: "false"
       EXTRA_MG_ARGS: --host-network
-      FEATURE: NetworkSegmentation
       ITERATION_MULTIPLIER_ENV: "3"
       KUBE_BURNER_VERSION: 1.5.0
     post:
@@ -469,7 +517,6 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    - chain: openshift-qe-installer-featuregate
     workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
 - as: e2e-aws-ovn-techpreview
@@ -585,16 +632,14 @@ tests:
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-virt-techpreview
+  as: e2e-aws-ovn-virt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
-      CNV_PRERELEASE_LATEST_CHANNEL: "true"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
       EXTRA_MG_ARGS: --host-network
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-ovn-virt
 - always_run: false
   as: perfscale-aws-ovn-small-cluster-density-v2

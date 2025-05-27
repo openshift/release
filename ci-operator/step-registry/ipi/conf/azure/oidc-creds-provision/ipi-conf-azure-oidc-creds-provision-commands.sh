@@ -138,8 +138,7 @@ ccoctl azure create-all \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
   --output-dir="/tmp" \
-  ${ADDITIONAL_CCOCTL_ARGS} &> "${ccoctl_ouptut}"
-cat "${ccoctl_ouptut}"
+  ${ADDITIONAL_CCOCTL_ARGS} 2>&1 | tee "${ccoctl_ouptut}"
 
 # get oidc_provider_issuer_url from `oc get Authentication cluster -o json`, so not have to enable the follwoing lines yet 
 # save oidc_provider info for upgrade

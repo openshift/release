@@ -87,12 +87,22 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-if [[ "$ONLY_IN_DIRS" == "true" || "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
-    TAG_NAME="next"
+if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
         TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+    else
+        TAG_NAME="next"
+    fi
+elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
+    if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
+        QUAY_REPO="rhdh/rhdh-hub-rhel9"
+        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
+        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+    else
+        QUAY_REPO="rhdh-community/rhdh"
+        TAG_NAME="next"
     fi
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"

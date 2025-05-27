@@ -12,7 +12,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.8-e2e-aws
@@ -1046,7 +1046,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-virtualmedia,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
@@ -1195,7 +1195,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
@@ -1269,7 +1269,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-operator,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
@@ -1747,31 +1747,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.8$
-    - ^release-4\.8-
-    cluster: build05
-    context: ci/prow/yaml-lint
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-machine-api-operator-release-4.8-yaml-lint
-    rerun_command: /test yaml-lint
-    spec:
-      containers:
-      - args:
-        - ./hack/yaml-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/yamllint
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test( | .* )yaml-lint,?($|\s.*)

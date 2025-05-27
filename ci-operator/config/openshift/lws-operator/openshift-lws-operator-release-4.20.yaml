@@ -1,4 +1,8 @@
 base_images:
+  kubernetes-sigs-lws:
+    name: "4.20"
+    namespace: ocp
+    tag: kubernetes-sigs-lws
   ocp_4.19_base-rhel9:
     name: "4.20"
     namespace: ocp
@@ -21,7 +25,8 @@ images:
   to: lws-operator
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 resources:
   '*':
@@ -60,6 +65,42 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- as: e2e-aws-operator
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: RELATED_IMAGE_OPERAND_IMAGE
+        name: pipeline:kubernetes-sigs-lws
+      - env: OPERATOR_IMAGE
+        name: lws-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-operand
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-operand
+      dependencies:
+      - env: RELATED_IMAGE_OPERAND_IMAGE
+        name: pipeline:kubernetes-sigs-lws
+      - env: OPERATOR_IMAGE
+        name: lws-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

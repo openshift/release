@@ -23,6 +23,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: hypershift-operator
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "4.18"
     namespace: ocp
@@ -70,7 +74,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-ocl-fips-f60
-  cron: 4 9 5 1,3,5,7,9,11 *
+  cron: 17 6 8 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -94,34 +98,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-disc-priv-sts-basecap-none-f60
-  cron: 32 16 4 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-mini-perm-f60
-  cron: 58 3 12 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
-    env:
-      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-fips-f60
   cron: 33 17 29 1,3,5,7,9,11 *
   steps:
@@ -352,15 +328,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
-- as: azure-aks-hypershift-byo-vnet-replace-guest-f28
-  cron: 25 17 2 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-    test:
-    - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
 - as: azure-ipi-confidentialvm-vmgueststateonly-f60
   cron: 45 23 30 2,4,6,8,10,12 *
   steps:
@@ -482,18 +449,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
-- as: baremetal-ipi-ovn-lvms-f60
-  cluster: build05
-  cron: 56 13 7 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: baremetalds-kubevirt-hypershift-mce-replace-f60
+  cluster: build05
   cron: 52 18 24 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -506,7 +463,8 @@ tests:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetal-compact-agent-ipv4-static-connected-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 30 13 7 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -522,7 +480,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-ha-agent-platform-none-ipv4-static-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 5 21 25 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -539,8 +498,9 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
-- as: baremetalds-ipi-ovn-ipv6-fips-f60
-  cron: 16 12 24 1,3,5,7,9,11 *
+- as: baremetalds-ipi-ovn-ipv6-fips-f999
+  cluster: build05
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -559,13 +519,14 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+  cluster: build05
   cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -579,6 +540,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-fips-f60
+  cluster: build05
   cron: 0 17 3 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -591,7 +553,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetal-sno-agent-ipv4-static-connected-fips-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 22 19 24 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -609,7 +572,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-upi-ovn-ipv4-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 49 19 23 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -651,19 +615,21 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
-- as: gcp-ipi-disc-priv-oidc-fips-f60
-  cron: 15 5 4 2,4,6,8,10,12 *
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f60
+  cron: 53 3 5 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-mini-perm-marketplace-f60
-  cron: 49 16 27 1,3,5,7,9,11 *
+- as: gcp-ipi-marketplace-mini-perm-f60
+  cron: 34 10 2 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -671,20 +637,29 @@ tests:
       COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
       CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission-without-actas-workers-marketplace
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-mini-perm-custom-type-f60
   cron: 49 2 16 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: custom-4-16384
+      CONTROL_PLANE_NODE_TYPE: custom-4-16384
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission
-- as: gcp-ipi-secureboot-confidential-computing-f60
-  cron: 11 23 14 2,4,6,8,10,12 *
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-confidential-secureboot-fips-mini-perm-f60
+  cron: 14 9 18 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
@@ -917,6 +892,17 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
+- as: vsphere-ipi-vsphere7-f60
+  cron: 2 19 11 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      HOSTS: "2"
+      NETWORK_TYPE: nested-multi-tenant
+      VCENTER_VERSION: "7"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-nested
 - as: vsphere-ipi-zones-template-f60
   cron: 1 20 19 2,4,6,8,10,12 *
   steps:

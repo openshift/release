@@ -188,7 +188,7 @@ fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
 echo "OC Version:"
-export PATH=${CLI_DIR}:$PATH
+export PATH=${CLI_DIR:-}:$PATH
 which oc
 oc version --client
 oc adm release extract --help
@@ -285,7 +285,11 @@ EOF
 
 ca_file=`mktemp`
 cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" > ${ca_file}
-cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt" >> ${ca_file}
+else
+    cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+fi
 cat <<EOF > ${SHARED_DIR}/manifest_cap-token-certs-secret.yaml
 apiVersion: v1
 kind: Secret

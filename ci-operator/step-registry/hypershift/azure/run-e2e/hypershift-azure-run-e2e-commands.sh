@@ -79,7 +79,7 @@ if [[ "${AUTH_THROUGH_CERTS}" == "true" ]]; then
 fi
 
 hack/ci-test-e2e.sh -test.v \
-  -test.run='^TestCreateCluster.*|^TestNodePool$|^TestAzureScheduler.*' \
+  -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
   --e2e.platform=Azure \
   --e2e.azure-credentials-file=/etc/hypershift-ci-jobs-azurecreds/credentials.json \

@@ -51,9 +51,23 @@ stringData:
 EOF
 echo "machine API credentials created"
 
-version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
-resource_timeout_seconds=300
+cat <<EOF | oc create -f -
+apiVersion: v1
+kind: Secret
+metadata:
+   name: nutanix-credentials
+   namespace: openshift-cloud-controller-manager
+type: Opaque
+stringData:
+  credentials: |
+    [{"type":"basic_auth","data":{"prismCentral":{"username":"${NUTANIX_USERNAME}","password":"${NUTANIX_PASSWORD}"},"prismElements":null}}]
+EOF
+echo "Cluster Cloud Controller Manager operator credentials created"
 
+version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+resource_timeout_seconds=600
+
+echo "${version}"
 # Do the following if OCP version is >=4.13
 # Cloud Provider Config is needed for CCM, which was introduced with 4.13 for Nutanix
 if [[ $(echo -e "4.13
@@ -91,24 +105,28 @@ cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  generateName: openshift-cluster-csi-drivers-
+  name: openshift-cluster-csi-drivers-r8czl
   namespace: openshift-cluster-csi-drivers
 spec:
   targetNamespaces:
-  - openshift-cluster-csi-drivers
-  upgradeStrategy: Default
+    - openshift-cluster-csi-drivers
 EOF
 
-if [[ -z "$(oc get packagemanifests | grep nutanix)" ]]; then
-  echo "Can't find CSI operator version that meet the OCP version"
-  cat <<EOF | oc apply -f -
+#catalog="Certified Operators"
+#if [[ -z "$(oc get packagemanifests | grep nutanix)" ]]; then
+
+# Always use beta channel in CI - there might be an issue in the Nutanix Certified Operator
+echo "Can't find CSI operator version that meet the OCP version"
+catalog="Nutanix Beta"
+
+cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
   name: nutanix-csi-operator-beta
   namespace: openshift-marketplace
 spec:
-  displayName: Nutanix Beta
+  displayName: ${catalog}
   publisher: Nutanix-dev
   sourceType: grpc
   image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
@@ -117,47 +135,80 @@ spec:
       interval: 5m
 EOF
 
-  start_time=$(date +%s)
-  while true; do
-    current_time=$(date +%s)
-    elapsed_time=$((current_time - start_time))
+start_time=$(date +%s)
+while true; do
+  current_time=$(date +%s)
+  elapsed_time=$((current_time - start_time))
 
-    if [[ $(oc get catalogsource nutanix-csi-operator-beta -n openshift-marketplace -o 'jsonpath={..status.connectionState.lastObservedState}') == "READY" ]]; then
-      echo "CatalogSource is now READY."
-      if oc get packagemanifests nutanixcsioperator &> /dev/null; then
-        echo "Package Manifests nutanixcsioperator is now READY."
-        break
-      fi
-      echo "Waiting for nutanixcsioperator package manifests to become READY ..."
+  if [[ $(oc get catalogsource nutanix-csi-operator-beta -n openshift-marketplace -o 'jsonpath={..status.connectionState.lastObservedState}') == "READY" ]]; then
+    echo "CatalogSource is now READY."
+    if oc get packagemanifests nutanixcsioperator &> /dev/null; then
+      echo "Package Manifests nutanixcsioperator is now READY."
+      break
     fi
+    echo "Waiting for nutanixcsioperator package manifests to become READY ..."
+  fi
 
-    if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
-      echo "Timeout: Nutanix CSI CatalogSource did not become READY within ${resource_timeout_seconds} seconds."
-      exit 1
-    fi
+  if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
+    echo "Timeout: Nutanix CSI CatalogSource did not become READY within ${resource_timeout_seconds} seconds."
+    exit 1
+  fi
 
-    echo "Waiting for CatalogSource to be READY..."
-    sleep 5s
-  done
-fi
+  echo "Waiting for CatalogSource to be READY..."
+  sleep 5s
+done
+#fi
 
 
-starting_csv=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.channels[*].currentCSV\})
-source=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSource\})
-source_namespace=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSourceNamespace\})
+# Get the package manifest for the Nutanix CSI Operator from the specific catalog
+start_time=$(date +%s)
+while true; do
+  current_time=$(date +%s)
+  elapsed_time=$((current_time - start_time))
+
+  packagemanifests_nutanix=$(oc get packagemanifests -o json | jq -r --arg catalog "$catalog" '.items[] | select(.metadata.name=="nutanixcsioperator" and .status.catalogSourceDisplayName==$catalog)')
+  starting_csv=$(echo "$packagemanifests_nutanix" | jq -r '.status.channels[].currentCSV')
+  source=$(echo "$packagemanifests_nutanix" | jq -r '.status.catalogSource')
+  source_namespace=$(echo "$packagemanifests_nutanix" | jq -r '.status.catalogSourceNamespace')
+  default_channel=$(echo "$packagemanifests_nutanix" | jq -r '.status.defaultChannel')
+
+  # Check if all variables have values (not null or empty)
+  if [[ -n "$source" && -n "$source_namespace" && -n "$default_channel" ]]; then
+    echo "Source: $source"
+    echo "Source Namespace: $source_namespace"
+    echo "Default Channel: $default_channel"
+    echo "Starting CSV: $starting_csv"
+    break
+  fi
+
+
+  if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
+    echo "Source: $source"
+    echo "Source Namespace: $source_namespace"
+    echo "Default Channel: $default_channel"
+    echo "Starting CSV: $starting_csv"
+    echo "Timeout reached (${resource_timeout_seconds}s) while waiting for required values."
+    exit 1
+  fi
+  echo "Waiting for source, source_namespace, and default_channel to be populated..."
+  sleep 5
+done
+
 
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
+  labels:
+    operators.coreos.com/nutanixcsioperator.openshift-cluster-csi-drivers: ""
   name: nutanixcsioperator
   namespace: openshift-cluster-csi-drivers
 spec:
-  installPlanApproval: Automatic
+  channel: ${default_channel}
   name: nutanixcsioperator
+  installPlanApproval: Automatic
   source: ${source}
   sourceNamespace: ${source_namespace}
-  startingCSV: ${starting_csv}
 EOF
 
 start_time=$(date +%s)
@@ -186,7 +237,13 @@ kind: NutanixCsiStorage
 metadata:
   name: nutanixcsistorage
   namespace: openshift-cluster-csi-drivers
-spec: {}
+spec:
+  namespace: openshift-cluster-csi-drivers
+  tolerations:
+    - key: "node-role.kubernetes.io/infra"
+      operator: "Exists"
+      value: ""
+      effect: "NoSchedule"
 EOF
 
 cat <<EOF | oc create -f -
@@ -200,43 +257,37 @@ stringData:
   key: ${PE_HOST}:${PE_PORT}:${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}
 EOF
 
-NUTANIX_STORAGE_CONTAINER=SelfServiceContainer
 
+NUTANIX_STORAGE_CONTAINER=SelfServiceContainer
 cat <<EOF | oc create -f -
-kind: StorageClass
 apiVersion: storage.k8s.io/v1
+kind: StorageClass
 metadata:
   name: nutanix-volume
   annotations:
-    storageclass.kubernetes.io/is-default-class: 'true'
+    storageclass.kubernetes.io/is-default-class: "true"
 provisioner: csi.nutanix.com
 parameters:
-  csi.storage.k8s.io/fstype: ext4
-  csi.storage.k8s.io/provisioner-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/provisioner-secret-name: ntnx-secret
-  storageContainer: ${NUTANIX_STORAGE_CONTAINER}
-  csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
-  csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
-  storageType: NutanixVolumes
+  csi.storage.k8s.io/provisioner-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/node-publish-secret-name: ntnx-secret
+  csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
+  csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
   csi.storage.k8s.io/controller-expand-secret-namespace: openshift-cluster-csi-drivers
-reclaimPolicy: Delete
+  csi.storage.k8s.io/fstype: ext4
+  storageContainer: ${NUTANIX_STORAGE_CONTAINER}
+  storageType: NutanixVolumes
 allowVolumeExpansion: true
-volumeBindingMode: Immediate
+reclaimPolicy: Delete
 EOF
 
 nutanix_pvc_name="nutanix-volume-pvc"
 cat <<EOF | oc create -f -
-kind: PersistentVolumeClaim
 apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
   name: "${nutanix_pvc_name}"
   namespace: openshift-cluster-csi-drivers
-  annotations:
-    volume.beta.kubernetes.io/storage-provisioner: csi.nutanix.com
-    volume.kubernetes.io/storage-provisioner: csi.nutanix.com
-  finalizers:
-    - kubernetes.io/pvc-protection
 spec:
   accessModes:
     - ReadWriteOnce
@@ -244,7 +295,6 @@ spec:
     requests:
       storage: 1Gi
   storageClassName: nutanix-volume
-  volumeMode: Filesystem
 EOF
 
 start_time=$(date +%s)

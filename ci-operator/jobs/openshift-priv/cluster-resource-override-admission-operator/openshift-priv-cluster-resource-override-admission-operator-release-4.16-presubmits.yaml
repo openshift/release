@@ -1,11 +1,74 @@
 presubmits:
   openshift-priv/cluster-resource-override-admission-operator:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build11
+    context: ci/prow/ci-bundle-cluster-resource-override-admission-operator-bundle
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-resource-override-admission-operator-release-4.16-ci-bundle-cluster-resource-override-admission-operator-bundle
+    path_alias: github.com/openshift/cluster-resource-override-admission-operator
+    rerun_command: /test ci-bundle-cluster-resource-override-admission-operator-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cluster-resource-override-admission-operator-bundle
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-bundle-cluster-resource-override-admission-operator-bundle,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build07
+    cluster: build01
     context: ci/prow/e2e-aws-olm
     decorate: true
     decoration_config:
@@ -15,7 +78,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-resource-override-admission-operator-release-4.16-e2e-aws-olm
@@ -88,7 +151,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build07
+    cluster: build01
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
@@ -98,7 +161,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-resource-override-admission-operator-release-4.16-e2e-aws-operator
@@ -193,6 +256,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=cluster-resource-override-admission-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest

@@ -13,7 +13,6 @@ echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and al
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare cloud_where_run
-declare vsphere_portgroup
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 # shellcheck source=/dev/null
@@ -171,6 +170,7 @@ function collect_diagnostic_data {
   VCENTER_COUNT=$(jq '.vcenters | length' "$SHARED_DIR"/platform.json)
   v_idx=0
 
+  
   while [[ $v_idx -lt $VCENTER_COUNT ]]; do
     VCENTER=$(jq -c -r '.vcenters['${v_idx}']' "$SHARED_DIR"/platform.json)
     GOVC_URL=$(echo $VCENTER | jq -r '.server')
@@ -182,58 +182,85 @@ function collect_diagnostic_data {
     echo "Processing vcenter $GOVC_URL"
 
     IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
-    IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${vsphere_portgroup})"
-    for network in "${networks[@]}"; do
+    IFS=$'\n' read -d '' -r -a PORTGROUPS <<< "$(jq -r -c --arg vcenter "${GOVC_URL}" '[.failureDomains[] | select(.server == $vcenter) | .topology.networks[]] | unique | .[]' < "$SHARED_DIR"/platform.json)"
+        
+    if [ -z ${PORTGROUPS:-} ]; then
+      echo "${GOVC_URL}; port groups in failure domain: ${#PORTGROUPS[@]}"
+      v_idx=$((v_idx+1));
+      continue
+    fi
 
-        IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"
-        if [ -z ${vms:-} ]; then
-          govc find . -type m -runtime.powerState poweredOn -network $network
-          echo "No VMs found"
-          continue
-        fi
-        for vm in "${vms[@]}"; do
-            datacenter=$(echo "$vm" | cut -d'/' -f 2)
-            vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
+    echo "${GOVC_URL}; port groups in failure domain: ${#PORTGROUPS[@]}"
 
-            if [ ! -z "${vm_host}" ]; then
-                hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
-                if [ ! -f "${vcenter_state}/${hostname}.metrics.txt" ]; then
-                    full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${vm_host}; done)
-                    if [ -z "${full_hostpath:-}" ]; then
-                      continue
-                    fi
-                    echo "Collecting Host metrics for ${vm_host}"
-                    hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
-                    govc metric.sample -dc="${datacenter}" -d=80 -n=180 ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.txt
-                    govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.json
-                    govc object.collect -dc="${datacenter}" "${vm_host}" triggeredAlarmState &> "${vcenter_state}/${hostname}_alarms.log"
-                    HOST_METRIC_FILE="${vcenter_state}/${hostname}.metrics.json"
-                    JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
-                fi
-            fi
-            echo "Collecting VM metrics for ${vm}"
-            vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
-            govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
-            govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
+    for PORTGROUP in "${PORTGROUPS[@]}"; do
+      echo "${GOVC_URL}; looking for networks in ${PORTGROUP}"
 
-            echo "Collecting alarms from ${vm}"
-            govc object.collect -dc="${datacenter}" "${vm}" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"
+      IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${PORTGROUP})"
 
-            # press ENTER on the console if screensaver is running
-            echo "Keystoke enter in ${vmname} console"
-            govc vm.keystrokes -dc="${datacenter}" -vm.ipath="${vm}" -c 0x28
+      if [ -z ${networks:-} ]; then          
+            echo "No networks found associated with port group ${PORTGROUP}: $(govc find -type=n -i=true -name ${PORTGROUP})"
+            v_idx=$((v_idx+1));
+            continue
+      fi
+      
+      echo "${GOVC_URL}; ${PORTGROUP}; found networks: ${#networks[@]}"
 
-            echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
-            govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
+      for network in "${networks[@]}"; do
+          IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"
+          if [ -z ${vms:-} ]; then          
+            echo "No VMs found associated with network ${network} $(govc find . -type m -runtime.powerState poweredOn -network $network)"
+            continue
+          fi
+          for vm in "${vms[@]}"; do
+              datacenter=$(echo "$vm" | cut -d'/' -f 2)
+              vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
 
-            METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
-            JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
-        done
+              if [ ! -z "${vm_host}" ]; then
+                  hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
+                  if [ ! -f "${vcenter_state}/${hostname}.metrics.txt" ]; then
+                      full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${vm_host}; done)
+                      if [ -z "${full_hostpath:-}" ]; then
+                        continue
+                      fi
+                      echo "Collecting Host metrics for ${vm_host}"
+                      hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
+                      govc metric.sample -dc="${datacenter}" -d=80 -n=180 ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.txt
+                      govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.json
+                      govc object.collect -dc="${datacenter}" "${vm_host}" triggeredAlarmState &> "${vcenter_state}/${hostname}_alarms.log"
+                      HOST_METRIC_FILE="${vcenter_state}/${hostname}.metrics.json"
+                      JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
+                  fi
+              fi
+              echo "Collecting VM metrics for ${vm}"
+              vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
+              govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
+              govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
+
+              echo "Collecting alarms from ${vm}"
+              govc object.collect -dc="${datacenter}" "${vm}" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"
+
+              # press ENTER on the console if screensaver is running
+              echo "Keystoke enter in ${vmname} console"
+              govc vm.keystrokes -dc="${datacenter}" -vm.ipath="${vm}" -c 0x28
+
+              echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
+              govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
+
+              METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
+              JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
+          done
+      done
     done
-    target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
-    echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
-    echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
+    
+    if [ -n "${vms:-}" ]; then
+      target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
+      echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"      
+    fi
 
+    if [ -n "${JSON_DATA:-}" ]; then
+      echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
+    fi  
+    
     v_idx=$((v_idx+1));
   done
 
@@ -332,6 +359,11 @@ function embed_vm_data() {
     FILE=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .file' ${vcenter_state}/metric-files.json)
     cat $FILE >> ${RESULT_HTML}
     echo "</script>" >> ${RESULT_HTML}
+
+    echo "<script type='application/json' id='${VM}-screenshot'>" >> ${RESULT_HTML}
+    SCREENSHOT_BASE64=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .screenshot' ${vcenter_state}/metric-files.json)
+    echo $SCREENSHOT_BASE64 >> ${RESULT_HTML}
+    echo "</script>" >> ${RESULT_HTML}    
   done
 }
 
@@ -352,7 +384,7 @@ function write_results_html() {
 <html lang="en-US">
   <head>
     <meta charset="utf-8">
-    <title>vSphere Metrics</title>
+    <title>vSphere Environment Summary and Metrics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
     <style>
   div#nav-col ul {
@@ -425,6 +457,11 @@ EOF
   echo ${VM_INPUT} >> ${RESULT_HTML}
   cat >> ${RESULT_HTML} << EOF
         <div id="chart-div">
+          <div class="chart-container" style="text-align: center">
+            <h4>Screenshot taken at the conclusion of the job</h4>
+            <img id="vm-screenshot"></img>
+          </div>
+          <hr>
           <div class="chart-container">
             <canvas id="cpu-usage"></canvas>
           </div>
@@ -560,6 +597,11 @@ async function processMaster(url, metricLabel, chart, prefix) {
     }
   }
 
+  screenShotBase64Elem = document.getElementById(url+"-screenshot")
+  if (screenShotBase64Elem != null) {
+    document.getElementById('vm-screenshot')
+      .src = 'data:image/png;base64,' + screenShotBase64Elem.innerHTML
+  }
   console.log(newData);
   chart.data = newData;
   chart.update();

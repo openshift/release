@@ -39,6 +39,11 @@ releases:
       product: ocp
       stream: ci
       version: "4.18"
+  latest-4-17:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
   multi-initial:
     candidate:
       architecture: multi
@@ -61,7 +66,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-multi
-  cron: 0 2 * * *
+  cron: 25 7 14,16 * *
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -70,16 +75,8 @@ tests:
     env:
       AWS_MULTI_ARCH: "true"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aks
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: hypershift
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
-  cron: 0 */6 * * *
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: hypershift
     env:
@@ -87,29 +84,40 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
-  cron: 0 1 * * *
+  cron: 11 8 14,28 * *
   steps:
     cluster_profile: hypershift
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
-  cron: 0 2 * * *
+  cron: 29 14 8,15 * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
-  cron: 0 3 * * *
+  cron: 4 23 13,20 * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
+- as: e2e-aws-upgrade
+  cron: 51 8 14,19 * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_PREVIOUS: release:latest-4-17
+    env:
+      CI_TESTS_RUN: ^TestUpgradeControlPlane.*
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-external
 - as: e2e-powervs-ovn
-  cron: 0 8 * * *
+  cron: 48 23 5,27 * *
   steps:
     cluster_profile: hypershift-powervs
     workflow: hypershift-powervs-e2e
 - as: e2e-ibmcloud-ovn-iks
-  cron: 0 4 * * *
+  cron: 10 7 6,20 * *
   steps:
     env:
       BOM_VERSION: 4.10.26_openshift
@@ -119,7 +127,7 @@ tests:
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
     workflow: hypershift-ibmcloud-e2e
 - as: e2e-ibmcloud-ovn-roks
-  cron: 0 4 * * *
+  cron: 7 16 11,23 * *
   steps:
     env:
       BOM_VERSION: 4.11.0_openshift
@@ -129,16 +137,16 @@ tests:
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
     workflow: hypershift-ibmcloud-e2e
 - as: e2e-kubevirt-metal-ovn
-  cron: 0 4 * * *
+  cron: 0 8 7,20 * *
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.17
       ODF_OPERATOR_SUB_CHANNEL: stable-4.17
     workflow: hypershift-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-metal-ovn-disconnected
-  cron: 0 8 * * *
+  cron: 58 7 8,22 * *
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -150,19 +158,14 @@ tests:
       ODF_OPERATOR_SUB_CHANNEL: stable-4.15
     workflow: hypershift-kubevirt-baremetalds-disconnected-conformance
 - as: e2e-kubevirt-aws-ovn-csi
-  cron: 0 4 * * *
+  cron: 13 10 13,16 * *
   steps:
     cluster_profile: aws
     env:
       ODF_OPERATOR_CHANNEL: stable-4.17
     workflow: hypershift-kubevirt-csi-e2e
-- as: e2e-azure-aks-ovn-conformance
-  cron: 0 2 * * *
-  steps:
-    cluster_profile: hypershift
-    workflow: hypershift-azure-aks-conformance
 - as: e2e-kubevirt-aws-ovn
-  cron: 0 0,6,12,18 * * *
+  cron: 35 4 5,22 * *
   steps:
     cluster_profile: aws
     env:
@@ -175,7 +178,7 @@ tests:
       ODF_OPERATOR_CHANNEL: stable-4.17
     workflow: hypershift-kubevirt-e2e-aws
 - as: e2e-azure-kubevirt-ovn
-  cron: 0 4 * * *
+  cron: 36 0 10,17 * *
   steps:
     cluster_profile: azure4
     env:
@@ -188,7 +191,7 @@ tests:
 - as: e2e-kubevirt-aws-ovn-conformance
   cron: 0 4 1 1 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       ODF_OPERATOR_CHANNEL: stable-4.17
@@ -196,7 +199,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-conformance
 - as: e2e-openstack-aws
-  cron: 0 10 * * *
+  cron: 9 21 11,22 * *
   steps:
     cluster_profile: hypershift
     env:

@@ -22,7 +22,7 @@ export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE=clusters-"${NODEPOOL_NAME}"
 # local variables
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
-NTO_BRANCH="master"
+NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
 GINKGO_LABEL="tier-0 && !openshift"
 GINKGO_SUITES="test/e2e/performanceprofile/functests/1_performance"
 
@@ -45,7 +45,7 @@ echo "************ Applying Performance Profile ************"
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/telco-ci/ansible.cfg
 ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_profile.yml -e kubeconfig="${SHARED_DIR}"/mgmt-kubeconfig -c local
 
-# checking to see if a release branch is needed or master
+# checking to see if a release branch is needed or main
 if awk "BEGIN {exit !($T5CI_VERSION < 4.19)}"; then
     NTO_BRANCH="release-${T5CI_VERSION}"
 fi
@@ -86,7 +86,7 @@ run_tests() {
     echo "************ Running ${GINKGO_LABEL} tests ************"
     GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
     --timeout=24h --keep-separate-reports --keep-going --flake-attempts=2 \
-    --junit-report=tier-0-junit.xml --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
+    --junit-report=junit.xml --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
 }
 
 if [[ "${T5CI_VERSION}" == "4.17" ]]; then

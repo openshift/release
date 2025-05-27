@@ -1,16 +1,7 @@
-base_images:
-  openshift_release_golang-1.21:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
 build_root:
   from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  inputs:
-    openshift_release_golang-1.21:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.21
   to: unused
 resources:
   '*':
@@ -26,50 +17,18 @@ tests:
   commands: make test
   container:
     from: src
+  run_if_changed: (\.go$)|(go\.(mod|sum)$)|(^\.ci-operator\.yaml$)|(^Makefile$)
 - as: lint
   commands: make lint
   container:
     from: src
+  run_if_changed: (\.go$)|(go\.(mod|sum)$)|(^\.ci-operator\.yaml$)|(^Makefile$)
 - as: scan
   commands: make scan
   container:
     from: src
   optional: true
-- as: pre-leading-zero-check
-  steps:
-    test:
-    - as: check-commit-message
-      commands: |
-        COMMIT_HASH=$(git rev-parse --short HEAD)
-        if [[ $COMMIT_HASH =~ ^0 ]]; then
-            echo "Git commit hash starts with a leading zero. Please generate a dummy commit to generate a new hash."
-            echo "we're doing this due to an OLM bug (https://issues.redhat.com/browse/OSD-13681) and the fix is to add a dummy commit"
-            exit 1
-        fi
-        exit 0
-      from: src
-      resources:
-        requests:
-          cpu: 10m
-          memory: 100Mi
-- as: post-leading-zero-check
-  postsubmit: true
-  steps:
-    test:
-    - as: check-commit-message
-      commands: |
-        COMMIT_HASH=$(git rev-parse --short HEAD)
-        if [[ $COMMIT_HASH =~ ^0 ]]; then
-            echo "Git commit hash starts with a leading zero. Please generate a dummy commit to generate a new hash."
-            echo "we're doing this due to an OLM bug (https://issues.redhat.com/browse/OSD-13681) and the fix is to add a dummy commit"
-            exit 1
-        fi
-        exit 0
-      from: src
-      resources:
-        requests:
-          cpu: 10m
-          memory: 100Mi
+  run_if_changed: (\.go$)|(go\.(mod|sum)$)|(^\.ci-operator\.yaml$)|(^Makefile$)
 zz_generated_metadata:
   branch: master
   org: openshift

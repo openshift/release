@@ -3,64 +3,57 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.21-linux:
+  stolostron_builder_go1.23-linux:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
-  stolostron_builder_go1.22-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.23-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: operators/multiclusterobservability/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: multicluster-observability-operator
 - dockerfile_path: proxy/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: rbac-query-proxy
 - dockerfile_path: operators/endpointmetrics/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: endpoint-monitoring-operator
 - dockerfile_path: tests/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.21-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
-    stolostron_builder_go1.22-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: observability-e2e-test
 - dockerfile_path: collectors/metrics/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: metrics-collector
 - dockerfile_path: loaders/dashboards/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: grafana-dashboard-loader
 promotion:
   to:
@@ -134,6 +127,7 @@ tests:
     VERBOSE="-v" make unit-tests
   container:
     from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: e2e-kind
   steps:
     env:
@@ -174,8 +168,9 @@ tests:
           memory: 200Mi
     workflow: ocm-e2e-kind
 - as: test-e2e
-  skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
+  skip_if_only_changed: ^docs/|hack/|^\.tekton/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
+    allow_skip_on_success: true
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
@@ -214,6 +209,18 @@ tests:
         ZDogU2VydmljZUFjY291bnQKICBuYW1lOiBtdWx0aWNsdXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVy
         YXRvcgogIG5hbWVzcGFjZTogb3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQKLS0tCg==
       PIPELINE_STAGE: dev
+    post:
+    - as: obs-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=registry.redhat.io/rhacm2/acm-must-gather-rhel9:v2.12
+        /usr/bin/gather_observability_log --dest-dir=${ARTIFACT_DIR}/must-gather --insecure-skip-tls-verify
+      from: base-tests
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
     test:
     - as: e2e
       commands: |
@@ -241,26 +248,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: sonarcloud
-  commands: |
-    export SELF="make"
-    make sonar/go/prow
-  container:
-    from: src
-  optional: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonarcloud-post-submit
-  commands: |
-    export SELF="make"
-    make sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: fast-forward
   postsubmit: true
   steps:

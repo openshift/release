@@ -2,27 +2,27 @@ base_images:
   aks:
     name: automation-flavors
     namespace: stackrox
-    tag: aks-latest
+    tag: aks-stable
   aro:
     name: automation-flavors
     namespace: stackrox
-    tag: aro-latest
+    tag: aro-stable
   eks:
     name: automation-flavors
     namespace: stackrox
-    tag: eks-latest
+    tag: eks-stable
   osd:
     name: automation-flavors
     namespace: stackrox
-    tag: osd-latest
+    tag: osd-stable
   rosa:
     name: automation-flavors
     namespace: stackrox
-    tag: rosa-latest
+    tag: rosa-stable
   rosa-hcp:
     name: automation-flavors
     namespace: stackrox
-    tag: rosa-latest
+    tag: rosa-stable
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -31,7 +31,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.4.5
+    tag: stackrox-ui-test-0.4.8
 resources:
   '*':
     requests:
@@ -39,11 +39,6 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: shell-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: gke-qa-e2e-tests
   postsubmit: true
   steps:
@@ -76,11 +71,11 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
-- as: gke-oldest-ebpf-ui-e2e-tests
+- as: gke-oldest-ui-e2e-tests
   postsubmit: true
   steps:
     env:
-      COLLECTION_METHOD: ebpf
+      COLLECTION_METHOD: core_bpf
       GKE_CLUSTER_VERSION: oldest
       TEST_SUITE: gke-ui-e2e-tests
     workflow: stackrox-stackrox-e2e-job
@@ -100,12 +95,37 @@ tests:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
+- as: gke-oldest-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: oldest
+      TEST_SUITE: gke-nongroovy-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+  timeout: 5h0m0s
+- as: gke-latest-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: latest
+      TEST_SUITE: gke-nongroovy-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+  timeout: 5h0m0s
 - as: gke-nongroovy-compatibility-tests
   postsubmit: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
+- as: gke-operator-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+  timeout: 5h0m0s
 - as: gke-latest-operator-e2e-tests
   postsubmit: true
   steps:
@@ -128,24 +148,6 @@ tests:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
-- as: gke-oldest-ebpf-nongroovy-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      GKE_CLUSTER_VERSION: oldest
-      TEST_SUITE: gke-nongroovy-e2e-tests
-    workflow: stackrox-stackrox-e2e-job
-  timeout: 5h0m0s
-- as: gke-latest-nongroovy-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-      GKE_CLUSTER_VERSION: latest
-      TEST_SUITE: gke-nongroovy-e2e-tests
-    workflow: stackrox-stackrox-e2e-job
-  timeout: 5h0m0s
 - as: gke-upgrade-tests
   postsubmit: true
   steps:
@@ -171,14 +173,6 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-    workflow: stackrox-automation-flavors-eks-e2e
-  timeout: 5h0m0s
-- as: eks-qa-ebpf-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      TEST_SUITE: eks-qa-e2e-tests
     workflow: stackrox-automation-flavors-eks-e2e
   timeout: 5h0m0s
 - as: osd-aws-qa-e2e-tests
@@ -207,14 +201,6 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-    workflow: stackrox-automation-flavors-aks-e2e
-  timeout: 5h0m0s
-- as: aks-ebpf-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      TEST_SUITE: aks-qa-e2e-tests
     workflow: stackrox-automation-flavors-aks-e2e
   timeout: 5h0m0s
 - as: rosa-qa-e2e-tests

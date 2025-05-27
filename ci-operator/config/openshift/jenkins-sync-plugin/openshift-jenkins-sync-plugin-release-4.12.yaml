@@ -4,12 +4,13 @@ images:
 - dockerfile_path: Dockerfile
   to: jenkins
 - dockerfile_literal: |
-    FROM quay.io/openshift/origin-jenkins-agent-maven:4.11.0 AS builder
-    WORKDIR /home/jenkins
+    FROM registry.access.redhat.com/ubi9/openjdk-21:1.20 AS builder
+    WORKDIR /home/default
     COPY . .
     USER 0
-    # We need a newer maven version as the RHEL package is still on 3.6.2
-    RUN curl -L -o maven.tar.gz https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz && \
+    # We need a newer maven version as the RHEL package is still on 3.8.5
+    RUN microdnf -y install gzip
+    RUN curl -L -o maven.tar.gz https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
     mkdir maven && \
     tar -xvzf maven.tar.gz -C maven --strip-component 1 && \
     cp -R maven /opt && \
@@ -58,6 +59,8 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
+      - env: JENKINS_AGENT_BASE_IMAGE
+        name: jenkins-agent-base
       from: src
       resources:
         requests:
@@ -66,7 +69,7 @@ tests:
 - as: e2e-aws-jenkins-sync-plugin-continuous
   cron: 43 5 24 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -74,6 +77,8 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
+      - env: JENKINS_AGENT_BASE_IMAGE
+        name: jenkins-agent-base
       from: src
       resources:
         requests:

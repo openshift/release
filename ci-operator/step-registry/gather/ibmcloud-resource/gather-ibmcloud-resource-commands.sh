@@ -112,28 +112,57 @@ function gather_cos {
 
 # Gather CIS resources
 function gather_cis {
-    local cisName BASE_DOMAIN
-    if [ -f "${CLUSTER_PROFILE_DIR}/ibmcloud-cis" ]; then
-        cisName="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis")"
-        BASE_DOMAIN="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis-domain")"
-    else
-        cisName="Openshift-IPI-CI-CIS"
+    echo -e "#ibmcloud_cis_instance_name: ${ibmcloud_cis_instance_name}\n"
+    command_retry "${IBMCLOUD_CLI}" cis instance-set ${ibmcloud_cis_instance_name}
+
+    if [[ -z "${BASE_DOMAIN}" ]]; then
+        # Default the baseDomain if it hasn't been set, to the CI domain.
         BASE_DOMAIN="ci-ibmcloud.devcluster.openshift.com"
     fi
-    echo -e "#cisName: ${cisName}"
-    command_retry "${IBMCLOUD_CLI}" cis instance-set ${cisName}
 
-    echo -e "#baseDomain: ${BASE_DOMAIN}"
-    DOMAIN_ID=$(command_retry "${IBMCLOUD_CLI}" cis domains | grep ${BASE_DOMAIN} | awk '{print $1}')
+    echo -e "#baseDomain: ${BASE_DOMAIN}\n"
+    cmd="${IBMCLOUD_CLI} cis domains -i ${ibmcloud_cis_instance_name} -o json | jq -r --arg n ${BASE_DOMAIN} '.[] | select(.name==\$n) | .id'"
+    DOMAIN_ID=$(eval "${cmd}")
+    if [[ -z "${DOMAIN_ID}" ]] ; then
+        echo "Debug: Did not find the cis domain id of ${BASE_DOMAIN}"
+        run_command "${IBMCLOUD_CLI} cis domains"
+    else 
     {
-        echo -e "# ibmcloud cis domains\n"
-        command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v filter="${DOMAIN_ID}" '$0 ~ filter'
-	echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
-	# DNS Record Names do not contain the $UNIQUE_HASH, so we filter on the $NAMESPACE only
-	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
-	echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
-	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
+        echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
+        # DNS Record Names do not contain the $UNIQUE_HASH, so we filter on the $NAMESPACE only
+        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
+        echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
+        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
     } > "${RESOURCE_DUMP_DIR}/cis.txt"
+    fi
+}
+
+function gather_dns() {
+    echo "IBMCLOUD_DNS_INSTANCE_NAME: $IBMCLOUD_DNS_INSTANCE_NAME, BASE_DOMAIN: $BASE_DOMAIN"
+    if [ ! -z ${IBMCLOUD_DNS_INSTANCE_NAME} ] && [ ! -z ${BASE_DOMAIN} ]; then
+        cmd="${IBMCLOUD_CLI} dns zones -i ${IBMCLOUD_DNS_INSTANCE_NAME} -o json | jq -r --arg n ${BASE_DOMAIN} '.[] | select(.name==\$n) | .id'"
+        dns_zone_id=$(eval "${cmd}")
+        if [[ -z "${dns_zone_id}" ]]; then
+            echo "Debug: Did not find dns_zone_id per the output of '${cmd}'"
+        else
+        {
+            echo -e "created dns resource-records...\n"
+            set +e
+            cmd="${IBMCLOUD_CLI} dns resource-records ${dns_zone_id} -i ${IBMCLOUD_DNS_INSTANCE_NAME} | grep -w ${CLUSTER_FILTER}"
+            count=$(eval "${cmd} -c")
+            set -e
+            if [ "${count}" -gt 0 ]; then
+                run_command "${cmd}"
+            fi
+
+            echo -e "The permitted-networks: \n"
+            cmd="${IBMCLOUD_CLI} dns permitted-networks ${dns_zone_id} -i ${IBMCLOUD_DNS_INSTANCE_NAME}"
+            run_command "${cmd}"
+        }  > "${RESOURCE_DUMP_DIR}/dns.txt"
+        fi
+    else
+        run_command "${IBMCLOUD_CLI} dns instances"
+    fi
 }
 
 # Gather resources
@@ -161,6 +190,13 @@ function gather_resources {
     gather_vpc_routing_tables
     gather_cos
     gather_cis
+    gather_dns
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running Command: ${CMD}"
+    eval "${CMD}"
 }
 
 ibmcloud_login
@@ -169,8 +205,20 @@ ibmcloud_login
 if [ -f ${SHARED_DIR}/metadata.json ]; then
     RESOURCE_GROUP=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
     echo "Resource group: $RESOURCE_GROUP"
+elif [ -s "${SHARED_DIR}/ibmcloud_cluster_resource_group" ]; then
+    RESOURCE_GROUP=$(cat "${SHARED_DIR}/ibmcloud_cluster_resource_group")
+    echo "Resource group: $RESOURCE_GROUP"    
+elif [ -s "${SHARED_DIR}/ibmcloud_resource_group" ]; then
+    RESOURCE_GROUP=$(cat "${SHARED_DIR}/ibmcloud_resource_group")
+    echo "Resource group: $RESOURCE_GROUP"
 fi
-# Enable exit on error to short circuit if there are failures during gather
+
+if [ -f "${CLUSTER_PROFILE_DIR}/ibmcloud-cis" ]; then
+    ibmcloud_cis_instance_name="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis")"
+else
+    #dev env variable
+    ibmcloud_cis_instance_name="Openshift-IPI-CI-CIS"
+fi
 
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources

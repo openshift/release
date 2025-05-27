@@ -1,19 +1,19 @@
 base_images:
-  stolostron_builder_go1.18-linux:
+  stolostron_builder_go1.23-linux:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.23-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    stolostron_builder_go1.18-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: observatorium
 promotion:
   to:
@@ -22,12 +22,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -48,25 +48,7 @@ tests:
     make test --always-make
   container:
     from: test-bin
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: pr-image-mirror
   steps:
     dependencies:

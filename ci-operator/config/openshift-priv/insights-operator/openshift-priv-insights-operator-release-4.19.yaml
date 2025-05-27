@@ -3,10 +3,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
+    tag: "4.19"
   ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -29,8 +33,7 @@ images:
   to: insights-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -84,7 +87,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only and not UI and not slow and not periodic_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not tp_only and not UI and not slow and not periodic_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks_4.19
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -106,6 +109,9 @@ tests:
         namespace: test-credentials
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
+        namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
         namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
@@ -139,7 +145,7 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview
+        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.19
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -161,6 +167,9 @@ tests:
         namespace: test-credentials
       - mount_path: /secret/slack-webhook-url
         name: slack-webhook-url
+        namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
         namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
@@ -188,6 +197,12 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

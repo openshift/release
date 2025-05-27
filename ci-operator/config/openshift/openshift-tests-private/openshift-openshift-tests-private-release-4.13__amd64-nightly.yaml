@@ -873,19 +873,63 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
-      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "40"
+      TEST_TIMEOUT: "20"
     test:
     - ref: etcd-encryption
     - ref: openshift-extended-test
-    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-f60-compliance-destructive
+  cron: 3 14 14 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "55"
+    test:
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-f60-file-integrity
+  cron: 6 22 1 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ""
+      INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-13@sha256:b1ad0315d70e024e4298113c358c21a757faa32c3b48d0cb4ce563086223f9d3
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-f60-security-profiles
+  cron: 2 17 25 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator
+    test:
+    - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: baremetalds-ipi-ovn-ipv4-fips-f60
+  cluster: build05
   cron: 54 22 3 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -898,6 +942,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-fips-f60-ui
+  cluster: build05
   cron: 59 5 12 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -910,6 +955,7 @@ tests:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-fips-f60-destructive
+  cluster: build05
   cron: 43 6 22 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -922,6 +968,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv6-fips-f60
+  cluster: build05
   cron: 13 22 26 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -936,6 +983,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv6-fips-f60-destructive
+  cluster: build05
   cron: 15 14 16 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -950,6 +998,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-fips-f60
+  cluster: build05
   cron: 24 21 9 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -962,6 +1011,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-fips-f60-destructive
+  cluster: build05
   cron: 16 18 7 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -974,6 +1024,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-fips-f60
+  cluster: build05
   cron: 6 3 5 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -988,6 +1039,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f60-destructive
+  cluster: build05
   cron: 51 3 29 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1001,7 +1053,8 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetal-3-plus-1-agent-ipv4-static-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 16 15 2 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1013,7 +1066,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-3-plus-1
 - as: baremetal-ha-agent-ipv4-static-disc-fips-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 14 15 24 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1032,7 +1086,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-disconnected
 - as: baremetal-sno-agent-ipv4-static-connected-fips-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 52 19 23 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1050,7 +1105,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-upi-ovn-ipv4-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 41 13 8 1,3,5,7,9,11 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1062,38 +1118,41 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
-- as: gcp-ipi-basecap-none-additionalcaps-f60
-  cron: 20 22 24 1,3,5,7,9,11 *
+- as: gcp-ipi-basecap-none-additionalcaps-mini-perm-f60
+  cron: 52 23 30 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: baremetal marketplace openshift-samples CSISnapshot
         Console Insights Storage NodeTuning
       BASELINE_CAPABILITY_SET: None
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-basecap-none-additionalcaps-f60-destructive
-  cron: 5 22 18 1,3,5,7,9,11 *
+- as: gcp-ipi-basecap-none-additionalcaps-mini-perm-f60-destructive
+  cron: 5 15 3 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: baremetal marketplace openshift-samples CSISnapshot
         Console Insights Storage NodeTuning
       BASELINE_CAPABILITY_SET: None
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-compact-f60-destructive
-  cron: 26 18 6 1,3,5,7,9,11 *
+- as: gcp-ipi-compact-mini-perm-f60-destructive
+  cron: 12 8 22 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       SIZE_VARIANT: compact
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-longduration-reliability-test-f60
+- as: gcp-ipi-f60-sanity-reliability-test
   cron: 36 10 24 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
@@ -1104,46 +1163,62 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-compact-filestore-csi-f60
-  cron: 23 7 22 2,4,6,8,10,12 *
+- as: gcp-ipi-compact-filestore-csi-mini-perm-f60
+  cron: 34 3 14 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     dependency_overrides:
       OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.13
     env:
       E2E_RUN_TAGS: not @storage
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       SIZE_VARIANT: compact
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-confidential-computing-fips-f60-destructive
-  cron: 36 21 2 2,4,6,8,10,12 *
+- as: gcp-ipi-confidential-fips-mini-perm-f60-destructive
+  cron: 5 14 7 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_SCENARIOS: MCO|ETCD|PSAP|SDN|API_Server|Authentication|Cluster_Operator|Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK|Workloads|Image_Registry|Container_Engine_Tools|NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
-- as: gcp-ipi-disc-priv-oidc-fips-f60
-  cron: 2 16 4 2,4,6,8,10,12 *
+- as: gcp-ipi-confidential-secureboot-mini-perm-f60
+  cron: 17 22 4 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      TEST_SCENARIOS: MCO|ETCD|PSAP|SDN|API_Server|Authentication|Cluster_Operator|Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK|Workloads|Image_Registry|Container_Engine_Tools|NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f60
+  cron: 52 2 27 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       E2E_RUN_TAGS: '@disconnected'
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-disc-priv-oidc-fips-f60-destructive
-  cron: 35 12 6 1,3,5,7,9,11 *
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f60-destructive
+  cron: 12 7 22 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       E2E_RUN_TAGS: '@disconnected'
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1168,17 +1243,21 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-workers-rhel8
-- as: gcp-ipi-disk-encryption-f60
-  cron: 52 12 19 2,4,6,8,10,12 *
+- as: gcp-ipi-disk-encryption-mini-perm-f60
+  cron: 51 18 7 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disk-encryption
-- as: gcp-ipi-disk-encryption-f60-destructive
-  cron: 50 2 12 1,3,5,7,9,11 *
+- as: gcp-ipi-disk-encryption-mini-perm-f60-destructive
+  cron: 10 10 4 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disk-encryption
@@ -1194,33 +1273,39 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-marketplace-f60
-  cron: 11 18 30 2,4,6,8,10,12 *
+- as: gcp-ipi-marketplace-mini-perm-f60
+  cron: 44 13 22 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
-- as: gcp-ipi-marketplace-f60-destructive
-  cron: 37 13 22 1,3,5,7,9,11 *
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-marketplace-mini-perm-f60-destructive
+  cron: 3 21 2 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-mini-perm-custom-type-f60
   cron: 12 21 7 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: custom-4-16384
+      CONTROL_PLANE_NODE_TYPE: custom-4-16384
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-ovn-ipsec-f60
   cron: 15 14 6 1,3,5,7,9,11 *
   steps:
@@ -1253,65 +1338,78 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
-- as: gcp-ipi-private-f60-disasterrecovery
-  cron: 37 12 11 * *
+- as: gcp-ipi-private-mini-perm-f60-disasterrecovery
+  cron: 15 6 18 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-private
-- as: gcp-ipi-private-fips-f60-disasterrecovery
-  cron: 41 17 15 * *
+- as: gcp-ipi-private-fips-mini-perm-f60-disasterrecovery
+  cron: 16 22 2 * *
   steps:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-private
-- as: gcp-ipi-proxy-etcd-encryption-f60
-  cron: 34 4 17 1,3,5,7,9,11 *
+- as: gcp-ipi-proxy-etcd-encryption-mini-perm-f60
+  cron: 9 22 30 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
-- as: gcp-ipi-proxy-etcd-encryption-f60-destructive
-  cron: 57 0 16 2,4,6,8,10,12 *
+- as: gcp-ipi-proxy-etcd-encryption-mini-perm-f60-destructive
+  cron: 51 0 2 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
-- as: gcp-ipi-proxy-private-f60
-  cron: 13 8 4 1,3,5,7,9,11 *
+- as: gcp-ipi-proxy-private-mini-perm-f60
+  cron: 23 15 3 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-proxy-private-f60-destructive
-  cron: 13 3 11 2,4,6,8,10,12 *
+- as: gcp-ipi-proxy-private-mini-perm-f60-destructive
+  cron: 22 16 24 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-proxy-tp-f60
-  cron: 34 0 5 2,4,6,8,10,12 *
+- as: gcp-ipi-proxy-tp-mini-perm-f60
+  cron: 16 16 25 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy
-- as: gcp-ipi-proxy-tp-f60-destructive
-  cron: 55 19 5 1,3,5,7,9,11 *
+- as: gcp-ipi-proxy-tp-mini-perm-f60-destructive
+  cron: 51 18 3 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy
@@ -1336,22 +1434,6 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-gcp-ipi-sdn
-- as: gcp-ipi-secureboot-confidential-computing-f60
-  cron: 26 8 5 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_SCENARIOS: MCO|ETCD|PSAP|SDN|API_Server|Authentication|Cluster_Operator|Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK|Workloads|Image_Registry|Container_Engine_Tools|NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
-- as: gcp-ipi-secureboot-f60-destructive
-  cron: 8 0 27 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: gcp-qe
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-secureboot
 - as: gcp-ipi-workers-rhel8-fips-f60
   cron: 43 13 14 2,4,6,8,10,12 *
   steps:
@@ -1366,25 +1448,29 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8-fips
-- as: gcp-ipi-oidc-rt-fips-regen-cert-f60
-  cron: 5 21 25 1,3,5,7,9,11 *
+- as: gcp-ipi-oidc-rt-fips-regen-cert-mini-perm-f60
+  cron: 18 11 5 2,4,6,8,10,12 *
   steps:
     cluster_profile: gcp-qe
     env:
       E2E_RUN_TAGS: '@level0'
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       RT_ENABLED: "true"
       TEST_IMPORTANCE: LEVEL0
     test:
     - chain: openshift-e2e-test-qe-regenerate-cluster-cert
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: gcp-ipi-oidc-rt-fips-f60-destructive
-  cron: 12 17 28 2,4,6,8,10,12 *
+- as: gcp-ipi-oidc-rt-fips-mini-perm-f60-destructive
+  cron: 47 22 2 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       RT_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive

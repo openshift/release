@@ -17,6 +17,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -46,6 +47,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 function vm_urn_check() {
 
@@ -96,7 +98,13 @@ worker_generation=$(az vm image show --urn ${worker_image_urn} --query hyperVGen
 critical_check_result=0
 
 echo "---------- Check worker nodes urn and hyperV generation ----------"
-worker_nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/worker -o json | jq -r '.items[].metadata.name')
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+node_filter=""
+if (( ${ocp_minor_version} < 19 )); then
+    # No rhel worker is provisioned on 4.19+
+    node_filter="node.openshift.io/os_id=rhcos,"
+fi
+worker_nodes_list=$(oc get nodes --selector ${node_filter}node-role.kubernetes.io/worker -o json | jq -r '.items[].metadata.name')
 for node in ${worker_nodes_list}; do
     echo "check worker node: ${node}"
     vm_urn_check "${node}" "${worker_image_urn,,}" "${RESOURCE_GROUP}" || critical_check_result=1
@@ -108,7 +116,7 @@ if [[ -f "${SHARED_DIR}/azure_marketplace_image_urn_master" ]]; then
     master_generation=$(az vm image show --urn ${master_image_urn} --query hyperVGeneration -otsv)
 
     echo "---------- Check master nodes urn and hyperV generation ---------"
-    master_nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/master -o json | jq -r '.items[].metadata.name')
+    master_nodes_list=$(oc get nodes --selector node-role.kubernetes.io/master -o json | jq -r '.items[].metadata.name')
     for node in ${master_nodes_list}; do
         echo "check master node: ${node}"
         vm_urn_check "${node}" "${master_image_urn,,}" "${RESOURCE_GROUP}" || critical_check_result=1

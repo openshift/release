@@ -7,37 +7,17 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
+
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
-}
 
-function run_script_in_the_hub_cluster {
-  local helper_img="${GITEA_HELPER_IMG}"
-  local script_file=$1
-  shift && local ns=$1
-  [ $# -gt 1 ] && shift && local pod_name="${1}"
-
-  set -x
-  if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
-    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
-      oc -n ${ns} run ${pod_name} \
-        --image=${helper_img} --restart=Never -- sleep infinity ; \
-      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
-    }
-    oc -n ${ns} exec -i ${pod_name} -- \
-      bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
   else
-    oc -n ${ns} run -i ${pod_name} \
-      --image=${helper_img} --restart=Never -- \
-        bash -s -- <<EOF
-$(cat ${script_file})
-EOF
+    _curl="curl"
   fi
-  set +x
 }
 
 function clone_and_test_gitea_repo {
@@ -62,7 +42,7 @@ test -f \${ztp_repo_dir}/README.md
 grep -w "$(cat ${ssh_pri_key_file}.pub)" \${ztp_repo_dir}/README.md
 EOF
 
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "gitea-pod-helper" "done"
+  run_script_on_ocp_cluster ${run_script} ${gitea_project} "${NAMESPACE}-helper" "done"
 }
 
 function test_gitea_deployment {
@@ -74,7 +54,7 @@ function test_gitea_deployment {
 
   set -x
   helm list --all-namespaces | grep "${gitea_project}"
-  curl -vkI ${gitea_url} || echo "Warning... maybe the proxy is no longer up and running"
+  ${_curl} -vkI ${gitea_url} || echo "Warning... maybe the proxy is no longer up and running"
   oc -n ${gitea_project} get all
   set +x
 

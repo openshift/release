@@ -1,12 +1,12 @@
 base_images:
-  base:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
   elasticsearch-operator-src:
     name: "5.8"
     namespace: logging
     tag: elasticsearch-operator-src
+  go_builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
   log-file-metric-exporter:
     name: 6.y
     namespace: logging
@@ -27,31 +27,24 @@ base_images:
     name: 5.y
     namespace: logging
     tag: loki-operator-src
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
 images:
 - from: ubi9-minimal
   inputs:
-    base:
+    go_builder:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: base
+  from: ubi9-minimal
   to: cluster-logging-operator-registry
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
@@ -62,6 +55,7 @@ images:
     COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
     WORKDIR /go/src/github.com/openshift/cluster-logging-operator
     USER 0
+    RUN dnf install gettext -y
     RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
       && chmod 755 kubectl && mv kubectl /go/bin
     RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
@@ -70,12 +64,12 @@ images:
     RUN chmod -R 777 /go
     RUN make bin/functional-benchmarker
   inputs:
-    base:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
     elasticsearch-operator-src:
       as:
       - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
+    go_builder:
+      as:
+      - registry.redhat.io/ubi9/go-toolset:latest
     loki-operator-src:
       as:
       - loki-operator-src
@@ -99,14 +93,13 @@ promotion:
     namespace: logging
   - additional_images:
       cluster-logging-operator-bundle: cluster-logging-operator-bundle
-    name: "6.2"
+    name: "6.3"
     namespace: logging
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.17"
+    release:
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -131,7 +124,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.18"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -169,7 +162,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.18"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -202,7 +195,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.18"
   optional: true
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:

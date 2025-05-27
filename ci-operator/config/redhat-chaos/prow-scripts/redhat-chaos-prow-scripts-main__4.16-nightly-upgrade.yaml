@@ -3,6 +3,14 @@ base_images:
     name: cerberus
     namespace: chaos
     tag: cerberus-prow
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
   prow-scripts.prow:
     name: prow-scripts
     namespace: chaos
@@ -18,6 +26,12 @@ images:
     RUN ls
   from: prow-scripts.prow
   to: prow-scripts-417-up
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   initial:
     prerelease:
@@ -50,7 +64,10 @@ tests:
       CHURN: "false"
       ENABLE_FORCE: "true"
       GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       MAX_UNAVAILABLE: "3"
+      USER_TAGS: |
+        TicketId 419
     observers:
       enable:
       - redhat-chaos-cerberus
@@ -74,6 +91,7 @@ tests:
       CHURN: "false"
       ENABLE_FORCE: "true"
       GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
       MAX_UNAVAILABLE: "3"
     observers:
       enable:
@@ -83,7 +101,7 @@ tests:
     - ref: redhat-chaos-start-krkn
     - chain: openshift-qe-cluster-density-v2
     - ref: openshift-qe-upgrade
-    workflow: openshift-qe-installer-gcp
+    workflow: redhat-chaos-installer-gcp
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main

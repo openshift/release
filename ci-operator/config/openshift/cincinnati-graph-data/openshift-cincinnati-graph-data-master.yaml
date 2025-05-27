@@ -13,37 +13,57 @@ base_images:
     tag: "9"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: boot-root-1.84.1
 images:
-- dockerfile_path: Dockerfile
-  to: stable
-- dockerfile_path: graph-data.rs/Dockerfile
-  to: graphdata-unittests
 - dockerfile_literal: |
-    FROM ubi
-    RUN dnf -y install python-pip python
-    COPY . .
-    WORKDIR /cincinnati-graph-data
-    RUN pip install -r requirements.txt
+    FROM replaced
+    WORKDIR /home
+    COPY . graph-data/
+    RUN mkdir -p /var/lib/cincinnati/graph-data
+    CMD cp -rp graph-data/* /var/lib/cincinnati/graph-data
+  from: ubi
+  to: stable
+- dockerfile_literal: |
+    FROM replaced
+    ENV RUST_LOG=actix_web=error,dkregistry=error
+    COPY graph-data.rs/public-keys /usr/local/share/public-keys
+    COPY --from=pipeline:test-bin /go/.cargo/bin/cincinnati-graph-data /usr/local/bin/
+    ENTRYPOINT ["/usr/local/bin/cincinnati-graph-data"]
   from: ubi
   inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/cincinnati-graph-data
+    test-bin:
+      as:
+      - pipeline:test-bin
+  to: graphdata-unittests
+- dockerfile_literal: |
+    FROM replaced
+    RUN pip install -r requirements.txt
+  from: src
   to: content-checks
+promotion:
+  to:
+  - excluded_images:
+    - content-checks
+    - graphdata-unittests
+    name: cincinnati-graph-data
+    namespace: cincinnati-ci-public
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  cargo test --manifest-path graph-data.rs/Cargo.toml
+  cargo install --locked --path graph-data.rs
 tests:
 - as: e2e
   commands: /usr/local/bin/cincinnati-graph-data
   container:
+    clone: true
     from: graphdata-unittests
+  run_if_changed: internal-channels/candidate.yaml|graph-data.rs/.*
 - as: e2e-latest-cincinnati
   cluster_claim:
     architecture: amd64
@@ -53,6 +73,7 @@ tests:
     timeout: 1h0m0s
     version: "4.14"
   optional: true
+  run_if_changed: internal-channels/candidate.yaml
   steps:
     test:
     - as: openshift-e2e-test
@@ -87,9 +108,10 @@ tests:
     exec hack/validate-blocked-edges.py
   container:
     from: content-checks
+  run_if_changed: hack/validate-blocked-edges.py|blocked-edges/.*
 - as: stabilization-bot-tests
   commands: |
-    PYTHONPATH=hack python -m unittest hack/stabilization-changes.py
+    PYTHONPATH=hack python3 -m unittest hack/stabilization-changes.py
   container:
     from: content-checks
   run_if_changed: hack/(stabilization-changes|util).py

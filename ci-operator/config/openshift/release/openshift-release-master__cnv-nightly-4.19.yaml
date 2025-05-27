@@ -27,6 +27,21 @@ releases:
       product: ocp
       stream: nightly
       version: "4.19"
+  multi-initial:
+    prerelease:
+      architecture: multi
+      product: ocp
+      version_bounds:
+        lower: 4.19.0-0
+        stream: 4-dev-preview
+        upper: 4.20.0-0
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -37,12 +52,15 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws-1-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: c8g.metal-24xl
       KUBEVIRT_RELEASE: v1.4.0
       KUBEVIRT_STORAGECLASS_NAME: gp3-csi
       KUBEVIRT_STORAGECLASS_RWX_NAME: ""
+      MAKEFILE_TARGET: deploy_test_arm64
       OCP_ARCH: arm64
       OCP_VERSION: "4.19"
     observers:
@@ -51,11 +69,13 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     - ref: cnv-e2e
-    workflow: ipi-aws
+    workflow: cnv-e2e-ipi-aws
 - as: e2e-aws-arm64-upgrade-cnv
   interval: 168h
   steps:
     cluster_profile: aws-1-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: c8g.metal-24xl

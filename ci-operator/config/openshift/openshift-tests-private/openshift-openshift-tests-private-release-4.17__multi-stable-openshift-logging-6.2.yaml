@@ -52,12 +52,12 @@ tests:
         [
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
-      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth
-      TEST_IMPORTANCE: Critial|High
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~AWSSTS&;~AZWIF&;~AZMonitor&;~Splunk&;~GCL&
+      TEST_IMPORTANCE: Critical|High
       TEST_PARALLEL: "3"
       TEST_ROSA_LOGIN_ENV: ""
       TEST_SCENARIOS: sig-openshift-logging
@@ -67,8 +67,8 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: azure-ipi-oidc-f28-logging
-  cron: 1 15 7 * *
+- as: azure-ipi-oidc-f7-logging
+  cron: 0 9 * * 1
   steps:
     cluster_profile: azure-qe
     env:
@@ -87,8 +87,8 @@ tests:
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
-      TEST_FILTERS: ~Disruptive&;~Longduration&
-      TEST_IMPORTANCE: ""
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~AWSSTS&;~AZMonitor&;~GCL&;~Cloudwatch&
+      TEST_IMPORTANCE: Critical|High|Medium
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
@@ -100,7 +100,7 @@ tests:
 - as: gcp-ipi-fips-f28-logging
   cron: 5 15 7 * *
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: gcp-observability
     env:
       COMPUTE_NODE_TYPE: e2-standard-8
       FILTERS_ADDITIONAL: ""
@@ -115,8 +115,8 @@ tests:
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
         ]
       TEST_ADDITIONAL: ""
-      TEST_FILTERS: Disruptive;Longduration
-      TEST_IMPORTANCE: ""
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~AWSSTS&;~AZWIF&;~AZMonitor&;~Splunk&;~Cloudwatch&
+      TEST_IMPORTANCE: Critical|High|Medium
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"

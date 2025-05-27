@@ -8,7 +8,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.17_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.21-openshift-4.17:
@@ -31,17 +31,17 @@ images:
   to: kubevirt-cloud-controller-manager
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -65,12 +65,18 @@ tests:
     from: src
 - as: hypershift-kubevirt-conformance-baremetalds
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv

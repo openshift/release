@@ -94,17 +94,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-- as: e2e-aks
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
@@ -167,16 +156,11 @@ tests:
 - as: e2e-kubevirt-metal-conformance
   optional: true
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
-- as: e2e-azure-aks-ovn-conformance
-  optional: true
-  steps:
-    cluster_profile: hypershift
-    workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

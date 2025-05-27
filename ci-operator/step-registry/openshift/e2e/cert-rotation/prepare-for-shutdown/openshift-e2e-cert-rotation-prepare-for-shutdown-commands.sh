@@ -14,14 +14,20 @@ source "${SHARED_DIR}/packet-conf.sh"
 # This file has commonly used functions for cert rotation steps
 cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
 LONG_COMMAND_TIMEOUT=30m
 
+# HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
+if [ -d "$KUBECONFIG" ]; then
+  export KUBECONFIG=$(find "$KUBECONFIG" -type f | head -n 1)
+fi
+
+if [ ! -f /srv/control_node_ips ]; then
 mapfile -d ' ' -t control_nodes < <( oc get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
 mapfile -d ' ' -t compute_nodes < <( oc get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
@@ -33,17 +39,21 @@ echo -n "${control_nodes[@]}" > /srv/control_node_ips
 echo -n "${compute_nodes[@]}" > /srv/compute_node_ips
 
 echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(cat /srv/compute_node_ips)"
+else
+  mapfile -d ' ' -t control_nodes < /srv/control_node_ips
+  mapfile -d ' ' -t compute_nodes < /srv/compute_node_ips
+fi
 
 function run-on-all-nodes {
   for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
 
 function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
 }
 
 function run-on-first-master-long {
-  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${LONG_COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo bash -eEuo pipefail ${1}
 }
 
 function run-on-first-master-silent {
@@ -58,9 +68,9 @@ function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
-run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
-
-cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
+if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
+  cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
+  set +e
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
@@ -73,10 +83,11 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
     until (( approved_csrs >= required_csrs )); do
       mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
       if [[ ${#csrs[@]} -gt 0 ]]; then
+        echo
         oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
       sleep 10
-    done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
+      done | /usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null
   done
   echo "All CSRs approved at $(date)"
 
@@ -91,49 +102,57 @@ cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
       fi
       TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
       sleep 1
-    done 3> >(/usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null)
+      done | /usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null
   done
   echo "All nodes are ready at $(date)"
 EOZ
-chmod a+x /tmp/ensure-nodes-are-ready.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
-run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
+  chmod a+x /tmp/ensure-nodes-are-ready.sh
+  timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/ensure-nodes-are-ready.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
+  run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
+fi
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master-long "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+  run-on-first-master-long "/usr/local/bin/ensure-nodes-are-ready.sh"
   run-on-first-master "cp -rvf /etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig && chown nobody:nobody /tmp/lb-ext.kubeconfig && chmod 644 /tmp/lb-ext.kubeconfig"
   copy-file-from-first-master /tmp/lb-ext.kubeconfig /tmp/lb-ext.kubeconfig
 }
 
-cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+if [ ! -f /tmp/wait-for-valid-lb-ext-kubeconfig.sh ]; then
+  cat << 'EOZ' > /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+    set +e
   echo "Waiting for lb-ext kubeconfig to be valid"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done
 EOZ
-chmod a+x /tmp/wait-for-valid-lb-ext-kubeconfig.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-valid-lb-ext-kubeconfig.sh "core@${control_nodes[0]}:/tmp/wait-for-valid-lb-ext-kubeconfig.sh"
-run-on-first-master "mv /tmp/wait-for-valid-lb-ext-kubeconfig.sh /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh && chmod a+x /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
+  chmod a+x /tmp/wait-for-valid-lb-ext-kubeconfig.sh
+  timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-valid-lb-ext-kubeconfig.sh "core@${control_nodes[0]}:/tmp/wait-for-valid-lb-ext-kubeconfig.sh"
+  run-on-first-master "mv /tmp/wait-for-valid-lb-ext-kubeconfig.sh /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh && chmod a+x /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
+fi
 
 function wait-for-valid-lb-ext-kubeconfig {
   run-on-first-master-silent "bash /usr/local/bin/wait-for-valid-lb-ext-kubeconfig.sh"
 }
 
-cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
+if [ ! -f /tmp/wait-for-kubeapiserver-to-start-progressing.sh ]; then
+  cat << 'EOZ' > /tmp/wait-for-kubeapiserver-to-start-progressing.sh
   echo "Waiting for kube-apiserver to start progressing to avoid stale operator statuses"
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
   # TODO: kube-apiserver never starts progressing in 4.19+
   # oc --request-timeout=5s wait --for=condition=Progressing=True clusteroperator/kube-apiserver --timeout=300s
   sleep 300
 EOZ
-chmod a+x /tmp/wait-for-kubeapiserver-to-start-progressing.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-kubeapiserver-to-start-progressing.sh "core@${control_nodes[0]}:/tmp/wait-for-kubeapiserver-to-start-progressing.sh"
-run-on-first-master "mv /tmp/wait-for-kubeapiserver-to-start-progressing.sh /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh && chmod a+x /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
+  chmod a+x /tmp/wait-for-kubeapiserver-to-start-progressing.sh
+  timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/wait-for-kubeapiserver-to-start-progressing.sh "core@${control_nodes[0]}:/tmp/wait-for-kubeapiserver-to-start-progressing.sh"
+  run-on-first-master "mv /tmp/wait-for-kubeapiserver-to-start-progressing.sh /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh && chmod a+x /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
+fi
 
 function wait-for-kubeapiserver-to-start-progressing {
   run-on-first-master "bash /usr/local/bin/wait-for-kubeapiserver-to-start-progressing.sh"
 }
 
-cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
+if [ ! -f /tmp/pod-restart-workarounds.sh ]; then
+  cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
+  set +e
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
@@ -143,15 +162,11 @@ cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
   oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
   oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
   oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
-
-  # Workaround for https://issues.redhat.com/browse/OCPBUGS-48750
-  # Restart console and console-operator pods
-  oc --request-timeout=5s -n openshift-console-operator delete pod --all --force --grace-period=0
-  oc --request-timeout=5s -n openshift-console delete pod --all --force --grace-period=0
 EOZ
-chmod a+x /tmp/pod-restart-workarounds.sh
-timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/pod-restart-workarounds.sh "core@${control_nodes[0]}:/tmp/pod-restart-workarounds.sh"
-run-on-first-master "mv /tmp/pod-restart-workarounds.sh /usr/local/bin/pod-restart-workarounds.sh && chmod a+x /usr/local/bin/pod-restart-workarounds.sh"
+  chmod a+x /tmp/pod-restart-workarounds.sh
+  timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/pod-restart-workarounds.sh "core@${control_nodes[0]}:/tmp/pod-restart-workarounds.sh"
+  run-on-first-master "mv /tmp/pod-restart-workarounds.sh /usr/local/bin/pod-restart-workarounds.sh && chmod a+x /usr/local/bin/pod-restart-workarounds.sh"
+fi
 
 function pod-restart-workarounds {
   run-on-first-master-silent "bash /usr/local/bin/pod-restart-workarounds.sh"
@@ -179,6 +194,54 @@ function wait-for-operators-to-stabilize {
 EOF
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cert-rotation-functions.sh "root@${IP}:/usr/local/share"
 
+cat >"${SHARED_DIR}"/set-client-ssh-settings.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+source /usr/local/share/cert-rotation-functions.sh
+
+# Install tqdm
+python -m ensurepip && python -m pip install tqdm
+run-on-all-nodes "python -m ensurepip && python -m pip install tqdm"
+
+# Stop chrony service on all nodes
+sudo systemctl stop chronyd
+run-on-all-nodes "systemctl disable chronyd --now"
+
+# Set ClientAliveInterval
+set +e
+run-on-all-nodes "sed -i -e 's/.*ClientAliveInterval.*/ClientAliveInterval 120/g' /etc/ssh/sshd_config && sed -i -e 's/.*ClientAliveCountMax.*/ClientAliveCountMax 100/g' /etc/ssh/sshd_config"
+run-on-all-nodes "systemctl restart sshd"
+for n in ${control_nodes[@]} ${compute_nodes[@]}; do
+  until timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" true >/dev/null 2>&1; do
+    echo "."
+  done
+done
+sed -i -e 's/.*ClientAliveInterval.*/ClientAliveInterval 120/g' /etc/ssh/sshd_config && sed -i -e 's/.*ClientAliveCountMax.*/ClientAliveCountMax 100/g' /etc/ssh/sshd_config
+systemctl restart sshd
+EOF
+
+chmod +x "${SHARED_DIR}"/set-client-ssh-settings.sh
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/set-client-ssh-settings.sh "root@${IP}:/usr/local/bin"
+
+timeout \
+	--kill-after 10m \
+	30m \
+	ssh \
+	"${SSHOPTS[@]}" \
+  -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
+	"root@${IP}" \
+	/usr/local/bin/set-client-ssh-settings.sh
+
+timeout \
+	--kill-after 10m \
+	30m \
+	ssh \
+	"${SSHOPTS[@]}" \
+  -o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
+	"root@${IP}" \
+  "systemctl restart sshd"
+
 # This file is scp'd to the machine where the nested libvirt cluster is running
 # It rotates node kubeconfigs so that it could be shut down earlier than 24 hours
 cat >"${SHARED_DIR}"/prepare-nodes-for-shutdown.sh <<'EOF'
@@ -188,9 +251,7 @@ set -euxo pipefail
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
-  for kubeconfig in $(find ${KUBECONFIG} -type f); do
-    export KUBECONFIG=${kubeconfig}
-  done
+  export KUBECONFIG=$(find "$KUBECONFIG" -type f | head -n 1)
 fi
 
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
@@ -379,6 +440,6 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
-	/usr/local/bin/prepare-nodes-for-shutdown.sh \
-	${SKEW}
+	/usr/local/bin/prepare-nodes-for-shutdown.sh

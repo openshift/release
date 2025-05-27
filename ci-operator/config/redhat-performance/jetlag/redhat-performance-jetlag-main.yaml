@@ -25,12 +25,9 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
-      BASTION_CP_INTERFACE: eno1
       CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
       NUM_WORKER_NODES: "2"
-      OCP_VERSION: latest-4.17
+      OCP_VERSION: latest-4.18
       PUBLIC_VLAN: "true"
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -44,10 +41,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
-      BASTION_CP_INTERFACE: eno1
       CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
       NUM_WORKER_NODES: "2"
       OCP_BUILD: dev
       OCP_VERSION: latest
@@ -65,11 +59,12 @@ tests:
     cluster_profile: metal-perfscale-jetlag
     env:
       CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      OCP_VERSION: latest-4.17
+      OCP_VERSION: latest-4.18
+      PUBLIC_VLAN: "true"
       TYPE: sno
     test:
     - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-poweroff
     - chain: openshift-qe-installer-bm-deploy
 - always_run: false
   as: deploy-sno-dev
@@ -80,13 +75,49 @@ tests:
     cluster_profile: metal-perfscale-jetlag
     env:
       CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
       OCP_BUILD: dev
       OCP_VERSION: latest
+      PUBLIC_VLAN: "true"
       TYPE: sno
     test:
     - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-poweroff
     - chain: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: deploy-compact
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      CRUCIBLE: "false"
+      NUM_WORKER_NODES: "0"
+      OCP_VERSION: latest-4.18
+      PUBLIC_VLAN: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-poweroff
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
+- always_run: false
+  as: deploy-compact-dev
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      CRUCIBLE: "false"
+      NUM_WORKER_NODES: "0"
+      OCP_BUILD: dev
+      OCP_VERSION: latest
+      PUBLIC_VLAN: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-poweroff
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
 zz_generated_metadata:
   branch: main
   org: redhat-performance

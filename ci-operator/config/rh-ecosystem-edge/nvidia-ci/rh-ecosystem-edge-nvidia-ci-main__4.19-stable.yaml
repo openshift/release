@@ -1,0 +1,55 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Containerfile
+  to: nvidia-ci
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.19.0-0
+        stream: 4-stable
+        upper: 4.20.0-0
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- as: nvidia-gpu-operator-e2e-master
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      NVIDIAGPU_DEPLOY_FROM_BUNDLE: "true"
+    workflow: nvidia-gpu-operator-e2e-aws
+- as: nvidia-gpu-operator-e2e-24-9-x
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/certified-operator-index:v4.18
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v24.9
+    workflow: nvidia-gpu-operator-e2e-aws
+- as: nvidia-gpu-operator-e2e-25-3-x
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.18
+      NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/certified-operator-index:v4.18
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v25.3
+    workflow: nvidia-gpu-operator-e2e-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.19-stable

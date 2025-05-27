@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/check-cluster-profiles-config
     decorate: true
     labels:
@@ -21,7 +21,7 @@ presubmits:
         - --config-path=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
         command:
         - check-cluster-profiles-config
-        image: registry.ci.openshift.org/ci/check-cluster-profiles-config:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-cluster-profiles-config_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -80,7 +80,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: registry.ci.openshift.org/ci/check-gh-automation:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -141,7 +141,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-merge-bot
-        image: registry.ci.openshift.org/ci/check-gh-automation:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -161,7 +161,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/image-mirroring-config-validation
     decorate: true
     labels:
@@ -210,7 +210,7 @@ presubmits:
       containers:
       - command:
         - ./hack/validate-ci-secret-boostrap.sh
-        image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -223,7 +223,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/clusterimageset-validate
     decorate: true
     labels:
@@ -240,7 +240,7 @@ presubmits:
         - ./clusters/hosted-mgmt/hive/pools
         command:
         - clusterimageset-updater
-        image: registry.ci.openshift.org/ci/clusterimageset-updater:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_clusterimageset-updater_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -281,7 +281,7 @@ presubmits:
             secretKeyRef:
               key: url
               name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -300,7 +300,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/boskos-config
     decorate: true
     labels:
@@ -327,7 +327,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/boskos-config-generation
     decorate: true
     labels:
@@ -339,7 +339,7 @@ presubmits:
       containers:
       - command:
         - hack/validate-boskos.sh
-        image: registry.ci.openshift.org/ci/python-validation
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -382,7 +382,7 @@ presubmits:
             secretKeyRef:
               key: url
               name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -441,7 +441,7 @@ presubmits:
             secretKeyRef:
               key: url
               name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -490,6 +490,11 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
+        - name: build03_id
+          valueFrom:
+            secretKeyRef:
+              key: build03-id
+              name: build03-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -519,55 +524,6 @@ presubmits:
     - ^master$
     - ^master-
     cluster: app.ci
-    context: ci/build-farm/build04-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: build04
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build04-dry
-    rerun_command: /test build04-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/build04
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.build04.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )build04-dry,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: app.ci
     context: ci/build-farm/build05-dry
     decorate: true
     labels:
@@ -588,7 +544,7 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -642,7 +598,7 @@ presubmits:
             secretKeyRef:
               key: build06-id
               name: build06-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -696,7 +652,7 @@ presubmits:
             secretKeyRef:
               key: build07-id
               name: build07-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -779,6 +735,60 @@ presubmits:
     - ^master$
     - ^master-
     cluster: app.ci
+    context: ci/build-farm/build10-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build10
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build10-dry
+    rerun_command: /test build10-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build10
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build10_id
+          valueFrom:
+            secretKeyRef:
+              key: build10-id
+              name: build10-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build10.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build10-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: app.ci
     context: ci/build-farm/build11-dry
     decorate: true
     labels:
@@ -804,7 +814,7 @@ presubmits:
             secretKeyRef:
               key: build11-id
               name: build11-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -832,7 +842,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -853,7 +863,7 @@ presubmits:
         - ./core-services/cluster-pools/_config.yaml
         command:
         - ci-operator-checkconfig
-        image: registry.ci.openshift.org/ci/ci-operator-checkconfig:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-checkconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -865,7 +875,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ci-operator-config-metadata
     decorate: true
     labels:
@@ -879,7 +889,7 @@ presubmits:
         - ./
         command:
         - hack/validate-ci-operator-config.sh
-        image: registry.ci.openshift.org/ci/determinize-ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -891,7 +901,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -910,7 +920,7 @@ presubmits:
         - --validate-only
         command:
         - ci-operator-configresolver
-        image: registry.ci.openshift.org/ci/ci-operator-configresolver:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-configresolver_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -922,7 +932,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ci-testgrid-allow-list
     decorate: true
     labels:
@@ -940,7 +950,7 @@ presubmits:
         - ./core-services/release-controller/_releases
         command:
         - testgrid-config-generator
-        image: registry.ci.openshift.org/ci/testgrid-config-generator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_testgrid-config-generator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -991,7 +1001,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250224-355743344
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250512-8cd4af136
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1011,7 +1021,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/core-valid
     decorate: true
     decoration_config:
@@ -1066,7 +1076,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -1080,7 +1090,7 @@ presubmits:
         - ./
         command:
         - hack/validate-generated-config.sh
-        image: registry.ci.openshift.org/ci/ci-operator-prowgen:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-prowgen_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1092,7 +1102,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -1106,7 +1116,7 @@ presubmits:
         - ./
         command:
         - hack/validate-generated-dashboards.sh
-        image: registry.ci.openshift.org/ci/dashboards-validation:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_dashboards-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1144,7 +1154,7 @@ presubmits:
             secretKeyRef:
               key: hosted-mgmt-id
               name: hosted-mgmt-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1172,7 +1182,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/jira-lifecycle-config
     decorate: true
     labels:
@@ -1186,7 +1196,7 @@ presubmits:
         - --validate-config=core-services/jira-lifecycle-plugin/config.yaml
         command:
         - jira-lifecycle-plugin
-        image: registry.ci.openshift.org/ci/jira-lifecycle-plugin
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_jira-lifecycle-plugin_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1198,7 +1208,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -1212,7 +1222,7 @@ presubmits:
         - ./
         command:
         - hack/validate-prow-job-ordering.sh
-        image: registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_sanitize-prow-jobs_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1224,7 +1234,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/owners
     decorate: true
     labels:
@@ -1238,7 +1248,7 @@ presubmits:
         - ./hack/missing-owners-whitelist
         command:
         - hack/validate-owners.sh
-        image: registry.ci.openshift.org/ci/centos:7
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_centos_7
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1250,7 +1260,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -1264,7 +1274,7 @@ presubmits:
         - ./
         command:
         - hack/validate-prow-config-formatting.sh
-        image: registry.ci.openshift.org/ci/determinize-prow-config:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-prow-config_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1276,7 +1286,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -1291,7 +1301,7 @@ presubmits:
         - ./ci-operator/config
         command:
         - hack/validate-ci-operator-config-filename.py
-        image: registry.ci.openshift.org/ci/python-validation
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1303,7 +1313,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -1317,7 +1327,7 @@ presubmits:
         - ./
         command:
         - hack/validate-prow-job-semantics.py
-        image: registry.ci.openshift.org/ci/python-validation
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1329,7 +1339,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/release-config
     decorate: true
     labels:
@@ -1343,7 +1353,7 @@ presubmits:
         - --validate-configs=core-services/release-controller/_releases
         command:
         - release-controller
-        image: registry.ci.openshift.org/ci/release-controller
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1355,7 +1365,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/release-controller-config
     decorate: true
     labels:
@@ -1368,7 +1378,7 @@ presubmits:
         - ./
         command:
         - hack/validate-release-controller-config.sh
-        image: registry.ci.openshift.org/ci/python-validation
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1380,7 +1390,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/secret-generator-config-valid
     decorate: true
     labels:
@@ -1396,7 +1406,7 @@ presubmits:
         - --validate-only=true
         command:
         - /usr/bin/ci-secret-generator
-        image: registry.ci.openshift.org/ci/ci-secret-generator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-generator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1408,7 +1418,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/services-valid
     decorate: true
     decoration_config:
@@ -1464,7 +1474,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/stackrox-stackrox-stackrox-stackrox-check
     decorate: true
     decoration_config:
@@ -1522,7 +1532,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -1536,7 +1546,7 @@ presubmits:
         - ./
         command:
         - hack/validate-registry-metadata.sh
-        image: registry.ci.openshift.org/ci/generate-registry-metadata:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_generate-registry-metadata_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1548,7 +1558,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -1562,7 +1572,7 @@ presubmits:
         - ./
         command:
         - hack/validate-registry-commands.sh
-        image: registry.ci.openshift.org/ci/shellcheck
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_shellcheck_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1595,7 +1605,7 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1623,7 +1633,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/openshift-image-mirror-mappings
     decorate: true
     labels:
@@ -1646,7 +1656,7 @@ presubmits:
           fi
         command:
         - /bin/bash
-        image: registry.ci.openshift.org/ci/promoted-image-governor:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_promoted-image-governor_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1679,7 +1689,7 @@ presubmits:
             --validate-only=true
         command:
         - /bin/bash
-        image: registry.ci.openshift.org/ci/pr-reminder:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_pr-reminder_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1705,7 +1715,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/pylint
     decorate: true
     labels:
@@ -1722,7 +1732,7 @@ presubmits:
         - hack
         command:
         - pylint
-        image: registry.ci.openshift.org/ci/python-validation
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1746,7 +1756,7 @@ presubmits:
       containers:
       - command:
         - ./hack/validate-rover-groups.sh
-        image: registry.ci.openshift.org/ci/sync-rover-groups:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_sync-rover-groups_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1758,7 +1768,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/sync-rover-groups
     decorate: true
     labels:
@@ -1778,7 +1788,7 @@ presubmits:
         - --validate-subjects
         command:
         - sync-rover-groups
-        image: registry.ci.openshift.org/ci/sync-rover-groups:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_sync-rover-groups_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1790,7 +1800,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build10
     context: ci/prow/yamllint
     decorate: true
     labels:
@@ -1809,7 +1819,7 @@ presubmits:
         - OWNERS_ALIASES
         command:
         - yamllint
-        image: registry.ci.openshift.org/ci/yamllint:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_yamllint_latest
         imagePullPolicy: Always
         name: ""
         resources:

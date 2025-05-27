@@ -17,24 +17,24 @@ CACHE_REGION="${regions[0]}"
 # Command to get AMIs without using WebUI/AWS console:
 # aws ec2 describe-images --region $region --filters 'Name=name,Values=RHEL-9.*' --query 'Images[*].[Name,ImageId,Architecture]' --output text | sort --reverse
 declare -A ami_map=(
-  [us-east-1,x86_64,rhel-9.2]=ami-078cb4217e3046abf  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [us-east-1,arm64,rhel-9.2]=ami-04c1dfc4f324c64b2   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
-  [us-east-1,x86_64,rhel-9.3]=ami-0fc8883cbe9d895c8  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
-  [us-east-1,arm64,rhel-9.3]=ami-0677a1dd1ad031d74   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-east-1,x86_64,rhel-9.4]=ami-0ceb31b482870cee1  # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
-  [us-east-1,arm64,rhel-9.4]=ami-08fbb4c856514bf2f   # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
-  [us-west-2,x86_64,rhel-9.2]=ami-0e4e5e5727c2a7a33  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [us-west-2,arm64,rhel-9.2]=ami-0538b6fddb813b795   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
-  [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
-  [us-west-2,arm64,rhel-9.3]=ami-04379fa947a959c92   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-west-2,x86_64,rhel-9.4]=ami-05d9b7d9c05363c76  # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
-  [us-west-2,arm64,rhel-9.4]=ami-083a0eb0b1c55a7da   # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
-  [eu-central-1,x86_64,rhel-9.2]=ami-0d4c002fec950de2b  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [eu-central-1,arm64,rhel-9.2]=ami-07dda6169c6afa927   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.2]=ami-06e4f11a19a9d5f45     # RHEL-9.2.0_HVM-20250326-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.2]=ami-0eb9f0269aced4aa7      # RHEL-9.2.0_HVM-20250326-arm64-0-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.3]=ami-0fc8883cbe9d895c8     # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.3]=ami-0677a1dd1ad031d74      # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.4]=ami-026b323c6b44bfe01     # RHEL-9.4.0_HVM-20250408-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.4]=ami-049c8efe36a960c28      # RHEL-9.4.0_HVM-20250408-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.2]=ami-06d931ad408f7676a     # RHEL-9.2.0_HVM-20250326-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.2]=ami-0641c0bb373b15e10      # RHEL-9.2.0_HVM-20250326-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e     # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.3]=ami-04379fa947a959c92      # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.4]=ami-041e1d038c8c67b05     # RHEL-9.4.0_HVM-20250408-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.4]=ami-00125a61380c8e5c0      # RHEL-9.4.0_HVM-20250408-arm64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.2]=ami-01aa3cac055c3f767  # RHEL-9.2.0_HVM-20250326-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.2]=ami-0a59f6776aafe99c4   # RHEL-9.2.0_HVM-20250326-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.3]=ami-0955dc0147853401b  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.3]=ami-0ea2a765094f230d5   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [eu-central-1,x86_64,rhel-9.4]=ami-089b71495d6cacd26  # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
-  [eu-central-1,arm64,rhel-9.4]=ami-06ce7461a466fec39   # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.4]=ami-018fddf60318c369b  # RHEL-9.4.0_HVM-20250408-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.4]=ami-0608096332a0a4739   # RHEL-9.4.0_HVM-20250408-arm64-0-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
@@ -47,7 +47,7 @@ fi
 # All graviton instances have a lower case g in the family part. Using
 # this we avoid adding the full map here.
 ARCH="x86_64"
-if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* ]]; then
+if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .+"g".* ]]; then
   ARCH="arm64"
 fi
 
@@ -134,6 +134,8 @@ for aws_region in "${regions[@]}"; do
       exit 0
   fi
   save_stack_events_to_shared
+  # Get reason for creation failure and print for quicker debugging
+  jq -r '.StackEvents[] | select (.ResourceStatus == "CREATE_FAILED" and .ResourceStatusReason != "Resource creation cancelled") | { timestamp: .Timestamp, reason: .ResourceStatusReason }' "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
 done
 
 echo "Unable to create stack in any of the regions."

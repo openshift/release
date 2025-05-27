@@ -61,7 +61,6 @@ promotion:
   to:
   - additional_images:
       vertical-pod-autoscaler-operator-bundle: vertical-pod-autoscaler-operator-bundle
-    disabled: true
     name: 4.19-priv
     namespace: ocp-private
 releases:
@@ -125,7 +124,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -167,7 +166,7 @@ tests:
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: install
       cli: latest
@@ -222,7 +221,7 @@ tests:
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       RELEASE_IMAGE_LATEST: release:multilatest
     test:
@@ -235,6 +234,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: hypershift-hostedcluster-workflow
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

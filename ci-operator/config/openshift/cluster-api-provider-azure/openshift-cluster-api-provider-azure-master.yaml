@@ -1,8 +1,12 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -12,13 +16,17 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -35,17 +43,17 @@ images:
   to: azure-cluster-api-controllers
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -95,6 +103,20 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
+- as: regression-clusterinfra-azure-ipi-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      E2E_RUN_TAGS: '@capi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: CAPI
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+      TEST_TIMEOUT: "35"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: e2e-azure-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -117,9 +139,14 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: westus2
-      TECH_PREVIEW_NO_UPGRADE: "true"
+      HYPERSHIFT_AZURE_LOCATION: eastus2
     workflow: hypershift-azure-aks-e2e
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift

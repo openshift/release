@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.18"
     namespace: ocp
     tag: cli
 build_root:
@@ -10,15 +10,11 @@ build_root:
     tag: upstream-master
   use_build_cache: true
 releases:
-  arm64-latest:
-    release:
-      architecture: arm64
-      channel: stable
-      version: "4.16"
   latest:
     release:
+      architecture: multi
       channel: stable
-      version: "4.16"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -56,11 +52,8 @@ tests:
 - as: istio-integration-pilot
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -84,6 +77,11 @@ tests:
     - as: integ-pilot-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
@@ -94,70 +92,14 @@ tests:
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge'"
+          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway'"
         # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
-- as: istio-telemetry-sail-controlplane
-  optional: true
-  steps:
-    cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      XDG_CACHE_HOME: /tmp/cache
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: telemetry-sail-cp-test-run
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export CONTROL_PLANE_SOURCE=sail &&\
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          telemetry"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -167,11 +109,8 @@ tests:
 - as: istio-integration-telemetry
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -195,6 +134,11 @@ tests:
     - as: integ-telemetry-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
           export KUBECONFIG=/work/ci-kubeconfig && \
@@ -206,12 +150,69 @@ tests:
           entrypoint \
           prow/integ-suite-ocp.sh \
           telemetry"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-security
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integ-security-test-run
+      cli: latest
+      commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          cd /work && \
+          entrypoint \
+          prow/integ-suite-ocp.sh \
+          security 'TestMultiTlsGateway_InvalidSecret|TestMultiMtlsGateway_InvalidSecret'"
+        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6401
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -221,11 +222,8 @@ tests:
 - as: istio-integration-helm
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -249,6 +247,11 @@ tests:
     - as: integ-helm-test-run
       cli: latest
       commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
           export KUBECONFIG=/work/ci-kubeconfig
           oc version
@@ -260,17 +263,135 @@ tests:
           cd /work
           entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease'
         EOF
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-sail-pilot
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integ-sail-pilot-test-run
+      cli: latest
+      commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          export CONTROL_PLANE_SOURCE=sail && \
+          export INSTALL_SAIL_OPERATOR=true && \
+          cd /work && \
+          entrypoint \
+          prow/integ-suite-ocp.sh \
+          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestValidation|TestWebhook|TestMultiRevision|TestAnalysisWritesStatus'"
+        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-sail-telemetry
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integ-sail-telemetry-test-run
+      cli: latest
+      commands: |
+        cleanup() {
+          echo "Copying artifacts..."
+          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        }
+        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          export CONTROL_PLANE_SOURCE=sail && \
+          export INSTALL_SAIL_OPERATOR=true && \
+          cd /work && \
+          entrypoint \
+          prow/integ-suite-ocp.sh \
+          telemetry 'TestTraffic/externalname/routed/auto-http|'"
+        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
   branch: master

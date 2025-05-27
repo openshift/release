@@ -159,6 +159,21 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-priv-sts-basecap-none-fips-f28
+  cron: 52 3 5 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      ENABLE_OTA_TEST: OCP-66839
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST: ImageRegistry MachineAPI
+      FIPS_ENABLED: "true"
+      PERSISTENT_MONITORING: "false"
+      UPGRADE_CCO_MANUAL_MODE: oidc
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-private-cco-manual-security-token-service
 - as: aws-ipi-proxy-sts-arm-f28
   cron: 2 19 15 * *
   steps:
@@ -221,16 +236,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: aws-upi-basecap-none-amd-f28
-  cron: 39 22 29 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-upi
 - as: aws-upi-basecap-none-arm-f28
   cron: 33 22 17 * *
   steps:
@@ -322,19 +327,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
-- as: azure-ipi-oidc-mini-perm-arm-f28
-  cron: 36 11 14 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
 - as: azure-ipi-ovn-etcd-encryption-compact-arm-f28
   cron: 24 22 30 * *
   steps:

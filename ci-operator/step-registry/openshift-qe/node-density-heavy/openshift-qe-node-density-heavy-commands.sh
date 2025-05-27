@@ -43,7 +43,7 @@ export WORKLOAD=node-density-heavy
 ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50  --pod-ready-threshold=2m" ./run.sh
 
 # The measurable run
-export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
 
 export CLEANUP_WHEN_FINISH=true
 
@@ -53,12 +53,39 @@ export GEN_CSV=true
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
 echo ${SHARED_DIR}
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+    EXTRA_FLAGS+=" --local-indexing"
+fi
+
+if [[ -n "${USER_METADATA}" ]]; then
+    USER_METADATA=$(echo "$USER_METADATA" | xargs)
+    IFS=',' read -r -a env_array <<< "$USER_METADATA"
+    true > user-metadata.yaml
+    for env_pair in "${env_array[@]}"; do
+      env_pair=$(echo "$env_pair" | xargs)
+      env_key=$(echo "$env_pair" | cut -d'=' -f1)
+      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+      echo "$env_key: \"$env_value\"" >> user-metadata.yaml
+    done
+    EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+fi
+export EXTRA_FLAGS
+export ADDITIONAL_PARAMS
 
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> "${SHARED_DIR}"/index_data.json
+
+cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
+cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
+
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+    metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
+    cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+fi
+
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes

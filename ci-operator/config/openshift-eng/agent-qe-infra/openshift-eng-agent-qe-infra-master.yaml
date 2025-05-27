@@ -1,0 +1,47 @@
+base_images:
+  centos9:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- context_dir: .
+  dockerfile_path: images/prow-image/Dockerfile
+  from: centos9
+  to: agent-qe-base
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shellcheck
+  commands: for f in $(git diff --name-only "$PULL_BASE_SHA..$PULL_PULL_SHA" | grep
+    -E ".*\.sh$"); do if [ -f "$f" ]; then echo -e "\nVerifying $f..."; shellcheck
+    -s bash "$f"; else echo -e "\nSkipping deleted file $f"; fi; done
+  container:
+    from: shellcheck
+zz_generated_metadata:
+  branch: master
+  org: openshift-eng
+  repo: agent-qe-infra

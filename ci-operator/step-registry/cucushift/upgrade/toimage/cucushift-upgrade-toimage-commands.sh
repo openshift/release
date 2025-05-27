@@ -34,25 +34,61 @@ function debug() {
     fi
 }
 
+# Explicitly set upgrade failure to operators
+function check_failed_operator(){
+    local latest_ver_in_history failing_status failing_operator failing_operators
+    latest_ver_in_history=$(oc get clusterversion version -ojson|jq -r '.status.history[0].version')
+    if [[ "${latest_ver_in_history}" != "${TARGET_VERSION}" ]]; then
+        # Upgrade does not start, set it to CVO
+        echo "Upgrade does not start, set UPGRADE_FAILURE_TYPE to cvo"
+        export UPGRADE_FAILURE_TYPE="cvo"
+    else
+        failing_status=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").status')
+        # Upgrade stuck at operators while failing=True, check from the operators reported in cv Failing condition
+        if [[ ${failing_status} == "True" ]]; then
+            failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
+            failing_operators="${failing_operator} ${failing_operators}"
+        else
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || \
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting up to 40 minutes on \K.*'|tr -d ',') || \
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting on \K.*'|tr -d ',') || true
+        fi
+        if [[ -n "${failing_operators}" && "${failing_operators}" =~ [^[:space:]] ]]; then
+            echo "Upgrade stuck, set UPGRADE_FAILURE_TYPE to ${failing_operators}"
+            export UPGRADE_FAILURE_TYPE="${failing_operators}"
+        fi
+    fi
+}
+
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
     echo -e "\n# Generating the Junit for upgrade"
+    local upg_report="${ARTIFACT_DIR}/junit_upgrade.xml"
+    local cases_in_upgrade
     if (( FRC == 0 )); then
-      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="cluster upgrade" tests="1" failures="0">
-  <testcase classname="cluster upgrade" name="upgrade should succeed"/>
-</testsuite>
-EOF
+        # The cases are SLOs on the live cluster which may be a possible UPGRADE_FAILURE_TYPE
+        local cases_from_available_operators upgrade_success_cases
+        cases_from_available_operators=$(oc get co --no-headers|awk '{print $1}'|tr '\n' ' ' || true)
+        upgrade_success_cases="${UPGRADE_FAILURE_TYPE} ${cases_from_available_operators} ${IMPLICIT_ENABLED_CASES}"
+        upgrade_success_cases=$(echo ${upgrade_success_cases} | tr ' ' '\n'|sort -u|xargs)
+        IFS=" " read -r -a cases_in_upgrade <<< "${upgrade_success_cases}"
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > "${upg_report}"
+        echo "<testsuite name=\"cluster upgrade\" tests=\"${#cases_in_upgrade[@]}\" failures=\"0\">" >> "${upg_report}"
+        for case in "${cases_in_upgrade[@]}"; do
+            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${case}\"/>" >> "${upg_report}"
+        done
+        echo '</testsuite>' >> "${upg_report}"
     else
-      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="cluster upgrade" tests="1" failures="1">
-  <testcase classname="cluster upgrade" name="upgrade should succeed">
-    <failure message="">openshift cluster upgrade failed</failure>
-  </testcase>
-</testsuite>
-EOF
+        IFS=" " read -r -a cases_in_upgrade <<< "${UPGRADE_FAILURE_TYPE}"
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > "${upg_report}"
+        echo "<testsuite name=\"cluster upgrade\" tests=\"${#cases_in_upgrade[@]}\" failures=\"${#cases_in_upgrade[@]}\">" >> "${upg_report}"
+        for case in "${cases_in_upgrade[@]}"; do
+            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${case}\">" >> "${upg_report}"
+            echo "    <failure message=\"openshift cluster upgrade failed at ${case}\"></failure>" >> "${upg_report}"
+            echo "  </testcase>" >> "${upg_report}"
+        done
+        echo '</testsuite>' >> "${upg_report}"
     fi
 }
 
@@ -96,18 +132,22 @@ function extract_ccoctl(){
 }
 
 function update_cloud_credentials_oidc(){
-    local platform preCredsDir tobeCredsDir tmp_ret
-
+    local platform preCredsDir tobeCredsDir tmp_ret testcase="OCP-66839"
     platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
     tobeCredsDir="/tmp/tobe-include-creds"
     mkdir "${preCredsDir}" "${tobeCredsDir}"
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     # Extract all CRs from live cluster with --included
     if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
-        echo "Failed to extract CRs from live cluster!" && exit 1
+        echo "Failed to extract CRs from live cluster!"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
+        return 1
     fi
     if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
-        echo "Failed to extract CRs from tobe upgrade release payload!" && exit 1
+        echo "Failed to extract CRs from tobe upgrade release payload!"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
+        return 1
     fi
 
     # TODO: add gcp and azure
@@ -120,14 +160,17 @@ function update_cloud_credentials_oidc(){
         case "${platform}" in
         "AWS")
             if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
-                echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
+		echo "No aws_oidc_provider_arn file in SHARED_DIR"
+		return 1
             else
                 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
                 infra_name=${NAMESPACE}-${UNIQUE_HASH}
                 oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
-                extract_ccoctl
+                extract_ccoctl || { export UPGRADE_FAILURE_TYPE="cloud-credential"; return 1; }
                 if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
-                    echo "Failed to update iam role!" && exit 1
+		    echo "Failed to update iam role!"
+		    export UPGRADE_FAILURE_TYPE="cloud-credential"
+		    return 1
                 fi
                 if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
                     echo "Apply the new credential secrets."
@@ -136,7 +179,7 @@ function update_cloud_credentials_oidc(){
             fi
             ;;
         *)
-           echo "to be supported platform: ${platform}" 
+	   echo "to be supported platform: ${platform}"
            ;;
         esac
     fi
@@ -144,7 +187,10 @@ function update_cloud_credentials_oidc(){
 
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual or the case in OCPQE-19413
 function cco_annotation(){
-    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+    local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
+    source_minor_version="$(echo "$source_version" | cut -f2 -d.)"
+    target_minor_version="$(echo "$target_version" | cut -f2 -d.)"
+    if (( source_minor_version == target_minor_version )) || (( source_minor_version < 8 )); then
         echo "CCO annotation change is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
@@ -153,10 +199,10 @@ function cco_annotation(){
     if [[ ${cco_mode} == "Manual" ]]; then
         echo "CCO annotation change is required in Manual mode"
     elif [[ -z "${cco_mode}" || ${cco_mode} == "Mint" ]]; then
-        if [[ "${SOURCE_MINOR_VERSION}" == "14" && ${platform} == "GCP" ]] ; then
+        if [[ "${source_minor_version}" == "14" && ${platform} == "GCP" ]] ; then
             echo "CCO annotation change is required in default or Mint mode on 4.14 GCP cluster"
         else
-            echo "CCO annotation change is not required in default or Mint mode on 4.${SOURCE_MINOR_VERSION} ${platform} cluster"
+            echo "CCO annotation change is not required in default or Mint mode on 4.${source_minor_version} ${platform} cluster"
             return 0
         fi
     else
@@ -165,7 +211,7 @@ function cco_annotation(){
     fi
 
     echo "Require CCO annotation change"
-    local wait_time_loop_var=0; to_version="$(echo "${TARGET_VERSION}" | cut -f1 -d-)"
+    local wait_time_loop_var=0; to_version="$(echo "${target_version}" | cut -f1 -d-)"
     oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${to_version}"'"}}}' --type=merge
 
     echo "CCO annotation patch gets started"
@@ -183,7 +229,10 @@ function cco_annotation(){
         (( wait_time_loop_var += 1 ))
     done
     if (( wait_time_loop_var >= 5 )); then
-        echo >&2 "Timed out waiting for CCO annotation completing, exiting" && return 1
+        echo >&2 "Timed out waiting for CCO annotation completing, exiting"
+        # Explicitly set failure to cco
+        export UPGRADE_FAILURE_TYPE="cloud-credential"
+        return 1
     fi
 }
 
@@ -195,12 +244,12 @@ function run_command() {
 
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response try max_retries
-    if [[ "${TARGET}" =~ "@sha256:" ]]; then
-        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries payload="${1}"
+    if [[ "${payload}" =~ "@sha256:" ]]; then
+        digest="$(echo "${payload}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
     else
-        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
         echo "The target image is using tagname pullspec, its digest is ${digest}"
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -215,32 +264,37 @@ function check_signed() {
         sleep 60
     done
     if (( response == 200 )); then
-        echo "${TARGET} is signed" && return 0
+        echo "${payload} is signed" && return 0
     else
-        echo "Seem like ${TARGET} is not signed" && return 1
+        echo "Seem like ${payload} is not signed" && return 1
     fi
 }
 
 # Check if admin ack is required before upgrade
 function admin_ack() {
-    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+    local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
+    source_minor_version="$(echo "$source_version" | cut -f2 -d.)"
+    target_minor_version="$(echo "$target_version" | cut -f2 -d.)"
+
+    if (( source_minor_version == target_minor_version )) || (( source_minor_version < 8 )); then
         echo "Admin ack is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
     echo -e "All admin acks:\n${out}"
-    if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
+    if [[ ${out} != *"ack-4.${source_minor_version}"* ]]; then
         echo "Admin ack not required: ${out}" && return
     fi
 
-    echo "Require admin ack:\n ${out}"
-    local wait_time_loop_var=0 ack_data
+    echo -e "Require admin ack:\n ${out}"
+    local wait_time_loop_var=0 ack_data testcase="OCP-44827"
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
 
     ack_data="$(echo "${out}" | jq -r "keys[]")"
     for ack in ${ack_data};
     do
         # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
-        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        if [[ "${ack}" == *"ack-4.${source_minor_version}"* ]]
         then
             echo "Admin ack patch data is: ${ack}"
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
@@ -261,7 +315,10 @@ function admin_ack() {
         (( wait_time_loop_var += 1 ))
     done
     if (( wait_time_loop_var >= 5 )); then
-        echo >&2 "Timed out waiting for admin-acks completing, exiting" && return 1
+        echo >&2 "Timed out waiting for admin-acks completing, exiting"
+        # Explicitly set failure to admin_ack
+        export UPGRADE_FAILURE_TYPE="${testcase}"
+        return 1
     fi
 }
 
@@ -382,6 +439,18 @@ function check_upgrade_status() {
     fi
     echo -e "Upgrade checking start at $(date "+%F %T")\n"
     start_time=$(date "+%s")
+
+    # https://issues.redhat.com//browse/OTA-861
+    # When upgrade is processing, Upgradeable will be set to false
+    sleep 60 # while waiting for condition to populate
+    local case_id="OCP-25473"
+    if [[ "$TARGET_MINOR_VERSION" -gt 18 ]] && [[ "$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].status}')" != "False" ]]; then
+        echo "Error: ${case_id} As OTA-861 designed, Upgradeable should be set to False when an upgrade is in progress, but actually not"
+        export UPGRADE_FAILURE_TYPE="${case_id}"
+        export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
+        return 1
+    fi
+
     # print once to log (including full messages)
     oc adm upgrade || true
     # log oc adm upgrade (excluding garbage messages)
@@ -428,19 +497,24 @@ function check_upgrade_status() {
         echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
         end_time=$(date "+%s")
         echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+        check_failed_operator
         return 1
     fi
 }
 
 # Check version, state in history
 function check_history() {
-    local version state
+    local version state testcase="OCP-21588"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now upgraded to ${TARGET_VERSION}" && return 0
     else
-        echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting" && return 1
+        echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting"
+	# Explicitly set failure to cvo
+        export UPGRADE_FAILURE_TYPE="${testcase}"
+	return 1
     fi
 }
 
@@ -452,6 +526,8 @@ function check_ota_case_enabled() {
         # shellcheck disable=SC2076
         if [[ " ${ENABLE_OTA_TEST} " =~ " ${case_id} " ]]; then
             echo "${case_id} is enabled via ENABLE_OTA_TEST on this job."
+            export UPGRADE_FAILURE_TYPE="${case_id}"
+            export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
             return 0
         fi
     done
@@ -493,7 +569,11 @@ export SOURCE_MINOR_VERSION
 echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
 
 export FORCE_UPDATE="false"
-if ! check_signed; then
+# Set genenral upgrade ci failure to overall as default
+export UPGRADE_FAILURE_TYPE="overall"
+# The cases are from the general checkpoints setting explicitly in upgrade step by export UPGRADE_FAILURE_TYPE="xxx".
+export IMPLICIT_ENABLED_CASES=""
+if ! check_signed "${TARGET}"; then
     echo "You're updating to an unsigned images, you must override the verification using --force flag"
     FORCE_UPDATE="true"
     if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-56083"; then
@@ -504,8 +584,8 @@ else
     echo "You're updating to a signed images, so run the upgrade command without --force flag"
 fi
 if [[ "${FORCE_UPDATE}" == "false" ]]; then
-    admin_ack
-    cco_annotation
+    admin_ack "${SOURCE_VERSION}" "${TARGET_VERSION}"
+    cco_annotation "${SOURCE_VERSION}" "${TARGET_VERSION}"
 fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc

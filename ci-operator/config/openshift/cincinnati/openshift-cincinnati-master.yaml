@@ -1,55 +1,75 @@
 base_images:
+  e2e:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: e2e-test-ubi9
   ubi:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
+binary_build_commands: |
+  cargo build --release
+  mkdir -p /go/bin/
+  cp target/release/graph-builder target/release/policy-engine target/release/metadata-helper /go/bin/
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: boot-root-1.84.1
 images:
 - dockerfile_literal: |
-    FROM ubi
-    COPY . /opt/app-root/src/
-    WORKDIR /opt/app-root/src/cincinnati
-    USER 0
-    ENV HOME="/root"
-    ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
-    RUN chgrp root /opt/app-root/src/cincinnati && \
-        chmod g+w /opt/app-root/src/cincinnati && \
-        dnf install -y jq python38 gcc openssl-devel && \
-        dnf clean all
-    # build: Rust stable toolchain
-    RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.70.0 -y && \
-      rustup install 1.64.0
-    # install yamllint
-    RUN pip3 install --user yamllint
-    RUN \
-      mkdir -p $HOME/.cargo/git/ && \
-      find $HOME/. -type d -exec chmod 777 {} \; && \
-      find $HOME/. -type f -exec chmod ugo+rw {} \;
-    RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
-    USER 1001
+    FROM registry.access.redhat.com/ubi9/ubi:latest
+    WORKDIR /root
+    ENV HOME=/root PATH="/root/.cargo/bin:${PATH}"
+    RUN dnf update -y \
+        && dnf install -y git gcc openssl-devel \
+        && dnf clean all \
+        && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    COPY . /root/cincinnati/
+    WORKDIR /root/cincinnati
+    RUN cargo build --release
+  from: ubi
+  to: rustup-build
+- dockerfile_literal: |
+    FROM registry.access.redhat.com/ubi9/ubi:latest
+    ENV RUST_LOG=actix_web=error,dkregistry=error
+    COPY --from=pipeline:bin /go/bin/graph-builder /go/bin/policy-engine /go/bin/metadata-helper /usr/bin/
+    ENTRYPOINT ["/usr/bin/graph-builder"]
   from: ubi
   inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/cincinnati
-  to: src-rust
-- dockerfile_path: dist/Dockerfile.rust-toolset/Dockerfile
-  inputs:
-    ubi:
+    bin:
       as:
-      - registry.access.redhat.com/ubi8/ubi:latest
+      - pipeline:bin
   to: deploy
-- dockerfile_path: dist/Dockerfile.e2e-ubi8/Dockerfile
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/cincinnati-ci-public/rust:e2e-test-ubi9
+    ENV HOME="/root"
+    WORKDIR "${HOME}/cincinnati"
+    COPY --from=pipeline:test-bin /opt/cincinnati/bin/e2e /usr/bin/cincinnati-e2e-test
+    COPY --from=pipeline:test-bin /opt/cincinnati/bin/prometheus_query /usr/bin/cincinnati-prometheus_query-test
+    COPY --from=pipeline:test-bin /opt/cincinnati/bin/slo /usr/bin/cincinnati-e2e-slo
+    COPY hack/e2e.sh hack/vegeta.targets hack/
+    COPY dist/openshift/cincinnati-deployment.yaml \
+         dist/openshift/cincinnati-e2e.yaml \
+         dist/openshift/observability.yaml \
+         dist/openshift/load-testing.yaml \
+         dist/openshift/
+    COPY e2e/tests/testdata e2e/tests/testdata
+    COPY dist/prepare_ci_credentials.sh dist/cargo_test.sh dist/
+    ENV E2E_TESTDATA_DIR "e2e/tests/testdata"
+    ENTRYPOINT ["hack/e2e.sh"]
+  from: e2e
   inputs:
-    ubi:
+    test-bin:
       as:
-      - registry.access.redhat.com/ubi8/ubi:latest
+      - pipeline:test-bin
   to: e2e-test
+promotion:
+  to:
+  - excluded_images:
+    - rustup-build
+    name: cincinnati-build-root
+    namespace: cincinnati-ci
 resources:
   '*':
     requests:
@@ -59,6 +79,7 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
+test_binary_build_commands: hack/build_e2e.sh
 tests:
 - as: cargo-test
   steps:
@@ -87,7 +108,7 @@ tests:
         name: CINCINNATI_CI_DOCKERJSON_FILE
       - default: public-ci-image-sa-dockerjson
         name: CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE
-      from: src-rust
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -109,7 +130,7 @@ tests:
         name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
       - default: /usr/local/ci-secrets/cincy-credentials/github_token.key
         name: CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH
-      from: src-rust
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -117,15 +138,11 @@ tests:
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
-    from: src-rust
-- as: rustfmt-1.70.0
-  commands: dist/prow_rustfmt.sh 1.70.0
+    from: src
+- as: rustfmt
+  commands: just format
   container:
-    from: src-rust
-- as: rustfmt-1.64.0
-  commands: dist/prow_rustfmt.sh 1.64.0
-  container:
-    from: src-rust
+    from: src
 - as: e2e
   cluster_claim:
     architecture: amd64
@@ -133,7 +150,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.17"
   steps:
     test:
     - as: openshift-e2e-test

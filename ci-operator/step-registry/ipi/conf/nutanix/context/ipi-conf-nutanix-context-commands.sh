@@ -45,8 +45,16 @@ clusters_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: 
 # For QE nutanix with multi zone, we need to select PE by host IP
 if [[ $LEASED_RESOURCE =~ "nutanix-qe" ]]; then
     pe_uuid=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .metadata.uuid" | head -n 1)
+    pe_name=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .spec.name" | head -n 1)
 else
     pe_uuid=$(echo "${clusters_json}" | jq '.entities[] | select (.spec.name != "Unnamed") | .metadata.uuid' | head -n 1)
+    pe_name=$(echo "${clusters_json}" | jq -r '.entities[] | select (.spec.name != "Unnamed") | .spec.name' | head -n 1)
+fi
+
+
+if [[ -z "${pe_name}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Cannot get PE Name"
+    exit 1
 fi
 
 if [[ -z "${pe_uuid}" ]]; then
@@ -116,6 +124,7 @@ export PE_PORT='${prism_element_port}'
 export PE_USERNAME='${prism_element_username}'
 export PE_PASSWORD='${prism_element_password}'
 export PE_UUID='${pe_uuid}'
+export PE_NAME='${pe_name}'
 export PE_STORAGE_CONTAINER='${prism_element_storage_container}'
 export SUBNET_UUID='${subnet_uuid}'
 export API_VIP='${API_VIP}'

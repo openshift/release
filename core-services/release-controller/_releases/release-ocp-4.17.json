@@ -8,6 +8,8 @@
   "minCreationIntervalSeconds": 14400,
   "referenceMode": "source",
   "pullSecretName": "source",
+  "alternateImageRepository": "quay.io/openshift-release-dev/dev-release",
+  "alternateImageRepositorySecretName": "release-controller-quay-mirror-secret",
   "check": {
     "OCP and Origin images should match": {
       "consistentImages": {
@@ -16,7 +18,15 @@
     }
   },
   "publish": {
-    "issues": {},
+    "issues": {
+      "verifyIssues": {
+        "previousReleaseTag": {
+          "namespace": "ocp",
+          "name": "release",
+          "tag": "4.16.0-rc.0"
+        }
+      }
+    },
     "tag": {
       "tagRef": {
         "name": "4.17"
@@ -39,7 +49,7 @@
     "agent-single-node-ipv6": {
       "optional": true,
       "prowJob": {
-        "name": "periodic-ci-openshift-release-master-nightly-4.17-e2e-agent-single-node-ipv6"
+        "name": "periodic-ci-openshift-release-master-nightly-4.17-e2e-agent-single-node-ipv6-conformance"
       }
     },
     "aws-ovn-upgrade-4.17-micro": {
@@ -433,12 +443,6 @@
         }
       }
     },
-    "metal-ovn-assisted": {
-      "optional": true,
-      "prowJob": {
-        "name": "periodic-ci-openshift-release-master-nightly-4.17-e2e-metal-ovn-assisted"
-      }
-    },
     "openshift-dedicated-aws": {
       "optional": true,
       "prowJob": {
@@ -474,7 +478,7 @@
     "qe-perfscale": {
       "optional": true,
       "prowJob": {
-        "name": "periodic-ci-openshift-qe-ocp-qe-perfscale-ci-main-aws-4.17-nightly-x86-payload-control-plane-6nodes"
+        "name": "periodic-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.17-nightly-x86-payload-control-plane-6nodes"
       }
     },
     "rosa-classic-sts": {
@@ -533,10 +537,10 @@
       },
       "upgrade": true,
       "upgradeFromRelease": {
-          "candidate": {
-              "stream": "nightly",
-              "version": "4.16"
-          }
+        "candidate": {
+          "stream": "nightly",
+          "version": "4.16"
+        }
       }
     },
     "vsphere-ovn-upi": {

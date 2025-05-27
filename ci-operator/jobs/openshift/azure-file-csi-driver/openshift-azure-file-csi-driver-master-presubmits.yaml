@@ -5,7 +5,80 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
+    context: ci/prow/e2e-azure-csi-file-cross-subscription
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-azure-file-csi-driver-master-e2e-azure-csi-file-cross-subscription
+    optional: true
+    rerun_command: /test e2e-azure-csi-file-cross-subscription
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-azure-csi-file-cross-subscription
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-azure-csi-file-cross-subscription,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
     context: ci/prow/e2e-azure-file-csi
     decorate: true
     labels:
@@ -77,7 +150,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/e2e-azure-file-csi-extended
     decorate: true
     labels:
@@ -150,7 +223,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/e2e-azure-file-nfs-csi
     decorate: true
     labels:
@@ -222,7 +295,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/e2e-azure-manual-oidc
     decorate: true
     labels:
@@ -295,7 +368,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     decoration_config:
@@ -369,7 +442,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -423,7 +496,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build10
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -501,7 +574,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -560,7 +633,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/security
     decorate: true
     labels:
@@ -621,7 +694,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -681,7 +754,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/verify-commits
     decorate: true
     labels:
@@ -734,7 +807,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build03
     context: ci/prow/verify-deps
     decorate: true
     labels:

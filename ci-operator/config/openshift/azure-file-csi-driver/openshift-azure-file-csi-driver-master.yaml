@@ -2,9 +2,9 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_azure-storage-azcopy-base:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: azure-storage-azcopy-base
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -30,17 +30,17 @@ images:
   to: azure-file-csi-driver
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -75,6 +75,13 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi-file-nfs
+- as: e2e-azure-csi-file-cross-subscription
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: openshift-e2e-azure-csi-file-cross-subscription
 - as: e2e-azure-file-csi-extended
   optional: true
   steps:

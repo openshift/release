@@ -1,8 +1,12 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -22,7 +26,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: latest
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -39,8 +43,7 @@ images:
   to: aws-cluster-api-controllers
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -69,7 +72,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -83,31 +86,35 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
+  shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: regression-clusterinfra-aws-ipi-proxy-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
+      E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_FILTERS: CAPI
-      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+      TEST_TIMEOUT: "35"
     test:
-    - ref: openshift-extended-test
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -125,6 +132,12 @@ tests:
     env:
       PROJECT_NAME: cluster-api-provider-aws
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

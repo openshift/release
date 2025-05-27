@@ -12,12 +12,15 @@ set -xeuo pipefail
 
 source /tmp/ci-functions.sh
 ci_subscription_register
+
+download_microshift_scripts
+"\${DNF_RETRY}" "install" "pcp-zeroconf jq"
 ci_copy_secrets "${CACHE_REGION}"
 
-sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
+sudo systemctl start pmcd
+sudo systemctl start pmlogger
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
-
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
@@ -74,6 +77,11 @@ if [ -e /var/run/microshift-dev-access-keys/aws_access_key_id ] && \
     scp \
         /var/run/microshift-dev-access-keys/aws_access_key_id \
         /var/run/microshift-dev-access-keys/aws_secret_access_key \
+        "${INSTANCE_PREFIX}:/tmp"
+fi
+
+if [ -e /var/run/microshift-dev-access-keys/registry.stage.redhat.io ] ; then
+    scp /var/run/microshift-dev-access-keys/registry.stage.redhat.io \
         "${INSTANCE_PREFIX}:/tmp"
 fi
 

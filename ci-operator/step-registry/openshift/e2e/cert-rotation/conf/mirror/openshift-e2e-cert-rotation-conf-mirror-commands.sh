@@ -23,7 +23,7 @@ scp "${SSHOPTS[@]}" /usr/bin/openshift-tests "root@${IP}:/usr/local/bin"
 cat >"${SHARED_DIR}"/local-mirror.sh <<'EOF'
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
@@ -226,8 +226,13 @@ do
 done
 set -e
 
+# Copy pull secret for external binary extraction
+mkdir -p /run/secrets/ci.openshift.io/cluster-profile
+cp -rvf ~/pull-secret /run/secrets/ci.openshift.io/cluster-profile
+
 # Mirror test images
 DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
+export KUBECONFIG=/root/.kube/config
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
 oc image mirror -f /tmp/mirror --registry-config ~/pull-secret
 echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
@@ -258,10 +263,11 @@ cat /tmp/registries.conf
 
 # Create a new CA bundle with registry CA included, restart assisted-service
 kubectl create configmap mirror-registry-ca -n assisted-installer --from-file=ca-bundle.crt=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem --from-file=registries.conf=/tmp/registries.conf
-mkdir -p $HOME/custom_manifests
-cat /etc/pki/ca-trust/source/anchors/ca.pem > $HOME/custom_manifests/ca.pem
-cat /etc/pki/ca-trust/source/anchors/server.pem >> $HOME/custom_manifests/ca.pem
-echo "export REGISTRY_CA_PATH=$HOME/custom_manifests/ca.pem" >> ~/config.sh
+mkdir -p /home/assisted/custom_manifests
+cat /etc/pki/ca-trust/source/anchors/ca.pem > /home/assisted/custom_manifests/ca.pem
+cat /etc/pki/ca-trust/source/anchors/server.pem >> /home/assisted/custom_manifests/ca.pem
+ls -la /home/assisted/custom_manifests/ca.pem
+echo "export REGISTRY_CA_PATH=/home/assisted/custom_manifests/ca.pem" >> ~/config.sh
 
 kubectl patch deployment -n assisted-installer assisted-service --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "mirror-registry-ca", "mountPath": "/etc/pki/tls/certs/ca-bundle.crt", "readOnly": true, "subPath": "mirror_ca.pem"}}]'
 kubectl -n assisted-installer rollout status deploy/assisted-service --timeout=5m
@@ -291,5 +297,6 @@ timeout \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \
+	-o 'ServerAliveInterval=90' -o 'ServerAliveCountMax=100' \
 	"root@${IP}" \
 	/usr/local/bin/local-mirror.sh

@@ -31,16 +31,8 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: "4.18"
-    namespace: ocp
-    tag: tests
-  tests-4.17:
-    name: "4.17"
-    namespace: ocp
-    tag: tests
   upi-installer:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -61,7 +53,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -165,16 +157,19 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
-- as: e2e-metal-assisted-4-18
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-metal-assisted-4-19
+  cluster: build05
+  pipeline_run_if_changed: ^(deploy/.*|hack/.*|src/.*|vendor/.*|Dockerfile.*|Makefile|go\.mod|go\.sum|\.dockerignore)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ipv6-4-18
+  as: e2e-metal-assisted-ipv6-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -182,39 +177,39 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-single-node-4-18
+  as: e2e-metal-assisted-single-node-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-cnv-4-17
+  as: e2e-metal-assisted-cnv-4-18
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.17
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+        OPENSHIFT_VERSION=4.18
         MASTER_MEMORY=18700
         MASTER_CPU=9
         WORKER_MEMORY=9216
         MASTER_DISK_COUNT=2
         WORKER_DISK_COUNT=2
         WORKER_CPU=5
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-lvm-4-18
+  as: e2e-metal-assisted-lvm-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -226,24 +221,24 @@ tests:
         MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-odf-4-17
+  as: e2e-metal-assisted-odf-4-18
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.17
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.17
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-ai-operator-ztp
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+        OPENSHIFT_VERSION=4.18
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-ai-operator-ztp
+  cluster: build05
+  pipeline_run_if_changed: ^(deploy/.*|hack/.*|src/.*|vendor/.*|Dockerfile.*|Makefile|go\.mod|go\.sum|\.dockerignore)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -251,29 +246,30 @@ tests:
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: assisted-baremetal-operator-ztp
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
-  as: e2e-oci-assisted-4-18
+  as: e2e-oci-assisted-4-19
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
     workflow: assisted-oci
 - always_run: false
-  as: e2e-metal-assisted-external-4-18
+  as: e2e-metal-assisted-external-4-19
+  cluster: build05
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
-        OPENSHIFT_VERSION=4.18
-    workflow: assisted-baremetal
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-vsphere-assisted-4-18
+  as: e2e-vsphere-assisted-4-19
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -281,7 +277,7 @@ tests:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
       PLATFORM: vsphere
     workflow: assisted-vsphere
 zz_generated_metadata:

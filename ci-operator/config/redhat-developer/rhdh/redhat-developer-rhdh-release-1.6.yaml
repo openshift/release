@@ -1,0 +1,182 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      cpu: "2"
+      memory: 5Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- as: e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md$
+  steps:
+    test:
+    - ref: redhat-developer-rhdh
+    workflow: generic-claim
+- as: e2e-tests-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 6 * * *
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-nightly
+    workflow: generic-claim
+- as: e2e-tests-nightly-ocp-v4-16
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  cron: 0 6 * * MON,WED,FRI
+  steps:
+    env:
+      OC_CLIENT_VERSION: stable-4.16
+    test:
+    - ref: redhat-developer-rhdh-nightly
+    workflow: generic-claim
+- as: e2e-tests-nightly-ocp-v4-15
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  cron: 0 6 * * MON,WED,FRI
+  steps:
+    env:
+      OC_CLIENT_VERSION: stable-4.15
+    test:
+    - ref: redhat-developer-rhdh-nightly
+    workflow: generic-claim
+- as: e2e-tests-aks-helm-nightly
+  cron: 0 6 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-aks-helm-nightly
+    workflow: redhat-developer-rhdh-aks-mapt
+- as: e2e-tests-aks-operator-nightly
+  cron: 0 6 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-aks-operator-nightly
+    workflow: redhat-developer-rhdh-aks-mapt
+- as: e2e-tests-gke-helm-nightly
+  cron: 0 6 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-gke-helm-nightly
+- as: e2e-tests-gke-operator-nightly
+  cron: 0 8 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-gke-operator-nightly
+- as: e2e-tests-operator-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 7 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-operator-nightly
+    workflow: generic-claim
+- as: e2e-tests-osd-gcp-helm-nightly
+  cron: 0 7 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    env:
+      OSD_VERSION: 4.17.12
+    test:
+    - ref: redhat-developer-rhdh-osd-gcp-nightly
+    workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
+  timeout: 3h40m0s
+- as: e2e-tests-osd-gcp-operator-nightly
+  cron: 0 7 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    env:
+      OSD_VERSION: 4.17.12
+    test:
+    - ref: redhat-developer-rhdh-osd-gcp-nightly
+    workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
+  timeout: 3h40m0s
+- as: e2e-tests-nightly-auth-providers
+  cron: 0 6 * * MON,WED,FRI
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-auth-providers-nightly
+- as: e2e-tests-upgrade-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 7 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-upgrade-nightly
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-1.6
+  org: redhat-developer
+  repo: rhdh

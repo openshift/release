@@ -125,6 +125,8 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   fi
 
   cd ${HOME}/install_yamls
+  # set slow etcd profile
+  make set_slower_etcd_profile
   # Create/enable openstack namespace
   make namespace
 
@@ -159,6 +161,12 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
     if oc get crd openstacks.operator.openstack.org &> /dev/null; then
       make openstack_init
     fi
+    # wait until all the service operators got really up and validate that the ctlplane
+    # is ready before patching the osversion. This is to make sure to check that the
+    # new set of operator and the deployments they create to work correct with the
+    # old vesion of service containers.
+    sleep 60
+    oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
     make openstack_patch_version || exit 1
     sleep 10
     oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1

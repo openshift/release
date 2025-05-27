@@ -7,13 +7,17 @@ ref:
       cpu: 1000m
       memory: 500Mi
   env:
+  - name: AUX_HOST
+    default: ""
+    documentation: |
+      The Bastion host acting as proxy to retrieve Catalog related information
   - name: CATALOGSOURCE_NAME
     default: ""
     documentation: |-
       System environment variable used to set the customized catalog name.
       If no catalog name is set, the catalog won't be generated.
   - name: CATALOGSOURCE_DISPLAY_NAME
-    default: PreGA Telco Operators
+    default: "Red Hat PreGA Operators"
     documentation: |-
       System environment variable used to set the customized catalog displayed name
   - name: INDEX_IMAGE
@@ -23,6 +27,14 @@ ref:
   - name: IMAGE_INDEX_OCP_VERSION
     documentation: |-
       System environment variable used to set the channel version to use (valid values would be: '4.15', '4.16', '4.17'...)
+  - name: PREGA_CATSRC_AND_ICSP_CRS_URL
+    default: "http://10.6.116.115"
+    documentation: |-
+      To get Catalog Sources and ImageContentSourcePolicy CR resources by Pre GA tag
+  - name: PREGA_OPERATOR_INDEX_TAGS_URL
+    default: "https://quay.io/api/v1/repository/prega/prega-operator-index/tag/"
+    documentation: |-
+      To get Pre GA Red Hat Operator tags
   - name: TENTATIVE_CREATION
     default: "yes"
     documentation: |-
@@ -33,8 +45,11 @@ ref:
       If, on the other hand, you want to ensure that the catalog has been created
       for the current job, set it to 'no' explicitly.
   credentials:
-   - namespace: test-credentials
-     name: telcov10n-ztp-left-shifting
-     mount_path: /var/run/telcov10n/ztp-left-shifting
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - namespace: test-credentials
+    name: telcov10n-ztp-left-shifting
+    mount_path: /var/run/telcov10n/ztp-left-shifting
   documentation: |-
     Install Telco pre-GA catalog source for OLM operators in connected env.

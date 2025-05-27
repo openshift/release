@@ -44,6 +44,12 @@ if [ ! -z ${resource_group} ]; then
 fi
 
 echo "DEBUG" "Checking the remaining dns resource-records ..."
+if [ -f "${CLUSTER_PROFILE_DIR}/ibmcloud-cis" ]; then
+  ibmcloud_cis_instance_name="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis")"
+else
+  ibmcloud_cis_instance_name="Openshift-IPI-CI-CIS"
+  ${IBMCLOUD_CLI} dns instances
+fi
 echo "IBMCLOUD_DNS_INSTANCE_NAME: $IBMCLOUD_DNS_INSTANCE_NAME, BASE_DOMAIN: $BASE_DOMAIN"
 if [ ! -z ${IBMCLOUD_DNS_INSTANCE_NAME} ] && [ ! -z ${BASE_DOMAIN} ]; then
   cmd="${IBMCLOUD_CLI} dns zones -i ${IBMCLOUD_DNS_INSTANCE_NAME} -o json | jq -r --arg n ${BASE_DOMAIN} '.[] | select(.name==\$n) | .id'"
@@ -63,7 +69,6 @@ if [ ! -z ${IBMCLOUD_DNS_INSTANCE_NAME} ] && [ ! -z ${BASE_DOMAIN} ]; then
   fi
 fi
 
-ibmcloud_cis_instance_name=$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis")
 echo "DEBUG" "Checking the remaining cis dns-records on ${ibmcloud_cis_instance_name}..."
 if [ ! -z ${BASE_DOMAIN} ] && [ ! -z ${ibmcloud_cis_instance_name} ]; then
   cmd="${IBMCLOUD_CLI} cis domains -i ${ibmcloud_cis_instance_name} -o json | jq -r --arg n ${BASE_DOMAIN} '.[] | select(.name==\$n) | .id'"

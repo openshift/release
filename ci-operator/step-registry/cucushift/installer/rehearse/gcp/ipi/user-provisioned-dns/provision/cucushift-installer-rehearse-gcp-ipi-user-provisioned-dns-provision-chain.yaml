@@ -1,8 +1,17 @@
 chain:
   as: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns-provision
   steps:
+  - ref: gcp-provision-minimal-permission
   - chain: ipi-conf-gcp
-  - chain: ipi-install
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install
+  - ref: gcp-provision-public-custom-dns
+  - ref: aws-provision-route53-public-record-sets
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
   - ref: enable-qe-catalogsource
   - chain: cucushift-installer-check
   - ref: cucushift-installer-check-user-provisioned-dns
@@ -10,7 +19,7 @@ chain:
   - name: USER_PROVISIONED_DNS
     default: "yes"
     documentation: |-
-      Allow users to select the user provisioned dns option for AWS installations during configuration. Valid options are "yes" and "no". When "yes", the
-      configuration will enable the user provisioned dns option through the install configuration file.
+      Allow users to select the user provisioned dns option for GCP installations during configuration. Valid options are "yes" and "no". When "yes", the configuration will enable the user provisioned 
+      dns option through the install configuration file.
   documentation: |-
-    Create an IPI cluster on GCP for QE e2e tests.
+    Create an IPI cluster on GCP with user provisioned DNS for QE e2e tests.

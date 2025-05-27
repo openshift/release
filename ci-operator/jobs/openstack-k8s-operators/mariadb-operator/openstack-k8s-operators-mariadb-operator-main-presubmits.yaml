@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build07
     context: ci/prow/functional
     decorate: true
     labels:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build07
     context: ci/prow/images
     decorate: true
     labels:
@@ -112,7 +112,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build07
     context: ci/prow/mariadb-operator-build-deploy
     decorate: true
     labels:
@@ -180,7 +180,77 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build07
+    context: ci/prow/mariadb-operator-build-deploy-chainsaw
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openstack-k8s-operators-mariadb-operator-main-mariadb-operator-build-deploy-chainsaw
+    rerun_command: /test mariadb-operator-build-deploy-chainsaw
+    skip_if_only_changed: ^(renovate.json|.*\.md|tests/functional/.*|OWNERS.*|LICENSE.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=mariadb-operator-build-deploy-chainsaw
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )mariadb-operator-build-deploy-chainsaw,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
     context: ci/prow/mariadb-operator-build-deploy-kuttl
     decorate: true
     decoration_config:
@@ -250,7 +320,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build07
     context: ci/prow/precommit-check
     decorate: true
     labels:

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/common-test
     decorate: true
     labels:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/e2e-agnostic-cmo
     decorate: true
     labels:
@@ -130,12 +130,12 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-prometheus-release-4.20-e2e-aws-ovn
@@ -202,12 +202,12 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-prometheus-release-4.20-e2e-aws-ovn-upgrade
@@ -274,7 +274,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/images
     decorate: true
     labels:
@@ -289,7 +289,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -328,7 +327,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/react-app-test
     decorate: true
     labels:
@@ -381,7 +380,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build07
     context: ci/prow/vendor
     decorate: true
     labels:
@@ -429,3 +428,63 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )vendor,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build07
+    context: ci/prow/verify-deps
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-prometheus-release-4.20-verify-deps
+    rerun_command: /test verify-deps
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=verify-deps
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)

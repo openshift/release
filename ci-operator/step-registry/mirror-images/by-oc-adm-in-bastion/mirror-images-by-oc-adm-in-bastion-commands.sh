@@ -13,6 +13,16 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
+if [[ "${MIRROR_BIN}" != "oc-adm" ]]; then
+  echo "users specifically do not use oc-adm to run mirror"
+  exit 0
+fi
+
+if [[ "${MIRROR_IN_BASTION}" != "yes" ]]; then
+  echo "users are going to mirror images from local, skip this step."
+  exit 0
+fi
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -47,6 +57,11 @@ fi
 
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+# since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
+# unset KUBECONFIG to ensure this step always interact with the build farm.
+unset KUBECONFIG
+oc registry login
+
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
 echo "readable_version: $readable_version"
 
@@ -60,14 +75,10 @@ target_release_image="${target_release_image_repo}:${readable_version}"
 echo "target_release_image: $target_release_image"
 echo "target_release_image_repo: $target_release_image_repo"
 
-# since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
-# unset KUBECONFIG to ensure this step always interact with the build farm.
-unset KUBECONFIG
-oc registry login
-
 # combine custom registry credential and default pull secret
 registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+oc registry login --to "${new_pull_secret}"
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
@@ -82,11 +93,14 @@ fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+if [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+    BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
+fi
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 
 # shellcheck disable=SC2089
 ssh_options="-o UserKnownHostsFile=/dev/null -o IdentityFile=${SSH_PRIV_KEY_PATH} -o StrictHostKeyChecking=no"
-# scp new_pull_secret credential to bastion host
+echo "copy pull secret from local to the remote host"
 # shellcheck disable=SC2090
 scp ${ssh_options} "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_pull_secret}
 
@@ -105,12 +119,25 @@ args=(
     --insecure=true
 )
 
-# shellcheck disable=SC2090
-ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "which oc && oc version --client"
+run_command "which oc && oc version --client"
+OC_BIN="oc"
+remote_oc_bin="/tmp/oc"
+if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "which oc && oc version --client"; then
+    echo "use the installed oc in the remote host"
+else
+    local_oc_bin=$(which oc)
+    echo "copy ${local_oc_bin} from local to the remote host"
+    # shellcheck disable=SC2090
+    scp ${ssh_options} "${local_oc_bin}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_oc_bin}
+    OC_BIN="${remote_oc_bin}"
+    # Note, if hit "/lib64/libc.so.6: version `GLIBC_2.33' not found" issue, that means the
+    # remote host OS is out of date, maybe need to use a newer bastion image to launch.
+    ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${OC_BIN} version --client"
+fi
 
 # check whether the oc command supports the extra options and add them to the args array.
 # shellcheck disable=SC2090
-if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release mirror -h | grep -q -- --keep-manifest-list"; then
+if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${OC_BIN} adm release mirror -h | grep -q -- --keep-manifest-list"; then
     echo "Adding --keep-manifest-list to the mirror command."
     args+=(--keep-manifest-list=true)
 else
@@ -118,7 +145,7 @@ else
 fi
 
 # shellcheck disable=SC2090
-if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release mirror -h | grep -q -- --print-mirror-instructions"; then
+if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${OC_BIN} adm release mirror -h | grep -q -- --print-mirror-instructions"; then
     echo "Adding --print-mirror-instructions to the mirror command."
     args+=(--print-mirror-instructions="${mirror_crd_type}")
 else
@@ -126,7 +153,8 @@ else
 fi
 
 # mirror images in bastion host, which will increase mirror upload speed
-cmd="oc adm release -a '${remote_pull_secret}' mirror ${args[*]}"
+cmd="${OC_BIN} adm release -a '${remote_pull_secret}' mirror ${args[*]}"
+echo "Remote Command: ${cmd}"
 # shellcheck disable=SC2090
 ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} \
 "${cmd}" | tee "${mirror_output}"

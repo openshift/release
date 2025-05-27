@@ -32,9 +32,15 @@ images:
   - name: OPENSHIFT_CI
     value: "1"
   dockerfile_path: Containerfile
-  from: rhel-coreos-base
+  inputs:
+    rhel-coreos-base:
+      as:
+      - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
   to: rhel-coreos
-- dockerfile_path: extensions/Dockerfile
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "1"
+  dockerfile_path: extensions/Dockerfile
   inputs:
     rhel-coreos:
       as:
@@ -42,8 +48,7 @@ images:
   to: rhel-coreos-extensions
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - build-image
     - rhel-coreos
     - rhel-coreos-extensions
@@ -193,7 +198,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.19

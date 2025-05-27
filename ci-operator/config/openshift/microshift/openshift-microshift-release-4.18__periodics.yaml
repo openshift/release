@@ -37,17 +37,21 @@ tests:
   cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-publish-release-notes
-- as: e2e-aws-tests-cache-nightly
-  cron: 0 0 * * *
+- as: rebase-on-nightlies
+  cron: 0 4 * * 1,4
   steps:
-    cluster_profile: aws
+    workflow: openshift-microshift-rebase
+- as: e2e-aws-tests-cache-nightly
+  cron: 30 0 * * *
+  steps:
+    cluster_profile: aws-3
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests-cache-nightly-arm
-  cron: 0 0 * * *
+  cron: 30 0 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
@@ -63,7 +67,7 @@ tests:
 - as: e2e-aws-tests-bootc-arm-nightly
   cron: 0 2 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.4
@@ -71,7 +75,7 @@ tests:
 - as: e2e-aws-tests-nightly
   cron: 30 2 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
@@ -87,7 +91,7 @@ tests:
 - as: e2e-aws-ovn-ocp-conformance
   cron: 0 4 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       MICROSHIFT_OS: rhel-9.4
       TEST_SUITE: openshift/conformance/parallel
@@ -95,7 +99,7 @@ tests:
 - as: e2e-aws-ovn-ocp-conformance-serial
   cron: 0 4 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       MICROSHIFT_OS: rhel-9.4
       TEST_SUITE: openshift/conformance/serial
@@ -130,11 +134,11 @@ tests:
 - as: e2e-aws-footprint-and-performance-nightly
   cron: 0 1 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-footprint-and-performance
+    workflow: openshift-microshift-e2e-bare-metal-tests
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

@@ -43,27 +43,30 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: true
+- always_run: false
   as: cargo-check
   commands: cargo check
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: cargo-test
   commands: cargo test
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: cargo-clippy
   commands: cargo clippy
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: e2e-aws-ovn-single-node-recert-serial
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SKIPS: Managed cluster should grow and decrease when scaling different
         machineSets simultaneously
       TEST_SUITE: openshift/conformance/serial
@@ -71,12 +74,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-recert
-- always_run: true
+- always_run: false
   as: e2e-aws-ovn-single-node-recert-parallel
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/parallel
     observers:
       enable:
@@ -85,9 +88,8 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       E2E_RUN_TAGS: '@level0'
       TEST_IMPORTANCE: LEVEL0
     observers:
@@ -125,10 +127,11 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-sno
-- always_run: true
+- always_run: false
   as: baremetalds-sno-recert-cluster-rename
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
       PACKET_OS: rocky_9
     test:

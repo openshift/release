@@ -1,0 +1,75 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/go-toolset:9.5
+      USER root
+      # latest version compatible with most kustomize manifests without throwing warnings (v4)
+      # from v5 warning will be thrown, however the ansible module will fail
+      ENV KUBECTL_VERSION=v1.24.17
+      RUN dnf install -y python3-pip diffutils && \
+      pip install ansible ansible-lint && \
+      dnf remove -y golang && \
+      wget -q https://go.dev/dl/go1.23.6.linux-amd64.tar.gz && \
+      rm -rf /usr/local/go && \
+      tar -C /usr/local -xzf go1.23.6.linux-amd64.tar.gz && \
+      mkdir /tmp/kubectl && \
+      curl -sSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+      install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+      rm -rf /tmp/kubectl && \
+      dnf install -y python3-pip diffutils && \
+      pip install ansible ansible-lint jinja2-cli
+      ENV PATH=$PATH:/usr/local/go/bin
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: XDG_CACHE_HOME=/tmp/.cache make lint
+  container:
+    from: src
+- as: unit
+  commands: XDG_CACHE_HOME=/tmp/.cache make test
+  container:
+    from: src
+- as: check-generated-files
+  commands: XDG_CACHE_HOME=/tmp/.cache make check-generated-files
+  container:
+    from: src
+- as: ansible-lint
+  commands: ANSIBLE_HOME=/tmp/.ansible ANSIBLE_LOCAL_TEMP=/tmp/.ansible.tmp XDG_CACHE_HOME=/tmp/.cache
+    ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/.ansible-cache make ansible-lint
+  container:
+    from: src
+  run_if_changed: ^(test/playbooks/.*|test/e2e/.*)$
+- always_run: false
+  as: e2e-capi-multinode
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-ofcir-baremetal-capi
+- as: e2e-capi-multinode-postsubmit
+  cluster: build05
+  postsubmit: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-ofcir-baremetal-capi
+zz_generated_metadata:
+  branch: master
+  org: openshift-assisted
+  repo: cluster-api-provider-openshift-assisted

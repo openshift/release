@@ -20,38 +20,28 @@ images:
       as:
       - $GO_BUILDER
   to: kn-plugin-event-sender
+- dockerfile_path: openshift/ci-operator/images/kn-event/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
+  to: kn-plugin-event-kn-event
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   to: kn-plugin-event-source-image
-- dockerfile_path: openshift/ci-operator/test-images/eventshub/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
-      as:
-      - $GO_BUILDER
-  to: kn-plugin-event-test-eventshub
-- dockerfile_path: openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
-      as:
-      - $GO_BUILDER
-  to: kn-plugin-event-test-wathola-forwarder
 promotion:
   to:
   - additional_images:
       kn-plugin-event-src: src
+    name: release-1.17
     namespace: knative
-    tag: release-1.17
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.18"
 resources:
   '*':
@@ -66,14 +56,16 @@ tests:
   container:
     from: src
 - as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.18"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -120,7 +112,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -129,18 +120,16 @@ tests:
       dependencies:
       - env: KN_PLUGIN_EVENT_SENDER
         name: kn-plugin-event-sender
+      - env: KN_PLUGIN_EVENT_KN_EVENT
+        name: kn-plugin-event-kn-event
       - env: KN_PLUGIN_EVENT_SOURCE_IMAGE
         name: kn-plugin-event-source-image
-      - env: KN_PLUGIN_EVENT_TEST_EVENTSHUB
-        name: kn-plugin-event-test-eventshub
-      - env: KN_PLUGIN_EVENT_TEST_WATHOLA_FORWARDER
-        name: kn-plugin-event-test-wathola-forwarder
       from: kn-plugin-event-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-1.17

@@ -13,7 +13,6 @@ fi
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
-    cp /tmp/installer/metadata.json "${ARTIFACT_DIR}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -32,9 +31,6 @@ export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
-elif [ -f "${SHARED_DIR}/gcp_min_permissions_without_actas.json" ]; then
-  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account, which hasn't the 'iam.serviceAccounts.actAs' permission, for the minimum permissions testing on GCP..."
-  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions_without_actas.json"
 elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
@@ -67,10 +63,12 @@ if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
 fi
 
 echo ${SHARED_DIR}/metadata.json
-
 if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
     echo "Setting AZURE credential with minimal permissions for installer"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+    echo "Setting AZURE credential with Contributor role only for installer"
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
 fi
 
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
@@ -82,6 +80,15 @@ fi
 
 echo "Copying the installation artifacts to the Installer's asset directory..."
 cp -ar "${SHARED_DIR}" /tmp/installer
+
+export INSTALLER_BINARY="openshift-install"
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        echo "Extracting installer from ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+        oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to="/tmp" || exit 1
+        export INSTALLER_BINARY="/tmp/openshift-install"
+fi
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # C2S/SC2S regions do not support destory
@@ -98,7 +105,7 @@ fi
 if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
   echo "Destroy bootstrap ..."
   set +e
-  openshift-install --dir /tmp/installer destroy bootstrap
+  ${INSTALLER_BINARY} --dir /tmp/installer destroy bootstrap
   set -e
 fi
 
@@ -125,7 +132,7 @@ fi
 
 echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
-openshift-install --dir /tmp/installer destroy cluster &
+${INSTALLER_BINARY} --dir /tmp/installer destroy cluster &
 
 set +e
 wait "$!"

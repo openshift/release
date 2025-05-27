@@ -1,6 +1,81 @@
 periodics:
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rhpit
+    repo: interop-tests
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: retrigger-poc
+    ci.openshift.io/generator: prowgen
+    job-release: "4.19"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rhpit-interop-tests-main-retrigger-poc-failure-test
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=failure-test
+      - --variant=retrigger-poc
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 6 * * 1
   decorate: true
   decoration_config:
@@ -14,9 +89,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-layered-product-interop-418
+  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-layered-product-interop-419
   reporter_config:
     slack:
       channel: '#team-qe-lp-triage'
@@ -36,7 +111,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-self-managed-layered-product-interop-418
+      - --target=ocp-self-managed-layered-product-interop-419
       - --variant=weekly_trigger
       command:
       - ci-operator
@@ -86,7 +161,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 6 * * 1
   decorate: true
   decoration_config:
@@ -100,9 +175,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-layered-product-interop-418-fips
+  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-layered-product-interop-419-fips
   reporter_config:
     slack:
       channel: '#team-qe-lp-triage'
@@ -122,7 +197,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-self-managed-layered-product-interop-418-fips
+      - --target=ocp-self-managed-layered-product-interop-419-fips
       - --variant=weekly_trigger
       command:
       - ci-operator
@@ -172,7 +247,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 16 15 4 *
   decorate: true
   decoration_config:
@@ -186,7 +261,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-layered-product-interop-zstream-n-1
   reporter_config:
@@ -258,7 +333,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 16 15 4 *
   decorate: true
   decoration_config:
@@ -272,7 +347,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-layered-product-interop-zstream-n-2
   reporter_config:
@@ -344,7 +419,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 14 * * 1
   decorate: true
   decoration_config:
@@ -358,9 +433,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-lp-watcher-bot-message-418
+  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-lp-watcher-bot-message-419
   reporter_config:
     slack:
       channel: '#team-qe-lp-triage'
@@ -380,7 +455,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-self-managed-lp-watcher-bot-message-418
+      - --target=ocp-self-managed-lp-watcher-bot-message-419
       - --variant=weekly_trigger
       command:
       - ci-operator
@@ -430,7 +505,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 14 * * 1
   decorate: true
   decoration_config:
@@ -444,9 +519,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-lp-watcher-bot-message-418-fips
+  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-ocp-self-managed-lp-watcher-bot-message-419-fips
   reporter_config:
     slack:
       channel: '#team-qe-lp-triage'
@@ -466,7 +541,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-self-managed-lp-watcher-bot-message-418-fips
+      - --target=ocp-self-managed-lp-watcher-bot-message-419-fips
       - --variant=weekly_trigger
       command:
       - ci-operator
@@ -516,8 +591,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
-  cron: 0 0 * * 3
+  cluster: build11
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -530,7 +605,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-rosa-classic-sts-layered-product-interop-416
   reporter_config:
@@ -602,8 +677,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
-  cron: 0 8 * * 3
+  cluster: build11
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -616,7 +691,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-rosa-classic-sts-lp-watcher-bot-message-416
   spec:
@@ -677,8 +752,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
-  cron: 0 6 * * 4
+  cluster: build11
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -691,93 +766,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-rosa-sts-hypershift-layered-product-interop-415
-  reporter_config:
-    slack:
-      channel: '#team-qe-lp-triage'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-hypershift-layered-product-interop-415
-      - --variant=weekly_trigger
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 0 0 * * 4
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: rhpit
-    repo: interop-tests
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
-    ci-operator.openshift.io/variant: weekly_trigger
-    ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-rosa-sts-hypershift-layered-product-interop-416
   reporter_config:
@@ -849,8 +838,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
-  cron: 0 18 * * 4
+  cluster: build11
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -863,93 +852,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: weekly_trigger
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-rosa-sts-hypershift-lp-watcher-bot-message-415
-  reporter_config:
-    slack:
-      channel: '#team-qe-lp-triage'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-hypershift-lp-watcher-bot-message-415
-      - --variant=weekly_trigger
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 0 18 * * 4
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: rhpit
-    repo: interop-tests
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
-    ci-operator.openshift.io/variant: weekly_trigger
-    ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhpit-interop-tests-main-weekly_trigger-rosa-sts-hypershift-lp-watcher-bot-message-416
   spec:

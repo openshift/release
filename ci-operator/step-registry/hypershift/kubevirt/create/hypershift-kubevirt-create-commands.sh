@@ -37,6 +37,16 @@ if [[ -n ${MCE} ]] ; then
   fi
 fi
 
+function SUPPORT_NP_SKEW() {
+  curl -L "https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq && chmod +x /tmp/yq
+  local EXTRA_FLARGS=""
+  if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && -n "$MCE" ]]; then
+    EXTRA_FLARGS+=$( (( $(awk 'BEGIN {print ("'"$MCE"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+    EXTRA_FLARGS+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+    EXTRA_FLARGS+="&& oc apply -f /tmp/hc.yaml"
+  fi
+  echo "$EXTRA_FLARGS"
+}
 
 if [[ ! -f $HCP_CLI ]]; then
   # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
@@ -89,7 +99,7 @@ oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p 
   '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
 
-RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
 if [[ "${DISCONNECTED}" == "true" ]];
 then
@@ -192,20 +202,20 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
   # shellcheck disable=SC2086
-  "${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
-    --name "${CLUSTER_NAME}" \
-    --namespace "${CLUSTER_NAMESPACE_PREFIX}" \
-    --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
-    --memory "${HYPERSHIFT_NODE_MEMORY}Gi" \
-    --cores "${HYPERSHIFT_NODE_CPU_CORES}" \
+  eval "${HCP_CLI} create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
+    --name ${CLUSTER_NAME} \
+    --namespace ${CLUSTER_NAMESPACE_PREFIX} \
+    --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
+    --memory ${HYPERSHIFT_NODE_MEMORY}Gi \
+    --cores ${HYPERSHIFT_NODE_CPU_CORES} \
     --root-volume-size 64 \
-    --release-image "${RELEASE_IMAGE}" \
-    --pull-secret "${PULL_SECRET_PATH}" \
+    --release-image ${RELEASE_IMAGE} \
+    --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
-    --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
-    --infra-availability-policy "${INFRA_AVAILABILITY}" \
+    --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
+    --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14
+    --cluster-cidr 10.136.0.0/14  $(SUPPORT_NP_SKEW)"
 fi
 
 

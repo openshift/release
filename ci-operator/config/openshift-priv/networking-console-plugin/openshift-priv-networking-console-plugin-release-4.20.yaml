@@ -1,31 +1,32 @@
 base_images:
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
+  ocp_4.19_base-rhel9:
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-base-nodejs-openshift-4.15:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-nodejs-openshift-4.15
+    tag: rhel-9-base-nodejs-openshift-4.19
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: console-plugin-test-cypress
+    tag: console-plugin-test-cypress-v18
 canonical_go_repository: github.com/openshift/networking-console-plugin
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-8-base-nodejs-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-base-nodejs-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-nodejs-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.19
   to: networking-console-plugin
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -71,7 +72,7 @@ tests:
           memory: 300Mi
 - as: e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest

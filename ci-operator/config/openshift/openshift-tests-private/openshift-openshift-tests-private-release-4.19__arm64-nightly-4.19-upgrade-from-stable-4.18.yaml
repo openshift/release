@@ -86,53 +86,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disc-priv-sts-basecap-none-f28
-  cron: 40 17 12 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      ENABLE_OTA_TEST: OCP-66839
-      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST: CloudCredential CloudCredential+Ingress
-        MachineAPI+CloudCredential
-      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE: CloudCredential CloudCredential+Ingress
-        MachineAPI+CloudCredential
-      EXPECTED_CAPABILITIES_IN_MANIFEST: CloudControllerManager CloudCredential CloudCredential+CloudControllerManager
-        CloudCredential+Ingress Ingress MachineAPI MachineAPI+CloudCredential
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CCO_MANUAL_MODE: oidc
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-f28
-  cron: 39 15 7 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-mini-perm-f28
   cron: 16 1 22 * *
   steps:
@@ -184,7 +137,8 @@ tests:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
 - as: baremetal-upi-ovn-ipv4-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 35 15 12 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -200,6 +154,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
 - as: baremetalds-ipi-ovn-ipv4-f28
+  cluster: build05
   cron: 8 12 14 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -209,13 +164,11 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
-      PACKET_METRO: dc
-      PACKET_PLAN: c3.large.arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: gcp-ipi-disc-priv-oidc-f28
-  cron: 2 13 14 * *
+- as: gcp-ipi-disc-priv-oidc-mini-perm-f28
+  cron: 35 0 5 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -223,7 +176,9 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test-disconnected

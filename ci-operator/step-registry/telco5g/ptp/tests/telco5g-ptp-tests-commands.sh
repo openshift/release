@@ -87,6 +87,8 @@ spec:
           cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
+          # OCPBUGS-52327 fix build due to libresolv.so link error
+          sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
           if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
             sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
             make docker-build
@@ -118,41 +120,40 @@ spec:
       secret:
       '
 
-jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<< "$jobdefinition")
-jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<< "$jobdefinition")
-jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<< "$jobdefinition")
-#oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
+  jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
+  #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
-retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
-dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
-jobdefinition="${jobdefinition} secretName: ${dockercgf}"
-echo "$jobdefinition"
-echo "$jobdefinition" | oc apply -f -
+  retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
+  dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
+  jobdefinition="${jobdefinition} secretName: ${dockercgf}"
+  echo "$jobdefinition"
+  echo "$jobdefinition" | oc apply -f -
 
-success=0
-iterations=0
-sleep_time=10
-max_iterations=72 # results in 12 minutes timeout
-until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]
-do
-  run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
-   if [ "$run_status" == "Succeeded" ]; then
-          success=1
-          break
-   fi
-   iterations=$((iterations+1))
-   sleep $sleep_time
-done
+  success=0
+  iterations=0
+  sleep_time=10
+  max_iterations=72 # results in 12 minutes timeout
+  until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]; do
+    run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
+    if [ "$run_status" == "Succeeded" ]; then
+      success=1
+      break
+    fi
+    iterations=$((iterations + 1))
+    sleep $sleep_time
+  done
 
-if [[ $success -eq 1 ]]; then
-  echo "[INFO] index build succeeded"
-else
-  echo "[ERROR] index build failed"
-  exit 1
-fi
+  if [[ $success -eq 1 ]]; then
+    echo "[INFO] index build succeeded"
+  else
+    echo "[ERROR] index build failed"
+    exit 1
+  fi
 
-# print the build logs
-oc -n openshift-ptp logs podman
+  # print the build logs
+  oc -n openshift-ptp logs podman
 
 }
 
@@ -161,7 +162,7 @@ retry_with_timeout() {
   local timeout=$1
   local interval=$2
   local command="${*:3}"
-  echo command=$command
+  echo command="$command"
   local start_time
   start_time=$(date +%s)
   local end_time=$((start_time + timeout))
@@ -172,44 +173,44 @@ retry_with_timeout() {
     # Check if the timeout has expired
     local current_time
     current_time=$(date +%s)
-    if [ ${current_time} -gt ${end_time} ]; then
+    if [ "${current_time}" -gt "${end_time}" ]; then
       return 1
     fi
 
     # Sleep for the specified interval before retrying
-    sleep ${interval}
+    sleep "${interval}"
   done
 }
 
 # print RTC logs
 print_time() {
-# Get the list of nodes in the cluster
-NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+  # Get the list of nodes in the cluster
+  NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
-# Loop through each node
-for node in $NODES; do
+  # Loop through each node
+  for node in $NODES; do
     echo "Processing node: $node"
-    oc debug node/$node -- chroot /host sh -c "date;sudo hwclock"
-done
+    oc debug node/"$node" -- chroot /host sh -c "date;sudo hwclock"
+  done
 }
 
 set_events_output_file() {
-  sed -i -E 's@(event_output_file:\s*)(.*)@event_output_file: '${ARTIFACT_DIR}'/event_log_'${PTP_TEST_MODE}'.csv@g' ${SHARED_DIR}/test-config.yaml
+  sed -i -E 's@(event_output_file:\s*)(.*)@event_output_file: '"${ARTIFACT_DIR}"'/event_log_'"${PTP_TEST_MODE}"'.csv@g' "${SHARED_DIR}"/test-config.yaml
 }
 
 echo "************ telco5g cnf-tests commands ************"
 
 if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
-    readarray -t config <<< "${E2E_TESTS_CONFIG}"
-    for var in "${config[@]}"; do
-        if [[ ! -z "${var}" ]]; then
-            if [[ "${var}" == *"CNF_E2E_TESTS"* ]]; then
-                CNF_E2E_TESTS="$(echo "${var}" | cut -d'=' -f2)"
-            elif [[ "${var}" == *"CNF_ORIGIN_TESTS"* ]]; then
-                CNF_ORIGIN_TESTS="$(echo "${var}" | cut -d'=' -f2)"
-            fi
-        fi
-    done
+  readarray -t config <<<"${E2E_TESTS_CONFIG}"
+  for var in "${config[@]}"; do
+    if [[ -n "${var}" ]]; then
+      if [[ "${var}" == *"CNF_E2E_TESTS"* ]]; then
+        CNF_E2E_TESTS="$(echo "${var}" | cut -d'=' -f2)"
+      elif [[ "${var}" == *"CNF_ORIGIN_TESTS"* ]]; then
+        CNF_ORIGIN_TESTS="$(echo "${var}" | cut -d'=' -f2)"
+      fi
+    fi
+  done
 fi
 
 export CNF_E2E_TESTS
@@ -224,11 +225,11 @@ export KUBECONFIG=$SHARED_DIR/kubeconfig
 
 # Set go version
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
-    source $HOME/golang-1.20
+  source "$HOME"/golang-1.20
 elif [[ "$T5CI_VERSION" == "4.16" ]]; then
-    source $HOME/golang-1.21.11
+  source "$HOME"/golang-1.21.11
 else
-    source $HOME/golang-1.22.4
+  source "$HOME"/golang-1.22.4
 fi
 
 temp_dir=$(mktemp -d -t cnf-XXXXX)
@@ -258,17 +259,29 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 
 # patching to add events
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
-    export EVENT_API_VERSION="1.0"
-    oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+  export EVENT_API_VERSION="1.0"
+  oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 else
-    export EVENT_API_VERSION="2.0"
-    oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"2.0"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
+  export EVENT_API_VERSION="2.0"
+  oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"2.0"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 fi
 
 if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
-    export ENABLE_V1_REGRESSION="true"
+  export ENABLE_V1_REGRESSION="true"
 else
-    export ENABLE_V1_REGRESSION="false"
+  export ENABLE_V1_REGRESSION="false"
+fi
+
+if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+  echo "Version is less than 4.19"
+  # release-4.18 consumer image supports event API v1
+  export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
+  TEST_MODES=("dualnicbc" "bc" "oc")
+else
+  echo "Version is 4.19 or greater"
+  export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
+  # Only run tgm and dualfollower tests from 4.19 onwards
+  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "bc" "oc")
 fi
 
 # wait for the linuxptp-daemon to be deployed
@@ -282,7 +295,7 @@ git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-
 cd ptp-operator-conformance-test
 
 # configuration
-cat <<'EOF' > ${SHARED_DIR}/test-config.yaml
+cat <<'EOF' >"${SHARED_DIR}"/test-config.yaml
 ---
 global:
  maxoffset: 100
@@ -333,10 +346,6 @@ EOF
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 
-temp_status_dnbc=0
-temp_status_bc=0
-temp_status_oc=0
-
 export PTP_LOG_LEVEL=debug
 export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
@@ -348,47 +357,42 @@ sleep 300
 # get RTC logs
 print_time
 
-# Running Dual NIC BC scenario
-export PTP_TEST_MODE=dualnicbc
-export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
-set_events_output_file
-make functests || temp_status_dnbc=$?
+# Run tests
+for mode in "${TEST_MODES[@]}"; do
+  echo "Running tests for PTP_TEST_MODE=${mode}"
 
-# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
-sleep 60
+  export PTP_TEST_MODE="${mode}"
+  export JUNIT_OUTPUT_FILE="test_results_${PTP_TEST_MODE}.xml"
+  set_events_output_file
 
-# get RTC logs
-print_time
+  temp_status="temp_status_${mode}" # Convert to lowercase for variable naming
+  exit_code=0
+  make functests || exit_code=$?
+  declare "$temp_status=$exit_code"
 
-# Running BC scenario
-export PTP_TEST_MODE=bc
-export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
-set_events_output_file
-make functests || temp_status_bc=$?
+  # Get RTC logs
+  print_time
+done
 
-# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
-sleep 60
-
-# get RTC logs
-print_time
-
-# Running OC scenario
-export PTP_TEST_MODE=oc
-export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
-set_events_output_file
-make functests || temp_status_oc=$?
-
-# get RTC logs
-print_time
-
-# saving overall status (all success=0, any failure=1)
 status=0
-if [[ $temp_status_dnbc != 0 || $temp_status_bc != 0 || $temp_status_oc != 0 ]]; then
-  echo  "status for Dual NIC BC scenario = $temp_status_dnbc"
-  echo  "status for BC scenario = $temp_status_bc"
-  echo  "status for OC scenario = $temp_status_oc"
-  status=1
-fi
+# Display all statuses
+for mode in "${TEST_MODES[@]}"; do
+  temp_status="temp_status_${mode}"
+  # If the variable is not set return an error
+  if [[ -z ${!temp_status+x} ]]; then
+    echo "Error: Variable $temp_status is unset!"
+    status=1
+    continue
+  fi
+
+  value="${!temp_status}"
+  echo "$temp_status = $value"
+
+  if [[ "$value" -ne 0 ]]; then
+    status=1
+    break
+  fi
+done
 
 # allows commands to fail without returning
 set +e
@@ -399,33 +403,30 @@ make undeploy
 # publishing results
 cd -
 
-python3 -m venv ${SHARED_DIR}/myenv
-source ${SHARED_DIR}/myenv/bin/activate
-git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
-pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
+python3 -m venv "${SHARED_DIR}"/myenv
+source "${SHARED_DIR}"/myenv/bin/activate
+git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
+pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
 # Create HTML reports for humans/aliens
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_*xml -o ${ARTIFACT_DIR}/test_results_all.html
+python "${SHARED_DIR}"/telco5gci/j2html.py "${ARTIFACT_DIR}"/test_results_*xml -o "${ARTIFACT_DIR}"/test_results_all.html
 
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_dualnicbc.xml -o ${ARTIFACT_DIR}/test_results_dualnicbc.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_bc.xml -o ${ARTIFACT_DIR}/test_results_bc.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_oc.xml -o ${ARTIFACT_DIR}/test_results_oc.html
+for mode in "${TEST_MODES[@]}"; do
+  python "${SHARED_DIR}"/telco5gci/j2html.py "${ARTIFACT_DIR}"/test_results_"${mode}".xml -o "${ARTIFACT_DIR}"/test_results_"${mode}".html
+done
 
 # merge junit files in to one
-junitparser merge ${ARTIFACT_DIR}/test_results_*xml ${ARTIFACT_DIR}/test_results_all.xml && \
-cp ${ARTIFACT_DIR}/test_results_all.xml ${ARTIFACT_DIR}/junit.xml
+junitparser merge "${ARTIFACT_DIR}"/test_results_*xml "${ARTIFACT_DIR}"/test_results_all.xml &&
+  cp "${ARTIFACT_DIR}"/test_results_all.xml "${ARTIFACT_DIR}"/junit.xml
 
 # Create JSON reports for robots
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/test_results_all.xml -o ${ARTIFACT_DIR}/test_results.json
-
-# delete original separate junit files
-#rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/test_results_*xml
+python "${SHARED_DIR}"/telco5gci/junit2json.py "${ARTIFACT_DIR}"/test_results_all.xml -o "${ARTIFACT_DIR}"/test_results.json
 
 # delete temp directory
-rm -rf $temp_dir
+rm -rf "$temp_dir"
 
 # cancel "allows commands to fail without returning"
 set -e
 
 # return saved status
-exit ${status}
+exit "${status}"

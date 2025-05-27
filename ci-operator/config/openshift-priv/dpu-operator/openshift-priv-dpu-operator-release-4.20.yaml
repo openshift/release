@@ -45,7 +45,8 @@ images:
   to: custom-src
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -90,6 +91,17 @@ tests:
   steps:
     workflow: dpu-operator-e2e-tests-workflow
   timeout: 8h0m0s
+- as: make-e2e-test-marvell
+  cluster: build05
+  steps:
+    workflow: dpu-operator-e2e-tests-marvell
+  timeout: 8h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
