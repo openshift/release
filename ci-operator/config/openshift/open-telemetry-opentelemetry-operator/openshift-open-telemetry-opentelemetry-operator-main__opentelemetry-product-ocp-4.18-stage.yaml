@@ -27,16 +27,8 @@ resources:
 tests:
 - always_run: false
   as: opentelemetry-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-tracing
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
   steps:
+    cluster_profile: gcp-observability
     env:
       OPERATORS: |
         [
@@ -49,13 +41,14 @@ tests:
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
         ]
       OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927217
+      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws*
       TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928198
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

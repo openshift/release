@@ -13,10 +13,16 @@ images:
 - dockerfile_literal: |
     FROM this-is-ignored
     RUN dnf install -y git
-    COPY oc /usr/bin/oc
     WORKDIR /go/src/github.com/openshift-kni/commatrix
     RUN mkdir -p /go/src/github.com/openshift-kni/commatrix/vendor && \
         chmod -R a+w /go/src/github.com/openshift-kni/commatrix
+
+    RUN mkdir -p /tmp/bin && \
+        chgrp root /tmp/bin && \
+        chmod -R a+w /tmp/bin
+
+    COPY oc /usr/bin/oc
+    COPY oc /tmp/bin/
     COPY app/ .
   from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
   inputs:
@@ -80,13 +86,15 @@ tests:
         tar -xvzf /tmp/${KREW}.tar.gz -C /tmp/krew
 
         /tmp/krew/${KREW} install krew
-        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+        export KREW_ROOT="${KREW_ROOT:-$HOME/.krew}"
+        export PATH="${KREW_ROOT}/bin:$PATH"
 
         # Install the commatrix krew plugin
-        oc krew install --manifest=cmd/commatrix-krew.yaml
-
+        go mod vendor
+        make build
+        make install INSTALL_DIR=/tmp/bin/
         # run the make e2e-test
-        go mod vendor && make e2e-test
+        PATH="/tmp/bin:$PATH" make e2e-test
       from: cli-with-git
       resources:
         requests:

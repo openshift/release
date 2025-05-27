@@ -6,6 +6,9 @@ set -o pipefail
 set -x
 
 echo "************ post cert-rotation test command ************"
+if [[ -f "${CLUSTER_PROFILE_DIR}"/osServicePrincipal.json ]]; then
+    export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+fi
 
 cat <<'EOF' > ${SHARED_DIR}/test-list
 "[sig-cli] Kubectl logs logs should be able to retrieve and filter logs [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
