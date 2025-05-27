@@ -49,4 +49,4 @@ fi
 
 echo "$RUN_COMMAND"
 
-${RUN_COMMAND} || true
+${RUN_COMMAND}
