@@ -720,90 +720,6 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build11
-    context: ci/prow/e2e-aws
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
-      ci.openshift.io/generator: prowgen
-      job-release: "4.15"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-tests-private-release-4.15-debug-winc-vsphere-ipi
-    optional: true
-    rerun_command: /test debug-winc-vsphere-ipi
-    run_if_changed: test/extended/winc/
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=debug-winc-vsphere-ipi
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )debug-winc-vsphere-ipi,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
     cluster: build10
     context: ci/prow/e2e-aws
     decorate: true
@@ -911,8 +827,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=[release:latest]
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-console
         command:
         - ci-operator
         image: ci-operator:latest
@@ -966,23 +882,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-console,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
     cluster: build06
-    context: ci/prow/images-images
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: images
       ci.openshift.io/generator: prowgen
+      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-tests-private-release-4.15-images-images
-    rerun_command: /test images-images
+    name: pull-ci-openshift-openshift-tests-private-release-4.15-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -991,7 +907,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=images
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1030,7 +945,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
