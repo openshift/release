@@ -19,8 +19,8 @@ echo "SHARED_DIR=${SHARED_DIR}"
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "KUBECONFIG=${KUBECONFIG}"
 
-ROX_SCANNER_V4=${ROX_SCANNER_V4_ENABLED:-true}
-echo "ROX_SCANNER_V4=${ROX_SCANNER_V4}"
+ROX_SCANNER_V4_ENABLED=${ROX_SCANNER_V4_ENABLED:-true}
+echo "ROX_SCANNER_V4_ENABLED=${ROX_SCANNER_V4_ENABLED}"
 
 export SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
 echo "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
@@ -177,7 +177,7 @@ function install_central_with_helm() {
     installflags+=('--set' 'scanner.resources.requests.cpu=500m')
     installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
     installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
-    if [[ "${ROX_SCANNER_V4}" == "true" ]]; then
+    if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
       installflags+=('--set' 'scannerV4.scannerComponent=Enabled')
       installflags+=('--set' 'scannerV4.indexer.scaling.autoScaling=Disabled')
       installflags+=('--set' 'scannerV4.indexer.scaling.replicas=1')
@@ -198,7 +198,7 @@ function install_central_with_helm() {
     fi
   fi
 
-  if [[ "${ROX_SCANNER_V4}" != "true" ]]; then
+  if [[ "${ROX_SCANNER_V4_ENABLED}" != "true" ]]; then
     installflags+=('--set' 'scannerV4.disable=true')
   else
     installflags+=('--set' 'scannerV4.disable=false')
@@ -297,7 +297,7 @@ done
 kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
 rm "${SCRATCH}/port_forward_pid"
 
-if [[ "${ROX_SCANNER_V4}" == "true" ]]; then
+if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
