@@ -4,6 +4,7 @@ set -o nounset
 set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export STORAGECLASS_LOCATION=${SHARED_DIR}/efs-sc.yaml
 
 ROLE_ARN=$(cat "${SHARED_DIR}"/efs-csi-driver-operator-role-arn)
 
@@ -19,6 +20,12 @@ logger() {
     # Print the log message with the level and timestamp
     echo "[$timestamp] [$level] $message"
 }
+
+# Cross account clusters switch to the shared account
+if grep -qi "efs-csi-cross-account" "${STORAGECLASS_LOCATION}"; then
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  logger "INFO" "Using shared AWS account ..."
+fi
 
 # Extract the role name
 ROLE_NAME="${ROLE_ARN##*/}"
