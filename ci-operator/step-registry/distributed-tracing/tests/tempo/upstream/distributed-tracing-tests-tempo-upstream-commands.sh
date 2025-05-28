@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 # Used for upstream testing.
-# Copy the tempo-operator repo files to a writable directory by kuttl
+# Copy the tempo-operator repo files to a writable directory by Chainsaw
 cp -R /tmp/tempo-operator /tmp/tempo-tests
 cd /tmp/tempo-tests
 
@@ -35,9 +35,6 @@ fi
 # Unset environment variable which conflicts with Chainsaw
 unset NAMESPACE
 
-# Initialize a variable to keep track of errors
-any_errors=false
-
 # Execute Tempo e2e tests
 chainsaw test \
 --config .chainsaw-openshift.yaml \
@@ -49,33 +46,6 @@ tests/e2e \
 tests/e2e-openshift \
 tests/e2e-openshift-serverless \
 tests/e2e-openshift-ossm \
+tests/e2e-openshift-object-stores \
 tests/e2e-long-running \
-tests/operator-metrics || any_errors=true
-
-# Get the platform type
-dt_platform_type=$(oc get infrastructures cluster -o=jsonpath='{.status.platformStatus.type}')
-echo "Platform is $dt_platform_type"
-
-# Check if the cluster is STS or WIF cluster
-dt_wif_or_sts=$(oc get authentication cluster -o=jsonpath='{.spec.serviceAccountIssuer}')
-echo "$dt_wif_or_sts"
-
-if [[ "$dt_platform_type" == "AWS" && -n "$dt_wif_or_sts" ]]; then
-    chainsaw test \
-        --config .chainsaw-openshift.yaml \
-        --report-name "junit_tempo_aws-sts" \
-        --report-path "$ARTIFACT_DIR" \
-        --selector type=aws-sts \
-        --report-format "XML" \
-        --test-dir tests/e2e-openshift-object-stores || any_errors=true
-else
-    echo "Cluster is not AWS STS cluster, skipping the AWS STS tests"
-fi
-
-# Check if any errors occurred
-if $any_errors; then
-  echo "Tests failed, check the logs for more details."
-  exit 1
-else
-  echo "All the tests passed."
-fi
+tests/operator-metrics

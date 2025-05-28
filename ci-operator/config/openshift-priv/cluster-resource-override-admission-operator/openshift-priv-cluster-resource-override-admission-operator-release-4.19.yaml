@@ -7,6 +7,18 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  previous-bundle:
+    name: 4.18-priv
+    namespace: ocp-private
+    tag: cluster-resource-override-admission-operator-bundle
+  previous-operator:
+    name: 4.18-priv
+    namespace: ocp-private
+    tag: cluster-resource-override-admission-operator
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -113,6 +125,64 @@ tests:
         name: cluster-resource-override-admission
       - env: CI_REGISTRY_IMAGE
         name: cluster-resource-override-admission-operator-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-upgrade
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export NS=clusterresourceoverride-operator
+        oc create ns $NS
+
+        # Deploy the bundle which will fail to come up due to it pointing to the operator
+        # image via a tag that is only available to the presubmit job it is created
+        # within. This pipeline image is removed shortly after said job
+        # completes, so the csv needs to be patched to point the equivalent image that has been
+        # promoted.
+        operator-sdk run bundle --timeout=10m -n $NS --security-context-config restricted "$PREVIOUS_BUNDLE" || true
+        export OLD_CSV_NAME=$(oc get csv -n $NS -o jsonpath='{.items[0].metadata.name}')
+
+        oc patch csv -n $NS $OLD_CSV_NAME --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
+        sleep 10
+
+        # Delete the deployment which will then be recreated by the subscription controller with the correct image.
+        oc delete deployment -n $NS clusterresourceoverride-operator
+
+        oc wait --timeout=10m --for=create -n $NS deployment clusterresourceoverride-operator
+        oc wait --timeout=10m --for condition=Available -n $NS deployment clusterresourceoverride-operator
+      dependencies:
+      - env: PREVIOUS_BUNDLE
+        name: previous-bundle
+      - env: PREVIOUS_OPERATOR
+        name: previous-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        export NS=clusterresourceoverride-operator
+        operator-sdk run bundle-upgrade --timeout 10m -n $NS --security-context-config restricted "$OO_BUNDLE"
+      dependencies:
+      - env: OO_BUNDLE
+        name: cluster-resource-override-admission-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export KUBECTL=$(which oc)
+        make e2e
       from: src
       resources:
         requests:

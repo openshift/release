@@ -41,12 +41,10 @@ function update_openshift_config_pull_secret {
 #       "email": "prega@redhat.com"
 #     },
 #     "brew.registry.redhat.io": {
-#       "auth": "${brew_registry_auth}",
-#       "email": "jiazha@redhat.com"
+#       "auth": "${brew_registry_auth}"
 #     },
 #     "quay.io/openshift-qe-optional-operators": {
-#       "auth": "${qe_registry_auth}",
-#       "email": "jiazha@redhat.com"
+#       "auth": "${qe_registry_auth}"
 #     },
 #     "quay.io/openshifttest": {
 #       "auth": "${openshifttest_registry_auth}"

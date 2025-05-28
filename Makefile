@@ -37,7 +37,7 @@ check-services:
 	core-services/_hack/validate-core-services.sh services
 	@echo "Service config check: PASS"
 
-# applyconfig is https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig
+# applyconfig is https://github.com/openshift/ci-tools/tree/main/cmd/applyconfig
 
 dry-core:
 	applyconfig --config-dir core-services

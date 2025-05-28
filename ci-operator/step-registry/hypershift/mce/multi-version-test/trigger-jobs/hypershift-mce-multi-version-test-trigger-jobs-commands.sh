@@ -11,6 +11,7 @@ declare -A guest_to_job_aws=(
     [4.16]="periodic-ci-openshift-hypershift-release-4.16-periodics-mce-e2e-aws-critical"
     [4.17]="periodic-ci-openshift-hypershift-release-4.17-periodics-mce-e2e-aws-critical"
     [4.18]="periodic-ci-openshift-hypershift-release-4.18-periodics-mce-e2e-aws-critical"
+    [4.19]="periodic-ci-openshift-hypershift-release-4.19-periodics-mce-e2e-aws-critical"
 )
 declare -A mce_to_guest=(
     [2.4]="4.14"
@@ -18,13 +19,15 @@ declare -A mce_to_guest=(
     [2.6]="4.14 4.15 4.16"
     [2.7]="4.14 4.15 4.16 4.17"
     [2.8]="4.14 4.15 4.16 4.17 4.18"
+    [2.9]="4.15 4.16 4.17 4.18 4.19"
 )
 declare -A hub_to_mce=(
     [4.14]="2.4 2.5 2.6"
     [4.15]="2.5 2.6 2.7"
     [4.16]="2.6 2.7 2.8"
-    [4.17]="2.7 2.8"
-    [4.18]="2.8"
+    [4.17]="2.7 2.8 2.9"
+    [4.18]="2.8 2.9"
+    [4.19]="2.9"
 )
 
 function get_payload_list() {
