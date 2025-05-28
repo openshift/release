@@ -1,0 +1,54 @@
+base_images:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  ocp_4.19_base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+releases:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: default-catalog-consistency
+  cron: 0 */4 * * *
+  steps:
+    test:
+    - as: default-catalog-tests
+      commands: |
+        echo "Running Default Catalog Tests"
+        cd openshift/default-catalog-consistency
+        REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
+      credentials:
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift
+  repo: operator-framework-operator-controller
+  variant: periodics

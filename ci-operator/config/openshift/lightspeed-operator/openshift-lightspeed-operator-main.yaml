@@ -71,10 +71,12 @@ tests:
   commands: make generate --always-make && git diff --exit-code
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make test --warn-undefined-variables
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: lint
   commands: |
     export GOCACHE=/tmp/
@@ -84,6 +86,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: bundle-e2e-4-15
   cluster_claim:
     architecture: amd64
@@ -351,6 +354,7 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: security
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
