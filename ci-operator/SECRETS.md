@@ -211,11 +211,10 @@ $ oc get secrets --selector=ci.openshift.io/managed=true --export -o yaml -n $TE
 $ diff prod.yaml proposed.yaml
 ```
 
-## Using Secrets to retrieve Credentials
+## Using Secrets to Access Registry Credentials
 
-You need a pull secret to access registries or services that require authentication.
-Below are examples of how to use the available credentials to pull images from the 
-Red Hat registry.
+To pull images from registries that require authentication, you need a pull secret.
+Some pull secrets may already be defined in [core-services/ci-secret-bootstrap/_config.yaml](./../core-services/ci-secret-bootstrap/_config.yaml)
 
 ### If your container has OpenShift installed
 
