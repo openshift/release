@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-e2e-cert-rotation-short
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+      - chain: ipi-aws-pre
+    test:
+      - ref: openshift-e2e-cert-rotation-observe
+      - ref: openshift-e2e-cert-rotation-test
+    post:
+      - chain: ipi-aws-post
+    observers:
+      enable:
+        - observers-resource-watch
+    env:
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+  documentation: |-
+    This workflow starts a cluster with ShortCertRotation feature gate enabled and observes cert rotation for 6 hours.

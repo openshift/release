@@ -1,0 +1,252 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.19_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
+binary_build_commands: go build -o bin/cluster-capi-operator cmd/cluster-capi-operator
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: cluster-capi-operator
+promotion:
+  to:
+  - name: "4.21"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 200m
+      memory: 600Mi
+  lint:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "1"
+      memory: 3Gi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: vendor
+  commands: make verify-vendor
+  container:
+    from: src
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: build
+  commands: make build
+  container:
+    from: src
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-serial
+  shard_count: 2
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-techpreview
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- as: e2e-aws-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws
+- as: e2e-aws-capi-customnoupgrade-migration
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_GATES: '["MachineAPIMigration=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-ovn-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp
+- as: e2e-openstack-ovn-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: hack/e2e-openstack.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-azure-ovn-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- as: e2e-azure-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure
+- as: e2e-vsphere-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
+- as: e2e-metal3-capi-techpreview
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMO_WATCH_ALL_NAMESPACES="true"
+        NUM_EXTRA_WORKERS=1
+        EXTRA_WORKERS_NAMESPACE=openshift-cluster-api
+        FEATURE_SET=TechPreviewNoUpgrade
+        ENABLE_CAPI_E2E="true"
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: regression-clusterinfra-cucushift-rehearse-capi-aws-ipi
+  optional: true
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: NonHyperShiftHOST&;capi;CAPI
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+      TEST_TIMEOUT: "1200"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+  timeout: 7h0m0s
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cluster-capi-operator
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: cluster-capi-operator

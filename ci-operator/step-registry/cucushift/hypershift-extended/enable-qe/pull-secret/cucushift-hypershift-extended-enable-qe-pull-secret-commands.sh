@@ -55,7 +55,7 @@ function check_update_pullsecret() {
     COUNT=${#workers_arr[*]}
 
     for worker in ${workers_arr[*]}; do
-        count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c jiazha@redhat.com || true)
+        count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' || true)
         if [ $count -gt 0 ] ; then
             UPDATED_COUNT=$((UPDATED_COUNT + 1))
         fi
@@ -98,10 +98,14 @@ openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_open
 openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
 openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
 
+stage_auth_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
+stage_auth_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
+stage_registry_auth=`echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0`
+
 reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
 reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
 brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
-jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/global-pull-secret.json" > /tmp/global-pull-secret.json.tmp
+jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" '.auths |= . + $a' "/tmp/global-pull-secret.json" > /tmp/global-pull-secret.json.tmp
 
 mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
 oc create secret -n "$HYPERSHIFT_NAMESPACE" generic "$CLUSTER_NAME"-pull-secret-new --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
@@ -120,7 +124,7 @@ for i in $(seq ${RETRIES}); do
   COUNT=${#workers_arr[*]}
   for worker in ${workers_arr[*]}
   do
-  count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c jiazha@redhat.com || true)
+  count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' || true)
   if [ $count -gt 0 ] ; then
       UPDATED_COUNT=`expr $UPDATED_COUNT + 1`
   fi

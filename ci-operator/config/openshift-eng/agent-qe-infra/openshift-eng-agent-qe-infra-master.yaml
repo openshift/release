@@ -13,8 +13,8 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- context_dir: images/prow-image
-  dockerfile_path: Dockerfile
+- context_dir: .
+  dockerfile_path: images/prow-image/Dockerfile
   from: centos9
   to: agent-qe-base
 promotion:
@@ -37,7 +37,8 @@ resources:
 tests:
 - as: shellcheck
   commands: for f in $(git diff --name-only "$PULL_BASE_SHA..$PULL_PULL_SHA" | grep
-    -E ".*.sh$"); do echo -e "\nVerifying $f..."; shellcheck -s bash "$f"; done
+    -E ".*\.sh$"); do if [ -f "$f" ]; then echo -e "\nVerifying $f..."; shellcheck
+    -s bash "$f"; else echo -e "\nSkipping deleted file $f"; fi; done
   container:
     from: shellcheck
 zz_generated_metadata:

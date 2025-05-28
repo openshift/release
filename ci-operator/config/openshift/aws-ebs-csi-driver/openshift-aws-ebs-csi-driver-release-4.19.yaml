@@ -2,7 +2,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.19"
     namespace: ocp
@@ -31,8 +31,7 @@ images:
   to: aws-ebs-csi-driver
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -82,6 +81,15 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --run=VolumeAttributesClass
+      TEST_SUITE: all
+    workflow: openshift-e2e-aws
+- as: periodic-e2e-aws-csi-techpreview-volumeattributesclass
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --run=VolumeAttributesClass

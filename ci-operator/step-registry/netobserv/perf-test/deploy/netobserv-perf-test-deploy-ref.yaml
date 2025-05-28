@@ -1,0 +1,48 @@
+ref:
+  as: netobserv-perf-test-deploy
+  from: netobserv-perfscale
+  cli: latest
+  commands: netobserv-perf-test-deploy-commands.sh
+  env:
+    - name: INSTALLATION_SOURCE
+      default: "Source"
+      documentation: "Source to install netobserv from, Source = upstream, Internal = downstream"
+    - name: UPSTREAM_IMAGE
+      default: ""
+      documentation: Specify upstream custom catalogsource image to use for NOO;only effective if INSTALLATION_SOURCE == Source
+    - name: DOWNSTREAM_IMAGE
+      default: ""
+      documentation: Specify downstream custom catalogsource image to use for NOO; only effective if INSTALLATION_SOURCE == Internal
+    - name: LOKI_OPERATOR
+      default: ""
+      documentation: "Loki Operator catalogsource, values could be 'Unreleased' = using qe-app-registry, other values uses redhat-operators"
+    - name: LOKISTACK_SIZE
+      default: "1x.extra-small"
+      documentation: "Defines LokiStack size, 1x.small for node-density-heavy and 1x.medium for cluster-density-v2 workloads"
+    - name: TOPIC_PARTITIONS
+      default: "48"
+      documentation: "Kafka Topic Partitions"
+    - name: KAFKA_CONSUMER_REPLICAS
+      default: "3"
+      documentation: "FLP Kafka consumer replicas"
+    - name: WORKLOAD
+      default: "None"
+      documentation: Set the workload name
+    - name: PATCH_EBPFAGENT_IMAGE
+      default: "false"
+      documentation: Patch NOO CSV with custom ebpf-agent image
+    - name: PATCH_FLOWLOGS_IMAGE
+      default: "false"
+      documentation: Patch NOO CSV with custom FLP image
+  dependencies:
+  - env: EBPFAGENT_PR_IMAGE
+    name: netobserv-ebpf-agent
+  - env: FLP_PR_IMAGE
+    name: flowlogs-pipeline
+  timeout: 2h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    This step will deploy network observability stack.

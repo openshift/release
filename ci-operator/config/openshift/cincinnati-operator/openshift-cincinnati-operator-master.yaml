@@ -3,8 +3,12 @@ base_images:
     name: cincinnati-build-root
     namespace: cincinnati-ci
     tag: deploy
+  fips-check-payload:
+    name: check-payload
+    namespace: ci
+    tag: latest
   operator-sdk:
-    name: "4.15"
+    name: "4.18"
     namespace: origin
     tag: operator-sdk
   published-cincinnati-graph-data:
@@ -19,7 +23,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.22-openshift-4.18
 images:
 - dockerfile_path: build/Dockerfile
   from: ubi
@@ -42,7 +46,7 @@ releases:
     release:
       architecture: multi
       channel: candidate
-      version: "4.15"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -60,6 +64,11 @@ tests:
   commands: make verify-generate
   container:
     from: src
+- as: verify-crypto
+  commands: make verify-crypto
+  container:
+    from: src
+  run_if_changed: \.go$
 - as: unit
   commands: make unit-test
   container:
@@ -71,7 +80,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.18"
   steps:
     test:
     - as: install
@@ -131,6 +140,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: fips-image-scan-operator
+  steps:
+    dependencies:
+      SCAN_IMAGE: cincinnati-operator
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-operator-production
+  cron: '@weekly'
+  steps:
+    test:
+    - as: check-payload
+      commands: |
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        set -x
+        SCAN_IMAGE="registry.redhat.io/openshift-update-service/openshift-update-service-rhel8-operator:latest"
+
+        export REGISTRY_AUTH_FILE=/var/secrets/ci-pull-credentials/.dockerconfigjson
+        mkdir -p /tmp/oci-images
+        skopeo copy --remove-signatures docker://"$SCAN_IMAGE" oci:/tmp/oci-images:image:latest
+        umoci raw unpack --rootless --image /tmp/oci-images:image:latest /tmp/unpacked-image
+        /check-payload scan local --path=/tmp/unpacked-image --output-file="$ARTIFACT_DIR"/check-payload-report.txt
+      credentials:
+      - mount_path: /var/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: fips-check-payload
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
 - as: operator-e2e-new-ocp-published-graph-data
   cluster_claim:
     architecture: amd64
@@ -138,7 +180,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.18"
   steps:
     test:
     - as: e2e-test
@@ -159,6 +201,31 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: operator-e2e-new-ocp-published-graph-data-fips
+  steps:
+    cluster_profile: aws-2
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - ref: fips-check-fips-or-die
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:published-cincinnati-graph-data
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: operator-e2e-hypershift-local-graph-data
   steps:
     allow_best_effort_post_steps: true

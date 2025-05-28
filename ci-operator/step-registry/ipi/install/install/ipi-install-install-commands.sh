@@ -606,6 +606,9 @@ azure4|azuremag|azure-arm64)
     if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
         echo "Setting AZURE credential with minimal permissions for installer"
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+    elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+        echo "Setting AZURE credential with Contributor role only for installer"
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
     else
         export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     fi
@@ -699,7 +702,11 @@ set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
+azure4|azure-arm64) 
+    if [[ "${BOOT_DIAGNOSTICS:-}" == "true" ]]; then
+      inject_boot_diagnostics ${dir}
+    fi
+    ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config "${dir}" "workers"

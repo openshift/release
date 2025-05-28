@@ -8,14 +8,24 @@ set -x
 ls 
 
 function cerberus_cleanup() {
+
   echo "killing cerberus observer"
   kill -15 ${cerberus_pid}
-
-  replaced_str=$(less -XF /tmp/cerberus_status | sed "s/True/0/g" | sed "s/False/1/g" )
+  
+  c_status=$(cat /tmp/cerberus_status)
   date
+  ls 
+  oc get ns
+
+  oc get pods -n $TEST_NAMESPACE
+
+  oc cluster-info
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
-  exit $replaced_str
+  echo '{"cerberus": '$c_status'}' >> test.json
+  oc cp -n $TEST_NAMESPACE test.json $POD_NAME:/tmp/test.json 
+
+  cat final_cerberus_info.json
   
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
@@ -45,5 +55,6 @@ jobs -p
 while [[ -z $(cat $cerberus_logs | grep "signal=terminated") ]]; do 
   echo "sleep wait for next iteration"
   sleep 10
+  date
   cat /tmp/cerberus_status
 done

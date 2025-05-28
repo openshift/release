@@ -1,0 +1,160 @@
+base_images:
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-vsphere-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-vsphere
+- as: e2e-vsphere-ovn-upgrade-storage-data
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-vsphere-storage-data
+- as: e2e-aws-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: aws
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-metal-ovn-single-node-rt-upgrade-test
+  interval: 168h
+  steps:
+    cluster_profile: aws
+    env:
+      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
+      TEST_TYPE: upgrade-rt
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node-realtime
+  timeout: 5h0m0s
+- as: e2e-gcp-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: gcp-3
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-ovn
+- as: e2e-gcp-ovn-rt-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-ovn-rt
+  timeout: 5h0m0s
+- as: e2e-azure-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v5
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+  timeout: 5h30m0s
+- as: e2e-aws-ovn-uwm
+  interval: 168h
+  steps:
+    cluster_profile: aws
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - ref: ipi-conf-user-workload-monitoring
+    - chain: ipi-aws-pre-stableinitial
+    workflow: openshift-upgrade-aws
+- as: e2e-azure-runc-upgrade
+  cron: '@weekly'
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v5
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-runc
+- as: e2e-gcp-runc-upgrade
+  cron: '@weekly'
+  steps:
+    cluster_profile: gcp-3
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-runc
+- as: e2e-aws-runc-upgrade
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-runc
+- as: e2e-vsphere-runc-upgrade
+  cron: '@weekly'
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-vsphere-runc
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ci-4.20-upgrade-from-stable-4.19

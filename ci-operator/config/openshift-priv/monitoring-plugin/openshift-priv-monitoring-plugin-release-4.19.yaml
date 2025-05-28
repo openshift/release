@@ -35,8 +35,7 @@ images:
   to: monitoring-plugin-test
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - monitoring-plugin-test
     name: 4.19-priv
     namespace: ocp-private
@@ -65,9 +64,10 @@ tests:
     from: monitoring-plugin-test
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-upgrade
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
@@ -76,6 +76,12 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

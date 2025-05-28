@@ -74,18 +74,26 @@ sed -i "s/- hosts: localhost/- hosts: hypervisor/g" playbooks/install_nrop.yml
 echo "Managment kubeconfig file: ${T5CI_HCP_MGMT_KUBECONFIG}"
 echo "Hosted cluster kubeconfig file: ${T5CI_HCP_HOSTED_KUBECONFIG}"
 
+ansible_playbook_status=0
+
 # Install certificates required for internal registries
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/ansible-automation/ansible.cfg
 ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_registry_certs.yml \
--e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}"
+-e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" || ansible_playbook_status=$?
+
+echo "Status of Ansible playbook to install certificates required for internal registires is: ${ansible_playbook_status}"
 
 # Install NUMAResources Operator Playbook
 ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yml \
 -e hosted_kubeconfig="${T5CI_HCP_HOSTED_KUBECONFIG}" \
 -e mgmt_kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" \
--e install_sources="${T5CI_NROP_SOURCE}"
+-e install_sources="${T5CI_NROP_SOURCE}" || ansible_playbook_status=$?
+
+echo "Status of Ansible playbook to deploy NROP operator is: ${ansible_playbook_status}"
 
 # Applying performance profile suitable for NROP
 echo "************ Applying Performance Profile suitable for NROP ************"
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/telco-ci/ansible.cfg
-ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_profile_nrop.yml -e kubeconfig="${SHARED_DIR}/mgmt-kubeconfig" -c local
+ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_profile_nrop.yml -e kubeconfig="${SHARED_DIR}/mgmt-kubeconfig" -c local || ansible_playbook_status=$?
+
+echo "Status of Ansible playbook to deploy performance profile is: ${ansible_playbook_status}"

@@ -1,0 +1,108 @@
+base_images:
+  ansible:
+    name: "4.13"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.13"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-upi-private-xpn-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-upi-private-xpn-sdn-provision
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      PERSISTENT_MONITORING: "false"
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-ipi-sdn
+- as: installer-rehearse-azure-aro
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: 4.13.40
+    workflow: cucushift-installer-rehearse-azure-aro-private
+- as: installer-rehearse-azure-stack
+  cluster: build01
+  cron: '@yearly'
+  steps:
+    cluster_profile: azurestack-qe
+    workflow: cucushift-installer-rehearse-azure-stack-upi
+- as: installer-rehearse-alibabacloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: alibabacloud-qe
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-workers-rhel8
+- as: installer-rehearse-gcp
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-private
+- as: installer-rehearse-vsphere
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-connected-2
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
+- as: installer-rehearse-nutanix-dis
+  cluster: build01
+  cron: '@yearly'
+  steps:
+    cluster_profile: nutanix-qe-dis
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: verification-tests
+  variant: installer-rehearse-4.13

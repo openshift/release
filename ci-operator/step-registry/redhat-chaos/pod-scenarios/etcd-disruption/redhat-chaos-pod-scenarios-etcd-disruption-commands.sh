@@ -32,7 +32,9 @@ rc=$?
 echo "Done running the test!" 
 
 cat /tmp/*.log 
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 
 echo "Return code: $rc"
 exit $rc
-echo $ENABLE_ALERTS

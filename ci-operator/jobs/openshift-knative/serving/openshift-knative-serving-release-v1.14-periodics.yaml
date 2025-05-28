@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 4 1 * * 2,6
   decorate: true
   decoration_config:
@@ -86,7 +86,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 16 5 * * 2,6
   decorate: true
   decoration_config:
@@ -172,7 +172,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 41 0 * * 2,6
   decorate: true
   decoration_config:
@@ -258,7 +258,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 35 4 * * 2,6
   decorate: true
   decoration_config:
@@ -269,6 +269,8 @@ periodics:
     org: openshift-knative
     repo: serving
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -288,8 +290,8 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=perf-tests-c
@@ -303,14 +305,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -323,12 +325,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -339,7 +344,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 42 1 * * 2,6
   decorate: true
   decoration_config:
@@ -350,6 +355,8 @@ periodics:
     org: openshift-knative
     repo: serving
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -369,8 +376,8 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-e2e-c
@@ -384,14 +391,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -404,12 +411,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -420,7 +430,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 6 5 * * 2,6
   decorate: true
   decoration_config:
@@ -431,6 +441,8 @@ periodics:
     org: openshift-knative
     repo: serving
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -450,8 +462,8 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-e2e-tls-c
@@ -465,14 +477,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -485,12 +497,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

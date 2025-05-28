@@ -1,0 +1,59 @@
+observer:
+  name: openshift-qe-cluster-density-v2-observer
+  # Only one of the following two should be specified
+  from: perfscale-observer
+  env:
+  - name: E2E_VERSION
+    default: "v2.3.5"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: CHURN
+    default: "true"
+    documentation: |-
+      Default is true, which means the workload with delete and recreate a set number of namespaces
+  - name: EXTRA_FLAGS
+    default: "--churn-duration=20m --timeout=5h"
+    documentation: |-
+      Default is Churn Duration for 20 minutes
+  - name: PROFILE_TYPE
+    default: "reporting"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: ITERATION_MULTIPLIER_ENV
+    default: "9"
+    documentation: |-
+      The number of iterations per worker nodes to create
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: ADDITIONAL_PARAMS
+    default: ""
+    documentation: |-
+      JSON value to upload additonal metadata to ES index
+  - name: WAIT_FOR_NS
+    default: "true"
+    documentation: |-
+      Waits to start the workload until a 'start-kraken' namespace gets created
+  # Literal image stream tag that will be used to run the observer
+  commands: openshift-qe-cluster-density-v2-observer-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 10Mi
+  timeout: 9h
+  grace_period: 200s
+  documentation: |-
+        Be able to run cluster-density throughout the time of other tests by leveraging the observer functionality

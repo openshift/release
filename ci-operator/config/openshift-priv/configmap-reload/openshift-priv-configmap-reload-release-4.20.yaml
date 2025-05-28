@@ -22,7 +22,8 @@ images:
   to: configmap-reloader
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -46,8 +47,14 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

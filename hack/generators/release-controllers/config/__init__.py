@@ -39,6 +39,8 @@ class RCPaths:
         self.path_rpc_resources = self.path_base.joinpath('clusters/app.ci/release-payload-controller')
         # Release Reimport Controller Resources
         self.path_reimport_resources = self.path_base.joinpath('clusters/app.ci/release-reimport-controller')
+        # Release Mirror Cleanup Controller Resources
+        self.path_mirror_cleanup_resources = self.path_base.joinpath('clusters/app.ci/release-mirror-cleanup-controller')
 
 
 class Config:

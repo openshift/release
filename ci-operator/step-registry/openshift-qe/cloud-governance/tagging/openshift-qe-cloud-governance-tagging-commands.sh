@@ -8,6 +8,8 @@ export es_port
 perf_services_url="$(cat /secret/perf_services_url)"
 export perf_services_url
 account_group="$(cat /secret/${account_group})"
+s3_bucket=""
+export s3_bucket
 IFS=","
 
 function run_policy(){
@@ -17,9 +19,10 @@ function run_policy(){
     for region in "${regions[@]}"; do
         AWS_DEFAULT_REGION="${region}"
         export AWS_DEFAULT_REGION
-        export s3_bucket
-        policy_output="s3://${s3_bucket}/${LOGS}/${AWS_DEFAULT_REGION}"
-        export policy_output
+        if [[ -n "$s3_bucket" ]]; then
+          policy_output="s3://${s3_bucket}/${LOGS}/${AWS_DEFAULT_REGION}"
+          export policy_output
+        fi
         python3 /usr/local/cloud_governance/main.py
     done
 }

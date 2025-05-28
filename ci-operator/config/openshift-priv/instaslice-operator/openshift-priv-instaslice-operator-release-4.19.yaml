@@ -1,18 +1,18 @@
-base_images:
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.54.2
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.22
 canonical_go_repository: github.com/openshift/instaslice-operator
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  to: instaslice-base-src
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -34,17 +34,121 @@ resources:
 tests:
 - as: lint
   commands: |
+    #!/bin/bash
+
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
     clone: true
-    from: golangci-lint
-- as: unit
-  commands: make test
-  container:
     from: src
+- as: unit
+  commands: |
+    #!/bin/bash
+
+    make test
+  container:
+    from: instaslice-base-src
+- as: e2e-sno-gpu
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: a2-highgpu-1g
+      CONTROL_PLANE_ZONES: '[us-central1-f]'
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: single-node-conf-gcp
+    - ref: ipi-conf-gcp-zones
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export KUBECTL=oc
+        export BUNDLE_IMG=quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-bundle:on-pr-${PULL_NUMBER}
+
+        # Install tools
+        TOOLS_DIR=/tmp/bin
+        mkdir -p "${TOOLS_DIR}"
+        export PATH="${TOOLS_DIR}:${PATH}"
+
+        echo "## Install umoci"
+        curl -L --retry 5 https://github.com/opencontainers/umoci/releases/download/v0.4.7/umoci.amd64 -o "${TOOLS_DIR}/umoci" && chmod +x "${TOOLS_DIR}/umoci"
+        echo "   umoci installed"
+
+        echo "Waiting for image ${BUNDLE_IMG} to be available..."
+        function wait_for_image() {
+            until skopeo inspect docker://${BUNDLE_IMG} >/dev/null 2>&1; do
+                echo "Image not found yet. Retrying in 30s..."
+                sleep 30
+            done
+        }
+
+        export -f wait_for_image
+        timeout 25m bash -c "wait_for_image"
+
+        oc apply -f - <<EOF
+          apiVersion: config.openshift.io/v1
+          kind: ImageTagMirrorSet
+          metadata:
+            name: instaslice-registry
+          spec:
+            imageTagMirrors:
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-daemonset
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-daemonset-rhel9
+        EOF
+
+        oc apply -f - <<EOF
+          apiVersion: config.openshift.io/v1
+          kind: ImageDigestMirrorSet
+          metadata:
+            name: instaslice-registry
+          spec:
+            imageDigestMirrors:
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-daemonset
+              source: registry.redhat.io/dynamic-accelerator-slicer-tech-preview/instaslice-daemonset-rhel9
+        EOF
+
+        echo "Image is available. Proceeding with tests..."
+
+        make deploy-cert-manager-ocp
+        make deploy-nfd-ocp
+        make deploy-nvidia-ocp
+
+        mkdir /tmp/oci-image && pushd /tmp/oci-image
+        skopeo copy docker://${BUNDLE_IMG} oci:instaslice-operator-bundle:pr
+        umoci unpack --rootless --image ./instaslice-operator-bundle:pr bundle/
+        oc create -f bundle/rootfs/manifests
+        popd
+
+        echo "Creating OperatorGroup"
+        oc create -f - <<EOF
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+                name: "instaslice"
+                namespace: "instaslice-system"
+        EOF
+
+        make test-e2e-ocp
+      from: instaslice-base-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: ipi-gcp-single-node
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

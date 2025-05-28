@@ -36,6 +36,23 @@ elif [ "$platform" = "Azure" ]; then
     export AZURE_CLIENT_ID
     AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
     export AZURE_CLIENT_SECRET
+elif [ "$platform" = "IBMCloud" ]; then
+# https://github.com/openshift/release/blob/3afc9cb376776ca27fbb1a4927281e84295f4810/ci-operator/step-registry/openshift-extended/upgrade/pre/openshift-extended-upgrade-pre-commands.sh#L158
+    IBMCLOUD_CLI=ibmcloud
+    export IBMCLOUD_CLI
+    IBMCLOUD_HOME=/output
+    export IBMCLOUD_HOME
+    region="${LEASED_RESOURCE}"
+    CLOUD_TYPE="ibmcloud"
+    export CLOUD_TYPE
+    export region
+    IBMC_URL="https://${region}.iaas.cloud.ibm.com/v1"
+    export IBMC_URL
+    IBMC_APIKEY=$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-api-key)
+    export IBMC_APIKEY
+
+    export TIMEOUT=320
+
 fi
 
 ES_PASSWORD=$(cat "/secret/es/password")
@@ -55,5 +72,8 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./power-outage/prow_run.sh
 rc=$?
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running power outages"
 echo "Return code: $rc"

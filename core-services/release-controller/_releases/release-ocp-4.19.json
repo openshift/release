@@ -8,6 +8,8 @@
   "minCreationIntervalSeconds": 14400,
   "referenceMode": "source",
   "pullSecretName": "source",
+  "alternateImageRepository": "quay.io/openshift-release-dev/dev-release",
+  "alternateImageRepositorySecretName": "release-controller-quay-mirror-secret",
   "check": {
     "OCP and Origin images should match": {
       "consistentImages": {
@@ -16,7 +18,15 @@
     }
   },
   "publish": {
-    "issues": {},
+    "issues": {
+      "verifyIssues": {
+        "previousReleaseTag": {
+          "namespace": "ocp",
+          "name": "release",
+          "tag": "4.18.0-rc.0"
+        }
+      }
+    },
     "tag": {
       "tagRef": {
         "name": "4.19"
@@ -39,13 +49,13 @@
     "agent-single-node-ipv6": {
       "optional": true,
       "prowJob": {
-        "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-agent-single-node-ipv6"
+        "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-agent-single-node-ipv6-conformance"
       }
     },
-    "aggregated-aws-ovn-upgrade-4.19-micro": {
+    "aggregated-aws-ovn-upgrade-4.19-micro-fips": {
       "maxRetries": 2,
       "prowJob": {
-        "name": "periodic-ci-openshift-release-master-ci-4.19-e2e-aws-ovn-upgrade"
+        "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-aws-ovn-upgrade-fips"
       },
       "upgrade": true,
       "aggregatedProwJob": {
@@ -87,6 +97,12 @@
         "analysisJobCount": 10
       }
     },
+    "hypershift-kubevirt-ovn-conformance-4.19": {
+      "optional": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-hypershift-release-4.19-periodics-e2e-azure-kubevirt-ovn"
+      }
+    },
     "aggregated-aws-ovn-single-node-upgrade-4.19-micro": {
       "maxRetries": 2,
       "prowJob": {
@@ -122,19 +138,10 @@
       }
     },
     "aws-ovn-fips": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-aws-ovn-fips"
       }
-    },
-    "aws-ovn-upgrade-micro-fips": {
-      "maxRetries": 2,
-      "optional": true,
-      "prowJob": {
-        "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-aws-ovn-upgrade-fips"
-      },
-      "upgrade": true
     },
     "aws-ovn-serial": {
       "maxRetries": 3,
@@ -143,14 +150,12 @@
       }
     },
     "aws-ovn-single-node": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-aws-ovn-single-node"
       }
     },
     "aws-ovn-single-node-serial": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-aws-ovn-single-node-serial"
@@ -207,7 +212,6 @@
       "upgrade": true
     },
     "aws-ovn-cgroupsv2": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-aws-ovn-cgroupsv2"
@@ -330,7 +334,6 @@
       }
     },
     "gcp-ovn-upgrade-micro": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-ci-4.19-e2e-gcp-ovn-upgrade"
@@ -377,7 +380,6 @@
       }
     },
     "metal-ipi-ovn-bm-upgrade": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-metal-ipi-ovn-bm-upgrade"
@@ -416,7 +418,6 @@
       }
     },
     "metal-ipi-upgrade-ovn-ipv6": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-metal-ipi-upgrade-ovn-ipv6"
@@ -452,12 +453,6 @@
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-metal-ipi-ovn-dualstack-techpreview"
-      }
-    },
-    "metal-ovn-assisted": {
-      "optional": true,
-      "prowJob": {
-        "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-metal-ovn-assisted"
       }
     },
     "microshift-ovn-conformance-parallel": {
@@ -616,7 +611,6 @@
       }
     },
     "vsphere-ovn": {
-      "maxRetries": 2,
       "optional": true,
       "prowJob": {
         "name": "periodic-ci-openshift-release-master-nightly-4.19-e2e-vsphere-ovn"

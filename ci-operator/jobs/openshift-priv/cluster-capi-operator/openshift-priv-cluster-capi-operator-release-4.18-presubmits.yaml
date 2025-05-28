@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/build
     decorate: true
     decoration_config:
@@ -68,7 +68,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-capi-techpreview
     decorate: true
     decoration_config:
@@ -78,7 +78,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-capi-operator-release-4.18-e2e-aws-capi-techpreview
@@ -151,7 +151,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -161,7 +161,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-capi-operator-release-4.18-e2e-aws-ovn
@@ -234,7 +234,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     decoration_config:
@@ -317,7 +317,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     decoration_config:
@@ -327,7 +327,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-capi-operator-release-4.18-e2e-aws-ovn-techpreview
@@ -399,7 +399,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/e2e-azure-capi-techpreview
     decorate: true
     decoration_config:
@@ -482,7 +482,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     decoration_config:
@@ -817,7 +817,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-openstack-capi-techpreview
     decorate: true
     decoration_config:
@@ -895,6 +895,89 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-capi-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.18$
+    - ^release-4\.18-
+    cluster: build03
+    context: ci/prow/e2e-openstack-ovn-techpreview
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: openstack-vexxhost
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-capi-operator-release-4.18-e2e-openstack-ovn-techpreview
+    path_alias: github.com/openshift/cluster-capi-operator
+    rerun_command: /test e2e-openstack-ovn-techpreview
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-openstack-ovn-techpreview
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-ovn-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -983,7 +1066,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1046,7 +1129,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -1109,7 +1192,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build05
+    cluster: build03
     context: ci/prow/regression-clusterinfra-cucushift-rehearse-capi-aws-ipi
     decorate: true
     decoration_config:
@@ -1120,7 +1203,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-capi-operator-release-4.18-regression-clusterinfra-cucushift-rehearse-capi-aws-ipi
@@ -1193,7 +1276,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -1264,7 +1347,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1327,7 +1410,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build11
+    cluster: build05
     context: ci/prow/vendor
     decorate: true
     decoration_config:

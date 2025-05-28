@@ -5,7 +5,7 @@ set -euo pipefail
 QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 
-echo "Running Quay Automation API testing cases..."
+echo "Running Quay Automation API testing cases......"
 cd quay-api-tests
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)
 echo "The Quay Route is $QUAY_ROUTE"

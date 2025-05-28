@@ -6,8 +6,11 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.e2etest
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.e2etest
   from: base
+  optional: true
   to: grc-policy-framework-tests
 promotion:
   to:
@@ -20,14 +23,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: grc-policy-framework-tests
-    env:
-      IMAGE_REPO: grc-policy-framework-tests
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: test-e2e-grc-framework
   steps:
     dependencies:

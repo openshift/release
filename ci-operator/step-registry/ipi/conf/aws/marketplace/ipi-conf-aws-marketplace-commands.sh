@@ -91,7 +91,7 @@ while [ $v -gt 10 ]
 do
   v_xy="${ocp_major_version}${v}"
   echo "Checking ${v_xy} ..."
-  jq --arg r "^rhcos-(x86_64-){0,1}${v_xy}\..*" '.Images[] | select(.Name | test($r))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.Name | sub("^rhcos-x86_64-"; "") | sub("^rhcos-"; "")) | last' > $selected_image
+  jq --arg r "${v_xy}" '.Images[] | select(.Description | test($r))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.CreationDate) | last' > $selected_image
   image_id=$(jq -r '.ImageId' $selected_image)
 
   if ! is_empty "$image_id"; then

@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#How to install trivy
 #https://aquasecurity.github.io/trivy/v0.54/getting-started/installation/
 
 #Create new AWS EC2 Instatnce to run Quay Security Testing

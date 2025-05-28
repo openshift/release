@@ -104,6 +104,7 @@ tests:
     VERBOSE="-v" make unit-tests
   container:
     from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: e2e-kind
   steps:
     env:
@@ -144,7 +145,7 @@ tests:
           memory: 200Mi
     workflow: ocm-e2e-kind
 - as: test-e2e
-  skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
+  skip_if_only_changed: ^docs/|hack/|^\.tekton/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
@@ -364,26 +365,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: sonarcloud
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  optional: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonarcloud-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: release-2.13
   org: stolostron

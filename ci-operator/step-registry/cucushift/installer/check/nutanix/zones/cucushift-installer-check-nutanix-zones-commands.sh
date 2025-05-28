@@ -59,7 +59,7 @@ else
             exit 1
         fi
     else
-        if [[ $compute_zone_list == "$compute_pes" ]]; then
+        if [[ "$compute_zone_list" == "$compute_pes" ]]; then
             echo "Pass: passed to check compute zone: $compute_zone_list, expected: $compute_pes"
         else
             echo "Fail: fail to check compute zone: $compute_zone_list, expected: $compute_pes"

@@ -13,12 +13,9 @@ declare -A CONFIGS=(
     [app.ci]=' RedHat_Internal_SSO ; default ; https://api.ci.l2s4.p1.openshiftapps.com:6443'
     [build01]='RedHat_Internal_SSO ; default ; https://api.build01.ci.devcluster.openshift.com:6443'
     [build02]='RedHat_Internal_SSO ; default ; https://api.build02.gcp.ci.openshift.org:6443'
-    [build03]='RedHat_Internal_SSO ; default ; https://api.build03.ky4t.p1.openshiftapps.com:6443'
-    [build04]='RedHat_Internal_SSO ; default ; https://api.build04.34d2.p2.openshiftapps.com:6443'
     [build05]='RedHat_Internal_SSO ; default ; https://api.build05.l9oh.p1.openshiftapps.com:6443'
     [build06]='RedHat_Internal_SSO ; default ; https://api.build06.ci.devcluster.openshift.com:6443'
     [build07]='RedHat_Internal_SSO ; default ; https://api.build07.ci.devcluster.openshift.com:6443'
-    [build09]='RedHat_Internal_SSO ; default ; https://api.build09.ci.devcluster.openshift.com:6443'
     [build10]='RedHat_Internal_SSO ; default ; https://api.build10.ci.devcluster.openshift.com:6443'
     [build11]='RedHat_Internal_SSO ; default ; https://api.build11.ci.devcluster.openshift.com:6443'
     [vsphere02]='RedHat_Internal_SSO ; default ; https://api.build02.vmc.ci.openshift.org:6443'
@@ -41,7 +38,7 @@ if [[ $# -eq 0 ]] ; then
 else
     for cluster in $@ ; do
         case $cluster in
-            app.ci|build01|build02|build03|build04|build05|build06|build07|build09|build10|build11|vsphere02|hosted-mgmt)
+            app.ci|build01|build02|build05|build06|build07|build10|build11|vsphere02|hosted-mgmt)
                 get_token "$cluster" "${CONFIGS[$cluster]}"
                 ;;
             *)

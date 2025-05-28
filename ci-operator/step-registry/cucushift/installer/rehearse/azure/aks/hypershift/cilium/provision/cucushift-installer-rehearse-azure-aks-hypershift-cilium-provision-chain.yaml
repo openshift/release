@@ -2,6 +2,8 @@ chain:
   as: cucushift-installer-rehearse-azure-aks-hypershift-cilium-provision
   steps:
   - chain: cucushift-installer-rehearse-azure-aks-provision
+  - ref: hypershift-azure-aks-attach-kv
+  - ref: azure-provision-resourcegroup
   - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
   - ref: cucushift-hypershift-extended-install-private
   - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
@@ -12,7 +14,9 @@ chain:
   - chain: cucushift-hypershift-extended-enable-qe-catalogsource
   env:
   - name: CILIUM_VERSION
-    default: "1.14.5"
+    default: "1.15.1"
+  - name: AKS_ADDONS
+    default: "azure-keyvault-secrets-provider"
   - name: ENABLE_ICSP
     default: "true"
   - name: HYPERSHIFT_AZURE_LOCATION
@@ -30,6 +34,10 @@ chain:
   - name: HYPERSHIFT_NETWORK_TYPE
     default: "Other"
   - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "true"
+  - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
+    default: "true"
+  - name: HYPERSHIFT_AZURE_CP_MI
     default: "true"
   documentation: |-
     Creates an aks management cluster and then a public hosted cluster using Cilium as CNI. 

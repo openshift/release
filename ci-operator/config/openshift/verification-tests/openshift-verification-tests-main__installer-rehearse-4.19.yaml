@@ -1,0 +1,93 @@
+base_images:
+  ansible:
+    name: "4.19"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.19"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CUSTOM_REGION_LIST: us-east-1
+    workflow: cucushift-installer-rehearse-aws-cases-all-regions
+- as: installer-rehearse-gcp
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-sj2qqdk/release:latest
+      ENABLE_DES_DEFAULT_MACHINE: "true"
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: installer-rehearse-ibmcloud-dis
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe-2
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
+      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
+      SLEEP_DURATION: 1m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: verification-tests
+  variant: installer-rehearse-4.19

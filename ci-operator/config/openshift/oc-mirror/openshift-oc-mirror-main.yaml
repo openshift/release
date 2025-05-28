@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: v1.63.4
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.23-openshift-4.19:
@@ -33,17 +33,17 @@ images:
   to: oc-mirror
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -59,7 +59,10 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test-unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make test-unit
   container:
     from: src
 - as: e2e
@@ -77,6 +80,12 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

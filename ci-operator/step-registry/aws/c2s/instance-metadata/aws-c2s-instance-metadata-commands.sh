@@ -97,7 +97,11 @@ rm /tmp/pull-secret
 
 ca_file=`mktemp`
 cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" > ${ca_file}
-cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt" >> ${ca_file}
+else
+    cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+fi
 
 if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
   echo "C2S: workaround for C2S emulator (BZ#1926975)"

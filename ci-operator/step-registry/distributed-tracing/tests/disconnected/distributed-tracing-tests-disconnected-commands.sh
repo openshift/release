@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Unset environment variables which conflict with kuttl
+# Unset environment variables which conflict with Chainsaw
 unset NAMESPACE
 
 # setup proxy

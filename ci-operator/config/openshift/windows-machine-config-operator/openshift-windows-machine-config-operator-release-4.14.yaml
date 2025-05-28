@@ -1,8 +1,8 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.20-openshift-4.14:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.14
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
   operator-sdk:
     name: "4.14"
     namespace: origin
@@ -22,9 +22,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -72,11 +72,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
-- as: build
-  commands: make build
-  container:
-    from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: unit
   commands: make unit
   container:
@@ -93,6 +88,9 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid

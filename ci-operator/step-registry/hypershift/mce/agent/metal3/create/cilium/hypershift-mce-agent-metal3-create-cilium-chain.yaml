@@ -1,0 +1,37 @@
+chain:
+  as: hypershift-mce-agent-metal3-create-cilium
+  steps:
+  - ref: hypershift-mce-conf-os-images
+  - ref: hypershift-mce-agent-create-agentserviceconfig
+  - ref: hypershift-agent-create-config-dns
+  - ref: hypershift-mce-agent-create-hostedcluster
+  - ref: hypershift-agent-create-proxy
+  - ref: cucushift-hypershift-extended-cilium
+  - ref: hypershift-agent-create-add-worker-metal3
+  - ref: cucushift-hypershift-extended-enable-qe-catalogsource
+  - ref: hypershift-agent-create-metallb
+  - ref: cucushift-hypershift-extended-cilium-health-check
+  env:
+  - name: HYPERSHIFT_NETWORK_TYPE
+    default: "Other"
+    documentation: Specifies the cluster SDN provider.
+  - name: DISCONNECTED
+    default: "false"
+    documentation: Should we work on top of a disconnected environment.
+  - name: IP_STACK
+    default: v4
+    documentation: |-
+      Configures the IP_STACK for the devscripts cluster. The possible values are v4, v6 or
+      v4v6 for dual stack. The default is v4. For more information on these values refer to
+      https://github.com/openshift-metal3/dev-scripts/blob/master/config_example.sh
+  - name: AGENT_NAMESPACE
+    default: ""
+    documentation: Namespace of the agent. If the default is an empty string,
+      it will be HOSTED_CONTROL_PLANE_NAMESPACE.
+  documentation: |-
+    The chain creates HostedClusters and NodePools using the Agent platform.
+    The installation method for nodepool is metal3.
+    The current chain supports both IPv4 IPv6 and dual-stack.
+    The current chain supports disconnected and connected.
+    The current chain supports specifying the agent namespace.
+    Doc: https://hypershift-docs.netlify.app/how-to/agent/create-agent-cluster

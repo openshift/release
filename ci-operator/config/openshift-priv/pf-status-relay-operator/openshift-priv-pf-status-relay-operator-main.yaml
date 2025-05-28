@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: v1.30.0
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -12,7 +12,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
   pf-status-relay:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: pf-status-relay
 build_root:
@@ -40,19 +40,19 @@ operator:
 promotion:
   to:
   - disabled: true
-    name: sriov-4.19
+    name: sriov-4.20
     namespace: origin
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -76,7 +76,7 @@ tests:
     workflow: openshift-ci-security
 - as: e2e-validation
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_BUNDLE: operator-bundle
     env:
@@ -93,6 +93,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv

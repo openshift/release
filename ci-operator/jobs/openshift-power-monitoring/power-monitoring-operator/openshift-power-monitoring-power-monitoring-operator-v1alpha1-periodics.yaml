@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
+  cluster: build02
   cron: 00 01 * * 1,3,5
   decorate: true
   decoration_config:
@@ -10,6 +10,8 @@ periodics:
     org: openshift-power-monitoring
     repo: power-monitoring-operator
   labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-observability
     ci-operator.openshift.io/variant: ocp4.16-periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -29,8 +31,8 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=power-monitoring-operator-e2e-aws
@@ -44,14 +46,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -64,12 +66,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -80,7 +85,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build02
   cron: 00 02 * * 1,3,5
   decorate: true
   decoration_config:
@@ -90,6 +95,8 @@ periodics:
     org: openshift-power-monitoring
     repo: power-monitoring-operator
   labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-observability
     ci-operator.openshift.io/variant: ocp4.17-periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -109,8 +116,8 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=power-monitoring-operator-e2e-aws
@@ -124,14 +131,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -144,12 +151,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -160,7 +170,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build02
   cron: 00 03 * * 1,3,5
   decorate: true
   decoration_config:
@@ -170,6 +180,8 @@ periodics:
     org: openshift-power-monitoring
     repo: power-monitoring-operator
   labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-observability
     ci-operator.openshift.io/variant: ocp4.18-periodic
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
@@ -190,8 +202,8 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=power-monitoring-operator-e2e-aws
@@ -205,14 +217,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -225,12 +237,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

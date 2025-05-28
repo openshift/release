@@ -47,7 +47,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      CNV_PRERELEASE_LATEST_CHANNEL: "true"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
       FEATURE_SET: TechPreviewNoUpgrade
@@ -55,9 +54,8 @@ tests:
 - as: e2e-aws-ovn-virt-periodic
   cron: 0 3 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
-      CNV_PRERELEASE_LATEST_CHANNEL: "true"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
     workflow: openshift-e2e-aws-ovn-virt
@@ -70,6 +68,8 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
       EXTRA_MG_ARGS: --host-network
       TEST_SKIPS: Services should fallback to local terminating endpoints when there
         are no ready endpoints with externalTrafficPolicy=Local
@@ -77,6 +77,35 @@ tests:
     - chain: baremetalds-ofcir-pre
     - ref: baremetalds-e2e-ovn-bgp-pre
     workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview-periodic
+  cluster: build05
+  interval: 24h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="extranet"
+        EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
+        EXTRANET_NETWORK_SUBNET_V6='fd2e:6f44:5dd8:ca56::/120'
+      NMSTATE_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local\|CPU Partitioning
+        cluster platform workloads should be annotated correctly for Deployments
+    pre:
+    - ref: baremetalds-devscripts-conf-extranetwork
+    - chain: baremetalds-ofcir-pre
+    - ref: ovn-shared-to-local-gateway-mode-migration
+    - ref: enable-qe-catalogsource
+    - ref: operatorhub-subscribe-nmstate-operator
+    - ref: baremetalds-e2e-ovn-bgp-pre
+    workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

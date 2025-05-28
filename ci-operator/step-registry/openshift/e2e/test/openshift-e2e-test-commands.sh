@@ -126,6 +126,8 @@ if [[ -f "${SHARED_DIR}/mirror-tests-image" ]]; then
     TEST_ARGS+=" --from-repository=$(<"${SHARED_DIR}/mirror-tests-image")"
 fi
 
+TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
+
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
 gcp|gcp-arm64)
@@ -198,7 +200,7 @@ powervs*)
     export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
-external) export TEST_PROVIDER='' ;;
+external) export TEST_PROVIDER='{"type":"external"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 

@@ -7,8 +7,6 @@ build_root:
 images:
 - dockerfile_path: Containerfile
   to: lightspeed-service-api
-- dockerfile_path: Containerfile.redis
-  to: lightspeed-service-redis
 promotion:
   to:
   - namespace: ols
@@ -31,6 +29,7 @@ tests:
   commands: pip install black ruff mypy && make verify
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -40,6 +39,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: ols-codecov-token
+  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: integration
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -49,6 +49,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: ols-codecov-token
+  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: security
   optional: true
   steps:

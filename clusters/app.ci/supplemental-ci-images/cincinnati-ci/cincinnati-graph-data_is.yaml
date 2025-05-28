@@ -1,0 +1,31 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  annotations:
+    description: this build config is to replace the image built by https://github.com/openshift/cincinnati/blob/de0aa9b81a01d38a6408c7ed0b5b9e13b3cc7658/cincinnati/src/plugins/internal/graph_builder/dkrv2_openshift_secondary_metadata_scraper/test_fixtures/graph-data-6420f7fbf3724e1e5e329ae8d1e2985973f60c14/Dockerfile#L1
+  namespace: cincinnati-ci-public
+  name: cincinnati-graph-data-6420f7fbf3724e1e5e329ae8d1e2985973f60c14
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: cincinnati-graph-data:6420f7fbf3724e1e5e329ae8d1e2985973f60c14
+  source:
+    dockerfile: |
+      FROM registry.access.redhat.com/ubi9-minimal as downloader
+      ADD https://github.com/openshift/cincinnati-graph-data/archive/e8692fe50ccbfa525cce340f781d56d5a1d4364d.tar.gz /graph-data.tar.gz
+      RUN microdnf install -y tar gzip
+      RUN mkdir -p /graph-data
+      RUN tar xav -C /graph-data -f /graph-data.tar.gz --no-same-owner
+
+      FROM scratch
+      COPY --from=downloader /graph-data/* /
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+    - type: ConfigChange

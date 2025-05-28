@@ -304,11 +304,39 @@ tests:
     env:
       CHANNEL_GROUP: candidate
       NAME_PREFIX: ocpe2e
-      TEST_PROFILE: TEST_PROFILE=rosa-hcp-shared-vpc-advanced
+      TEST_PROFILE: rosa-hcp-shared-vpc-advanced
       VERSION: "4.18"
     test:
     - ref: cucushift-hypershift-extended-health-check
     workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-upgrade-f999
+  cron: 0 2 10 5 *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa'
+      HOLD_TIME_BEFORE_UPGRADE: "14400"
+      NAME_PREFIX: ocpe2e
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_PROFILE: ocpe2e-rosa-hcp-upgrade-y-stream
+      VERSION: "4.17"
+    test:
+    - ref: rosa-cluster-upgrade-hcp
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-upgrade-with-running-cluster-f999
+  cron: 0 2 20 5 *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      E2E_RUN_TAGS: '@rosa'
+      NAME_PREFIX: ci-long-run
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - ref: rosa-cluster-upgrade-hcp
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-running-cluster
 - as: aws-rosa-non-sts-byo-vpc-kms-proxy-f14
   cron: 23 22 6,20 * *
   steps:
@@ -428,7 +456,8 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 39 16 12,28 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -444,7 +473,8 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 45 13 6,22 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -460,7 +490,8 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-sno-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 15 15 2,16 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe

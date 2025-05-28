@@ -1,21 +1,32 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-
-AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
-AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
-AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-updater-v2/client-id)"
+AZURE_AUTH_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-updater-v2/client-secret-value)"
+AZURE_AUTH_TENANT_ID="$(</var/run/hypershift-ext-oidc-app-updater-v2/tenant-id)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(</var/run/hypershift-ext-oidc-app-updater-v2/subscription-id)"
 
 az --version
+az cloud set --name AzureCloud
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 set -x
 
 export PS4='[$(date "+%Y-%m-%d %H:%M:%S")] '
 
+if [ -f "${SHARED_DIR}/cluster-type" ] ; then
+  CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
+  if [[ "$CLUSTER_TYPE" == "rosa" ]]; then
+    CONSOLE_HOST="$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get route console -n openshift-console -o=jsonpath='{.spec.host}')"
+  else
+    echo "It is only for HCP cluster that cluster type is rosa"
+  fi
+else
+  CONSOLE_HOST="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get route console -n openshift-console -o=jsonpath='{.spec.host}')"
+fi
+
 CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
-CONSOLE_HOST="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get route console -n openshift-console -o=jsonpath='{.spec.host}')"
 CONSOLE_CALLBACK_URI="https://${CONSOLE_HOST}/auth/callback"
 CONSOLE_REDIRECT_URIS="$(az ad app show --id "$CONSOLE_CLIENT_ID" --query 'web.redirectUris' -o tsv | paste -s -d ' ' -)"
 

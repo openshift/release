@@ -34,11 +34,24 @@ then
 fi
 
 echo "Gathering artifacts ..."
-mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds
+mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds ${ARTIFACT_DIR}/inspect
 
 oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
 oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
 oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+oc --insecure-skip-tls-verify --request-timeout=5s adm inspect clusteroperators --dest-dir ${ARTIFACT_DIR}/inspect || true
+
+PLATFORM=$(oc get infrastructure cluster -o jsonpath="{.status.platform}")
+CAPI_PLATFORM=$(echo "$PLATFORM" | tr '[:upper:]' '[:lower:]')
+
+if [[ "${CAPI_PLATFORM}" == "baremetal" ]]; then
+  CAPI_PLATFORM=metal3
+fi
+
+if [[ "${CAPI_PLATFORM}" == "powervs" ]]; then
+  CAPI_PLATFORM=ibmpower
+fi
 
 queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
 queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
@@ -58,6 +71,7 @@ FILTER=gzip queue ${ARTIFACT_DIR}/deployments.json.gz oc --insecure-skip-tls-ver
 queue ${ARTIFACT_DIR}/oc_cmds/deployments oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o wide
 FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/daemonsets oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o wide
+FILTER=gzip queue ${ARTIFACT_DIR}/jobs.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get jobs.batch --all-namespaces -o json
 queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/events oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces
 queue ${ARTIFACT_DIR}/featuregate.json oc --insecure-skip-tls-verify --request-timeout=5s get featuregate -o json
@@ -75,9 +89,16 @@ queue ${ARTIFACT_DIR}/oc_cmds/controlplanemachinesets oc --insecure-skip-tls-ver
 queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/machinesets oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A
 queue ${ARTIFACT_DIR}/machinesets.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.cluster.x-k8s.io -A -o json
+
 queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/machines oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o wide
+
 queue ${ARTIFACT_DIR}/machines.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.cluster.x-k8s.io -A -o json
+
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A -o json
+
 queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/namespaces oc --insecure-skip-tls-verify --request-timeout=5s get namespaces
 queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
@@ -552,10 +573,6 @@ ${t_test}    cluster:version:updates:seconds max by (from_version,version) (max_
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
 ${t_test}    job:duration:test:seconds vector(${s_test})
-
-${t_all}     cluster:promtail:failed_targets   sum by (pod) (promtail_targets_failed_total{reason!="exists"})
-${t_all}     cluster:promtail:dropped_entries  sum by (pod) (promtail_dropped_entries_total)
-${t_all}     cluster:promtail:request:duration sum by (status_code) (rate(promtail_request_duration_seconds_count[${d_all}]))
 
 ${t_all}     cluster:rest:client:requests:latency:total:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_all}:30s])) by (le,type)))
 ${t_install} cluster:rest:client:requests:latency:install:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_install}:30s])) by (le,type)))

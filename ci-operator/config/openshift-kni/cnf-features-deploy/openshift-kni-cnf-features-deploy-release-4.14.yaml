@@ -80,7 +80,8 @@ tests:
         ci-org-name openshift-kni
     test:
     - as: e2e-aws-ci-tests
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" TARGET_RELEASE=release-4.14
+        make functests-on-ci
       from: src
       resources:
         requests:
@@ -114,7 +115,8 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -126,19 +128,6 @@ tests:
       T5CI_VERSION: "4.14"
     workflow: telco5g-cnf
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-telco5g-sno-cnftests
-  cluster: build05
-  optional: true
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.14"
-    workflow: telco5g-sno-cnf
 - as: security
   optional: true
   skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$

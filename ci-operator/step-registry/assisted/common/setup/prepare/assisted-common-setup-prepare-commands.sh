@@ -167,7 +167,7 @@ cat > run_test_playbook.yaml <<-"EOF"
     POST_INSTALL_COMMANDS: "{{ lookup('env', 'POST_INSTALL_COMMANDS') }}"
     ASSISTED_CONFIG: "{{ lookup('env', 'ASSISTED_CONFIG') }}"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
-    CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
+    CLUSTERTYPE: "{{ lookup('env', 'CLUSTERTYPE')}}"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
     CLUSTER_PROFILE_PULL_SECRET: "{{ lookup('file', '{{ CLUSTER_PROFILE_DIR }}/pull-secret') }}"
     BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
@@ -251,46 +251,21 @@ cat > run_test_playbook.yaml <<-"EOF"
         path: "{{ REPO_DIR }}"
         state: directory
     - debug:
-        var: CLUSTER_TYPE
-    - name: Customize equinix machine
-      block:
-      - name: Fetch equinix metadata
-        ansible.builtin.uri:
-          url: "https://metadata.platformequinix.com/metadata"
-          return_content: yes
-        register: equinix_metadata
-        until: equinix_metadata.status == 200
-        retries: 5
-        delay: 5
-      - name: Setup working directory for machine type m3.large.x86
-        ansible.builtin.shell: |
-          # Get disk where / is mounted
-          ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
+        var: CLUSTERTYPE
+    - name: Setup working directory for large machines
+      ansible.builtin.shell: |
+        # Get disk where / is mounted
+        ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
 
-          # Use the largest disk available for assisted
-          DATA_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
-          mkfs.xfs -f "${DATA_DISK}"
-          mount "${DATA_DISK}" {{ REPO_DIR }}
-        when: "equinix_metadata.json.plan == 'm3.large.x86'"
-      - name: Setup extra swap for machine type {{ equinix_metadata.json.plan }}
-        ansible.builtin.shell: |
-          # c3.medium.x86 and m3.small.x86 have 64GB of RAM which is not enough for most of assisted jobs.
-          # We need to mount extra swap space in order allow memory overcommit with libvirt/KVM.
-          #
-          # c3.medium.x86 is supposed to have 2x240G disks (one is used for the system) and
-          # 2x480GB disks (sometimes missing).
-          #
-          # m3.small.x86 has 2 x 480GB disks (one is used for the system)
+        # Use the largest disk available for assisted
+        DATA_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
+        if [[ -z "$DATA_DISK" ]]; then
+          exit 0
+        fi
 
-          # Get disk where / is mounted
-          ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
-
-          # Setup the smallest disk available as swap
-          SWAP_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | head -n1)
-          mkswap "${SWAP_DISK}"
-          swapon "${SWAP_DISK}"
-        when: "equinix_metadata.json.plan == 'c3.medium.x86' or equinix_metadata.json.plan == 'm3.small.x86'"
-      when: '"packet" in CLUSTER_TYPE'
+        mkfs.xfs -f "${DATA_DISK}"
+        mount "${DATA_DISK}" {{ REPO_DIR }}
+      when: '"large" in CLUSTERTYPE'
     - name: Create {{ MINIKUBE_HOME }} directory if it does not exist
       ansible.builtin.file:
         path: "{{ MINIKUBE_HOME }}"

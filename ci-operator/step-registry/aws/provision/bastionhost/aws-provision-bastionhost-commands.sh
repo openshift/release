@@ -73,8 +73,22 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   if [[ ! -f "${bastion_ignition_file}" ]]; then
     echo "'${bastion_ignition_file}' not found , abort." && exit 1
   fi
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json -o /tmp/fedora-coreos-stable.json
-  ami_id=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fedora-coreos-stable.json)
+  #Use 4.18 RHCOS image as the boot image of bastion by default
+  bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
+  if ! curl -sSLf --retry 3 --connect-timeout 30 --max-time 60 -o /tmp/bastion-image.json "${bastion_image_list_url}"; then
+    echo "ERROR: Failed to download RHCOS image list from ${bastion_image_list_url}" >&2
+    exit 1
+  fi
+
+  if ! jq empty /tmp/bastion-image.json &>/dev/null; then
+    echo "ERROR: Downloaded file is not valid JSON" >&2
+    exit 1
+  fi
+
+  ami_id=$(jq -r --arg r ${REGION} '.architectures.x86_64.images.aws.regions[$r].image // ""' /tmp/bastion-image.json)
+  if [[ ${ami_id} == "" ]]; then
+    echo "Bastion host AMI was NOT found in region ${REGION}, exit now." && exit 1
+  fi
 
   ign_location="s3://${s3_bucket_name}/bastion.ign"
   aws --region $REGION s3 mb "s3://${s3_bucket_name}"
@@ -328,7 +342,11 @@ echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/proxyip"
 
-PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+if [[ "${CUSTOM_PROXY_CREDENTIAL}" == "true" ]]; then
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/custom_proxy_creds)
+else
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+fi
 PROXY_PUBLIC_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
 PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
 

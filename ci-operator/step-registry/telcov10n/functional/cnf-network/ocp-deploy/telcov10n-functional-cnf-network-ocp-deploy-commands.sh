@@ -27,6 +27,13 @@ process_inventory() {
     echo "Processing complete. Check ${dest_file}"
 }
 
+echo "Set CLUSTER_NAME env var"
+if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
+    CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
+fi
+export CLUSTER_NAME=${CLUSTER_NAME}
+echo CLUSTER_NAME=${CLUSTER_NAME}
+
 echo "Create group_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
 
@@ -47,6 +54,12 @@ find /var/host_variables/${CLUSTER_NAME}/ -mindepth 1 -type d | while read -r di
     echo "Process group inventory file: ${dir}"
     process_inventory $dir /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename ${dir})"
 done
+
+echo "Load network mutation env variablies if present"
+if [[ -f "${SHARED_DIR}/set_ocp_net_vars.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/set_ocp_net_vars.sh"
+fi
 
 cd /eco-ci-cd
 ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME}"

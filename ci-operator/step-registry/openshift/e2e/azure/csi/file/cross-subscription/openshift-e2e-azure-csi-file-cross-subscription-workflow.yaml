@@ -1,0 +1,37 @@
+workflow:
+  as: openshift-e2e-azure-csi-file-cross-subscription
+  steps:
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - chain: azure-provision-bastionhost
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-proxy
+    - ref: ipi-conf-azure-provisionednetwork
+    - ref: azure-provision-resourcegroup-cross-subscription
+    - ref: storage-conf-storageclass-pre-set-default-azure-file-cross-subscription
+    - chain: ipi-install
+    - ref: storage-conf-csi-azure-file
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - ref: gather-proxy
+    - chain: ipi-azure-post
+    - ref: cucushift-installer-check-azure-destroy-dns
+    - ref: azure-deprovision-resourcegroup
+    env:
+      # for storage-conf-wait-for-csi-driver
+      CLUSTERCSIDRIVER: file.csi.azure.com
+      TRUECONDITIONS: AzureFileDriverControllerServiceControllerAvailable AzureFileDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-file.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-azure-file.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E Azure `csi` workflow executes the `openshift/csi` end-to-end test suite on Azure File CSI driver that was installed during cluster setup.
+    This workflow creates a cluster in one Azure subscription (Subscription A) and provisions Azure File shares in another (Subscription B). Therefore, the service principal must be granted the required roles on Subscription B to ensure proper access.
+
+

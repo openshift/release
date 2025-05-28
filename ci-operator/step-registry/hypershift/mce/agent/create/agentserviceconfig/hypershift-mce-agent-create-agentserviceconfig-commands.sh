@@ -70,7 +70,10 @@ END
 }
 
 function deploy_mirror_config_map() {
-  oc get configmap -n openshift-config user-ca-bundle -o json | jq -r '.data."ca-bundle.crt"' | awk '{ print "    " $0 }' > /tmp/ca-bundle-crt
+  if [ "${DISCONNECTED}" = "true" ]; then
+    oc get configmap -n openshift-config user-ca-bundle -o json | \
+      jq -r '.data."ca-bundle.crt"' | awk '{ print "    " $0 }' > /tmp/ca-bundle-crt
+  fi
   oc apply -f - <<END
 apiVersion: v1
 kind: ConfigMap

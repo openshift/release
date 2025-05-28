@@ -2,9 +2,9 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -31,17 +31,17 @@ images:
   to: vsphere-cluster-api-controllers
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -106,6 +106,12 @@ tests:
     env:
       PROJECT_NAME: cluster-api-provider-vsphere
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift-priv

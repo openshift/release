@@ -11,12 +11,12 @@ curl https://raw.githubusercontent.com/openshift/openshift-docs/main/makeBuild.p
 
 IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 
-for DISTRO in "${DISTROS[@]}"; do
+# Set the default value
+TOPICMAP="_topic_maps/_topic_map.yml"
 
+for DISTRO in "${DISTROS[@]}"; do
+    # Only override for distros that need a different value
     case "${DISTRO}" in
-        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops"|"openshift-builds"|"openshift-service-mesh"|"openshift-opp"|"openshift-rhde"|"openshift-lightspeed"|"openshift-ove")
-            TOPICMAP="_topic_maps/_topic_map.yml"
-            ;;
         "openshift-rosa")
             TOPICMAP="_topic_maps/_topic_map_rosa.yml"
             ;;

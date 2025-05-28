@@ -21,6 +21,11 @@ if [[ ! -z "${OVERRIDE_RHCOS_IMAGE}" ]]; then
     RHCOS_PATCH=$(printf "\n    ClusterOSImage: %s" "${OVERRIDE_RHCOS_IMAGE}")
 fi
 
+API_CALL_TIMEOUT_PATCH=""
+if [[ -n "${API_CALL_TIMEOUT}" ]]; then
+    API_CALL_TIMEOUT_PATCH=$(printf "\n    prismAPICallTimeout: %s" "${API_CALL_TIMEOUT}")
+fi
+
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
     MACHINE_POOL_OVERRIDES="
 compute:
@@ -74,6 +79,7 @@ baseDomain: ${BASE_DOMAIN}
 credentialsMode: Manual
 platform:
   nutanix:${RHCOS_PATCH}
+    ${API_CALL_TIMEOUT_PATCH}
     apiVIP: ${API_VIP}
     ingressVIP: ${INGRESS_VIP}
     ${LB_TYPE_DEF}

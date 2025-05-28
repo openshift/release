@@ -64,7 +64,7 @@ go mod vendor
 # make commands required to run tests
 make vet
 make update-buildinfo
-
+run_tests_status=0
 run_tests() {
     echo "************ Running NROP serial test suite with ${GINKGO_LABEL} labels ************"
     GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
@@ -74,5 +74,6 @@ run_tests() {
 
 echo "************ Starting NROP tests ************"
 
-run_tests
+run_tests || run_tests_status=$?
+echo "Test status: ${run_tests_status}"
 popd

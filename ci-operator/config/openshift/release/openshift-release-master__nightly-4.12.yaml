@@ -122,25 +122,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ovn-assisted
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: assisted-baremetal
 - as: e2e-aws-ovn-single-node-workers-serial
   interval: 168h
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
@@ -150,8 +136,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -159,9 +143,7 @@ tests:
 - as: e2e-aws-ovn-single-node
   cron: 42 7 */2,15 * *
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -177,9 +159,8 @@ tests:
 - as: e2e-aws-ovn-single-node-serial
   cron: 7 5 */9,19 * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
@@ -188,12 +169,12 @@ tests:
 - as: e2e-metal-ovn-single-node-live-iso
   cron: 3 4 */5,17 * *
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   cron: 18 7 */5,18 * *
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
@@ -345,7 +326,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       GATEWAY_MODE: local
     observers:
       enable:
@@ -472,7 +452,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FIPS_ENABLED: "true"
     observers:
       enable:
@@ -530,7 +509,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -557,9 +535,7 @@ tests:
 - as: console-aws
   cron: 28 16 */12,24 * *
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -601,7 +577,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -610,9 +585,7 @@ tests:
 - as: e2e-aws-sdn
   cron: 17 5 */14,26 * *
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -620,12 +593,10 @@ tests:
 - as: e2e-aws-ovn-multi
   cron: 17 19 */1,11 * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
       RELEASE_IMAGE_LATEST: release:multi-latest
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -633,9 +604,7 @@ tests:
 - as: e2e-aws-sdn-serial
   cron: 50 3 */9,20 * *
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -643,9 +612,7 @@ tests:
 - as: e2e-aws-ovn-serial
   cron: 32 19 */7,16 * *
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -654,8 +621,6 @@ tests:
   cron: 38 6 */11,20 * *
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -695,8 +660,6 @@ tests:
   cron: 41 11 */7,20 * *
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -705,8 +668,6 @@ tests:
   cron: 57 18 */1,14 * *
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -800,8 +761,6 @@ tests:
   cron: 15 22 */14,25 * *
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -815,7 +774,8 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-telco5g
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 08 2 */1 * 1-5
   restrict_network_access: false
   steps:
@@ -830,7 +790,8 @@ tests:
       - observers-resource-watch
     workflow: telco5g-origin
 - as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 16 * * 6,0
   restrict_network_access: false
   steps:
@@ -845,27 +806,14 @@ tests:
       - observers-resource-watch
     workflow: telco5g-cnf
   timeout: 6h0m0s
-- as: e2e-telco5g-sno-cnftests
-  cluster: build05
-  cron: 00 16 * * 6,0
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.12"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 21 * * 6
   restrict_network_access: false
   steps:
     env:
+      SKIP_OCP_INSTALL: "false"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.12"
     observers:
@@ -908,7 +856,7 @@ tests:
 - as: e2e-aws-ovn-upi
   cron: 31 22 */10,24 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -950,7 +898,7 @@ tests:
 - as: e2e-aws-ovn-etcd-scaling
   cron: 9 5 */10,22 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     observers:
       enable:
       - observers-resource-watch

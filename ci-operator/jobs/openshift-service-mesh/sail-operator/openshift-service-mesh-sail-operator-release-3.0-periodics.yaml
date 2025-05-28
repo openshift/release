@@ -11,9 +11,18 @@ periodics:
     org: openshift-service-mesh
     repo: sail-operator
   labels:
+    ci-operator.openshift.io/variant: ocp-4.18
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-service-mesh-sail-operator-release-3.0-sync-upstream
+  name: periodic-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.18-sync-upstream
+  reporter_config:
+    slack:
+      channel: '#istio-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -22,6 +31,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ossm-github-simple-job
       - --target=sync-upstream
+      - --variant=ocp-4.18
       command:
       - ci-operator
       image: ci-operator:latest

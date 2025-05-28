@@ -1,0 +1,195 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: daily-6nodes
+  capabilities:
+  - intranet
+  cron: 0 0 * * 2
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
+      CRUCIBLE: "false"
+      INFRA: "true"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.19
+      PUBLIC_VLAN: "true"
+      RUN_CERBERUS: "false"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-node-density
+    - chain: openshift-qe-node-density-heavy
+  timeout: 8h0m0s
+- as: daily-virt-6nodes
+  capabilities:
+  - intranet
+  cron: 0 8 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CNV_VERSION: "4.19"
+      CONFIG: config/standard-scalelab.yml
+      CRUCIBLE: "false"
+      INFRA: "true"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.19
+      PUBLIC_VLAN: "true"
+      VM: "true"
+      VMI_READY_THRESHOLD: "180"
+      VMS_PER_NODE: "200"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-cnv
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-virt-density
+  timeout: 8h0m0s
+- always_run: false
+  as: deploy-6nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CRUCIBLE: "false"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.19
+      PUBLIC_VLAN: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+- always_run: false
+  as: deploy-sno
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      CRUCIBLE: "false"
+      OCP_VERSION: latest-4.19
+      PUBLIC_VLAN: "true"
+      TYPE: sno
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+- always_run: false
+  as: node-density-heavy-6nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CRUCIBLE: "false"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.19
+      PUBLIC_VLAN: "true"
+      RUN_CERBERUS: "false"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-node-density-heavy
+  timeout: 7h0m0s
+- always_run: false
+  as: data-path-6nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
+      CRUCIBLE: "false"
+      INFRA: "true"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.19
+      PUBLIC_VLAN: "true"
+      RUN_CERBERUS: "false"
+      TELCO: "false"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-data-path-tests
+  timeout: 7h55m0s
+- always_run: false
+  as: web-burner-node-density-6nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CRUCIBLE: "false"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.19
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-sriov
+    - chain: openshift-qe-web-burner
+- always_run: false
+  as: web-burner-cluster-density-6nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CRUCIBLE: "false"
+      KUBE_BURNER_VERSION: 1.2.9
+      LIMIT_COUNT: "1"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.19
+      WORKLOAD: web-burner-cluster-density
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-sriov
+    - chain: openshift-qe-web-burner
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-4.19-latest-x86

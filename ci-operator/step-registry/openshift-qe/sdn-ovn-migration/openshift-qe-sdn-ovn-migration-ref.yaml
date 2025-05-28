@@ -1,0 +1,55 @@
+ref:
+  as: openshift-qe-sdn-ovn-migration
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-sdn-ovn-migration-commands.sh
+  timeout: 8h0m0s    
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: ocp-qe-gcp-sa
+    mount_path: /ga-gsheet
+  env:
+  - name: ITERATIONS
+    default: "3"
+    documentation: |-
+      Override the ITERATIONS for kube-burner-ocp
+  - name: ENABLE_INGRESS_CONTROLLER
+    default: "true"
+    documentation: |-
+      If customized ingress controller
+  - name: EGRESS_FIREWALL_POLICY_RULES_TOTAL_NUM
+    default: "60"
+    documentation: |-
+      Override the EGRESS_FIREWALL_POLICY_RULES_TOTAL_NUM for creating rules per egressnetworkpolicy/egressfirewall
+  - name: POD_RPLICAS
+    default: "3"
+    documentation: |-
+      The pod replicas in sdn-ovn-restricted-x and sdn-ovn-migration-x, those used for deletec service broken and network function verification
+  - name: IF_CUSTOMIZED_KUBE_BURNER_WORKLOAD
+    default: "false"
+    documentation: |-
+      If customized cluster-density-v2, don't use the pods/service number by default
+  - name: KUBE_BURNER_POD_REPLICAS
+    default: "1"
+    documentation: |-
+      The pod replicas in customized cluster-density-v2
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      set CHURN to false or true
+  - name: MAX_UNAVAILABLE
+    default: "3"
+    documentation: |-
+       set max unavailabe of worker nodes if no upgrade steps when migration sdn to ovn    
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale configmap-scale workload in the deployed cluster

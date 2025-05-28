@@ -1,0 +1,72 @@
+base_images:
+  upi-installer:
+    name: "4.20"
+    namespace: origin
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    prerelease:
+      product: okd
+      version_bounds:
+        lower: 4.18.0-0
+        stream: 4-scos-stable
+        upper: 4.1003.0-0
+  latest:
+    candidate:
+      product: okd
+      stream: okd-scos
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn
+  interval: 168h
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp
+  interval: 168h
+  steps:
+    cluster_profile: gcp-3
+    workflow: openshift-e2e-gcp
+- as: e2e-vsphere-ovn
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- as: e2e-aws-ovn-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-agent-single-node-ipv6
+  cluster: build05
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: okd-scos-4.20

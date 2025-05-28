@@ -7,10 +7,11 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
+  optional: true
   to: must-gather
 promotion:
   to:
@@ -22,14 +23,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: must-gather
-    env:
-      IMAGE_REPO: must-gather
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: make -f Makefile.prow unit-test
   container:

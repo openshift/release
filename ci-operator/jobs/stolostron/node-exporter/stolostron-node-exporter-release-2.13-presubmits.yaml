@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build02
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -60,7 +60,7 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build02
+    cluster: build05
     context: ci/prow/ocm-ci-rbac
     decorate: true
     decoration_config:
@@ -122,7 +122,7 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build02
+    cluster: build05
     context: ci/prow/pr-image-mirror
     decorate: true
     decoration_config:
@@ -180,73 +180,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build02
-    context: ci/prow/sonar-pre-submit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-node-exporter-release-2.13-sonar-pre-submit
-    rerun_command: /test sonar-pre-submit
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/acm-sonarcloud-token
-        - --target=sonar-pre-submit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/acm-sonarcloud-token
-          name: acm-sonarcloud-token
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-sonarcloud-token
-        secret:
-          secretName: acm-sonarcloud-token
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sonar-pre-submit,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.13$
-    - ^release-2\.13-
-    cluster: build02
+    cluster: build05
     context: ci/prow/test-e2e
     decorate: true
     decoration_config:
@@ -256,6 +194,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stolostron-node-exporter-release-2.13-test-e2e
     rerun_command: /test test-e2e
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -297,11 +236,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )test-e2e,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build02
+    cluster: build05
     context: ci/prow/test-unit
     decorate: true
     decoration_config:
@@ -311,6 +250,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stolostron-node-exporter-release-2.13-test-unit
     rerun_command: /test test-unit
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
       containers:
       - args:

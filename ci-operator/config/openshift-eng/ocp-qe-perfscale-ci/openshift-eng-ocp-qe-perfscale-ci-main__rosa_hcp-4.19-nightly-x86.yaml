@@ -36,6 +36,10 @@ tests:
       ENABLE_AUTOSCALING: "false"
       HOSTED_CP: "true"
       INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: r5.2xlarge
+      MP_REPLICAS: "2"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.19"
       PPROF: "false"
@@ -43,8 +47,9 @@ tests:
       REPLICAS: "24"
       ZONES_COUNT: "3"
     test:
+    - chain: openshift-qe-hypershift-infra
     - chain: openshift-qe-control-plane
-    workflow: rosa-aws-sts-hcp
+    workflow: rosa-aws-sts-hcp-mp
   timeout: 5h0m0s
 - as: node-density-heavy-24nodes
   cron: 0 5 5,12,19,26 * *
@@ -58,6 +63,10 @@ tests:
       ENABLE_AUTOSCALING: "false"
       HOSTED_CP: "true"
       INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: r5.2xlarge
+      MP_REPLICAS: "2"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.19"
       PPROF: "false"
@@ -65,8 +74,9 @@ tests:
       REPLICAS: "24"
       ZONES_COUNT: "3"
     test:
+    - chain: openshift-qe-hypershift-infra
     - chain: openshift-qe-node-density-heavy
-    workflow: rosa-aws-sts-hcp
+    workflow: rosa-aws-sts-hcp-mp
   timeout: 5h0m0s
 - always_run: false
   as: node-density-24nodes
@@ -114,6 +124,72 @@ tests:
     - chain: openshift-qe-node-density-cni
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
+- always_run: false
+  as: control-plane-120nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_SECTOR: perf4
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: r5.4xlarge
+      MP_REPLICAS: "2"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.19"
+      PPROF: "false"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-east-2
+      REPLICAS: "120"
+      ZONES_COUNT: "3"
+    test:
+    - ref: rosa-cluster-credentials-hypershift-mgmt
+    - chain: openshift-qe-hypershift-infra
+    - ref: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-node-density
+    - ref: openshift-qe-node-density-cni
+    - ref: openshift-qe-crd-scale
+    workflow: rosa-aws-sts-hcp-mp
+  timeout: 8h0m0s
+- always_run: false
+  as: control-plane-249nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_SECTOR: perf4
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: r5.4xlarge
+      MP_REPLICAS: "2"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.19"
+      PPROF: "false"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-east-2
+      REPLICAS: "249"
+      ZONES_COUNT: "3"
+    test:
+    - ref: rosa-cluster-credentials-hypershift-mgmt
+    - chain: openshift-qe-hypershift-infra
+    - ref: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-node-density
+    - ref: openshift-qe-node-density-cni
+    - ref: openshift-qe-crd-scale
+    workflow: rosa-aws-sts-hcp-mp
+  timeout: 8h0m0s
 - as: data-path-9nodes
   cron: 0 1 1,8,15,22 * *
   steps:

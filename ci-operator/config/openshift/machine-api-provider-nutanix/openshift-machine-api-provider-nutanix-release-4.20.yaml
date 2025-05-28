@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.20"
     namespace: ocp
@@ -7,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -21,7 +29,8 @@ images:
   to: nutanix-machine-controllers
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -44,7 +53,7 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-nutanix
   cluster: build01
@@ -68,10 +77,31 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-nutanix
+- as: regression-clusterinfra-nutanix-ipi-mapi
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: nutanix
+    env:
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS: NonHyperShiftHOST
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+      TEST_TIMEOUT: "35"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-nutanix-ipi
+  timeout: 7h0m0s
 - as: unit
   commands: make test
   container:
     from: src
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

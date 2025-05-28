@@ -98,11 +98,9 @@ operator:
     with: pipeline:sriov-network-metrics-exporter
 promotion:
   to:
-  - disabled: true
-    name: sriov-4.19
+  - name: sriov-4.19
     namespace: origin
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -182,7 +180,7 @@ tests:
       OO_INDEX: ci-index-operator-bundle
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
-    workflow: openshift-e2e-openstack-sriov-cgroupsv1
+    workflow: openshift-e2e-openstack-sriov
 - as: e2e-openstack-nfv-config-drive
   optional: true
   steps:
@@ -192,7 +190,7 @@ tests:
     env:
       CONFIG_DRIVE: "true"
       OPENSTACK_DPDK_NETWORK: intel-dpdk
-    workflow: openshift-e2e-openstack-sriov-cgroupsv1
+    workflow: openshift-e2e-openstack-sriov
 - as: security
   optional: true
   steps:
@@ -202,7 +200,8 @@ tests:
     workflow: openshift-ci-security
 - always_run: false
   as: e2e-telco5g-sriov
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -259,6 +258,12 @@ tests:
           memory: 200Mi
     workflow: telco5g-sriov
   timeout: 6h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

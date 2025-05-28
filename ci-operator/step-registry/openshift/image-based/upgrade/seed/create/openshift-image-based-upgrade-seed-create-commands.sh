@@ -64,7 +64,7 @@ case $SEED_IMAGE_TAG_FORMAT in
     SEED_IMAGE_TAG="e2e-${SEED_VERSION}-$(date +%F)"
     ;;
   "presubmit")
-    SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
+    SEED_IMAGE_TAG="pre-${SEED_VERSION}-${PULL_PULL_SHA}"
     ;;
   "release")
     SEED_IMAGE_TAG="rel-${SEED_VERSION}-${PULL_PULL_SHA}"
@@ -100,7 +100,7 @@ export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
 export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
-export RELEASE_IMAGE="${RELEASE_IMAGE}"
+export SEED_RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
 export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
@@ -131,7 +131,7 @@ set_docker_config_file() {
   mkdir -p \${HOME}/.docker/ && cp ${PULL_SECRET_FILE} \${HOME}/.docker/config.json
 }
 
-set_openshift_clients \${RELEASE_IMAGE}
+set_openshift_clients \${SEED_RELEASE_IMAGE}
 
 cd ${remote_workdir}/ib-orchestrate-vm
 

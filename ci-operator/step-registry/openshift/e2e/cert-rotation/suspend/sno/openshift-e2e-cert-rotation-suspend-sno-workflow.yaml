@@ -3,10 +3,8 @@ workflow:
   steps:
     allow_skip_on_success: true
     allow_best_effort_post_steps: true
-    cluster_profile: packet-assisted
+    cluster_profile: gcp
     env:
-      PACKET_PLAN: "c3.medium.x86"
-      PACKET_OS: "rocky_9"
       ASSISTED_CONFIG: |
         KUBE_API=true
         ENABLE_KUBE_API=true
@@ -18,7 +16,8 @@ workflow:
         DEPLOY_TARGET=minikube
         NUM_MASTERS=1
     pre:
-      - ref: baremetalds-packet-setup
+      - chain: upi-gcp-nested-pre
+      - ref: openshift-e2e-cert-rotation-conf-assisted-on-gcp
       - chain: openshift-e2e-cert-rotation-conf
     test:
       - ref: openshift-e2e-cert-rotation-prepare-for-shutdown
@@ -27,8 +26,6 @@ workflow:
       - ref: openshift-e2e-cert-rotation-test
     post:
       - ref: gather-cert-rotation
-      - ref: assisted-common-gather
-      - ref: baremetalds-packet-gather-metadata
-      - ref: baremetalds-packet-teardown
+      - chain: upi-gcp-nested-post
   documentation: |-
-    This workflow executes single-node installation using live CD, rolls time forward for 90 days and verifies that the cluster correctly reconfigures itself
+    This workflow executes single-node on a nested environment in GCP, rolls time forward for 90 days and verifies that the cluster correctly reconfigures itself
