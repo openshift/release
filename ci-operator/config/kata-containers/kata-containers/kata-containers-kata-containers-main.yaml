@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: cli
   openstack-installer:
@@ -35,10 +35,11 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       CUSTOM_AZURE_REGION: eastus
+      LOKI_ENABLED: "false"
       SLEEP_DURATION: 2h
       SPOT_INSTANCES: "false"
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;C00113'
-      TEST_SCENARIOS: Kata
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;C00113
+      TEST_SCENARIOS: kata
       TEST_TIMEOUT: "75"
     post:
     - ref: cucushift-installer-wait
@@ -48,8 +49,9 @@ tests:
     - ref: ipi-conf-azure-custom-region
     - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install
+    - ref: ipi-azure-rbac
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: openshift-extended-test
 zz_generated_metadata:
   branch: main
   org: kata-containers
