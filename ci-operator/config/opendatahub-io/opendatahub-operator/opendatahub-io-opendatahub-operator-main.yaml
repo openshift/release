@@ -15,7 +15,9 @@ images:
   to: opendatahub-operator
 operator:
   bundles:
-  - dockerfile_path: Dockerfiles/bundle.Dockerfile
+  - as: opendatahub-operator-bundle
+    dockerfile_path: Dockerfiles/bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
@@ -49,6 +51,8 @@ tests:
 - as: opendatahub-operator-e2e
   steps:
     cluster_profile: gcp-opendatahub
+    dependencies:
+      OO_BUNDLE: opendatahub-operator-bundle
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       OO_CHANNEL: fast
@@ -66,7 +70,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-operator-sdk-gcp
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
