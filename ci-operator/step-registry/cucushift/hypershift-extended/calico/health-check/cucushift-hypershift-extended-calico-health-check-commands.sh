@@ -12,9 +12,9 @@ timeout 30m bash -c 'until [[ $(oc get nodes --no-headers | wc -l) -eq "$HYPERSH
 echo "Waiting for the guest cluster to be ready"
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 
-oc wait tigerastatus calico --for=condition=Available --timeout=30m
-oc wait tigerastatus apiserver --for=condition=Available --timeout=30m
-oc wait tigerastatus ippools --for=condition=Available --timeout=30m
+oc wait tigerastatus calico --for=condition=Available --timeout=30m || oc get tigerastatus calico -oyaml
+oc wait tigerastatus apiserver --for=condition=Available --timeout=30m || oc get tigerastatus apiserver -oyaml
+oc wait tigerastatus ippools --for=condition=Available --timeout=30m || oc get tigerastatus ippools -oyaml
 
 oc wait clusteroperators --all --for=condition=Available=True --timeout=60m
 oc wait clusteroperators --all --for=condition=Progressing=False --timeout=30m
