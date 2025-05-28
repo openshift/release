@@ -390,11 +390,11 @@ function run {
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
-        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
+        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} ${SHARD_ARGS} \
         -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     else
-        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
+        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} ${SHARD_ARGS} \
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
