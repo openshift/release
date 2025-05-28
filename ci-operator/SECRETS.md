@@ -224,7 +224,7 @@ The credentials are already available at:
 /var/run/secrets/ci.openshift.io/cluster-profile/pull-secret
 ```
 
-**Example:**
+**Example usage:**
 ```shell
 podman pull --authfile /var/run/secrets/ci.openshift.io/cluster-profile/pull-secret registry.redhat.io/<image>:<tag>
 ```
