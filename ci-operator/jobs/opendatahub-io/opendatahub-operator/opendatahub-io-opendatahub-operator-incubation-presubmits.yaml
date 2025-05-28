@@ -6,22 +6,23 @@ presubmits:
     - ^incubation$
     - ^incubation-
     cluster: build06
-    context: ci/prow/ci-bundle-opendatahub-operator-bundle
+    context: ci/prow/ci-index
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-opendatahub-operator-incubation-ci-bundle-opendatahub-operator-bundle
-    rerun_command: /test ci-bundle-opendatahub-operator-bundle
+    name: pull-ci-opendatahub-io-opendatahub-operator-incubation-ci-index
+    rerun_command: /test ci-index
+    skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=opendatahub-operator-bundle
+        - --target=ci-index
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,7 +55,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-bundle-opendatahub-operator-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

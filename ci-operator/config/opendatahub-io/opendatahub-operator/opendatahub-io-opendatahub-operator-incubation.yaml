@@ -15,9 +15,7 @@ images:
   to: opendatahub-operator
 operator:
   bundles:
-  - as: opendatahub-operator-bundle
-    dockerfile_path: Dockerfiles/bundle.Dockerfile
-    skip_building_index: true
+  - dockerfile_path: Dockerfiles/bundle.Dockerfile
   substitutions:
   - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
@@ -53,12 +51,12 @@ tests:
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$
   steps:
     cluster_profile: gcp-opendatahub
-    dependencies:
-      OO_BUNDLE: opendatahub-operator-bundle
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
-      OO_INSTALL_MODE: AllNamespaces
+      OO_CHANNEL: fast
       OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: opendatahub-operator
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e
       cli: latest
@@ -70,7 +68,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: incubation
   org: opendatahub-io
