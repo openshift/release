@@ -23,20 +23,26 @@ main() {
   #   exit 0
   # fi
 
+  echo "Reading alert message from ${SHARED_DIR}/ci-slack-alert.txt"
   SLACK_ALERT_MESSAGE=$(cat "${SHARED_DIR}/ci-slack-alert.txt")
   export SLACK_ALERT_MESSAGE
+  echo "Getting job URL for alert message."
   URL_CI_RESULTS=$(get_job_url)
 
   if [[ -z "${SLACK_ALERT_MESSAGE}" ]]; then
+    echo "No alert message found in ${SHARED_DIR}/ci-slack-alert.txt, sending default message."
     curl -X POST -H 'Content-type: application/json' \
       --data "{\"text\":\":failed: \`$JOB_NAME\`, <$URL_CI_RESULTS|📜logs>.\"}" \
       "$SLACK_NIGHTLY_WEBHOOK_URL"
     exit 1
   fi
 
+  echo "Alert message found, sending it to Slack: ${SLACK_ALERT_MESSAGE}"
   curl -X POST -H 'Content-type: application/json' \
       --data "{\"text\":\"${SLACK_ALERT_MESSAGE}\"}" \
       "$SLACK_NIGHTLY_WEBHOOK_URL"
+  echo "Alert message successfully sent to Slack."
+  exit 0
 }
 
 main
