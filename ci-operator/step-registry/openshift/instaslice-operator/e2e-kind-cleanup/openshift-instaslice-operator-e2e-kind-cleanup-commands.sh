@@ -37,16 +37,16 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 popd
 
 # Collecting the controller, daemonset logs
-gcloud compute ssh "$VM_NAME" --zone="$GOOGLE_COMPUTE_ZONE" --command="
+gcloud compute ssh "$VM_NAME" --zone="$GOOGLE_COMPUTE_ZONE" --command='
 set -eux
 kubectl get pods -n instaslice-system |tee get_pods_instaslice-system.log
 kubectl describe pods -n instaslice-system |tee describe_pods_instaslice-system.log
 kubectl get instaslice -oyaml -A |tee instaslice.log
-kubectl logs -n instaslice-system -l app=controller-daemonset |tee daemonset.log
-kubectl logs -n instaslice-system -l control-plane=controller-manager |tee controller.log
+kubectl get pods -n instaslice-system | grep daemonset | awk '\''{print $1}'\'' | xargs kubectl logs -n instaslice-system |tee daemonset.log
+kubectl get pods -n instaslice-system | grep controller-manager | awk '\''{print $1}'\'' | xargs kubectl logs -n instaslice-system |tee controller.log
 
 tar -czf logs_archive.tar.gz *.log
-"
+'
 
 gcloud compute scp \
   --quiet \
