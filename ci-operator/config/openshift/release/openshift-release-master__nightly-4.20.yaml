@@ -75,6 +75,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
   upi-installer:
     name: "4.20"
     namespace: ocp
@@ -103,6 +107,13 @@ releases:
       product: ocp
       stream: nightly
       version: "4.20"
+  stable:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.20.0-0
+        stream: 4-dev-preview
+        upper: 4.21.0-0
 resources:
   '*':
     requests:
@@ -452,6 +463,14 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
+- as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
+  cluster: build05
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: equinix-edge-enablement
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
+    workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
