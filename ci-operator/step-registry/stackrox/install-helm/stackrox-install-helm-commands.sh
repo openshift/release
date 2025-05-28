@@ -54,9 +54,10 @@ trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
 function retry() {
-  for (( i = 0; i < 10; i++ )); do
-    "$@" && return 0
+  "$@" && return 0  # unrolled 1 to simplify sleep only between tries
+  for (( i = 0; i < 9; i++ )); do
     sleep 30
+    "$@" && return 0
   done
   return 1
 }
@@ -299,6 +300,7 @@ if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
   if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
+    # matcher deployment progress deadline is 300s. rollout check fails at the progress deadline.
     echo '>>> Follow scanner-v4-matcher logs until ready state'
     kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' -n stackrox \
       --timeout="${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}" \
