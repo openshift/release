@@ -18,10 +18,10 @@ get_job_url() {
 }
 
 main() {
-  if [[ "$JOB_TYPE" != "periodic" ]]; then
-    echo "This job is not a nightly job, skipping alert."
-    exit 0
-  fi
+  # if [[ "$JOB_TYPE" != "periodic" ]]; then
+  #   echo "This job is not a nightly job, skipping alert."
+  #   exit 0
+  # fi
 
   SLACK_ALERT_MESSAGE=$(cat "${SHARED_DIR}/ci-slack-alert.txt")
   export SLACK_ALERT_MESSAGE
