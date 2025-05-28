@@ -42,4 +42,4 @@ To https://openshift-merge-robot@github.com/openshift-priv/cluster-api-provider-
  + 3bde969f...5e3a2bae public/release-4.13 -> release-4.13 (forced update)
 ```
 
-[private_org_sync_readme]: https://github.com/openshift/ci-tools/blob/master/cmd/private-org-sync/README.md
+[private_org_sync_readme]: https://github.com/openshift/ci-tools/blob/main/cmd/private-org-sync/README.md

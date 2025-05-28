@@ -1034,7 +1034,6 @@ tests:
       ASSIGN_ROLES_TO_SUBNETS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       EDGE_ZONE_TYPES: wavelength-zone
-      EDGE_ZONES_LIST: us-east-1-mia-1a
       SUBNET_ROLES: |-
         [
           [
@@ -4370,6 +4369,38 @@ tests:
   steps:
     cluster_profile: nutanix-qe-dis
     workflow: agent-qe-nutanix-disconnected
+- as: vsphere-short-cert-rotation-f9
+  cron: 6 18 5,17,26 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: ibmcloud-short-cert-rotation-f9
+  cron: 50 16 1,13,22 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: nutanix-short-cert-rotation-f9
+  cluster: build01
+  cron: 37 3 1,10,19 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-nutanix-ipi
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

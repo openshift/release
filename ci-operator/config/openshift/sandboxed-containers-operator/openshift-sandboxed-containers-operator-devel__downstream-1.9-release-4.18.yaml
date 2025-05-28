@@ -1,0 +1,44 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: peerpods-e2e-azure
+  cron: '@yearly'
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLEGPU: "false"
+      ENABLEPEERPODS: "true"
+      INSTALL_KATA_RPM: "false"
+      OPERATOR_INDEX_VERSION: 1.9.0
+      OPERATOR_UPDATE_CHANNEL: stable
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;41566
+      TEST_RELEASE_TYPE: GA
+      TEST_SCENARIOS: kata
+      TEST_TIMEOUT: "50"
+    workflow: sandboxed-containers-operator-e2e-azure
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: downstream-1.9-release-4.18
