@@ -52,7 +52,9 @@ gcloud compute scp \
   --quiet \
   --project "${GOOGLE_COMPUTE_PROJECT}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse  "$VM_NAME":~/logs_archive.tar.gz "$HOME"/results.tar.gz
+  --recurse  "$VM_NAME":~/logs_archive.tar.gz "$HOME"/artifacts.tar.gz
+
+tar -xzvf "${HOME}"/artifacts.tar.gz -C "${ARTIFACT_DIR}"
 
 # Optional: clean up to avoid charges
 echo "Cleaning up VM..."
