@@ -257,6 +257,10 @@ function collect_diagnostic_data {
               echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
               govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
 
+              # attempt to get and clean up node journals
+              curl -H "node-id: ${vmname}" -o "${vcenter_state}/${vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000
+              curl -X DELETE -H "node-id: ${vmname}" http://log-gather.vmc.ci.openshift.org:8000
+              
               METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
               JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
           done
