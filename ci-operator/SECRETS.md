@@ -250,7 +250,7 @@ You can mount the credentials manually in your pod like this:
             cpu: 100m
 ```
 
-Then, the credentials will be available at:
+This makes the credentials available at:
 
 ```shell
 /var/run/secrets/ci-pull-credentials/.dockerconfigjson
