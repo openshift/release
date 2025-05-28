@@ -132,7 +132,7 @@ EOF
     run_command "cat oc-mirror-workspace/results-*/catalogSource*"
     run_command "oc apply -f ./oc-mirror-workspace/results-*/"
 
-    CATALOG_SOURCE="cs-redhat-operator-index"
+    CATALOG_SOURCE="redhat-operators"
     local -i counter=0
     local status=""
     while [ $counter -lt 600 ]; do
