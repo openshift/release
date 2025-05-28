@@ -51,5 +51,5 @@ spec:
       kubernetes: NodeInternalIP
     ipPools:
       - cidr: 10.128.0.0/14
-        encapsulation: None
+        encapsulation: VXLANCrossSubnet
 EOF
