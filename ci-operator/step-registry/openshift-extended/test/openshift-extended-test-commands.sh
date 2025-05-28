@@ -344,6 +344,8 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
+    echo "SHARD_ARGS=\"${SHARD_ARGS}\""
+
     extended-platform-tests run all --dry-run ${SHARD_ARGS} | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
