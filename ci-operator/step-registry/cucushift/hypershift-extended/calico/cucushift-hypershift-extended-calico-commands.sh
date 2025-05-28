@@ -73,4 +73,7 @@ spec:
   calicoNetwork:
     nodeAddressAutodetectionV4:
       kubernetes: NodeInternalIP
+    ipPools:
+      - cidr: 10.136.0.0/14
+        encapsulation: None
 EOF
