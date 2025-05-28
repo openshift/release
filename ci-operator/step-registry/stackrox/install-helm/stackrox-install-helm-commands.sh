@@ -54,18 +54,15 @@ trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
 function retry() {
-  "$@" && return 0  # unrolled 1 to simplify sleep only between tries
-  for (( i = 0; i < 9; i++ )); do
-    sleep 30
+  for (( i = 0; i < 10; i++ )); do
     "$@" && return 0
+    sleep 30
   done
   return 1
 }
 
 function wait_deploy() {
-  local total_wait=${2:-3000}
-  local wait_step=$(( total_wait > 270 ? ( total_wait - 30 * 9 ) / 10 : 0 ))  # account for retry's sleeps
-  retry oc -n stackrox rollout status deploy/"$1" --timeout=${wait_step//-/}s \
+  retry oc -n stackrox rollout status deploy/"$1" --timeout=300s \
     || {
       echo "oc describe -n stackrox deploy/$1"
       oc describe -n stackrox deploy/"$1" || true
@@ -301,12 +298,15 @@ if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
   echo ">>> Wait for 'stackrox scanner-v4' deployments"
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
-  wait_deploy scanner-v4-matcher "${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}"
-  kubectl logs --tail=2 --selector 'app=scanner-v4-matcher' -n stackrox --timestamps
-  kubectl rollout status deploy/scanner-v4-matcher --timeout=0 -n stackrox || true
-  kubectl logs --tail=2 --selector 'app=scanner-v4-matcher' -n stackrox --timestamps
-  kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' -n stackrox --timeout=0 || true
-  kubectl logs --tail=20 --selector 'app=scanner-v4-matcher' -n stackrox --timestamps
+  if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
+    echo '>>> Follow scanner-v4-matcher logs until ready state'
+    kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' -n stackrox \
+      --timeout="${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}" \
+      || { kubectl logs --tail=20 --selector 'app=scanner-v4-matcher' -n stackrox --timestamps; exit 1; }
+    kubectl rollout status deploy/scanner-v4-matcher --timeout=0 -n stackrox
+  else
+    wait_deploy scanner-v4-matcher "${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}"
+  fi
 fi
 
 kubectl get nodes -o wide
