@@ -38,6 +38,7 @@ cp "${calico_dir}/01-cr-apiserver.yaml" "${SHARED_DIR}/manifest_01-cr-apiserver.
 # The specific setting is required as some tests create NetworkAttachmentDefinitions
 # which add network interfaces to the host. Calico then incorrectly chooses this interface
 # and breaks connectivity between nodes.
+# Use encapsulation: None to prevent OCPBUGS-56096
 cat > "${SHARED_DIR}/manifest_01-cr-installation.yaml" << EOF
 apiVersion: operator.tigera.io/v1
 kind: Installation
@@ -46,8 +47,6 @@ metadata:
 spec:
   variant: Calico
   calicoNetwork:
-    nodeAddressAutodetectionV4:
-      kubernetes: NodeInternalIP
     ipPools:
       - cidr: 10.128.0.0/14
         encapsulation: None
