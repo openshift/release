@@ -68,11 +68,11 @@ resources:
       memory: 200Mi
 tests:
 - as: generate
-  commands: make generate --always-make && git diff --exit-code
+  commands: GOFLAGS="-mod=readonly" make generate --always-make && git diff --exit-code
   container:
     from: src
 - as: unit
-  commands: make test --warn-undefined-variables
+  commands: GOFLAGS="-mod=readonly" make test --warn-undefined-variables
   container:
     from: src
 - as: lint
@@ -80,6 +80,7 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
+    export GOFLAGS="-mod=readonly"
     make lint
   container:
     clone: true
@@ -119,6 +120,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
@@ -185,6 +188,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
@@ -251,6 +256,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
@@ -319,6 +326,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
