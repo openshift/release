@@ -37,6 +37,17 @@ if ! whoami &> /dev/null; then
   fi
 fi
 
+# if curl is ever updated we can use this instead
+#curl -o /dev/null -s -k -w "\n%{certs}\n" "https://api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com:6443"
+
+
+
+curl -kv "https://api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com:6443" > ${ARTIFACT_DIR}/cluster-cert.txt
+
+echo | \
+    openssl s_client -servername api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com -connect api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com:6443 2>/dev/null | \
+    openssl x509 -text
+
 function collect_sosreport {
   ADDRESS=$1
   echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
@@ -67,7 +78,7 @@ function collect_sosreport_from_unprovisioned_machines {
   for MACHINE in ${MACHINES}; do
     echo "$(date -u --rfc-3339=seconds) - checking if machine $MACHINE lacks a nodeRef"
     NODEREF=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.nodeRef}')
-      
+
     if [ -z "$NODEREF" ]; then
       echo "$(date -u --rfc-3339=seconds) - attempting to collect sos report"
       ADDRESS=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.addresses[0].address}')
@@ -170,7 +181,7 @@ function collect_diagnostic_data {
   VCENTER_COUNT=$(jq '.vcenters | length' "$SHARED_DIR"/platform.json)
   v_idx=0
 
-  
+
   while [[ $v_idx -lt $VCENTER_COUNT ]]; do
     VCENTER=$(jq -c -r '.vcenters['${v_idx}']' "$SHARED_DIR"/platform.json)
     GOVC_URL=$(echo $VCENTER | jq -r '.server')
@@ -183,7 +194,7 @@ function collect_diagnostic_data {
 
     IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
     IFS=$'\n' read -d '' -r -a PORTGROUPS <<< "$(jq -r -c --arg vcenter "${GOVC_URL}" '[.failureDomains[] | select(.server == $vcenter) | .topology.networks[]] | unique | .[]' < "$SHARED_DIR"/platform.json)"
-        
+
     if [ -z ${PORTGROUPS:-} ]; then
       echo "${GOVC_URL}; port groups in failure domain: ${#PORTGROUPS[@]}"
       v_idx=$((v_idx+1));
@@ -197,17 +208,17 @@ function collect_diagnostic_data {
 
       IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${PORTGROUP})"
 
-      if [ -z ${networks:-} ]; then          
+      if [ -z ${networks:-} ]; then
             echo "No networks found associated with port group ${PORTGROUP}: $(govc find -type=n -i=true -name ${PORTGROUP})"
             v_idx=$((v_idx+1));
             continue
       fi
-      
+
       echo "${GOVC_URL}; ${PORTGROUP}; found networks: ${#networks[@]}"
 
       for network in "${networks[@]}"; do
           IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"
-          if [ -z ${vms:-} ]; then          
+          if [ -z ${vms:-} ]; then
             echo "No VMs found associated with network ${network} $(govc find . -type m -runtime.powerState poweredOn -network $network)"
             continue
           fi
@@ -251,16 +262,16 @@ function collect_diagnostic_data {
           done
       done
     done
-    
+
     if [ -n "${vms:-}" ]; then
       target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
-      echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"      
+      echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
     fi
 
     if [ -n "${JSON_DATA:-}" ]; then
       echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
-    fi  
-    
+    fi
+
     v_idx=$((v_idx+1));
   done
 
@@ -314,7 +325,7 @@ function embed_topology_data() {
     POD=$(jq --compact-output -r .spec.podName < "${NETWORK}")
     DATACENTER=$(jq --compact-output -r .spec.datacenterName < "${NETWORK}")
     CIDR=$(jq --compact-output -r .spec.machineNetworkCidr < "${NETWORK}")
-    GATEWAY=$(jq --compact-output -r .spec.gateway < "${NETWORK}")    
+    GATEWAY=$(jq --compact-output -r .spec.gateway < "${NETWORK}")
 
     echo "Network: ${NAME}<br>" >> "${RESULT_HTML}"
     echo "- VLAN: ${VLAN}<br>" >> "${RESULT_HTML}"
@@ -363,7 +374,7 @@ function embed_vm_data() {
     echo "<script type='application/json' id='${VM}-screenshot'>" >> ${RESULT_HTML}
     SCREENSHOT_BASE64=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .screenshot' ${vcenter_state}/metric-files.json)
     echo $SCREENSHOT_BASE64 >> ${RESULT_HTML}
-    echo "</script>" >> ${RESULT_HTML}    
+    echo "</script>" >> ${RESULT_HTML}
   done
 }
 
@@ -446,7 +457,7 @@ EOF
 
 embed_topology_data
 
-cat >> "${RESULT_HTML}" << EOF      
+cat >> "${RESULT_HTML}" << EOF
     </data>
     <data id="vm-data">
       <div id="vm-data-content">
