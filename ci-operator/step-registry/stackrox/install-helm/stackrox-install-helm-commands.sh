@@ -251,7 +251,7 @@ function install_secured_cluster_with_helm() {
 echo '>>> Begin setup'
 fetch_last_nightly_tag
 prepare_helm_templates
-install_helm
+helm version || install_helm
 
 install_central_with_helm
 
@@ -300,12 +300,11 @@ if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
   wait_deploy scanner-v4-db
   wait_deploy scanner-v4-indexer
   if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
-    # matcher deployment progress deadline is 300s. rollout check fails at the progress deadline.
+    # Cannot use wait_deploy because the matcher deployment progress deadline is 300s, and the rollout check fails at the progress deadline.
     echo '>>> Follow scanner-v4-matcher logs until ready state'
     kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' -n stackrox \
-      --timeout="${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}" \
-      || { kubectl logs --tail=20 --selector 'app=scanner-v4-matcher' -n stackrox --timestamps; exit 1; }
-    kubectl rollout status deploy/scanner-v4-matcher --timeout=0 -n stackrox
+      --timeout="${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}s" \
+      || { kubectl logs --selector 'app=scanner-v4-matcher' -n stackrox --timestamps; exit 1; }
   else
     wait_deploy scanner-v4-matcher "${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}"
   fi
