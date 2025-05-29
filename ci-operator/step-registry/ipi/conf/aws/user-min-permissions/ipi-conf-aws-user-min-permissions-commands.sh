@@ -342,7 +342,16 @@ EOF
 		# Make a copy of the install-config.yaml since the installer will consume it.
 		cp "${SHARED_DIR}/install-config.yaml" ${dir}/
 
-		openshift-install create permissions-policy --dir ${dir}
+		export INSTALLER_BINARY="openshift-install"
+		if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+		  echo "Extracting installer from ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+		  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to="/tmp" || exit 1
+		  export INSTALLER_BINARY="/tmp/openshift-install"
+		fi
+
+		${INSTALLER_BINARY} version
+
+		${INSTALLER_BINARY} create permissions-policy --dir ${dir}
 
 		# Save policy to artifact dir for debugging
 		mv ${dir}/${USER_POLICY_FILENAME} ${ARTIFACT_DIR}/${USER_POLICY_FILENAME}.original.json

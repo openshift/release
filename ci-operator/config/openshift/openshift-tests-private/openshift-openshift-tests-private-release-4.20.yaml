@@ -32,12 +32,12 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.23-openshift-4.20
 images:
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
 
-    FROM registry.ci.openshift.org/ocp/4.19:tools
+    FROM this-is-ignored-and-not-used
     ENV ART_DNF_WRAPPER_POLICY=append
     COPY --from=netobservcli /oc-netobserv /usr/bin/
     RUN set -x && \
@@ -163,7 +163,8 @@ images:
   to: tests-private-newpr
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - tests-private-base
     - tests-private-baseui
     - tests-private
@@ -227,9 +228,9 @@ tests:
     from: src
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
+  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test
@@ -309,6 +310,8 @@ tests:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: debug-disasterrecovery-baremetal-upi
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: test/extended/disaster_recovery/
   steps:

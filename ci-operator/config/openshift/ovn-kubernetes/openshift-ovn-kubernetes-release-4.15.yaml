@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
 build_root:
   image_stream_tag:
     name: release
@@ -71,11 +75,11 @@ tests:
 - as: e2e-aws-ovn-clusternetwork-cidr-expansion
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-local-gateway
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
@@ -124,13 +128,13 @@ tests:
     workflow: openshift-e2e-azure-ovn
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-ovn-upgrade-local-gateway
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       GATEWAY_MODE: local
       TEST_TYPE: upgrade-conformance
@@ -176,12 +180,12 @@ tests:
     workflow: openshift-e2e-ibmcloud-ovn
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
   cron: 5 9 2 * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   steps:
@@ -192,7 +196,7 @@ tests:
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
   cron: 48 2 28 * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -226,10 +230,10 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-aws-ovn-kubevirt
+- as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: hypershift-kubevirt-conformance
 - as: security
   optional: true
@@ -308,7 +312,7 @@ tests:
   as: e2e-aws-ovn-network-migration
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
@@ -326,7 +330,7 @@ tests:
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-live-migration-sdn-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
@@ -355,6 +359,15 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     workflow: openshift-e2e-aws-sdn
   timeout: 4h0m0s
+- as: e2e-aws-ovn-fdp-qe
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PARALLEL: "1"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

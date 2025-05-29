@@ -2,11 +2,7 @@ base_images:
   base:
     name: builder
     namespace: ocp
-    tag: rhel-9-enterprise-base-multi-openshift-4.17
-  builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+    tag: rhel-9-enterprise-base-multi-openshift-4.19
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -15,10 +11,6 @@ images:
   - arm64
   dockerfile_path: Dockerfile
   from: base
-  inputs:
-    builder:
-      as:
-      - golang:1.22
   to: multiarch-tuning-operator
 - additional_architectures:
   - arm64
@@ -109,6 +101,7 @@ tests:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
+      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-downstream-main
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_OPERATOR_INSTALL_METHOD: catalog
@@ -139,13 +132,14 @@ tests:
   postsubmit: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/)konflux\.Dockerfile$)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
+      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-downstream-main
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_OPERATOR_INSTALL_METHOD: catalog

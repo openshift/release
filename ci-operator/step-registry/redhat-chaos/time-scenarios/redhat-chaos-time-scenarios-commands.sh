@@ -29,8 +29,9 @@ export ENABLE_ALERTS=False
 
 ./time-scenarios/prow_run.sh
 rc=$?
-
-cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 
 echo "Finished running time scenario"
 echo "Return code: $rc"

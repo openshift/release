@@ -18,23 +18,35 @@ resources:
       memory: 200Mi
 tests:
 - as: cnf-network-functional-tests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 23 31 2 *
   restrict_network_access: false
   steps:
     env:
+      CNF_TESTS_SKIP: reconcile
+      ECO_GOTEST_BMC_ACCESS: "true"
+      ECO_GOTESTS_ENV_VARS: -e ECO_CNF_CORE_NET_TEST_CONTAINER=quay.io/ocp-edge-qe/eco-gotests-network-client:v4.17
+        -e ECO_CNF_CORE_NET_DPDK_TEST_CONTAINER=quay.io/ocp-edge-qe/eco-gotests-rootless-dpdk:v4.16.0
+      FEATURES: core
       FEATURES_TO_TEST: sctp|sriov|dpdk|vrf|ovs_qos|metallb|fec|multinetworkpolicy
+      LABELS: net
       OPERATORS: |
         [
-          {"name":"sriov-network-operator","catalog":"redhat-operators","nsname":"openshift-sriov-network-operator","deploy_default_config":"true"},
+          {"name":"sriov-network-operator","catalog":"redhat-operators","nsname":"openshift-sriov-network-operator","deploy_default_config":"true", "og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
           {"name":"ptp-operator","catalog":"redhat-operators","nsname":"openshift-ptp","ns_labels":{"workload.openshift.io/allowed":"management","name":"openshift-ptp"}},
           {"name":"kubernetes-nmstate-operator","catalog":"redhat-operators","nsname":"openshift-nmstate","deploy_default_config":"true"},
           {"name":"sriov-fec","catalog":"certified-operators","nsname":"vran-acceleration-operators","channel":"stable"},
-          {"name":"metallb-operator","catalog":"redhat-operators","nsname":"metallb-system","channel":"stable","og_spec":{},"deploy_default_config":"true"}
+          {"name":"metallb-operator","catalog":"redhat-operators","nsname":"metallb-system","channel":"stable","og_spec":{},"deploy_default_config":"false"}
         ]
+      REPORTER_TEMPLATE_NAME: 'Telco Network 4_17 Regression - Telco Network 4.17
+        Regression Testing - Version: <version>; Build: <build>'
       VERSION: "4.17"
     test:
+    - ref: telcov10n-functional-cnf-network-metrics-daemon-tests
     - ref: telcov10n-functional-cnf-network-cnf-tests
+    - ref: telcov10n-functional-cnf-network-eco-gotests
+    - ref: telcov10n-functional-cnf-network-cnf-gotests
     workflow: telcov10n-functional-cnf-network-ocp-setup
 zz_generated_metadata:
   branch: main

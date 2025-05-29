@@ -22,8 +22,7 @@ images:
   to: telemeter
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -60,7 +59,7 @@ tests:
     from: test-bin
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws
@@ -72,7 +71,7 @@ tests:
     workflow: openshift-upgrade-aws
 - as: benchmark
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -85,6 +84,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

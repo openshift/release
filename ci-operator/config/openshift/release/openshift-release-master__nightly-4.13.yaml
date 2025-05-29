@@ -105,23 +105,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ovn-assisted
-  cron: 48 0 * * 0
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: assisted-baremetal
 - as: e2e-aws-ovn-single-node-workers-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -139,7 +126,7 @@ tests:
 - as: e2e-aws-ovn-single-node
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -147,7 +134,7 @@ tests:
 - as: e2e-aws-ovn-single-node-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -157,12 +144,12 @@ tests:
 - as: e2e-metal-ovn-single-node-live-iso
   interval: 168h
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   interval: 168h
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
@@ -312,7 +299,7 @@ tests:
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       GATEWAY_MODE: local
     observers:
@@ -463,7 +450,7 @@ tests:
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
     observers:
@@ -540,7 +527,7 @@ tests:
 - as: e2e-aws-ovn-fips-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -568,7 +555,7 @@ tests:
 - as: console-aws
   cron: 53 3 * * 6
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -611,7 +598,7 @@ tests:
 - as: e2e-aws-sdn-upgrade
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       TEST_TYPE: upgrade-conformance
     observers:
@@ -621,7 +608,7 @@ tests:
 - as: e2e-aws-sdn
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -629,7 +616,7 @@ tests:
 - as: e2e-aws-sdn-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -637,7 +624,7 @@ tests:
 - as: e2e-aws-ovn-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -645,7 +632,7 @@ tests:
 - as: e2e-aws-csi
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -692,7 +679,7 @@ tests:
 - as: e2e-aws-sdn-crun
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -783,11 +770,13 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 - as: e2e-telco5g-ptp
-  cluster: build05
-  cron: 0 17 * * 0
+  capabilities:
+  - intranet
+  cron: 0 9 * * 6
   restrict_network_access: false
   steps:
     env:
+      SKIP_OCP_INSTALL: "true"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.13"
     observers:
@@ -880,7 +869,7 @@ tests:
 - as: e2e-aws-ovn-etcd-scaling
   cron: 38 7 * * 6
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -904,7 +893,7 @@ tests:
 - as: e2e-aws-ovn-cpu-partitioning
   cron: 9 1 * * 6
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-cpu-partitioning

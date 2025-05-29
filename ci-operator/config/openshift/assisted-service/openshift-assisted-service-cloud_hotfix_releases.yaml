@@ -1,32 +1,28 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: "4.19"
-    namespace: ocp
-    tag: tests
 build_root:
   from_repository: true
 images:
@@ -165,25 +161,6 @@ tests:
         STATIC_IPS=true
         OPENSHIFT_VERSION=4.19
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-cnv-4-18
-  cluster: build05
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.18
-        MASTER_MEMORY=18700
-        MASTER_CPU=9
-        WORKER_MEMORY=9216
-        MASTER_DISK_COUNT=2
-        WORKER_DISK_COUNT=2
-        WORKER_CPU=5
-    workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-ipv4v6-4-19
   cluster: build05
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
@@ -212,40 +189,6 @@ tests:
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=4.19
-    workflow: assisted-ofcir-baremetal
-- always_run: true
-  as: e2e-metal-assisted-odf-4-18
-  cluster: build05
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.18
-      CLUSTERTYPE: assisted_large_el9
-    workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-mtv-4-18
-  cluster: build05
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/mtv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_TESTS_IMAGE: tests-4.18
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=cloud_hotfix_releases
-        OLM_OPERATORS=mtv
-        OPENSHIFT_VERSION=4.18
-        MASTER_MEMORY=19724
-        MASTER_CPU=10
-        WORKER_MEMORY=10240
-        MASTER_DISK_COUNT=2
-        WORKER_DISK_COUNT=2
-        WORKER_CPU=6
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-osc-4-19
   cluster: build05
@@ -312,6 +255,47 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         PLATFORM=external
         OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-virtualization-4-18
+  cluster: build05
+  run_if_changed: ^(internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/nodemaintenance/.*|internal/operators/kubedescheduler/.*|internal/operators/cnv|internal/operators/mtv/.*|internal/operators/nmstate/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
+        OPENSHIFT_VERSION=4.18
+        MASTER_MEMORY=18700
+        MASTER_CPU=10
+        MASTER_DISK_COUNT=2
+        WORKER_CPU=20
+        WORKER_MEMORY=16384
+        WORKER_DISK_COUNT=2
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ai-nvidia-4-18
+  cluster: build05
+  run_if_changed: ^(internal/operators/authorino/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/nvidiagpu/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
+        OPENSHIFT_VERSION=4.18
+        NVIDIA_REQUIRE_GPU=false
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ai-amd-4-18
+  cluster: build05
+  run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh
+        OPENSHIFT_VERSION=4.18
+        AMD_REQUIRE_GPU=false
+      CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: cloud_hotfix_releases

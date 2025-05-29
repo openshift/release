@@ -10,7 +10,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci-operator.openshift.io/variant: 4.14-upgrade-from-stable-4.13
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -79,7 +79,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/4.14-upgrade-from-stable-4.13-images
     decorate: true
     labels:
@@ -208,7 +208,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/4.14-upgrade-from-stable-4.13-local-gateway-images
     decorate: true
     labels:
@@ -344,7 +344,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-release-4.14-e2e-aws-ovn-clusternetwork-cidr-expansion
@@ -412,7 +412,82 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
+    context: ci/prow/e2e-aws-ovn-fdp-qe
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.14-e2e-aws-ovn-fdp-qe
+    optional: true
+    rerun_command: /test e2e-aws-ovn-fdp-qe
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-fdp-qe
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-fdp-qe,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     decoration_config:
@@ -487,18 +562,18 @@ presubmits:
     - ^release-4\.14$
     - ^release-4\.14-
     cluster: build09
-    context: ci/prow/e2e-aws-ovn-kubevirt
+    context: ci/prow/e2e-aws-ovn-hypershift-kubevirt
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.14-e2e-aws-ovn-kubevirt
+    name: pull-ci-openshift-ovn-kubernetes-release-4.14-e2e-aws-ovn-hypershift-kubevirt
     optional: true
-    rerun_command: /test e2e-aws-ovn-kubevirt
+    rerun_command: /test e2e-aws-ovn-hypershift-kubevirt
     spec:
       containers:
       - args:
@@ -507,7 +582,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-kubevirt
+        - --target=e2e-aws-ovn-hypershift-kubevirt
         command:
         - ci-operator
         image: ci-operator:latest
@@ -555,7 +630,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-kubevirt,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-hypershift-kubevirt,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -790,7 +865,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-release-4.14-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -864,7 +939,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-release-4.14-e2e-aws-ovn-upgrade
@@ -1079,7 +1154,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1536,7 +1611,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-release-4.14-e2e-ovn-hybrid-step-registry
@@ -1754,7 +1829,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -1809,7 +1884,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1865,7 +1940,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -2224,7 +2299,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -2287,7 +2362,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build07
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     decoration_config:

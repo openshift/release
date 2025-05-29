@@ -71,10 +71,12 @@ tests:
   commands: make generate --always-make && git diff --exit-code
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make test --warn-undefined-variables
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: lint
   commands: |
     export GOCACHE=/tmp/
@@ -84,6 +86,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: bundle-e2e-4-15
   cluster_claim:
     architecture: amd64
@@ -91,7 +94,7 @@ tests:
     labels:
       region: us-east-1
       variant: fips
-    owner: ols
+    owner: obs
     product: ocp
     timeout: 1h0m0s
     version: "4.15"
@@ -123,10 +126,27 @@ tests:
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
+        export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
+        export LLM_PROVIDER="azure_openai"
+        export LLM_MODEL="gpt-4o-mini"
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azureopenai-entra-id
+        name: azureopenai-entra-id
         namespace: test-credentials
       from: src
       resources:
@@ -140,7 +160,7 @@ tests:
     labels:
       region: us-east-1
       variant: fips
-    owner: ols
+    owner: obs
     product: ocp
     timeout: 1h0m0s
     version: "4.16"
@@ -172,10 +192,27 @@ tests:
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
+        export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
+        export LLM_PROVIDER="azure_openai"
+        export LLM_MODEL="gpt-4o-mini"
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azureopenai-entra-id
+        name: azureopenai-entra-id
         namespace: test-credentials
       from: src
       resources:
@@ -189,7 +226,7 @@ tests:
     labels:
       region: us-east-1
       variant: fips
-    owner: ols
+    owner: obs
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
@@ -221,10 +258,27 @@ tests:
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
+        export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
+        export LLM_PROVIDER="azure_openai"
+        export LLM_MODEL="gpt-4o-mini"
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azureopenai-entra-id
+        name: azureopenai-entra-id
         namespace: test-credentials
       from: src
       resources:
@@ -238,7 +292,7 @@ tests:
     labels:
       region: us-east-1
       variant: fips
-    owner: ols
+    owner: obs
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
@@ -272,10 +326,27 @@ tests:
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
+        export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
+        export LLM_PROVIDER="azure_openai"
+        export LLM_MODEL="gpt-4o-mini"
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azureopenai-entra-id
+        name: azureopenai-entra-id
         namespace: test-credentials
       from: src
       resources:
@@ -283,6 +354,7 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: security
+  skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk

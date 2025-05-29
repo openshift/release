@@ -31,7 +31,7 @@ export WORKLOAD=network-policy
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # Run a non-indexed warmup for scheduling inconsistencies
-ES_SERVER="" EXTRA_FLAGS="--pods-per-namespace 1 --netpol-per-namespace 2 --local-pods 1 --single-ports 5 --port-ranges 5 --remotes-namespaces 1  --remotes-pods 1 --cidrs 1 --iterations=${current_worker_count}" ./run.sh
+ES_SERVER="" ITERATIONS=${current_worker_count} EXTRA_FLAGS="--pods-per-namespace 1 --netpol-per-namespace 2 --local-pods 1 --single-ports 5 --port-ranges 5 --remotes-namespaces 1  --remotes-pods 1 --cidrs 1" ./run.sh
 
 # The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
@@ -42,7 +42,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR} --iterations=${ITERATIONS}"
+EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR}"
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json

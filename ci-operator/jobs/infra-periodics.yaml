@@ -30,6 +30,36 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
+  cluster: build03
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build03-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build03` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.17:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
   cluster: build06
   cron: 30 7 * * 1-5
   decorate: true
@@ -60,19 +90,79 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build09
+  cluster: build07
   cron: 30 7 * * 1-5
   decorate: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-build09-upgrade
+  name: periodic-build07-upgrade
   reporter_config:
     slack:
       channel: '#ops-testplatform'
       job_states_to_report:
       - failure
       report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
-        `build09` has not been completed over 24 hours. Please check if anything blocks
+        `build07` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.17:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
+  cluster: build10
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build10-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build10` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.17:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
+  cluster: build11
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build11-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build11` has not been completed over 24 hours. Please check if anything blocks
         the process.
   spec:
     containers:
@@ -186,7 +276,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - /usr/bin/sprint-automation
-      image: registry.ci.openshift.org/ci/sprint-automation:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_sprint-automation_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -237,7 +327,7 @@ periodics:
       - --week-start=true
       command:
       - /usr/bin/sprint-automation
-      image: registry.ci.openshift.org/ci/sprint-automation:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_sprint-automation_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -295,7 +385,7 @@ periodics:
         --github-token-path=/etc/oauth/oauth
       command:
       - /bin/bash
-      image: registry.ci.openshift.org/ci/pr-reminder:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_pr-reminder_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -935,7 +1025,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250522-9b3f5faca
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -970,7 +1060,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250522-9b3f5faca
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -992,7 +1082,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  - base_ref: openshift-4.19
+  - base_ref: openshift-4.20
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1010,14 +1100,14 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.19
-      - --future-release=4.20
+      - --current-release=4.20
+      - --future-release=4.21
       - --self-approve=true
       - --assign=openshift/test-platform
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/autoconfigbrancher
-      image: registry.ci.openshift.org/ci/auto-config-brancher:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-config-brancher_latest
       imagePullPolicy: Always
       name: auto-config-brancher
       resources:
@@ -1060,7 +1150,7 @@ periodics:
       - --create-pr=true
       command:
       - /usr/bin/prow-job-dispatcher
-      image: registry.ci.openshift.org/ci/prow-job-dispatcher:latest
+      image: quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest
       imagePullPolicy: Always
       name: auto-prow-job-dispatcher
       resources:
@@ -1246,10 +1336,11 @@ periodics:
       - --ignore-org=openshift-priv
       - --ignore-org=kubernetes-sigs
       - --ignore-org=CSPI-QE
+      - --ignore-org=openshift-online/ocm-cli
       - --extra-config-dir=core-services/prow/02_config/
       command:
       - /usr/bin/autoowners
-      image: registry.ci.openshift.org/ci/autoowners:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_autoowners_latest
       imagePullPolicy: Always
       name: autoowners
       resources:
@@ -1296,7 +1387,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250522-9b3f5faca
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1353,7 +1444,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250522-9b3f5faca
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1411,7 +1502,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250522-9b3f5faca
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1480,7 +1571,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20250522-9b3f5faca
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1510,8 +1601,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.19
-      - --future-release=4.20
+      - --current-release=4.20
+      - --future-release=4.21
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -1595,8 +1686,8 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --dry-run=false
       - --config-dir=./ci-operator/config/
-      - --current-release=4.19
-      - --future-release=4.20
+      - --current-release=4.20
+      - --future-release=4.21
       command:
       - blocking-issue-creator
       image: blocking-issue-creator:latest
@@ -1683,7 +1774,7 @@ periodics:
       - --only-org=openshift
       command:
       - /usr/bin/autoperibolossync
-      image: registry.ci.openshift.org/ci/auto-peribolos-sync:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-peribolos-sync_latest
       imagePullPolicy: Always
       name: auto-peribolos-sync
       resources:
@@ -1726,7 +1817,7 @@ periodics:
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/autopublicizeconfig
-      image: registry.ci.openshift.org/ci/autopublicizeconfig:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_autopublicizeconfig_latest
       imagePullPolicy: Always
       name: auto-publicize-config
       resources:
@@ -1765,7 +1856,7 @@ periodics:
       - --bootstrap-config=/etc/ci-secret-bootstrap/_config.yaml
       - --config=/etc/ci-secret-generator/_config.yaml
       - --dry-run=false
-      image: registry.ci.openshift.org/ci/ci-secret-generator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-generator_latest
       imagePullPolicy: Always
       name: ci-secret-generator
       resources:
@@ -1841,7 +1932,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - /usr/bin/ci-secret-bootstrap
-      image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
       resources:
@@ -1870,7 +1961,7 @@ periodics:
   cron: '@yearly'
   decorate: true
   extra_refs:
-  - base_ref: openshift-4.19
+  - base_ref: openshift-4.20
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1885,14 +1976,14 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --ocp-build-data-repo-dir=./
       - --create-prs=true
-      - --minor=19
+      - --minor=20
       - --pr-creation-ceiling=1000
       command:
       - /usr/bin/ocp-build-data-enforcer
       env:
       - name: CLICOLOR_FORCE
         value: "1"
-      image: registry.ci.openshift.org/ci/ocp-build-data-enforcer:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ocp-build-data-enforcer_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1940,7 +2031,7 @@ periodics:
       - --allow-list=../../openshift/release/core-services/testgrid-config-generator/_allow-list.yaml
       command:
       - /usr/bin/autotestgridgenerator
-      image: registry.ci.openshift.org/ci/auto-testgrid-generator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-testgrid-generator_latest
       imagePullPolicy: Always
       name: auto-testgrid-generator
       resources:
@@ -1972,7 +2063,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250522-9b3f5faca
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2004,7 +2095,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250522-9b3f5faca
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2036,7 +2127,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250328-f21b03b92
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250522-9b3f5faca
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2081,10 +2172,12 @@ periodics:
       - '^origin/4.([6-9]|\d\d+):'
       - --ignored-image-stream-tags
       - '^origin/scos-4.([6-9]|\d\d+):'
+      - --ignored-image-stream-tags
+      - cincinnati-ci-public/cincinnati-graph-data:6420f7fbf3724e1e5e329ae8d1e2985973f60c14
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
       - --dry-run=false
-      image: registry.ci.openshift.org/ci/promoted-image-governor:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_promoted-image-governor_latest
       imagePullPolicy: Always
       name: promoted-image-governor
       resources:
@@ -2417,7 +2510,7 @@ periodics:
         --dry-run=false
       command:
       - /bin/bash
-      image: registry.ci.openshift.org/ci/github-ldap-user-group-creator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_github-ldap-user-group-creator_latest
       imagePullPolicy: Always
       name: github-ldap-user-group-creator
       resources:
@@ -2503,7 +2596,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: registry.ci.openshift.org/ci/check-gh-automation:latest
+      image: uay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
       imagePullPolicy: Always
       name: check-gh-automation
       resources:
@@ -2570,7 +2663,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-merge-bot
-      image: registry.ci.openshift.org/ci/check-gh-automation:latest
+      image: uay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
       imagePullPolicy: Always
       name: check-gh-automation
       resources:
@@ -2629,7 +2722,7 @@ periodics:
         -pr-title="Automated - Update config ./config/openshift.yaml"
       command:
       - /bin/bash
-      image: registry.ci.openshift.org/ci/auto-sippy-config-generator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-sippy-config-generator_latest
       imagePullPolicy: Always
       name: auto-sippy-config-generator
       resources:
@@ -2714,7 +2807,7 @@ periodics:
         $extra_flag
       command:
       - /bin/bash
-      image: registry.ci.openshift.org/ci/job-run-aggregator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_job-run-aggregator_latest
       imagePullPolicy: Always
       name: job-run-aggregator
       resources:

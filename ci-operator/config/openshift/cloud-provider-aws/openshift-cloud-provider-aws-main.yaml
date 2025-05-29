@@ -6,7 +6,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -16,7 +16,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -24,7 +24,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
   rhel-coreos-base:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: rhel-coreos
 binary_build_commands: make aws-cloud-controller-manager
@@ -68,7 +68,7 @@ promotion:
       cloud-provider-aws-rpms: rpms
     excluded_images:
     - rhel-coreos
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
 raw_steps:
 - rpm_image_injection_step:
@@ -77,12 +77,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -98,7 +98,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -128,6 +128,12 @@ tests:
     env:
       PROJECT_NAME: cloud-provider-aws
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -7,10 +7,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -18,16 +18,16 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cert-manager
 operator:
   bundles:
@@ -37,11 +37,11 @@ operator:
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller
+  - pullspec: quay.io/jetstack/cert-manager-controller:latest
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-webhook
+  - pullspec: quay.io/jetstack/cert-manager-webhook:latest
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-cainjector
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:latest
     with: pipeline:cert-manager
 releases:
   initial:
@@ -119,7 +119,7 @@ tests:
   optional: true
   run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:

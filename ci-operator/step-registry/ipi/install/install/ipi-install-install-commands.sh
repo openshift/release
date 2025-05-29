@@ -702,7 +702,11 @@ set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
+azure4|azure-arm64) 
+    if [[ "${BOOT_DIAGNOSTICS:-}" == "true" ]]; then
+      inject_boot_diagnostics ${dir}
+    fi
+    ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config "${dir}" "workers"

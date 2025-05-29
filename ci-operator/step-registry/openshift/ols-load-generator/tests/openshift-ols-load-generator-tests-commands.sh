@@ -72,6 +72,7 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   # Deploy controller manager
   pushd lightspeed-operator
   run_or_fail make deploy
+  run_or_fail oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-lightspeed:lightspeed-operator-controller-manager
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager --timeout=600s
   popd
 
@@ -103,10 +104,9 @@ EOF
   # Wait for the app server deployment
   sleep 60
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
+  LOG_START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   COMMIT_ID=$(skopeo inspect docker://quay.io/openshift-lightspeed/lightspeed-service-api:latest | jq -r '.Labels."vcs-ref"')
   run_or_fail echo "Possible commit ID under test: $COMMIT_ID"
-  run_or_fail oc logs -f -n openshift-lightspeed deployment/lightspeed-app-server > ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt 2>&1 &
-  LOGS_PID=$!
 
   # Create namespace and kubeconfig secret for load testing
   run_or_fail oc create namespace ols-load-test
@@ -149,6 +149,37 @@ subjects:
 - kind: ServiceAccount
   name: default
   namespace: ols-load-test
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-loadgen-to-api
+  namespace: openshift-lightspeed
+  labels:
+    app.kubernetes.io/component: application-server
+    app.kubernetes.io/managed-by: lightspeed-operator
+    app.kubernetes.io/name: lightspeed-service-api
+    app.kubernetes.io/part-of: openshift-lightspeed
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: application-server
+      app.kubernetes.io/managed-by: lightspeed-operator
+      app.kubernetes.io/name: lightspeed-service-api
+      app.kubernetes.io/part-of: openshift-lightspeed
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          job-name: ols-load-generator-orchestrator
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ols-load-test
+    ports:
+    - protocol: TCP
+      port: 8443
 ---
 apiVersion: batch/v1
 kind: Job
@@ -244,7 +275,7 @@ EOF
   # Clean up
   run_or_fail oc delete namespace ols-load-test
   run_or_fail oc wait --for=delete ns/ols-load-test --timeout=600s
-  run_or_fail kill $LOGS_PID
+  run_or_fail oc logs -n openshift-lightspeed deployment/lightspeed-app-server --since-time="$LOG_START_TIME" > ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt
   run_or_fail cp ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt ${ARTIFACT_DIR}/ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt
 
   pushd lightspeed-operator

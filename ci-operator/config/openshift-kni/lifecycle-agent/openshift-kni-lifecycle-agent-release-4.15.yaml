@@ -9,11 +9,10 @@ images:
 - dockerfile_path: Dockerfile
   from: ubi9-minimal
   to: lifecycle-agent-operator
-- dockerfile_path: bundle.Dockerfile
-  to: lifecycle-agent-operator-bundle
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: lifecycle-agent-operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
     with: pipeline:lifecycle-agent-operator
@@ -55,6 +54,8 @@ tests:
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_INDEX: ci-index-lifecycle-agent-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_CHANNEL: alpha
@@ -90,11 +91,10 @@ tests:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
 - as: ibu-e2e-flow
-  cluster: build02
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle

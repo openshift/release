@@ -6,14 +6,14 @@ base_images:
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.22
+      FROM ${ARTIFACTS_BUILD_ROOT}
       COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/oc /bin/oc
+      COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/kubectl /bin/kubectl
       RUN umask 0002
       WORKDIR /workspace
-      RUN curl -L -o repo.zip "https://github.com/openshift/multiarch-tuning-operator/archive/main.zip" && unzip repo.zip
-      WORKDIR /workspace/multiarch-tuning-operator-main
-      COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-operator-sdk_v1.31.0 /usr/local/bin/operator-sdk /usr/local/bin/
-      RUN make build
+      RUN curl -L -o repo.zip "https://github.com/${ORG}/${REPO}/archive/${COMMIT}.zip" && unzip repo.zip
+      WORKDIR /workspace/${REPO}-${COMMIT}
+      ${DOCKERFILE_ADDITIONS}
       RUN find /workspace -type d -not -perm -0777 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod 777
       RUN find /workspace -type f -not -perm -0777 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod 777
       RUN find /go -type d -not -perm -0777 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod 777
@@ -33,17 +33,15 @@ tests:
 - as: konflux-test-aws
   cron: 0 0 1 1 0
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
-      OCP_ARCH: arm64
+      OCP_ARCH: amd64
     test:
     - as: konflux-test
       cli: latest
       commands: command-placeholder
       dependencies:
       - env: OPERATOR_IMAGE
-        name: operator-placeholder
-      - env: OO_BUNDLE
         name: operator-placeholder
       from: root
       resources:
@@ -55,7 +53,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OCP_ARCH: arm64
+      OCP_ARCH: amd64
     test:
     - as: konflux-test
       cli: latest
@@ -93,8 +91,9 @@ tests:
     dependencies:
       OO_BUNDLE: operator-placeholder
     env:
+      OCP_ARCH: amd64
       OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-multiarch-tuning-operator
+      OO_INSTALL_NAMESPACE: ns-placeholder
     test:
     - as: konflux-test
       cli: latest

@@ -4,7 +4,7 @@ chain:
   - as: create-hostedcluster
     cli: latest
     env:
-    - name: FEATURE_SET
+    - name: GUEST_FEATURE_SET
       default: ""
       documentation: |
         This field sets the cluster feature set. This is used to enable custom features such as tech preview features
@@ -122,7 +122,7 @@ chain:
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
       fi
       
-      if [[ $FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
+      if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
         COMMAND+=(--feature-set=TechPreviewNoUpgrade)
       fi
       
@@ -173,20 +173,27 @@ chain:
       # In case of BYO CNI, the HC will never be ready before CNI components are up and running
       if [[ "$HYPERSHIFT_NETWORK_TYPE" == "Other" ]]; then
         echo "Waiting for nodes to join the hosted cluster"
-        num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
-        export num_nodes_expected
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        set +e
-        timeout 25m bash -c '
-          while true; do
-            num_nodes=$(oc get nodes --no-headers | wc -l)
-            if (( num_nodes == num_nodes_expected )); then
-              break
-            fi
-            echo "$num_nodes/$num_nodes_expected have joined the HC"
-            sleep 15s
-          done
-        '
+        if [[ "$ENDPOINT_ACCESS" == "Private" ]]; then
+          # With Private access the cluster is not yet accessible (the Proxy bastion
+          # node was not yet configured). Let's sleep for a little longer than the usual wait
+          # time for nodes to join.
+          sleep 300
+        else
+          num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+          export num_nodes_expected
+          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+          set +e
+          timeout 25m bash -c '
+            while true; do
+              num_nodes=$(oc get nodes --no-headers | wc -l)
+              if (( num_nodes == num_nodes_expected )); then
+                break
+              fi
+              echo "$num_nodes/$num_nodes_expected have joined the HC"
+              sleep 15s
+            done
+          '
+        fi
       else
         set +e
         export CLUSTER_NAME

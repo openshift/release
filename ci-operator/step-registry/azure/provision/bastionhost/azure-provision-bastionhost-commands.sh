@@ -153,46 +153,50 @@ az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 #####################################
 ##########Create Bastion#############
 #####################################
-echo "azure vhd uri: ${bastion_source_vhd_uri}"
+if [[ -z "${BASTION_BOOT_IMAGE}" ]]; then
+    echo "azure vhd uri: ${bastion_source_vhd_uri}"
 
-echo "Create a Storage Account for bastion vhd"
-# 'account_name' must have length less than 24, so hardcode the basion sa name
-sa_name_prefix=$(echo "${NAMESPACE}" | sed "s/ci-op-//" | sed 's/[-_]//g')
-sa_name="${sa_name_prefix}${UNIQUE_HASH}basa"
-run_command_with_retries "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" "5"
-account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_name} --query "[0].value" -o tsv)
+    echo "Create a Storage Account for bastion vhd"
+    # 'account_name' must have length less than 24, so hardcode the basion sa name
+    sa_name_prefix=$(echo "${NAMESPACE}" | sed "s/ci-op-//" | sed 's/[-_]//g')
+    sa_name="${sa_name_prefix}${UNIQUE_HASH}basa"
+    run_command_with_retries "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" "5"
+    account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_name} --query "[0].value" -o tsv)
 
-echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
-storage_contnainer="${bastion_name}vhd"
-vhd_name=$(basename "${bastion_source_vhd_uri}")
-status="unknown"
-run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name} --account-key ${account_key}" &&
-run_command "az storage blob copy start --account-name ${sa_name} --account-key ${account_key} --destination-blob ${vhd_name} --destination-container ${storage_contnainer} --source-uri '${bastion_source_vhd_uri}'" || exit 2
-bastion_url_expiry=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
-bastion_url=$(az storage blob generate-sas -c ${storage_contnainer} -n ${vhd_name} --https-only --full-uri --permissions r --expiry ${bastion_url_expiry} --account-name ${sa_name} --account-key ${account_key} -o tsv)
-try=0 retries=30 interval=60
-while [ X"${status}" != X"success" ] && [ $try -lt $retries ]; do
-    echo "check copy complete, ${try} try..."
-    if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-        cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
-    else
-        cmd="az storage blob show --blob-url '${bastion_url}' -o tsv --query properties.copy.status"
+    echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
+    storage_contnainer="${bastion_name}vhd"
+    vhd_name=$(basename "${bastion_source_vhd_uri}")
+    status="unknown"
+    run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name} --account-key ${account_key}" &&
+    run_command "az storage blob copy start --account-name ${sa_name} --account-key ${account_key} --destination-blob ${vhd_name} --destination-container ${storage_contnainer} --source-uri '${bastion_source_vhd_uri}'" || exit 2
+    bastion_url_expiry=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
+    bastion_url=$(az storage blob generate-sas -c ${storage_contnainer} -n ${vhd_name} --https-only --full-uri --permissions r --expiry ${bastion_url_expiry} --account-name ${sa_name} --account-key ${account_key} -o tsv)
+    try=0 retries=30 interval=60
+    while [ X"${status}" != X"success" ] && [ $try -lt $retries ]; do
+        echo "check copy complete, ${try} try..."
+        if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+            cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
+        else
+            cmd="az storage blob show --blob-url '${bastion_url}' -o tsv --query properties.copy.status"
+        fi
+        echo "Command: $cmd"
+        status=$(eval "$cmd" || echo "pending")
+        echo "Status: $status"
+        sleep $interval
+        try=$(expr $try + 1)
+    done
+    if [ X"$status" != X"success" ]; then
+        echo  "Something wrong, copy timeout or failed!"
+        exit 2
     fi
-    echo "Command: $cmd"
-    status=$(eval "$cmd" || echo "pending")
-    echo "Status: $status"
-    sleep $interval
-    try=$(expr $try + 1)
-done
-if [ X"$status" != X"success" ]; then
-    echo  "Something wrong, copy timeout or failed!"
-    exit 2
-fi
-vhd_blob_url=$(az storage blob url --account-name ${sa_name} --account-key ${account_key} -c ${storage_contnainer} -n ${vhd_name} -o tsv)
+    vhd_blob_url=$(az storage blob url --account-name ${sa_name} --account-key ${account_key} -c ${storage_contnainer} -n ${vhd_name} -o tsv)
 
-echo "Deploy the bastion image from bastion vhd"
-run_command "az image create --resource-group ${bastion_rg} --name '${bastion_name}-image' --source ${vhd_blob_url} --os-type Linux --storage-sku Standard_LRS" || exit 2
-bastion_image_id=$(az image show --resource-group ${bastion_rg} --name "${bastion_name}-image" | jq -r '.id')
+    echo "Deploy the bastion image from bastion vhd"
+    run_command "az image create --resource-group ${bastion_rg} --name '${bastion_name}-image' --source ${vhd_blob_url} --os-type Linux --storage-sku Standard_LRS" || exit 2
+    bastion_image_id=$(az image show --resource-group ${bastion_rg} --name "${bastion_name}-image" | jq -r '.id')
+else
+    bastion_image_id=${BASTION_BOOT_IMAGE}
+fi
 
 open_port="22 873 3128 3129 5000 6001 6002"
 if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
@@ -200,8 +204,8 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
     run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}"
     run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
-    #subnet cidr for int service is hard code, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
-    bastion_subnet_cidr="10.0.99.0/24"
+    #subnet cidr for int service is xx.xx.99.0/24, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
+    bastion_subnet_cidr=$(echo ${AZURE_VNET_ADDRESS_PREFIXES%/*} | awk -F'.' '{print $1"."$2".99.0/24"}')
     if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
         # for ash wwt, the parameter name get changed
         vnet_subnet_address_parameter="--address-prefix ${bastion_subnet_cidr}"
