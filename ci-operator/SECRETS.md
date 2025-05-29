@@ -262,8 +262,3 @@ This makes the credentials available at:
 podman pull --authfile /var/run/secrets/ci-pull-credentials/.dockerconfigjson registry.redhat.io/<image>:<tag>
 ```
 
-### Credentials used in CI jobs
-
-They are set up in this config file:
-
-[core-services/ci-secret-bootstrap/_config.yaml](./../core-services/ci-secret-bootstrap/_config.yaml)
