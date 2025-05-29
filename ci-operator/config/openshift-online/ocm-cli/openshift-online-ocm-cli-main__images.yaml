@@ -1,0 +1,29 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_literal: "FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder\nWORKDIR
+    /go/src/github.com/openshift-online/ocm-cli\nCOPY . .\nENV GOFLAGS=-buildvcs=false\nUSER
+    root\nRUN make \nFROM registry.access.redhat.com/ubi9/ubi:latest\nCOPY --from=builder
+    /go/src/github.com/openshift-online/ocm-cli/ocm /usr/local/bin\nCOPY --from=builder
+    /usr/bin/make /usr/local/bin\n"
+  to: ocm-cli
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+    tag_by_commit: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: ocm-cli
+  variant: images

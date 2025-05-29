@@ -207,13 +207,13 @@ EOF
 
 # Upgrade RHEL node
 function rhel_upgrade(){
+    local testcase="rhel"
     echo "Upgrading RHEL nodes"
     echo "Validating parsed Ansible inventory"
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     echo -e "\nRunning RHEL worker upgrade"
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv || { export UPGRADE_FAILURE_TYPE="${testcase}"; return 1; }
-
     check_upgrade_status
 }
 

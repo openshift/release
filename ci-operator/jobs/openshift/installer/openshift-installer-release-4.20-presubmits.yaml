@@ -2468,6 +2468,82 @@ presubmits:
     - ^release-4\.20$
     - ^release-4\.20-
     cluster: build01
+    context: ci/prow/e2e-aws-private
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.20-e2e-aws-private
+    optional: true
+    rerun_command: /test e2e-aws-private
+    run_if_changed: aws
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-private
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-private,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build01
     context: ci/prow/e2e-aws-upi-proxy
     decorate: true
     decoration_config:
@@ -5814,15 +5890,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-externallb-ovn
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-externallb-ovn
     skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
@@ -5972,15 +6039,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-multi-vcenter-ovn
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-multi-vcenter-ovn
     run_if_changed: vsphere
     spec:
@@ -6063,8 +6121,8 @@ presubmits:
         - failure
         - error
         report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+          {{ else }} :red_jenkins_circle: {{ end }} Presubmit job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn
     run_if_changed: vsphere
     spec:
@@ -6217,15 +6275,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-ovn-multi-disk
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-multi-disk
     run_if_changed: vsphere
     spec:
@@ -6300,15 +6349,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-ovn-multi-network
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-multi-network
     skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
@@ -6458,15 +6498,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-ovn-techpreview
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-techpreview
     run_if_changed: vsphere
     spec:
@@ -6549,8 +6580,8 @@ presubmits:
         - failure
         - error
         report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+          {{ else }} :red_jenkins_circle: {{ end }} Presubmit job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-upi
     run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
     spec:
@@ -6703,15 +6734,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-ovn-zones
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-zones
     run_if_changed: vsphere
     spec:
@@ -6788,15 +6810,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-ovn-zones-techpreview
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-zones-techpreview
     run_if_changed: vsphere
     spec:
@@ -6873,15 +6886,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.20-e2e-vsphere-static-ovn
     optional: true
-    reporter_config:
-      slack:
-        channel: '#forum-ocp-splat-alerts'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-          {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with
-          *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-static-ovn
     skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
