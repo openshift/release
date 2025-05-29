@@ -218,6 +218,9 @@ CONFIG = {
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
     },
+    'oex-aws-qe-quota-slice': {
+        'default': 40,
+    },
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
     },
