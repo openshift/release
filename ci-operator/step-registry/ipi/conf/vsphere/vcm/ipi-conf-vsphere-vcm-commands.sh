@@ -132,8 +132,8 @@ if [ -n "${ADDITIONAL_DISK}" ]; then
   echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
   DISKS="platform:
     vsphere:
-      additionalDisks:
-      - diskSizeGiB: 20
+      dataDisks:
+      - sizeGiB: 20
         name: Disk1"
 fi
 
