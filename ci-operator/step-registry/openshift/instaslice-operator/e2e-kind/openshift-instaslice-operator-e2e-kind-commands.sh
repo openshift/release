@@ -12,7 +12,7 @@ VM_NAME="prow-e2e-vm-${PROW_JOB_ID}"
 GOOGLE_COMPUTE_ZONE="us-central1-f"
 GOOGLE_COMPUTE_REGION="us-central1"
 MACHINE_TYPE="a2-highgpu-1g"
-IMAGE_FAMILY="ubuntu-2204-lts"
+IMAGE_FAMILY="ubuntu-2404-lts-amd64"
 IMAGE_PROJECT="ubuntu-os-cloud"
 GOOGLE_COMPUTE_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
@@ -82,7 +82,7 @@ gcloud compute ssh "$VM_NAME" --zone="$GOOGLE_COMPUTE_ZONE" --command='
 
   # NVIDIA Driver Ubuntu installation
   sudo apt install linux-headers-$(uname -r) -y
-  export distro=ubuntu2204 arch=x86_64 arch_ext=amd64
+  export distro=ubuntu2404 arch=x86_64 arch_ext=amd64
   wget https://developer.download.nvidia.com/compute/cuda/repos/$distro/$arch/cuda-keyring_1.1-1_all.deb
   sudo dpkg -i cuda-keyring_1.1-1_all.deb
   sudo apt update
