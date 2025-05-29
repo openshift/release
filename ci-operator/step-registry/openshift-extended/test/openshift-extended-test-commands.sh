@@ -87,6 +87,10 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+if [ -f "${SHARED_DIR}/runtime_env" ]; then
+    source "${SHARED_DIR}/runtime_env"
+fi
+
 # restore external oidc cache dir for oc
 if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
     echo "Restoring external OIDC cache dir for oc"

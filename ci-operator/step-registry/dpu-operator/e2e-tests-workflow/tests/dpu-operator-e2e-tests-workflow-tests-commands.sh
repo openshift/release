@@ -90,10 +90,10 @@ if [ -z "$queue_manager_tls_ip" ] ; then
     exit 1
 fi
 
-submit_response="$(_curl_jobs_submit "$PULL_NUMBER" "$PULL_PULL_SHA")"
+submit_response="$(_curl_jobs_submit "$PULL_NUMBER" "$PULL_PULL_SHA")" || die "Failure submitting job in queue-manager"
 
 return_code="$(_json_get "$submit_response" '.return_code')"
-if [ "$return_code" -ne 200 ] && [ "$return_code" -ne 202 ] ; then
+if [ "$return_code" -ne 200 ] 2>/dev/null && [ "$return_code" -ne 202 ] 2>/dev/null ; then
     echo "failure to start job: $return_code"
     exit 1
 fi
@@ -103,11 +103,11 @@ uuid="$(_json_get "$submit_response" '.message')"
 echo "Started job in queue manager: UUID=$uuid, return_code=$return_code. Start polling"
 
 while true ; do
-    retrieve_response="$(_curl_jobs_retrieve "$uuid")"
+    retrieve_response="$(_curl_jobs_retrieve "$uuid")" || die "Failure checking job status in queue-manager"
 
     return_code="$(_json_get "$retrieve_response" '.return_code')"
 
-    if [ "$return_code" -eq 102 ] ; then
+    if [ "$return_code" -eq 102 ] 2>/dev/null ; then
         # Job still running.
         sleep 15
         continue
@@ -115,7 +115,7 @@ while true ; do
 
     result_msg="$(_json_get "$retrieve_response" '.result_msg')"
 
-    if [ "$return_code" -ne 200 ] ; then
+    if [ "$return_code" -ne 200 ] 2>/dev/null ; then
         echo "failure checking for job $uuid [$return_code]: $result_msg"
         exit 1
     fi
