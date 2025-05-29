@@ -56,8 +56,8 @@ mkdir -p "${INSTALL_DIR}"/openshift
 pushd ${INSTALL_DIR}
 cp -t "${INSTALL_DIR}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
-echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "${SHARED_DIR}"/pull-secrets "$RELEASE_IMAGE_LATEST" \
+echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+oc adm release extract -a "${SHARED_DIR}"/pull-secrets "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
   --command=openshift-install --to=/tmp
 
 echo "Copying Custom Manifest"

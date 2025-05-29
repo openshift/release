@@ -183,7 +183,10 @@ function update_cloud_credentials_oidc(){
 
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual or the case in OCPQE-19413
 function cco_annotation(){
-    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+    local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
+    source_minor_version="$(echo "$source_version" | cut -f2 -d.)"
+    target_minor_version="$(echo "$target_version" | cut -f2 -d.)"
+    if (( source_minor_version == target_minor_version )) || (( source_minor_version < 8 )); then
         echo "CCO annotation change is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
@@ -192,10 +195,10 @@ function cco_annotation(){
     if [[ ${cco_mode} == "Manual" ]]; then
         echo "CCO annotation change is required in Manual mode"
     elif [[ -z "${cco_mode}" || ${cco_mode} == "Mint" ]]; then
-        if [[ "${SOURCE_MINOR_VERSION}" == "14" && ${platform} == "GCP" ]] ; then
+        if [[ "${source_minor_version}" == "14" && ${platform} == "GCP" ]] ; then
             echo "CCO annotation change is required in default or Mint mode on 4.14 GCP cluster"
         else
-            echo "CCO annotation change is not required in default or Mint mode on 4.${SOURCE_MINOR_VERSION} ${platform} cluster"
+            echo "CCO annotation change is not required in default or Mint mode on 4.${source_minor_version} ${platform} cluster"
             return 0
         fi
     else
@@ -204,7 +207,7 @@ function cco_annotation(){
     fi
 
     echo "Require CCO annotation change"
-    local wait_time_loop_var=0; to_version="$(echo "${TARGET_VERSION}" | cut -f1 -d-)"
+    local wait_time_loop_var=0; to_version="$(echo "${target_version}" | cut -f1 -d-)"
     oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${to_version}"'"}}}' --type=merge
 
     echo "CCO annotation patch gets started"
@@ -237,12 +240,12 @@ function run_command() {
 
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response try max_retries
-    if [[ "${TARGET}" =~ "@sha256:" ]]; then
-        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries payload="${1}"
+    if [[ "${payload}" =~ "@sha256:" ]]; then
+        digest="$(echo "${payload}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
     else
-        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
         echo "The target image is using tagname pullspec, its digest is ${digest}"
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -257,31 +260,36 @@ function check_signed() {
         sleep 60
     done
     if (( response == 200 )); then
-        echo "${TARGET} is signed" && return 0
+        echo "${payload} is signed" && return 0
     else
-        echo "Seem like ${TARGET} is not signed" && return 1
+        echo "Seem like ${payload} is not signed" && return 1
     fi
 }
 
 # Check if admin ack is required before upgrade
 function admin_ack() {
-    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+    local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
+    source_minor_version="$(echo "$source_version" | cut -f2 -d.)"
+    target_minor_version="$(echo "$target_version" | cut -f2 -d.)"
+
+    if (( source_minor_version == target_minor_version )) || (( source_minor_version < 8 )); then
         echo "Admin ack is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
-    if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
+    echo -e "All admin acks:\n${out}"
+    if [[ ${out} != *"ack-4.${source_minor_version}"* ]]; then
         echo "Admin ack not required: ${out}" && return
     fi
 
-    echo "Require admin ack:\n ${out}"
+    echo -e "Require admin ack:\n ${out}"
     local wait_time_loop_var=0 ack_data testcase="OCP-44827"
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     ack_data="$(echo "${out}" | jq -r "keys[]")"
     for ack in ${ack_data};
     do
         # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
-        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        if [[ "${ack}" == *"ack-4.${source_minor_version}"* ]]
         then
             echo "Admin ack patch data is: ${ack}"
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
@@ -289,7 +297,7 @@ function admin_ack() {
     done
     echo "Admin-acks patch gets started"
 
-    echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
+    echo -e "sleep 5 mins wait admin-acks patch to be valid...\n"
     while (( wait_time_loop_var < 5 )); do
         sleep 1m
         echo -e "wait_time_passed=${wait_time_loop_var} min.\n"
@@ -466,15 +474,15 @@ fi
 
 set_target_and_upgrade_cmd
 export FORCE_UPDATE="false"
-if ! check_signed; then
+if ! check_signed "${TARGET}"; then
     echo "You're updating to an unsigned images, you must override the verification using --force flag"
     FORCE_UPDATE="true"
 else
     echo "You're updating to a signed images, so run the upgrade command without --force flag"
 fi
 if [[ "${FORCE_UPDATE}" == "false" ]]; then
-    admin_ack
-    cco_annotation
+    admin_ack "${SOURCE_VERSION}" "${TARGET_VERSION}"
+    cco_annotation "${SOURCE_VERSION}" "${TARGET_VERSION}"
 fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc

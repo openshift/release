@@ -48,14 +48,17 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: shell-unit-tests
-  run_if_changed: ((\.sh)|(\.bat))$
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: gke-qa-e2e-tests
   optional: true
   skip_if_only_changed: ^ui/
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+  timeout: 5h0m0s
+- always_run: false
+  as: gke-external-pg-17-qa-e2e-tests
+  optional: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -81,9 +84,8 @@ tests:
       TEST_SUITE: gke-qa-e2e-tests
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
-- as: gke-ui-e2e-tests
-  optional: true
-  run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)
+- always_run: true
+  as: gke-ui-e2e-tests
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -261,11 +263,6 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aks-e2e
   timeout: 5h0m0s
-- as: merge-shell-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: merge-gke-operator-e2e-tests
   postsubmit: true
   steps:

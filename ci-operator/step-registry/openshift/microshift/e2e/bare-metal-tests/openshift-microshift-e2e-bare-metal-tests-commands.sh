@@ -36,7 +36,17 @@ scp \
 
 ssh "${INSTANCE_PREFIX}" "/tmp/prepare.sh"
 
-ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"
+setup_ok=true
+if ! ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"; then
+    setup_ok=false
+fi
+# Always try to get the artifacts, even if the setup failed
+scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/artifacts/*" "${ARTIFACT_DIR}" || true
+
+if ! "${setup_ok}"; then
+    exit 1
+fi
+
 boot_id=$(ssh "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id')
 ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/2-reboot.sh" || true
 

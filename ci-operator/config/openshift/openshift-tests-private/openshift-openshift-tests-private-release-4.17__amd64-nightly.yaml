@@ -187,67 +187,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
-- as: aws-ipi-disc-priv-sts-oc-mirror-basecap-none-f28-destructive
-  cron: 19 10 25 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      MIRROR_BIN: oc-mirror
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-basecap-none-f14
-  cron: 37 11 14,30 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-f28-destructive
-  cron: 0 18 22 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
-- as: aws-ipi-disc-priv-sts-efs-f14
-  cron: 33 10 12,28 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-fips-f14
   cron: 5 17 6,20 * *
   steps:
@@ -261,7 +200,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-disc-priv-sts-ep-fips-f28-destructive
+- as: aws-ipi-disc-priv-sts-ep-oc-mirror-fips-f28-destructive
   cron: 40 17 4 * *
   steps:
     cluster_profile: aws-qe
@@ -270,6 +209,7 @@ tests:
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      MIRROR_BIN: oc-mirror
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1386,24 +1326,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-with-ep-s3
-- as: aws-usgov-ipi-private-f14
-  cron: 23 17 9,23 * *
-  steps:
-    cluster_profile: aws-usgov-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
-- as: aws-usgov-ipi-private-f28-destructive
-  cron: 22 12 17 * *
-  steps:
-    cluster_profile: aws-usgov-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
 - as: aws-usgov-ipi-private-f9-longduration-hive
   cron: 1 23 5,14,26 * *
   steps:
@@ -1436,13 +1358,12 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: aws-usgov-ipi-private-sts-f28-compliance
-  cron: 12 13 27 * *
+- as: aws-ipi-proxy-sts-f28-compliance
+  cron: 13 0 4 * *
   steps:
-    cluster_profile: aws-usgov-qe
+    cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
@@ -1453,52 +1374,51 @@ tests:
     - ref: openshift-extended-test
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: aws-usgov-ipi-private-sts-f28-compliance-destructive
-  cron: 31 3 6 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-proxy-sts-f28-compliance-destructive
+  cron: 19 2 22 * *
   steps:
-    cluster_profile: aws-usgov-qe
+    cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@complianceoperator'
-      EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "45"
+      TEST_TIMEOUT: "55"
     test:
     - ref: etcd-encryption
     - ref: openshift-extended-test-disruptive
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: aws-usgov-ipi-private-sts-f28-file-integrity
-  cron: 37 15 30 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-proxy-sts-f28-file-integrity
+  cron: 30 19 4 * *
   steps:
-    cluster_profile: aws-usgov-qe
+    cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@fio'
-      EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
+      INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-17@sha256:15b55610bbf6bb442a07850272d35f4a9d96aa2d5cc02e8695a03bb821bd5d17
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Compliance_Operator|File_Integrity_Operator|Security_Profiles_Operator
+      TEST_SCENARIOS: File_Integrity_Operator
       TEST_TIMEOUT: "30"
     test:
+    - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: aws-usgov-ipi-private-sts-f28-security-profiles
-  cron: 54 11 17 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-proxy-sts--f28-security-profiles
+  cron: 33 21 26 * *
   steps:
-    cluster_profile: aws-usgov-qe
+    cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@spo'
-      EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
@@ -1508,7 +1428,7 @@ tests:
     - ref: openshift-extended-test
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-usgov-ipi-private-workers-marketplace-f14
   cron: 7 21 1,17 * *
   steps:
@@ -1658,125 +1578,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
-- as: azure-aks-hypershift-byo-vnet-fips-guest-f14
-  cron: 31 18 5,19 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
-- as: azure-aks-hypershift-byo-vnet-fips-guest-f28-destructive
-  cron: 42 7 9 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
-- as: azure-aks-hypershift-byo-vnet-fips-guest-f14-longduration
-  cron: 54 22 8,22 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-longrun
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
-- as: azure-aks-hypershift-byo-vnet-fips-mgmt-f14
-  cron: 50 6 14,30 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      IS_ACTIVE_CLUSTER_OPENSHIFT: "false"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet
-- as: azure-aks-hypershift-cilium-guest-f14
-  cron: 43 15 7,23 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-cilium-guest
-- as: azure-aks-hypershift-disaster-recovery-infra-guest-f14
-  cron: 59 2 7,21 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-disaster-recovery-infra-guest
-- as: azure-aks-hypershift-ephemeral-creds-guest-f14
-  cron: 52 2 4,18 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-guest
-- as: azure-aks-hypershift-etcd-disk-encryption-guest-f14
-  cron: 56 4 11,27 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
-- as: azure-aks-hypershift-ext-oidc-guest-f14
-  cron: 44 16 1,15 * *
-  steps:
-    cluster_profile: azure-qe
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-ext-oidc
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-ext-oidc-guest
-- as: azure-aks-hypershift-full-cert-guest-f14
-  cron: 52 8 5,19 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-full-cert-guest
-- as: azure-aks-hypershift-registry-overrides-guest-f14
-  cron: 55 19 4,18 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-registry-overrides-guest
-- as: azure-aks-hypershift-install-f14-longduration
-  cron: 16 9 7,23 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      IS_ACTIVE_CLUSTER_OPENSHIFT: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftAKSINSTALL&
-      TEST_SCENARIOS: Hypershift
-      TEST_TIMEOUT: "90"
-    test:
-    - ref: openshift-extended-test-longduration
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-install
 - as: azure-ipi-private-fips-f28-disasterrecovery
   cron: 35 19 25 * *
   steps:
@@ -3561,8 +3362,8 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
-      NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      MULTI_STAGE_OVERRIDE_CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+      MULTI_STAGE_OVERRIDE_NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
