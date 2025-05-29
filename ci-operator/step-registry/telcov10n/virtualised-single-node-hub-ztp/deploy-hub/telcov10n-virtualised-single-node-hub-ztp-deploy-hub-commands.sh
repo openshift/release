@@ -591,13 +591,13 @@ function verify_virtualised_hub_cluster_installed {
     echo ${SHARED_DIR}
     ls -lRhtr ${SHARED_DIR}
     echo
+    set -x
     grep -HiIn 'server:\|proxy-url:' ${SHARED_DIR}/kubeconfig
-    # echo
-    # sc="$(oc --kubeconfig ${SHARED_DIR}/kubeconfig get sc -oname | head -1)"
-    # oc --kubeconfig ${SHARED_DIR}/kubeconfig annotate ${sc} storageclass.kubernetes.io/is-default-class=true --overwrite
+    set +x
     echo
-    # oc --kubeconfig ${SHARED_DIR}/kubeconfig get nodes,sc -owide
+    set -x
     oc --kubeconfig ${SHARED_DIR}/kubeconfig get nodes -owide
+    set +x
 }
 
 function main {
@@ -610,7 +610,6 @@ function main {
   generate_pull_secret
   generate_inventory_file
   install_virtualised_hub_cluster
-  set -x
   verify_virtualised_hub_cluster_installed
 }
 
@@ -618,11 +617,13 @@ function pr_debug_mode_waiting {
 
   ext_code=$? ; [ $ext_code -eq 0 ] && return
 
+  set -x
   [ -n "${inventory_file:-}" ] && \
     cp -v $inventory_file "${SHARED_DIR}/$(basename ${inventory_file})"
   env > "${SHARED_DIR}/$(basename ${inventory_file}).env"
 
   [ -z "${PULL_NUMBER:-}" ] && return
+  set +x
 
   echo "################################################################################"
   echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
