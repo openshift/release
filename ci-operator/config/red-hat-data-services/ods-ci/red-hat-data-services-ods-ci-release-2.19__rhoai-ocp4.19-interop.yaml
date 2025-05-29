@@ -32,7 +32,7 @@ resources:
       cpu: 8000m
       memory: 10Gi
 tests:
-- as: rhoai-interop-aws
+- as: rhoai-interop-aws-ipi
   cron: 0 6 * * 1
   steps:
     cluster_profile: aws-rhoai-qe
@@ -46,7 +46,8 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "rhoai-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "rhoai-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "rhoai-opendatahub-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
@@ -73,6 +74,39 @@ tests:
     - ref: rhoai-opendatahub-tests
     - ref: rhoai-tests
     workflow: firewatch-ipi-aws
+- as: rhoai-interop-aws-rosa
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: aws-managed-rosa-rhoai-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "rhoai-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "rhoai-opendatahub-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19","rosa-managed","rhoai"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: obarhaim@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: RHOAIENG-22952
+      OPERATORS: |
+        [
+            {"name": "authorino-operator", "source": "redhat-operators", "channel": "tech-preview-v1", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
+            {"name": "rhods-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
+        ]
+      TEST_MARKERS: ocp_interop
+    test:
+    - ref: install-operators
+    - ref: rhoai-deploy-dsc
+    - ref: rhoai-opendatahub-tests
+    - ref: rhoai-tests
+    workflow: firewatch-rosa-aws-sts
 zz_generated_metadata:
   branch: release-2.19
   org: red-hat-data-services
