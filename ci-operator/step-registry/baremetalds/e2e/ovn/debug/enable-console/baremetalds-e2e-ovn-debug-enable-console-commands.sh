@@ -19,8 +19,8 @@ for node in \$nodes; do
   oc debug node/"\$node" -- chroot /host bash -c "rpm-ostree kargs --append-if-missing=console=ttyS0,115200n8"
 done
 
-#oc adm reboot-machine-config-pool mcp/worker mcp/master
-#oc adm wait-for-node-reboot nodes --all
+oc adm reboot-machine-config-pool mcp/worker mcp/master
+oc adm wait-for-node-reboot nodes --all
 
 for node in \$nodes; do
   oc debug node/"\$node" -- chroot /host bash -c "echo $PASSWD | passwd core --stdin"
