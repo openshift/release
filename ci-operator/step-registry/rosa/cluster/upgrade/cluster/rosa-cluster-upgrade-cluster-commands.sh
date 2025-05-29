@@ -77,6 +77,20 @@ function get_recommended_version_for_machinepool () {
   fi
 }
 
+# check_admin_gates function for ROSA
+function check_admin_gates() {
+    check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')
+    echo -e "Admin ack required for these:\n$check_admin_gates"
+
+    ack_list=$(echo $check_admin_gates | jq -r 'keys[]')
+    for item in ${ack_list}; do
+      # $ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.18-kube-1.32-api-removals-in-4.19":"true"}}' --type=merge
+      # https://access.redhat.com/articles/7112216
+      log "Patch Admin-acks configmap with ${item}: true"
+      oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${item}"'": "true"}}' --type=merge
+    done
+}
+
 function upgrade_cluster_to () {
   major_version=$1
   recommended_version=""
@@ -93,10 +107,20 @@ function upgrade_cluster_to () {
     fi
 
     rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1 || true
+    rosa list upgrade -c $cluster_id
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
       log "Waiting for the previous upgrade schedule to be removed."
       sleep 120
+    elif [[ "$upgrade_info" == *"Missing required acknowledgements to schedule upgrade"* ]]; then 
+      log "Admin Acknowledgements required."
+      check_admin_gates
+      sleep 120
+      # ROSA Classic fails to schedule if an admin-ack is required, so attempts a re-try after clearing admin-gates.
+      # ROSA-HCP schedules so breaking the loop after clearing admin-gates.
+      if [[ "$HOSTED_CP" == "true" ]]; then
+        break
+      fi
     else
       log -e "$upgrade_info"
       break
