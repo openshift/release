@@ -309,7 +309,14 @@ function load_env {
   HUB_CLUSTER_VERSION="stable"
   export HUB_CLUSTER_VERSION
 
-  HUB_CLUSTER_TAG="${OCP_HUB_VERSION}"
+  set -x
+  if [ -n "${PULL_NUMBER:-}" ] && [ -n "${SET_SPECIFIC_RELEASE_IMAGE}" ]; then
+    rel_img="${SET_SPECIFIC_RELEASE_IMAGE}"
+  else
+    rel_img=${RELEASE_IMAGE_LATEST}
+  fi
+  HUB_CLUSTER_TAG="$(extract_cluster_image_set_reference ${rel_img} ${CLUSTER_PROFILE_DIR}/pull-secret)"
+  set +x
   export HUB_CLUSTER_TAG
 
   CLUSTER_BASE_DOMAIN="$(cat ${bastion_settings}/cluster_domain_name)"
