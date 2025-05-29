@@ -28,13 +28,6 @@ EOF
   set +x
 }
 
-function hack_spoke_deployment_clean_up {
-
-  echo "************ telcov10n hack spoke deployment clean up ************"
-
-  release_locked_host
-}
-
 function server_poweroff {
 
   echo "************ telcov10n Power Off the server use as SNO Spoke cluster ************"
@@ -57,9 +50,18 @@ function server_poweroff {
 
 function main {
 
-  setup_aux_host_ssh_access
-  hack_spoke_deployment_clean_up
-  server_poweroff
+  local does_the_current_job_hold_a_lock_to_use_a_baremetal_server
+  does_the_current_job_hold_a_lock_to_use_a_baremetal_server=$( \
+    cat ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt || echo "no")
+
+  if [ "${does_the_current_job_hold_a_lock_to_use_a_baremetal_server}" == "yes" ]; then
+
+    setup_aux_host_ssh_access
+    server_poweroff
+
+    # This must be run the latest one since it releases its server lock
+    release_locked_host
+  fi
 }
 
 main

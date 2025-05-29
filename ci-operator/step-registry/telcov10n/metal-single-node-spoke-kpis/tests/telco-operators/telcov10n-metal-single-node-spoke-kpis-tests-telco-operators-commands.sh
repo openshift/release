@@ -189,6 +189,16 @@ function test_spoke_deployment {
   echo "-----------------------------------------------------"
   oc get clusterversion
   echo
+
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    echo
+    echo "------------------------ Spoke Details --------------------------------------------------------"
+    echo "kubeconfig: export KUBECONFIG=${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
+    echo "Console: $(oc --kubeconfig ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml whoami --show-console)"
+    secret_adm_pass=${SPOKE_CLUSTER_NAME}-admin-password
+    cat ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml || echo
+    echo
+  fi
 }
 
 function copy_spoke_kubeconfig_to_bastion_location {
@@ -212,25 +222,11 @@ function copy_spoke_kubeconfig_to_bastion_location {
 
 }
 
-function test_kpis {
-
-  echo "************ telcov10n Run KPIs tests ************"
-
-  # TODO: Run all KPIs testing from this point onward
-
-  copy_spoke_kubeconfig_to_bastion_location
-
-  echo
-  echo "Running KPIs tests..."
-  echo
-
-}
-
 function main {
   set_spoke_cluster_kubeconfig
   install_test_tools
   test_spoke_deployment
-  test_kpis
+  copy_spoke_kubeconfig_to_bastion_location
 }
 
 main
