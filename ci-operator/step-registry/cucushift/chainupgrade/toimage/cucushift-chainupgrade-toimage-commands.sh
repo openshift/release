@@ -1147,7 +1147,7 @@ for target in "${TARGET_RELEASES[@]}"; do
     upgrade
     check_upgrade_status
 
-    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+    if [[ "${TARGET_MINOR_VERSION}" -lt "19" ]] && [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo "Found rhel worker..."
         run_command "oc get node -owide"
         if [[ $(oc get machineconfigpools worker -ojson | jq -r '.spec.paused') == "true" ]]; then
