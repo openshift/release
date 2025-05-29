@@ -120,20 +120,19 @@ tests:
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
-      FIPS_ENABLED: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
     test:
-    - ref: fips-check-fips-or-die
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
   branch: master
   org: openshift
