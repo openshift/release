@@ -70,28 +70,56 @@ function find_and_purchase_capacity_blocks() {
     if ! aws ec2 purchase-capacity-block \
         --capacity-block-offering-id "${OFFERING_ID}" \
         --instance-platform "${OPERATING_SYSTEM}" \
+        --tag-specifications 'ResourceType=capacity-reservation,Tags=[{Key=usage-cluster-type,Value=hypershift-hosted}]' \
         --dry-run 2>&1 | grep -q "DryRunOperation"; then
         echo "Dry run failed. Check parameters or permissions."
         return 1
     fi
 
     echo "Dry run successful. Proceeding with purchase..."
-    aws ec2 purchase-capacity-block \
-        --capacity-block-offering-id "${OFFERING_ID}" \
-        --instance-platform "${OPERATING_SYSTEM}" \
-        > "${CR_OUTPUT_FILE}"
-    if [ $? -ne 0 ]; then
-        echo "Failed to purchase capacity block." >&2
-        return 1
-    fi
-    CB_RESERVATION_ID=$(jq -r '.CapacityBlock.CapacityBlockId' "${CR_OUTPUT_FILE}")
-    #CB_RESERVATION_ID="cb-0ab8ec361e1c9cc46"
+#    aws ec2 purchase-capacity-block \
+#        --capacity-block-offering-id "${OFFERING_ID}" \
+#        --instance-platform "${OPERATING_SYSTEM}" \
+#        --tag-specifications 'ResourceType=capacity-reservation,Tags=[{Key=usage-cluster-type,Value=hypershift-hosted}]' \
+#        --output json > "${CR_OUTPUT_FILE}"
+#    if [ $? -ne 0 ]; then
+#        echo "Failed to purchase capacity block." >&2
+#        return 1
+#    fi
+#    CB_RESERVATION_ID=$(jq -r '.CapacityReservation.CapacityReservationId' "${CR_OUTPUT_FILE}")
+    CB_RESERVATION_ID="cr-011db017388a95436"
     if [ -z "${CB_RESERVATION_ID}" ]; then
         echo "Failed to get capacity blocks reservation ID. Exiting."
         return 1
     fi
-
     echo "Purchased capacity block successfully: ${CB_RESERVATION_ID}"
+
+    echo "Waiting for capacity block to become active..."
+    #CB_START_TIME=$(jq -r '.CapacityReservation.StartDate' "${CR_OUTPUT_FILE}")
+    CB_START_TIME="2025-05-29T11:30:00+00:00"
+    CB_START_TIMESTRAMP=$(date -d $CB_START_TIME +%s)
+#    time_str="2025-05-29T11:30:00+00:00"
+#    time_bsd="${time_str%:*}${time_str: -2}"
+#    CB_START_TIMESTRAMP=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$time_bsd" +%s)
+    while true; do
+        CURRENT_TIMESTRAMP=$(date -u +%s)
+        if [ $CURRENT_TIMESTRAMP -ge $CB_START_TIMESTRAMP ]; then
+            echo "Capacity Block should become active now"
+            break
+        fi
+        sleep 60
+    done
+
+    sleep 60
+    STATE=$(aws ec2 describe-capacity-reservations \
+        --capacity-reservation-ids ${CB_RESERVATION_ID} \
+        --query "CapacityReservations[].State" \
+        --output text)
+    if [[ $STATE != "active" ]]; then
+        echo "Capacity Block does not become active, please check: ${CB_RESERVATION_ID}"
+        echo "The current status is: $STATE"
+        return 1
+    fi
     echo "{\"CapacityBlocks\":\"${CB_RESERVATION_ID}\"}" | jq . > "${SHARED_DIR}/reservation_id"
 }
 
