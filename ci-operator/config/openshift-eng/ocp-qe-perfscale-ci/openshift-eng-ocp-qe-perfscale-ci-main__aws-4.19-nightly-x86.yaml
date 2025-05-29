@@ -411,6 +411,23 @@ tests:
     workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
 - always_run: false
+  as: udn-density-l3-24nodes-wait
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ITERATION_MULTIPLIER_ENV: "3"
+      TIMEOUT: 1 hours
+      VERSION: "4.19"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: wait
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
+- always_run: false
   as: udn-density-l2-24nodes
   steps:
     cluster_profile: aws-perfscale-qe
@@ -420,9 +437,11 @@ tests:
       COMPUTE_NODE_TYPE: m5.xlarge
       ENABLE_LAYER_3: "false"
       ITERATION_MULTIPLIER_ENV: "3"
+      TIMEOUT: 1 hours
       VERSION: "4.19"
     test:
     - ref: openshift-qe-workers-scale
+    - ref: wait
     - chain: openshift-qe-udn-density-pods
     workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
