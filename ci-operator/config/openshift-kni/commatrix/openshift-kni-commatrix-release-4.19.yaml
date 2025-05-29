@@ -1,0 +1,76 @@
+build_root:
+  from_repository: true
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  commands: make test
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: commatrix-e2e-tests
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.19
+        ci-job-fullname openshift-kni-commatrix-e2e-tests-release-4.19
+        ci-job-type commatrix-e2e-tests
+        ci-repo-name commatrix
+        ci-org-name openshift-kni
+    test:
+    - as: commatrix-e2e-tests
+      commands: |
+        echo "tcp dport 8443 accept
+        udp dport 8443 accept
+        # Allow host level services dynamic port range
+        tcp dport 9000-9999 accept
+        udp dport 9000-9999 accept
+        # Allow Kubernetes node ports dynamic port range
+        tcp dport 30000-32767 accept
+        udp dport 30000-32767 accept
+        # Keep port open for origin test
+        # https://github.com/openshift/origin/blob/master/vendor/k8s.io/kubernetes/test/e2e/network/service.go#L2622
+        tcp dport 10180 accept
+        udp dport 10180 accept
+        # Keep port open for origin test
+        # https://github.com/openshift/origin/blob/master/vendor/k8s.io/kubernetes/test/e2e/network/service.go#L2724
+        tcp dport 80 accept
+        udp dport 80 accept" > ${ARTIFACT_DIR}/additional-nftables-rules
+        go mod vendor && EXTRA_NFTABLES_MASTER_FILE=${ARTIFACT_DIR}/additional-nftables-rules EXTRA_NFTABLES_WORKER_FILE=${ARTIFACT_DIR}/additional-nftables-rules make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn-serial
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: commatrix
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-kni
+  repo: commatrix
