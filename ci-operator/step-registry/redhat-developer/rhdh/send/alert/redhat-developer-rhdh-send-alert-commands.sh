@@ -3,6 +3,8 @@
 set -o errexit
 set -o nounset
 
+sudo dnf install jq -y
+
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
 export RELEASE_BRANCH_NAME SLACK_NIGHTLY_WEBHOOK_URL
@@ -68,8 +70,8 @@ get_slack_alert_text() {
           notification_text="${notification_text}:circleci-pass: test passed, "
         fi
         notification_text="${notification_text}:playwright: <${URL_PLAYWRIGHT[i]}|Playwright>, "
-        if [[ "${URL_REPORTPORTAL[i]}" != "" ]]; then
-          notification_text="${notification_text}:reportportal: <${URL_REPORTPORTAL[i]}|ReportPortal>, "
+        if [[ "${STATUS_URL_REPORTPORTAL[i]}" != "" ]]; then
+          notification_text="${notification_text}:reportportal: <${STATUS_URL_REPORTPORTAL[i]}|ReportPortal>, "
         fi
       fi
       notification_text="${notification_text}📦 <${URL_ARTIFACTS[i]}|artifacts>."
@@ -91,6 +93,7 @@ main() {
   mapfile -t STATUS_DEPLOYMENT_NAMESPACE < "$SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt"
   mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"
   mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"
+  mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"
 
   echo "Getting Slack alert message"
   SLACK_ALERT_MESSAGE=$(get_slack_alert_text)
