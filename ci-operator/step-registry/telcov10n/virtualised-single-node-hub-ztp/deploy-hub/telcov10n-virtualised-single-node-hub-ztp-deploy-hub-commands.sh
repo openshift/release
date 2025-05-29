@@ -622,6 +622,8 @@ function pr_debug_mode_waiting {
     cp -v $inventory_file "${SHARED_DIR}/$(basename ${inventory_file})"
   env > "${SHARED_DIR}/$(basename ${inventory_file}).env"
 
+  [ -z "${PULL_NUMBER:-}" ] && return
+
   echo "################################################################################"
   echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
   echo "################################################################################"
