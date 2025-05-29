@@ -185,7 +185,7 @@ EOF
 
 echo "Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
-   -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
+   -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m'
 
 echo "ODF/OCS Operator is deployed successfully"
 
