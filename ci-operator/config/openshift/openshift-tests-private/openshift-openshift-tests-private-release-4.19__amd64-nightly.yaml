@@ -650,13 +650,14 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-hypershift-guest-ext-oidc-f7
-  cron: 14 21 6,13,22,29 * *
+- as: aws-ipi-ovn-hypershift-guest-ext-oidc-tp-f14
+  cron: 56 12 16,30 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --render-sensitive
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
     test:
@@ -1034,7 +1035,6 @@ tests:
       ASSIGN_ROLES_TO_SUBNETS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       EDGE_ZONE_TYPES: wavelength-zone
-      EDGE_ZONES_LIST: us-east-1-mia-1a
       SUBNET_ROLES: |-
         [
           [
@@ -1654,10 +1654,13 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
-- as: azure-aks-hypershift-ext-oidc-guest-f7
-  cron: 21 11 7,14,23,30 * *
+- as: azure-aks-hypershift-ext-oidc-tp-guest-f14
+  cron: 6 11 12,26 * *
   steps:
     cluster_profile: azure-qe
+    env:
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
     test:
     - chain: openshift-e2e-test-hypershift-qe-ext-oidc
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-ext-oidc-guest
@@ -2904,6 +2907,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: osd-ccs-gcp-xpn-private
+- as: gcp-upi-external-oidc-keycloak-tp-f14
+  cron: 24 16 5,20 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - chain: idp-external-oidc-keycloak
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-upi
 - as: gcp-upi-f7-ui
   cron: 34 23 7,14,21,30 * *
   steps:
@@ -4370,6 +4384,38 @@ tests:
   steps:
     cluster_profile: nutanix-qe-dis
     workflow: agent-qe-nutanix-disconnected
+- as: vsphere-short-cert-rotation-f9
+  cron: 6 18 5,17,26 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: ibmcloud-short-cert-rotation-f9
+  cron: 50 16 1,13,22 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: nutanix-short-cert-rotation-f9
+  cluster: build01
+  cron: 37 3 1,10,19 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-cert-rotation
+    workflow: cucushift-installer-rehearse-nutanix-ipi
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

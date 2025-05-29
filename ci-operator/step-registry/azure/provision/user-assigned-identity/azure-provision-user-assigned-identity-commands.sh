@@ -38,6 +38,11 @@ fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
+if [[ ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER} -eq 0 ]]; then
+    echo "ENV 'AZURE_USER_ASSIGNED_IDENTITY_NUMBER' is set to 0, no user-assigned identity needs to be created, skip the step..."
+    exit 0
+fi
+
 rg_file="${SHARED_DIR}/resourcegroup"
 if [ -f "${rg_file}" ]; then
     RESOURCE_GROUP=$(cat "${rg_file}")
@@ -48,7 +53,7 @@ fi
 identity_name_prefix="${NAMESPACE}-${UNIQUE_HASH}-identity"
 azure_identity_json="{}"
 # defalutMachinePlatform
-if [[ "${ENABLE_AZURE_IDENTITY_DEFAULT_MACHINE}" == "true" ]]; then
+if [[ "${AZURE_IDENTITY_TYPE_DEFAULT_MACHINE}" == "UserAssigned" ]]; then
     echo "Creating user-assigned identity to configure under defaultMachinePlatform..."
     azure_identity_json=$(echo "${azure_identity_json}" | jq -c -S ". +={\"identityDefault\":[]}")
     for num in $(seq 1 ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER}); do
@@ -58,7 +63,7 @@ if [[ "${ENABLE_AZURE_IDENTITY_DEFAULT_MACHINE}" == "true" ]]; then
     done
 fi
 # ControlPlane
-if [[ "${ENABLE_AZURE_IDENTITY_CONTROL_PLANE}" == "true" ]]; then
+if [[ "${AZURE_IDENTITY_TYPE_CONTROL_PLANE}" == "UserAssigned" ]]; then
     echo "Creating user-assigned identity to configure under controlPlane..."
     azure_identity_json=$(echo "${azure_identity_json}" | jq -c -S ". +={\"identityControlPlane\":[]}")
     for num in $(seq 1 ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER}); do
@@ -68,7 +73,7 @@ if [[ "${ENABLE_AZURE_IDENTITY_CONTROL_PLANE}" == "true" ]]; then
     done
 fi
 # Compute
-if [[ "${ENABLE_AZURE_IDENTITY_COMPUTE}" == "true" ]]; then
+if [[ "${AZURE_IDENTITY_TYPE_COMPUTE}" == "UserAssigned" ]]; then
     echo "Creating user-assigned identity to configure under compute..."
     azure_identity_json=$(echo "${azure_identity_json}" | jq -c -S ". +={\"identityCompute\":[]}")
     for num in $(seq 1 ${AZURE_USER_ASSIGNED_IDENTITY_NUMBER}); do
@@ -79,4 +84,6 @@ if [[ "${ENABLE_AZURE_IDENTITY_COMPUTE}" == "true" ]]; then
 fi
 
 # save user-assigned identity info to ${SHARED_DIR} for reference
-echo "${azure_identity_json}" > "${SHARED_DIR}/azure_user_assigned_identity.json"
+if [[ -n "${azure_identity_json}" ]]; then
+    echo "${azure_identity_json}" > "${SHARED_DIR}/azure_user_assigned_identity.json"
+fi
