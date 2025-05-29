@@ -50,10 +50,11 @@ function server_poweroff {
 
 function main {
 
-  local hold_the_lock
-  hold_the_lock=$(cat ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt || echo "no")
+  local does_the_current_job_hold_a_lock_to_use_a_baremetal_server
+  does_the_current_job_hold_a_lock_to_use_a_baremetal_server=$( \
+    cat ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt || echo "no")
 
-  if [ "${hold_the_lock}" == "yes" ]; then
+  if [ "${does_the_current_job_hold_a_lock_to_use_a_baremetal_server}" == "yes" ]; then
 
     setup_aux_host_ssh_access
     server_poweroff
