@@ -37,16 +37,31 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 popd
 
 # Collecting the controller, daemonset logs
+echo "Collecting all the required logs"
 gcloud compute ssh "$VM_NAME" --zone="$GOOGLE_COMPUTE_ZONE" --command="
 set -eux
-kubectl get pods -n instaslice-system |tee get_pods_instaslice-system.log
-kubectl describe pods -n instaslice-system |tee describe_pods_instaslice-system.log
-kubectl get instaslice -oyaml -A |tee instaslice.log
-kubectl logs -n instaslice-system -l app=controller-daemonset |tee daemonset.log
-kubectl logs -n instaslice-system -l control-plane=controller-manager |tee controller.log
 
-tar -czf logs_archive.tar.gz *.log
+NAMESPACE='instaslice-system'
+
+kubectl get pods -n \"\$NAMESPACE\" | tee get_pods_\${NAMESPACE}.log
+kubectl describe pods -n \"\$NAMESPACE\" | tee describe_pods_\${NAMESPACE}.log
+kubectl get instaslice -oyaml -A | tee instaslice.log
+
+# Get daemonset pod logs
+for pod in \$(kubectl get pods -n \"\$NAMESPACE\" -o json | jq -r \
+  '.items[] | select(.metadata.name | contains(\"daemonset\")) | .metadata.name'); do
+  kubectl logs -n \"\$NAMESPACE\" \"\$pod\" | tee -a daemonset.log
+done
+
+# Get controller-manager pod logs
+for pod in \$(kubectl get pods -n \"\$NAMESPACE\" -o json | jq -r \
+  '.items[] | select(.metadata.name | contains(\"controller-manager\")) | .metadata.name'); do
+  kubectl logs -n \"\$NAMESPACE\" \"\$pod\" | tee -a controller.log
+done
+
+tar -cvzf logs_archive.tar.gz *.log
 "
+
 
 gcloud compute scp \
   --quiet \
