@@ -13,6 +13,7 @@ instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
+    sed -i "s/install/install.bin/g" build/conmon.yml
     ansible-playbook setup-main.yml --connection=local -vvv
     sudo rm -rf "\${SOURCE_DIR}"
 EOF
