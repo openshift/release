@@ -1,8 +1,20 @@
 base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
   tests-base:
     name: "4.19"
     namespace: ocp
     tag: tests
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: |
   # The CentOS 8 build root does not have golang package installed so that we
   # use the golang installed by Kata Containers setup script. Here it is
@@ -106,6 +118,31 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+- as: azure-ipi-kata
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_AZURE_REGION: eastus
+      LOKI_ENABLED: "false"
+      SLEEP_DURATION: 2h
+      SPOT_INSTANCES: "false"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;C00102
+      TEST_SCENARIOS: kata
+      TEST_TIMEOUT: "75"
+    post:
+    - ref: cucushift-installer-wait
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    test:
+    - ref: openshift-extended-test
 zz_generated_metadata:
   branch: main
   org: kata-containers
