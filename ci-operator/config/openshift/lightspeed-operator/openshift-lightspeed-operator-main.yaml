@@ -20,7 +20,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: golang-1.23
 images:
 - dockerfile_path: Dockerfile
   to: lightspeed-operator
@@ -68,12 +68,12 @@ resources:
       memory: 200Mi
 tests:
 - as: generate
-  commands: make generate --always-make && git diff --exit-code
+  commands: GOFLAGS="-mod=readonly" make generate --always-make && git diff --exit-code
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
-  commands: make test --warn-undefined-variables
+  commands: GOFLAGS="-mod=readonly" make test --warn-undefined-variables
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
@@ -82,6 +82,7 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
+    export GOFLAGS="-mod=readonly"
     make lint
   container:
     clone: true
@@ -122,6 +123,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
@@ -191,6 +194,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
@@ -260,6 +265,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
@@ -331,6 +338,8 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
+        export GOFLAGS="-mod=readonly"
+
         export LLM_PROVIDER=openai
         export LLM_MODEL=gpt-3.5-turbo
         export LLM_TOKEN=$(cat /var/run/openai/token)
