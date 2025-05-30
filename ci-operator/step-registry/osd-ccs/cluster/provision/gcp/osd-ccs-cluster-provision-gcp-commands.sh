@@ -113,6 +113,7 @@ function wait_for_bootstrap() {
   return 0
 }
 
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [ "${ENABLE_SHARED_VPC}" == "yes" ] && [ ! -f "${SHARED_DIR}/xpn.json" ]; then
