@@ -80,7 +80,7 @@ function get_recommended_version_for_machinepool () {
 # check_admin_gates function for ROSA
 function check_admin_gates() {
     check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')
-    echo -e "Admin ack required for these:\n$check_admin_gates"
+    log -e "Admin ack required for these:\n$check_admin_gates"
 
     ack_list=$(echo $check_admin_gates | jq -r 'keys[]')
     for item in ${ack_list}; do
@@ -101,7 +101,7 @@ function upgrade_cluster_to () {
   echo "rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH}"
   start_time=$(date +"%s")
   while true; do
-    if (( $(date +"%s") - $start_time >= 1800 )); then
+    if (( $(date +"%s") - $start_time >= 3600 )); then
       log "error: Timed out while waiting for the previous upgrade schedule to be removed."
       exit 1
     fi
@@ -114,7 +114,9 @@ function upgrade_cluster_to () {
       sleep 120
     elif [[ "$upgrade_info" == *"Missing required acknowledgements to schedule upgrade"* ]]; then 
       log "Admin Acknowledgements required."
+      set_proxy
       check_admin_gates
+      unset_proxy
       sleep 120
       # ROSA Classic fails to schedule if an admin-ack is required, so attempts a re-try after clearing admin-gates.
       # ROSA-HCP schedules so breaking the loop after clearing admin-gates.
@@ -122,6 +124,7 @@ function upgrade_cluster_to () {
         break
       fi
     elif [[ "$upgrade_info" == *"Failed to schedule upgrade for cluster"* ]]; then
+      log -e "$upgrade_info"
       log "Failed to schedule upgrade for cluster, so retry after a pause"
       sleep 120
     else
@@ -138,6 +141,22 @@ function upgrade_cluster_to () {
     oc delete pod $muo_pod -n openshift-managed-upgrade-operator
   fi
   unset_proxy
+
+  # Setting maxUnavailable and maxSurge to speed up upgrades
+  if [[ -n "${NP_MAX_UNAVAILABLE}" && -n "${NP_MAX_SURGE}" ]]; then
+    mp_id_list=rosa list machinepool -c $cluster_id -o json | jq -r ".[].id" | grep -i worker
+    for mp_id in $mp_id_list; do
+      log "Update the machinepool maxUnavailable and maxSurge of $mp_id to ${NP_MAX_UNAVAILABLE} and ${NP_MAX_SURGE}"
+      if [[ "$HOSTED_CP" == "false" ]]; then
+        mp_replicas=rosa describe machinepool -c $cluster_id $mp_id -o json | jq -r ".replicas"
+        log "rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE} --enable-autoscaling=false --replicas $mp_replicas"
+        rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE} --enable-autoscaling=false --replicas $mp_replicas
+      else
+        log "rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE}"
+        rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE}      
+      fi
+    done
+  fi
 
   # Upgrade cluster
   start_time=$(date +"%s")
