@@ -120,6 +120,22 @@ mirror:
       - name: alpha
 EOF
 
+cat <<EOF | oc create -f -
+kind: CatalogSource
+apiVersion: operators.coreos.com/v1alpha1
+metadata:
+  name: redhat-operators
+  namespace: openshift-marketplace
+spec:
+  displayName: Red Hat Operators
+  image: 'registry.redhat.io/redhat/redhat-operator-index:v4.17'
+  publisher: Red Hat
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOF
+
     run_command "cd /tmp"
     run_command "curl -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
     run_command "./oc-mirror --config=/tmp/image-set.yaml docker://${MIRROR_REGISTRY_HOST} --continue-on-error --ignore-history --source-skip-tls --dest-skip-tls || true"
@@ -129,8 +145,8 @@ EOF
 
     # print and apply generated ICSP and catalog source
     run_command "cat oc-mirror-workspace/results-*/imageContentSourcePolicy.yaml"
-    run_command "cat oc-mirror-workspace/results-*/catalogSource*"
-    run_command "oc apply -f ./oc-mirror-workspace/results-*/"
+    #run_command "cat oc-mirror-workspace/results-*/catalogSource*"
+    run_command "oc apply -f ./oc-mirror-workspace/results-*/imageContentSourcePolicy.yaml"
 
     CATALOG_SOURCE="redhat-operators"
     local -i counter=0
