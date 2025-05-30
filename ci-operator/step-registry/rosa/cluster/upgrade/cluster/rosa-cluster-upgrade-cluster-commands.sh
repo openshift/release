@@ -143,15 +143,20 @@ function upgrade_cluster_to () {
   unset_proxy
 
   # Setting maxUnavailable and maxSurge to speed up upgrades
-  if [[ -n "${NP_MAX_UNAVAILABLE}" && -n "${NP_MAX_SURGE}" ]]; then
+  if [[ "${NP_MAX_UNAVAILABLE}" != "" ]]; then
     mp_id_list=$(rosa list machinepool -c $cluster_id -o json | jq -r ".[].id" | grep -i worker)
     for mp_id in $mp_id_list; do
       log "Update the machinepool maxUnavailable and maxSurge of $mp_id to ${NP_MAX_UNAVAILABLE} and ${NP_MAX_SURGE}"
       if [[ "$HOSTED_CP" == "false" ]]; then
-        mp_replicas=$(rosa describe machinepool -c $cluster_id $mp_id -o json | jq -r ".replicas")
-        log "rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE} --enable-autoscaling=false --replicas $mp_replicas"
-        rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE} --enable-autoscaling=false --replicas $mp_replicas
+        set_proxy
+        log "oc patch mcp worker --patch '{"spec":{"maxUnavailable": "'"${NP_MAX_UNAVAILABLE}"'"}}' --type=merge"
+        oc patch mcp worker --patch '{"spec":{"maxUnavailable": "'"${NP_MAX_UNAVAILABLE}"'"}}' --type=merge
+        unset_proxy
       else
+        if [[ "${NP_MAX_SURGE}" == "" ]]; then
+          NP_MAX_SURGE=$NP_MAX_UNAVAILABLE
+          log "MaxUnavailable: ${NP_MAX_UNAVAILABLE}, MaxSurge: ${NP_MAX_SURGE}"
+        fi
         log "rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE}"
         rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE}      
       fi
