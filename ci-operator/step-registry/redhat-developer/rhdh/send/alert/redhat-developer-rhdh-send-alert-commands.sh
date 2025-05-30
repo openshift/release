@@ -88,10 +88,18 @@ main() {
   # fi
 
   echo "Reading results from $SHARED_DIR"
-  mapfile -t STATUS_DEPLOYMENT_NAMESPACE < "$SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt"
-  mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"
-  mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"
-  mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"
+  if ! mapfile -t STATUS_DEPLOYMENT_NAMESPACE < "$SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt"; then
+    echo "Notice: $SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt not found." >&2
+  fi
+  if ! mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"; then
+    echo "Notice: $SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt not found." >&2
+  fi
+  if ! mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"; then
+    echo "Notice: $SHARED_DIR/STATUS_TEST_FAILED.txt not found." >&2
+  fi
+  if ! mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"; then
+    echo "Notice: $SHARED_DIR/STATUS_URL_REPORTPORTAL.txt not found." >&2
+  fi
 
   echo "Getting Slack alert message"
   SLACK_ALERT_MESSAGE=$(get_slack_alert_text)
