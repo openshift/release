@@ -116,6 +116,23 @@ set -eux
   sudo systemctl restart docker
   sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 
+  echo "Checking NVIDIA driver availability with nvidia-smi..."
+  MAX_RETRIES=5
+  RETRY_DELAY=5
+  attempt=1
+
+  while ! nvidia-smi > /dev/null 2>&1; do
+    echo "[$attempt/$MAX_RETRIES] nvidia-smi failed. Retrying in $RETRY_DELAY seconds..."
+    if [ "$attempt" -ge "$MAX_RETRIES" ]; then
+      echo "nvidia-smi failed after $MAX_RETRIES attempts. Exiting."
+      exit 1
+    fi
+    attempt=$((attempt + 1))
+    sleep $RETRY_DELAY
+  done
+
+  echo "nvidia-smi succeeded. NVIDIA driver is available."
+
   # Enable MIG on the GPU
   nvidia-smi
   nvidia-smi -L
