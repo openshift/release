@@ -302,3 +302,27 @@ $ rg registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2 ./core-services
 
 $ oc image mirror --keep-manifest-list --skip-multiple-scopes --force --registry-config /tmp/.dockerconfigjson quay.io/kubevirt/prom-metrics-linter:v0.0.2 registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2
 ```
+
+## `periodic-prow-auto-config-brancher`
+This job runs [`autoconfigbrancher`](https://github.com/openshift/ci-tools/tree/main/cmd/autoconfigbrancher).
+
+#### Useful Links
+
+- [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-prow-auto-config-brancher)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+
+### Failed to get pullspec
+
+#### Symptom
+
+```
+Failed to get pullspec for version range `>4.19.0-0 <4.20.0-0`" error="failed to request latest release: server responded with 404: no tags exist within the release that satisfy the request\n
+```
+
+#### Culprit
+
+Th job is trying to find a cluster pool image for a version range that does not exist in the hive cluster. This can happen as a result of a new release being created.
+
+#### Resolution
+
+Create a PR similar to this one: https://github.com/openshift/release/pull/65517
