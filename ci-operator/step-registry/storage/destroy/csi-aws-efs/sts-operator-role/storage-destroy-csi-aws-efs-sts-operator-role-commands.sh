@@ -25,6 +25,26 @@ logger() {
 if grep -qi "efs-csi-cross-account" "${STORAGECLASS_LOCATION}"; then
   export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
   logger "INFO" "Using shared AWS account ..."
+  CROSS_ACCOUNT_ROLE_ARN=$(cat "${SHARED_DIR}"/cross-account-efs-csi-driver-operator-role-arn)
+  CROSS_ACCOUNT_ROLE_NAME="${CROSS_ACCOUNT_ROLE_ARN##*/}"
+  # List and detach inline policies
+  INLINE_POLICIES=$(aws iam list-role-policies --role-name "$CROSS_ACCOUNT_ROLE_NAME" --query 'PolicyNames' --output text)
+  for POLICY in $INLINE_POLICIES; do
+      aws iam delete-role-policy --role-name "$CROSS_ACCOUNT_ROLE_NAME" --policy-name "$POLICY"
+      logger "INFO" "Inline policy $POLICY deleted succeed ..."
+  done
+
+  # List and detach managed policies
+  MANAGED_POLICIES=$(aws iam list-attached-role-policies --role-name "$CROSS_ACCOUNT_ROLE_NAME" --query 'AttachedPolicies[*].PolicyArn' --output text)
+  for POLICY in $MANAGED_POLICIES; do
+      aws iam detach-role-policy --role-name "$CROSS_ACCOUNT_ROLE_NAME" --policy-arn "$POLICY"
+      aws iam delete-policy --policy-arn "$POLICY"
+      logger "INFO" "Managed policy $POLICY detach and deleted succeed ..."
+  done
+
+  aws iam delete-role --role-name "$CROSS_ACCOUNT_ROLE_NAME"
+  logger "INFO" "$CROSS_ACCOUNT_ROLE_NAME deleted succeed ..."
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 fi
 
 # Extract the role name

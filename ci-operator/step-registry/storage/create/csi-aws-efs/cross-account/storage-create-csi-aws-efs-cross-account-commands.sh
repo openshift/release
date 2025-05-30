@@ -3,6 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+set -x
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -196,7 +198,7 @@ ACCOUNT_B_ROLE_ARN=$(aws iam create-role \
   --assume-role-policy-document file://"${SHARED_DIR}"/AssumeRolePolicyInAccountB.json \
   --query "Role.Arn" --output text)
 logger "INFO" "Created efs csi driver operator role ${ACCOUNT_B_ROLE_ARN} and trust policy allows a role from account A to assume this new role in account B"
-echo "${ACCOUNT_B_ROLE_ARN}" > "${SHARED_DIR}"/efs-csi-driver-operator-role-arn
+echo "${ACCOUNT_B_ROLE_ARN}" > "${SHARED_DIR}"/cross-account-efs-csi-driver-operator-role-arn
 
 cat << EOF > "${SHARED_DIR}"/EfsPolicyInAccountB.json
 {
@@ -225,10 +227,7 @@ cat << EOF > "${SHARED_DIR}"/EfsPolicyInAccountB.json
                 "elasticfilesystem:CreateAccessPoint",
                 "elasticfilesystem:TagResource"
             ],
-            "Resource": [
-                "arn:aws:elasticfilesystem:*:${AWS_ACCOUNT_B_ID}:access-point/*",
-                "arn:aws:elasticfilesystem:*:${AWS_ACCOUNT_B_ID}:file-system/*"
-            ]
+            "Resource": "*"
         }
     ]
 }
@@ -261,17 +260,26 @@ EOF
 
 
 # TODO: sts and rosa clusters using role instead of user
-EFS_CSI_DRIVER_OPERATOR_USER=$(oc -n openshift-cloud-credential-operator get credentialsrequest/openshift-aws-efs-csi-driver -o json | jq -r '.status.providerStatus.user')
-aws iam put-user-policy \
-  --user-name "${EFS_CSI_DRIVER_OPERATOR_USER}"  \
+# EFS_CSI_DRIVER_OPERATOR_USER=$(oc -n openshift-cloud-credential-operator get credentialsrequest/openshift-aws-efs-csi-driver -o json | jq -r '.status.providerStatus.user')
+# aws iam put-user-policy \
+#   --user-name "${EFS_CSI_DRIVER_OPERATOR_USER}"  \
+#   --policy-name efs-cross-account-inline-policy \
+#   --policy-document file://"${SHARED_DIR}"/AssumeRoleInlinePolicyPolicyInAccountA.json
+# logger "INFO" "Attach the inline Policies to the efs csi driver operator Role in account A"
+
+# STS
+EFS_CSI_DRIVER_OPERATOR_ROLE_ARN=$(cat "${SHARED_DIR}"/efs-csi-driver-operator-role-arn)
+EFS_CSI_DRIVER_OPERATOR_ROLE="${EFS_CSI_DRIVER_OPERATOR_ROLE_ARN##*/}"
+aws iam put-role-policy \
+  --role-name "${EFS_CSI_DRIVER_OPERATOR_ROLE}"  \
   --policy-name efs-cross-account-inline-policy \
   --policy-document file://"${SHARED_DIR}"/AssumeRoleInlinePolicyPolicyInAccountA.json
 logger "INFO" "Attach the inline Policies to the efs csi driver operator Role in account A"
 
 # STEP. Add the efs full access to master/control plane role which used for driver controller unpublish volume
-aws iam attach-role-policy \
-  --role-name "${CLUSTER_NAME}"-master-role \
-  --policy-arn arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess
+# aws iam attach-role-policy \
+#   --role-name "${CLUSTER_NAME}"-master-role \
+#   --policy-arn arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess
 
 # STEP. Create a secret with awsRoleArn as the key and ACCOUNT_B_ROLE_ARN as the value, add secret access permission for the aws-efs-csi-driver-controller-sa
 oc create -n ${EFS_CSI_DRIVER_OPERATOR_INSTALLED_NAMESPACE} secret generic efs-csi-cross-account --from-literal=awsRoleArn="${ACCOUNT_B_ROLE_ARN}"
