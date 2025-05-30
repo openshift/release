@@ -2,7 +2,7 @@
 
 set -o nounset
 
-
+POD_NAME=$(oc -n $TEST_NAMESPACE get pods -lapp=observer-status -ojsonpath='{.items[*].metadata.name}')
 output_code=1
 
 CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
