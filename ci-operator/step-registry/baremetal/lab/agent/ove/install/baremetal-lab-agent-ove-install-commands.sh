@@ -90,3 +90,4 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
 
 echo "BASE_DOMAIN ${BASE_DOMAIN}"
 echo "CLUSTER_NAME ${CLUSTER_NAME}"
+sleep 3000
