@@ -144,11 +144,11 @@ function upgrade_cluster_to () {
 
   # Setting maxUnavailable and maxSurge to speed up upgrades
   if [[ -n "${NP_MAX_UNAVAILABLE}" && -n "${NP_MAX_SURGE}" ]]; then
-    mp_id_list=rosa list machinepool -c $cluster_id -o json | jq -r ".[].id" | grep -i worker
+    mp_id_list=$(rosa list machinepool -c $cluster_id -o json | jq -r ".[].id" | grep -i worker)
     for mp_id in $mp_id_list; do
       log "Update the machinepool maxUnavailable and maxSurge of $mp_id to ${NP_MAX_UNAVAILABLE} and ${NP_MAX_SURGE}"
       if [[ "$HOSTED_CP" == "false" ]]; then
-        mp_replicas=rosa describe machinepool -c $cluster_id $mp_id -o json | jq -r ".replicas"
+        mp_replicas=$(rosa describe machinepool -c $cluster_id $mp_id -o json | jq -r ".replicas")
         log "rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE} --enable-autoscaling=false --replicas $mp_replicas"
         rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE} --enable-autoscaling=false --replicas $mp_replicas
       else
