@@ -65,3 +65,4 @@ oc wait clusteroperator.config.openshift.io \
     --all
 
 echo "$(date -u --rfc-3339=seconds) - RHEL worker scaleup complete"
+sleep 6h
