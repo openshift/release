@@ -121,6 +121,9 @@ function upgrade_cluster_to () {
       if [[ "$HOSTED_CP" == "true" ]]; then
         break
       fi
+    elif [[ "$upgrade_info" == *"Failed to schedule upgrade for cluster"* ]]; then
+      log "Failed to schedule upgrade for cluster, so retry after a pause"
+      sleep 120
     else
       log -e "$upgrade_info"
       break
