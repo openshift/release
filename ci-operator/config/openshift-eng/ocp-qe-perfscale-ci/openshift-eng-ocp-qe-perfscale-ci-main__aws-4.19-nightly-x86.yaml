@@ -39,7 +39,7 @@ tests:
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
-      HUNTER_ANALYZE: "true"
+      IGNORE_JOB_ITERATIONS: "true"
       ITERATION_MULTIPLIER_ENV: "15"
       OUTPUT_FORMAT: JUNIT
       RUN_ORION: "true"
@@ -177,6 +177,19 @@ tests:
     workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - always_run: false
+  as: node-density-heavy-ipsec-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 5h0m0s
+- always_run: false
   as: payload-node-density-heavy-6nodes
   steps:
     allow_skip_on_success: true
@@ -261,6 +274,33 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: aws-ovn-payload-node-density-heavy
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CLUSTER_NETWORK_CIDR: 10.128.0.0/14
+      CLUSTER_NETWORK_HOST_PREFIX: "20"
+      EXTRA_FLAGS: --pods-per-node=250 --pod-ready-threshold=85s
+      ITERATIONS_PER_NAMESPACE: "100"
+      MAX_PODS: "250"
+      PROFILE_TYPE: both
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-custom-cidr
+    - chain: ipi-install
+    - ref: openshift-qe-set-max-pods
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
 - as: control-plane-ipsec-120nodes
   cron: 0 10 11,25 * *
   steps:
@@ -369,6 +409,76 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: openshift-qe-workers-scale
     workflow: openshift-qe-udn-density-pods
+  timeout: 8h0m0s
+- always_run: false
+  as: udn-density-l2-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_LAYER_3: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      VERSION: "4.19"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
+- always_run: false
+  as: udn-density-l3-ipsec-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ITERATION_MULTIPLIER_ENV: "3"
+      VERSION: "4.19"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
+- always_run: false
+  as: udn-density-l2-ipsec-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_LAYER_3: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      VERSION: "4.19"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
+- always_run: false
+  as: ingress-perf-gateway-api-9nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONFIG: config/standard-gateway-api.yml
+      GATEWAY_API: "true"
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-gateway-api-day2-config
+    - chain: openshift-qe-ingress-perf
+    workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main

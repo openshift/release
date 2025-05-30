@@ -54,13 +54,12 @@ promotion:
   to:
   - additional_images:
       kn-plugin-event-src: src
+    name: release-1.16
     namespace: knative
-    tag: release-1.16
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.18"
 resources:
   '*':
@@ -75,14 +74,16 @@ tests:
   container:
     from: src
 - as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.18"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -129,7 +130,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -151,7 +151,88 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: e2e-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.18"
+  cron: 43 1 * * 2,6
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: kn-plugin-event-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: kn-plugin-event-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: kn-plugin-event-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: kn-plugin-event-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make e2e
+      dependencies:
+      - env: KN_PLUGIN_EVENT_SENDER
+        name: kn-plugin-event-sender
+      - env: KN_PLUGIN_EVENT_KN_EVENT
+        name: kn-plugin-event-kn-event
+      - env: KN_PLUGIN_EVENT_SOURCE_IMAGE
+        name: kn-plugin-event-source-image
+      - env: KN_PLUGIN_EVENT_TEST_EVENTSHUB
+        name: kn-plugin-event-test-eventshub
+      - env: KN_PLUGIN_EVENT_TEST_WATHOLA_FORWARDER
+        name: kn-plugin-event-test-wathola-forwarder
+      from: kn-plugin-event-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-1.16

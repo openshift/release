@@ -1,0 +1,56 @@
+ref:
+  as: telcov10n-virtualised-single-node-hub-ztp-deploy-hub
+  commands: telcov10n-virtualised-single-node-hub-ztp-deploy-hub-commands.sh
+  from: src
+  grace_period: 10s
+  timeout: 72h0m0s
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/run/telcov10n/ansible-group-all
+  - namespace: test-credentials
+    name: helix92-telcoqe-eng-rdu2-dc-redhat-com
+    mount_path: /var/run/telcov10n/helix92-telcoqe-eng-rdu2-dc-redhat-com
+  - namespace: test-credentials
+    name: telcov10n-ztp-left-shifting
+    mount_path: /var/run/telcov10n/ztp-left-shifting
+  env:
+  - name: MAX_HUB_DEPLOYMENT_TIMEOUT
+    default: "+4 hours"
+    documentation: |-
+  - name: DEBUGGING_TIMEOUT
+    default: "+3 hours"
+    documentation: |-
+      Set the amount of time, the step must wait at most, before unconditionally forcing the workflow to continue
+      with the next steps (MIN: "1 min", default: "+3 hours", MAX: "72 hours").
+  - name: SHARED_HUB_CLUSTER_PROFILE
+    default: "ztp-hub-preserved-prod-cluster_profile_dir"
+    documentation: |-
+      This ENV var will be the symbolic link that points to the folder that contains all relevant Hub cluster files
+      so that it can be known from another later job during Spoke deployment.
+      You will be able to consume the content of that folder from a later job, by ssh-ing or rsyncing from the
+      shared file located at AUX_HOST host
+  - name: AUX_HOST
+    default: ""
+    documentation: |
+      The Bastion host where jobs can share synchronised data and run remote aux scripts and playbooks
+  - name: OCP_HUB_VERSION
+    documentation: |-
+      OCP Hub version to be installed (i.e.: '4.15' or '4.15.22' are both valid values, but in the first case
+      any value will match since it checks if the version starts with that value)
+  - name: PYTEST_VERBOSITY
+    default: "-vv -s"
+    documentation: |-
+      pytest trace level
+  - name: OPERATORS
+    documentation: List of JSON objects representing operators. Please see the README.md document associated with this ref for more information.
+  - name: SOCKS5_PROXY
+    default: ""
+    documentation: |-
+      If cluster endpoints are reachables through a socks5 proxy
+  documentation: |-
+    This step allows to test the OCP Hub cluster deployment

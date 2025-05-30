@@ -20,7 +20,8 @@ images:
   to: cluster-samples-operator
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -51,7 +52,7 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -69,13 +70,13 @@ tests:
 - as: e2e-aws-ovn-builds
   run_if_changed: ^(tmp/build)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-builds
 - as: e2e-aws-ovn-proxy
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-proxy
 - as: e2e-aws-ovn-jenkins
   run_if_changed: ^(tmp/build)
@@ -92,6 +93,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws-ovn
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

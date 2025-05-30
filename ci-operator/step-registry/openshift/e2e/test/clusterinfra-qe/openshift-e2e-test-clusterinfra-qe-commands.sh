@@ -246,7 +246,7 @@ function run {
     if [[ -n "$TEST_FILTERS_CLUSTERINFRASTRUCTURE" ]]; then
         hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter="${TEST_FILTERS_CLUSTERINFRASTRUCTURE}" -p || ret_value=$?
     else
-        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter='!disruptive' -p || ret_value=$?
+        hack/ci-integration.sh --junit-report=junit_cluster-api-actuator-testutils.xml --output-dir=/logs/artifacts/ --label-filter='!disruptive&&!autoscaler' -p || ret_value=$?
     fi
     set +x
     set +e

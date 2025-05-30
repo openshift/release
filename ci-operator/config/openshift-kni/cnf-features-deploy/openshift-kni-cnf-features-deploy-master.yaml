@@ -1,6 +1,6 @@
 base_images:
   base-9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_4.19_oc-rpms:
@@ -41,18 +41,18 @@ images:
   to: ztp-site-generator
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -87,7 +87,7 @@ tests:
         ci-org-name openshift-kni
     test:
     - as: e2e-aws-ci-tests
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" TARGET_RELEASE=release-4.19
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" TARGET_RELEASE=release-4.20
         make functests-on-ci
       from: src
       resources:
@@ -131,7 +131,8 @@ tests:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
 - as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -140,23 +141,12 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     workflow: telco5g-cnf
   timeout: 6h0m0s
-- as: e2e-telco5g-sno-cnftests
-  cluster: build05
-  optional: true
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.19"
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-hcp-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -165,7 +155,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.19"
+      T5CI_VERSION: "4.20"
     workflow: telco5g-hcp-cnf
 zz_generated_metadata:
   branch: master

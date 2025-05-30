@@ -1,0 +1,127 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
+  netobserv-perfscale:
+    name: netobserv-perfscale
+    namespace: ci
+    tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: node-density-heavy-25nodes
+  cron: '@weekly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      EBPFAGENT_PR_IMAGE: ""
+      FLP_PR_IMAGE: ""
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "25"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      DOWNSTREAM_IMAGE: ""
+      ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
+      ES_METADATA_INDEX: perf_scale_ci*
+      ES_TYPE: qe
+      EXTRA_FLAGS: --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
+      INSTALLATION_SOURCE: Source
+      KAFKA_CONSUMER_REPLICAS: "6"
+      LOKISTACK_SIZE: 1x.small
+      LOOKBACK: "90"
+      LOOKBACK_SIZE: "15"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: https://github.com/cloud-bulldozer/orion/blob/3ccfb0437810057c546656689b427373159fa4de/examples/netobserv-node-density-heavy.yaml
+      ORION_ENVS: PLATFORM=AWS
+      PATCH_EBPFAGENT_IMAGE: "false"
+      PATCH_FLOWLOGS_IMAGE: "false"
+      PODS_PER_NODE: "200"
+      RUN_ORION: "false"
+      SIZE_VARIANT: large
+      UPSTREAM_IMAGE: ""
+      VERSION: "4.19"
+      WORKLOAD: node-density-heavy
+      ZONES_COUNT: "3"
+    post:
+    - ref: netobserv-perf-test-cleanup
+    - chain: ipi-aws-post
+    test:
+    - ref: netobserv-perf-test-deploy
+    - ref: openshift-qe-kube-burner-ingress-perf
+    - chain: netobserv-perf-test-post-workload
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
+- as: cluster-density-v2-250nodes
+  cron: '@monthly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      EBPFAGENT_PR_IMAGE: ""
+      FLP_PR_IMAGE: ""
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "true"
+      COMPUTE_NODE_REPLICAS: "250"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      DOWNSTREAM_IMAGE: ""
+      ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
+      ES_METADATA_INDEX: perf_scale_ci*
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn=true --churn-delay=60s --churn-duration=10m --churn-percent=10
+        --timeout=5h --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
+      INSTALLATION_SOURCE: Source
+      ITERATION_MULTIPLIER_ENV: "4"
+      KAFKA_CONSUMER_REPLICAS: "18"
+      LOKISTACK_SIZE: 1x.medium
+      LOOKBACK: "90"
+      LOOKBACK_SIZE: "15"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: https://raw.githubusercontent.com/cloud-bulldozer/orion/3ccfb0437810057c546656689b427373159fa4de/examples/netobserv-cluster-density-v2.yaml
+      ORION_ENVS: PLATFORM=AWS
+      PATCH_EBPFAGENT_IMAGE: "false"
+      PATCH_FLOWLOGS_IMAGE: "false"
+      RUN_ORION: "false"
+      SIZE_VARIANT: large
+      UPSTREAM_IMAGE: ""
+      VERSION: "4.19"
+      WORKLOAD: cluster-density-v2
+      ZONES_COUNT: "3"
+    post:
+    - ref: netobserv-perf-test-cleanup
+    - chain: ipi-aws-post
+    test:
+    - ref: netobserv-perf-test-deploy
+    - ref: openshift-qe-kube-burner-ingress-perf
+    - chain: netobserv-perf-test-post-workload
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: netobserv-perf-tests
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: netobserv-aws-4.19-nightly-x86

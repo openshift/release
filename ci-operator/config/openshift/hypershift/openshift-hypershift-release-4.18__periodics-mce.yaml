@@ -54,7 +54,7 @@ tests:
 - as: e2e-aws-ovn-conformance
   cron: 59 23 12,15 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_ARGS: --multi-arch=false
       MCE_VERSION: "2.8"
@@ -155,10 +155,20 @@ tests:
       OADP_OPERATOR_SUB_CHANNEL: stable-1.4
       OADP_OPERATOR_SUB_SOURCE: qe-app-registry
     test:
-    - chain: hypershift-mce-agent-oadp
+    - ref: hypershift-mce-agent-minio
+    - ref: operatorhub-subscribe-oadp-operator
+    - ref: hypershift-mce-agent-oadp-v2
     - ref: hypershift-mce-agent-info
     - chain: hypershift-conformance
     workflow: hypershift-mce-agent-metal3-conformance
+- as: e2e-agent-connected-cilium-ipv4-metal-conformance
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    workflow: hypershift-mce-agent-metal3-conformance-cilium
 - as: e2e-kubevirt-metal-ovn
   cron: 0 4 1 1 *
   steps:
@@ -224,19 +234,19 @@ tests:
 - as: e2e-ibmz-ovn-conformance
   cron: 49 6 5,26 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-ibmz-conformance
 - as: e2e-power-ovn-conformance
-  cron: 15 4 10,19 * *
+  cron: 0 8 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-power-conformance
 - as: e2e-x86-power-heterogeneous-conformance
-  cron: 47 3 11,18 * *
+  cron: 0 8 * * *
   steps:
     cluster_profile: aws
     env:
@@ -247,11 +257,7 @@ tests:
       HYPERSHIFT_NODE_COUNT: "1"
       IS_HETEROGENEOUS: "yes"
       MCE_VERSION: "2.8"
-      TEST_SKIPS: ""
       USE_GLB: "no"
-    test:
-    - chain: hypershift-mce-power-test
-    - ref: hypershift-mce-agent-info
     workflow: hypershift-mce-power-conformance
 - as: e2e-aws-critical
   cron: 0 0 29 2 *

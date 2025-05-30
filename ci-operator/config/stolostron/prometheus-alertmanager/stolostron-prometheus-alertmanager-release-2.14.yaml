@@ -3,26 +3,22 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.21-linux:
+  stolostron_builder_go1.23-linux:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
-  stolostron_builder_go1.22-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.23-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
   inputs:
-    stolostron_builder_go1.21-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: prometheus-alertmanager
 promotion:
   to:
@@ -66,41 +62,7 @@ tests:
     make -f Makefile test
   container:
     from: src
-- as: sonar-pre-submit
-  commands: |
-    nodejs_version=v20.12.2
-    nodejs_platform=linux-x64
-    nodejs="node-${nodejs_version}-${nodejs_platform}"
-    cd /tmp
-    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
-    tar xf "${nodejs}.tar.gz"
-    export NODEJS_HOME="/tmp/${nodejs}"
-    export PATH=$PATH:$NODEJS_HOME/bin
-    HOME=/tmp npm install yarn
-    export PATH=$PATH:/tmp/node_modules/.bin
-    cd -
-    export npm_config_cache="/tmp/.npm"
-    export SELF="make -f Makefile"
-    make -f Makefile build
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f Makefile"
-    make -f Makefile build
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: pr-image-mirror
   steps:
     dependencies:

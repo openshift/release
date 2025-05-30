@@ -1,0 +1,51 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+- dockerfile_path: ci/Dockerfile
+  from: os
+  to: molecule-test-runner
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: integration
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-integration-incluster
+      dependencies:
+      - env: MOLECULE_IMAGE
+        name: molecule-test-runner
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: stable-5
+  org: openshift
+  repo: community.okd

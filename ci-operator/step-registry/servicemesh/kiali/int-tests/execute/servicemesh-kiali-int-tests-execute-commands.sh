@@ -26,7 +26,7 @@ sleep 120
 oc wait --for condition=Successful kiali/kiali -n ${SMCP_NAMESPACE} --timeout=250s
 oc wait --for condition=available deployment/kiali -n ${SMCP_NAMESPACE} --timeout=250s
 
-make test-integration -e URL="https://$(oc get route -n ${SMCP_NAMESPACE} kiali -o 'jsonpath={.spec.host}')" -e TOKEN="$(oc whoami -t)"
+make test-integration -e URL="https://$(oc get route -n ${SMCP_NAMESPACE} kiali -o 'jsonpath={.spec.host}')" -e TOKEN="$(oc whoami -t)" -e LPINTEROP="true"
 
 echo "Copying result xml to ${ARTIFACT_DIR}"
 # the file name must start with 'junit'

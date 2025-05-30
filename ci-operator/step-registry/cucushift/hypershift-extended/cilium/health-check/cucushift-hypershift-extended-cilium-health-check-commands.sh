@@ -8,10 +8,15 @@ function cleanup_connectivity_test() {
 }
 
 function dump_connectivity_test_namespace() {
+    echo "Dumping cilium-test ns at $(date --iso=seconds --utc)"
     local dump_dir="${ARTIFACT_DIR}/cilium-connectivity-test"
     mkdir -p "$dump_dir"
     oc adm inspect ns/cilium-test --dest-dir "$dump_dir" || true
 }
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 # Target the guest cluster
 if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
@@ -24,6 +29,8 @@ oc wait clusteroperators --all --for=condition=Available=True --timeout=30m
 oc wait clusteroperators --all --for=condition=Progressing=False --timeout=30m
 oc wait clusteroperators --all --for=condition=Degraded=False --timeout=30m
 oc wait clusterversion/version --for=condition=Available=True --timeout=30m
+
+oc wait --for=condition=Ready pod -n cilium --all --timeout=5m
 
 echo "Performing Cilium connectivity tests"
 trap "dump_connectivity_test_namespace; cleanup_connectivity_test" EXIT
@@ -63,7 +70,7 @@ oc label ns cilium-test \
 
 # Run the test
 oc apply -n cilium-test -f "https://raw.githubusercontent.com/cilium/cilium/${CILIUM_VERSION}/examples/kubernetes/connectivity-check/connectivity-check.yaml"
-oc wait --for=condition=Ready pod -n cilium-test --all --timeout=5m
+oc wait --for=condition=Ready pod -n cilium-test --all --timeout=10m
 sleep "$CILIUM_CONNECTIVITY_TEST_DURATION"
 
 # Error out in case of failing pods

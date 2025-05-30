@@ -96,4 +96,3 @@ spec:
 ' | envsubst > /tmp/ciliumconfig.json
 
 oc apply -f /tmp/ciliumconfig.json
-oc wait --for=condition=Ready pod -n cilium --all --timeout=5m

@@ -1,6 +1,6 @@
 base_images:
   ocp_4.19_base-rhel9:
-    name: 4.19-priv
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.23-openshift-4.19:
@@ -12,10 +12,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+  from_repository: true
 canonical_go_repository: github.com/openshift/bond-cni
 images:
 - dockerfile_path: Dockerfile.openshift
@@ -32,17 +29,17 @@ images:
   to: network-interface-bond-cni
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.20-priv
       namespace: ocp-private
 resources:
   '*':
@@ -54,8 +51,14 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv

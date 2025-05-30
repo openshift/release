@@ -87,3 +87,35 @@ NAME                                        TYPE                                
 config-updater-token-version-1              kubernetes.io/service-account-token   4      13d   ci.openshift.io/non-expiring-token=true,ci.openshift.io/token-version=version-1
 sync-rover-groups-updater-token-version-1   kubernetes.io/service-account-token   4      13d   ci.openshift.io/non-expiring-token=true,ci.openshift.io/token-version=version-1
 ```
+
+## Konflux `ephemeral-cluster` Service Account Token
+
+Determine the active and standby secrets:
+```sh
+active_secret="$(oc --context=app.ci -n ephemeral-cluster get secrets -l 'ci.openshift.io/ephemeral-cluster-active-token' -o json | jq -r '.items[0].metadata.name')"
+
+standby_secret="$(oc --context=app.ci -n ephemeral-cluster get secret -l 'ci.openshift.io/ephemeral-cluster-token-object' -o name | grep -vF "$active_secret" | sed 's|secret/||')"
+```
+
+Generate a new token and store it into the `ephemeral-cluster-appci-kubeconfig` entry at [https://vault.devshift.net/ui/vault/secrets/stonesoup/kv/list/production/openshift-ci/](https://vault.devshift.net/ui/vault/secrets/stonesoup/kv/list/production/openshift-ci/):
+```sh
+one_year=$((60*60*24*365))
+oc --context=app.ci --as system:admin create token -n ephemeral-cluster ephemeral-cluster \
+    --duration="${one_year}s" --bound-object-kind=Secret \
+    --bound-object-name="$standby_secret"
+```
+
+Delete the old secret:
+```sh
+oc --context=app.ci --as system:admin -n ephemeral-cluster delete secret/$active_secret
+```
+
+Recreate the old secret:
+```sh
+oc --context=app.ci --as system:admin apply -f clusters/app.ci/ephemeral-cluster/01_bound-secrets.yaml
+```
+
+Mark the new active secret:
+```sh
+oc --context=app.ci --as system:admin -n ephemeral-cluster label secret/$standby_secret 'ci.openshift.io/ephemeral-cluster-active-token='
+```

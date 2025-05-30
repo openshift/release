@@ -55,8 +55,15 @@ find /var/host_variables/${CLUSTER_NAME}/ -mindepth 1 -type d | while read -r di
     process_inventory $dir /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename ${dir})"
 done
 
+echo "Load network mutation env variablies if present"
+if [[ -f "${SHARED_DIR}/set_ocp_net_vars.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/set_ocp_net_vars.sh"
+fi
+
 cd /eco-ci-cd
-ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME}"
+ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME} kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
 echo "Store inventory in SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* ${SHARED_DIR}/

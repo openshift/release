@@ -1,0 +1,48 @@
+base_images:
+  ocp_4.19_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.19_installer:
+    name: "4.21"
+    namespace: ocp
+    tag: installer
+build_root:
+  from_repository: true
+images:
+- build_args:
+  - name: DIRECT_DOWNLOAD
+    value: "true"
+  dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_4.19_installer:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:installer
+  to: machine-os-images
+promotion:
+  to:
+  - name: "4.21"
+    namespace: origin
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: origin
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: machine-os-images
+  variant: okd

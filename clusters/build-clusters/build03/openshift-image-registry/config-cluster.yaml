@@ -9,9 +9,27 @@ kind: Config
 metadata:
   name: cluster
 spec:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: docker-registry
+              operator: In
+              values:
+              - default
+          topologyKey: kubernetes.io/hostname
+        weight: 100
   managementState: Managed
-  replicas: 2
+  nodeSelector:
+    node-role.kubernetes.io/infra: ""
+  replicas: 5
   routes:
   - hostname: registry.build03.ci.openshift.org
-    name: registry-build03-ci-openshift-org
+    name: public-routes
     secretName: public-route-tls
+  tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/infra
+    operator: Exists

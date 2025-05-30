@@ -91,6 +91,19 @@ function cleanup_ibmcloud_vpc() {
         done
     fi
     echo "Done cleaning up prior runs"
+    echo "Cleanup security group"
+    SEC_GROUP_NAME="${VPC_NAME}-workers-sg"
+
+    SEC_GROUP_ID=$(ibmcloud is security-groups --output json | jq -r \
+      --arg NAME "$SEC_GROUP_NAME" '.[] | select(.name == $NAME) | .id')
+
+    if [[ -n "$SEC_GROUP_ID" ]]; then
+      echo "Deleting security group: $SEC_GROUP_NAME ($SEC_GROUP_ID)"
+      ibmcloud is security-group-delete "$SEC_GROUP_ID" -f
+    else
+      echo "Security group '$SEC_GROUP_NAME' not found."
+    fi
+    echo "Cleanup security group"
 }
 
 function setup_multi_arch_vpc_workspace(){

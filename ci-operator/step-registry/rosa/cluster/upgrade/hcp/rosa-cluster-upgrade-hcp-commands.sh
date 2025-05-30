@@ -20,6 +20,7 @@ configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
 configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 cluster_id=$(cat "${SHARED_DIR}/cluster-id")
 
+HOLD_TIME_BEFORE_UPGRADE=${HOLD_TIME_BEFORE_UPGRADE:-"0"}
 CP_UPGRADE_TIMEOUT=${CP_UPGRADE_TIMEOUT:-"14400"}
 NP_UPGRADE_TIMEOUT=${NP_UPGRADE_TIMEOUT:-"7200"}
 test_timeout=`expr $CP_UPGRADE_TIMEOUT + $NP_UPGRADE_TIMEOUT`
@@ -172,6 +173,19 @@ read_profile_file() {
   fi
 }
 
+# hold on before upgrading cluster
+start_time=$(date +"%s")
+echo "$(date): Beginning to wait: ${HOLD_TIME_BEFORE_UPGRADE} seconds"
+while true; do
+  current_time=$(date +"%s")
+  if (( "${current_time}" - "${start_time}" < "${HOLD_TIME_BEFORE_UPGRADE}" )); then
+    sleep 60
+    echo "Hold on before upgrading cluster: $(date)"
+  else
+    break
+  fi
+done
+
 # Log in
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
@@ -189,6 +203,9 @@ else
   exit 1
 fi
 
+if [[ -z "$CHANNEL_GROUP" ]];then
+  CHANNEL_GROUP=$(rosa describe cluster -c $cluster_id -o json | jq -r '.version.channel_group')
+fi
 
 if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
   log "Get the latest version!"

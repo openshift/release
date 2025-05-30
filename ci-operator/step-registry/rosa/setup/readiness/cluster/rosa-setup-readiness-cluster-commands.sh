@@ -16,6 +16,10 @@ log(){
 
 source ./tests/prow_ci.sh
 
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
 # functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
 #configure aws
 aws_region=${REGION:-$LEASED_RESOURCE}

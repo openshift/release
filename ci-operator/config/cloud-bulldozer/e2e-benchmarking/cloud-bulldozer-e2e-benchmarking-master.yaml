@@ -482,12 +482,9 @@ tests:
     cluster_profile: metal-perfscale-jetlag
     env:
       BAREMETAL: "true"
-      BASTION_CP_INTERFACE: ens7f1
       CRUCIBLE: "false"
       ISOLATED_CORES: 2-39,42-79
       JETLAG_BRANCH: main
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
       LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
       OCP_BUILD: ga
       OCP_VERSION: 4.18.5
@@ -506,6 +503,27 @@ tests:
     - chain: openshift-qe-installer-bm-day2-metallb
     - chain: openshift-qe-installer-bm-day2-perf-profile-rds-core
     - ref: cloud-bulldozer-e2e-benchmarking-rds-core
+- always_run: false
+  as: e2e-vm-density-single-node
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+      CRUCIBLE: "false"
+      JETLAG_BRANCH: main
+      OCP_BUILD: ga
+      OCP_VERSION: 4.18.5
+      PUBLIC_VLAN: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-installer-bm-day2-cnv
+    - ref: cloud-bulldozer-e2e-benchmarking-virt-density
 zz_generated_metadata:
   branch: master
   org: cloud-bulldozer

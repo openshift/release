@@ -12,10 +12,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
@@ -31,7 +28,8 @@ images:
   to: network-interface-bond-cni
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -53,8 +51,14 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

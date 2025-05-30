@@ -1,0 +1,85 @@
+base_images:
+  ocp_4.13_cli:
+    name: 4.13-priv
+    namespace: ocp-private
+    tag: cli
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/network.offline_migration_sdn_to_ovnk
+images:
+- dockerfile_path: ci/Dockerfile
+  from: ocp_4.13_cli
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: ansible-test-runner
+promotion:
+  to:
+  - name: 4.13-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.13-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.13-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: sh ci/ansible_lint_test.sh
+  container:
+    from: ansible-test-runner
+- as: sanity
+  commands: sh ci/ansible_sanity_test.sh
+  container:
+    from: ansible-test-runner
+- as: migration
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test-migration
+      cli: latest
+      commands: sh ci/test-integration.sh
+      dependencies:
+      - env: ANSIBLE_TEST_IMAGE
+        name: ansible-test-runner
+      from: ansible-test-runner
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws-sdn
+- as: rollback
+  steps:
+    cluster_profile: aws-3
+    test:
+    - as: test-rollback
+      cli: latest
+      commands: sh ci/test-integration.sh
+      dependencies:
+      - env: ANSIBLE_TEST_IMAGE
+        name: ansible-test-runner
+      from: ansible-test-runner
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws-ovn
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: network.offline_migration_sdn_to_ovnk

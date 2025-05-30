@@ -29,7 +29,8 @@ images:
   to: cluster-node-tuning-operator
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -113,7 +114,7 @@ tests:
   timeout: 5h0m0s
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
@@ -133,7 +134,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -144,7 +145,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-gcp-pao
-  cluster: build03
+  cluster: build05
   steps:
     cluster_profile: gcp
     test:
@@ -159,7 +160,7 @@ tests:
       timeout: 2h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-pao-updating-profile
-  cluster: build03
+  cluster: build05
   steps:
     cluster_profile: gcp
     test:
@@ -175,7 +176,7 @@ tests:
     workflow: ipi-gcp
   timeout: 5h0m0s
 - as: e2e-gcp-pao-workloadhints
-  cluster: build03
+  cluster: build05
   steps:
     cluster_profile: gcp
     test:
@@ -192,7 +193,7 @@ tests:
   timeout: 4h0m0s
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local
@@ -200,7 +201,8 @@ tests:
     from: src
 - always_run: false
   as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -213,6 +215,12 @@ tests:
       TEST_RUN_FEATURES: performance
     workflow: telco5g-cnf
   timeout: 6h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

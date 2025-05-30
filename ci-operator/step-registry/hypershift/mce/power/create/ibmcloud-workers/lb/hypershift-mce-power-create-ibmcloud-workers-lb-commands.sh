@@ -130,6 +130,25 @@ provision_backend_pool() {
 	ibmcloud is load-balancer-listener-create "${LB_ID}" --port "${POOL_PORT}" --protocol tcp --default-pool "${POOL_ID}"
 }
 
+update_security_groups() {
+    # Fetch private IP addresses of the Load Balancer
+    LB_PRIVATE_IPS=$(ibmcloud is load-balancer "${LB_ID}" --output JSON | jq -r '.private_ips[].address')
+
+    # Retrieve the security group ID associated with the Load Balancer
+    SECURITY_GROUP_ID=$(ibmcloud is load-balancer "${LB_ID}" --output JSON | jq -r '.security_groups[].id')
+    # Add inbound rules to allow traffic from the Load Balancer for ports 80 and 443
+	RULE_ID=()
+    for ip in $LB_PRIVATE_IPS; do
+        for port in 80 443; do
+            echo "Adding security group rule for IP $ip on port $port"
+            rule_id=$(ibmcloud is security-group-rule-add "${SECURITY_GROUP_ID}" inbound tcp --local "$ip" --port-min "$port" --port-max "$port" --output JSON | jq -r '.id')
+			RULE_ID+=("$rule_id")
+        done
+    done
+	# Save rule ids to ${SHARED_DIR} to be used in destroy step later
+	echo "${RULE_ID[@]}" > "${SHARED_DIR}/rule_id"
+}
+
 provision_lb() {
 	if [ -n "${1:-}" ] && [ "$1" == "glb" ]; then
 		origins=$(sed 's/,$//' "${SHARED_DIR}/origins")
@@ -155,6 +174,8 @@ provision_lb() {
 	provision_backend_pool "http" "80"
 	wait_lb_active 30 600
 	provision_backend_pool "https" "443"
+	# Update security groups to allow traffic through LB
+	update_security_groups
 }
 
 update_dns_records() {
