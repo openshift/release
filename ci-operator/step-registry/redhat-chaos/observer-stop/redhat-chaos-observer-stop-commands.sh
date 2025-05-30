@@ -2,7 +2,7 @@
 
 set -o nounset
 
-
+POD_NAME=$(oc -n $TEST_NAMESPACE get pods -lapp=$POD_NAME -ojsonpath='{.items[*].metadata.name}')
 output_code=1
 
 counter=0
