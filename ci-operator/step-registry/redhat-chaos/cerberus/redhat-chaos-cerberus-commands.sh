@@ -23,10 +23,14 @@ function cerberus_cleanup() {
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$c_status'}' >> test.json
+  POD_NAME=$(oc -n $TEST_NAMESPACE get pods -lapp=observer-status -ojsonpath='{.items[*].metadata.name}')
   oc cp -n $TEST_NAMESPACE test.json $POD_NAME:/tmp/test.json 
-
-  cat final_cerberus_info.json
   
+  if [[ -f final_cerberus_info.json ]];then
+    cat final_cerberus_info.json
+  else
+      echo "No final_cerberus_info.json generated"
+  fi
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 
