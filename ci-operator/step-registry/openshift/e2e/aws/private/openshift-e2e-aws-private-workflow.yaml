@@ -1,0 +1,29 @@
+workflow:
+  as: openshift-e2e-aws-private
+  steps:
+    pre:
+    - ref: ipi-conf
+    - ref: aws-provision-vpc-shared
+    - chain: aws-provision-bastionhost
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-custom-security-groups
+    - ref: proxy-config-generate
+    - chain: ipi-install
+    - ref: aws-provision-tags-for-byo-vpc
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - chain: gather-network
+    - chain: gather-core-dump
+    - ref: gather-aws-console
+    - chain: ipi-deprovision
+    - ref: aws-deprovision-security-group
+    - ref: aws-deprovision-stacks
+    - ref: aws-deprovision-s3buckets
+    env:
+      PUBLISH: Internal
+  documentation: |-
+    The Openshift E2E AWS workflow executes the common end-to-end test suite on AWS in private cluster.
