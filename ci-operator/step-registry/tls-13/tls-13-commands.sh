@@ -7,4 +7,11 @@ oc login -u kubeadmin "$(oc whoami --show-server=true)" < "$SHARED_DIR/kubeadmin
 
 oc patch apiservers/cluster --type=merge -p '{"spec": {"tlsSecurityProfile":{"modern":{},"type":"Modern"}}}'
 
-oc adm wait-for-stable-cluster
+# Wait for cluster operators to start rolling out because of tls Security Profile change
+sleep 3m
+
+oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
+
+oc get apiservers/cluster -oyaml | tee "$SHARED_DIR"/apiserver.config
+oc get openshiftapiservers.operator.openshift.io cluster -o json | tee -a "$SHARED_DIR"/apiserver.config
+
