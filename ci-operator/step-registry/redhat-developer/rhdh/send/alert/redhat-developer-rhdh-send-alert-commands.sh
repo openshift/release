@@ -3,8 +3,6 @@
 set -o errexit
 set -o nounset
 
-sudo dnf install jq -y
-
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
 export RELEASE_BRANCH_NAME SLACK_NIGHTLY_WEBHOOK_URL
