@@ -23,18 +23,24 @@ declare -A ami_map=(
   [us-east-1,arm64,rhel-9.3]=ami-0677a1dd1ad031d74      # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
   [us-east-1,x86_64,rhel-9.4]=ami-026b323c6b44bfe01     # RHEL-9.4.0_HVM-20250408-x86_64-0-Hourly2-GP3
   [us-east-1,arm64,rhel-9.4]=ami-049c8efe36a960c28      # RHEL-9.4.0_HVM-20250408-arm64-0-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.6]=ami-0b8c2bd77c5e270cf     # RHEL-9.6.0_HVM_GA-20250423-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.6]=ami-0d8b1aea127330f03      # RHEL-9.6.0_HVM_GA-20250423-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.2]=ami-06d931ad408f7676a     # RHEL-9.2.0_HVM-20250326-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.2]=ami-0641c0bb373b15e10      # RHEL-9.2.0_HVM-20250326-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e     # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
   [us-west-2,arm64,rhel-9.3]=ami-04379fa947a959c92      # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.4]=ami-041e1d038c8c67b05     # RHEL-9.4.0_HVM-20250408-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.4]=ami-00125a61380c8e5c0      # RHEL-9.4.0_HVM-20250408-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.6]=ami-06bd16627b2097a96     # RHEL-9.6.0_HVM_GA-20250423-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.6]=ami-02af66c313c5e8456      # RHEL-9.6.0_HVM_GA-20250423-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.2]=ami-01aa3cac055c3f767  # RHEL-9.2.0_HVM-20250326-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.2]=ami-0a59f6776aafe99c4   # RHEL-9.2.0_HVM-20250326-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.3]=ami-0955dc0147853401b  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.3]=ami-0ea2a765094f230d5   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.4]=ami-018fddf60318c369b  # RHEL-9.4.0_HVM-20250408-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.4]=ami-0608096332a0a4739   # RHEL-9.4.0_HVM-20250408-arm64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.6]=ami-0478598586d8a0356  # RHEL-9.6.0_HVM_GA-20250423-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.6]=ami-09c39f329a5cf7ee5   # RHEL-9.6.0_HVM_GA-20250423-arm64-0-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
