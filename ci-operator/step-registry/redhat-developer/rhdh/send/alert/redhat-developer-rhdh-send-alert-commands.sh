@@ -46,10 +46,22 @@ get_artifacts_url() {
   echo "${artifacts_complete_url}"
 }
 
+get_overall_results() {
+  local overall_status=0
+  for ((i = 1; i <= ${#STATUS_FAILED_TO_DEPLOY[@]}; i++)); do
+    if [[ "${STATUS_FAILED_TO_DEPLOY[i]}" == "true" ]] || [[ "${STATUS_TEST_FAILED[i]}" == "true" ]]; then
+      overall_status=1
+      break
+    fi
+  done
+  echo "${overall_status}"
+}
+
 get_slack_alert_text() {
   # TODO: Remove set -x after debugging
   set -x
   URL_CI_RESULTS=$(get_job_url)
+  OVERALL_RESULT=$(get_overall_results)
   local notification_text
   if [[ $OVERALL_RESULT == 0 ]]; then
     notification_text=":done-circle-check: \`${JOB_NAME}\`, 📜 <$URL_CI_RESULTS|logs>."
