@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o errexit
-set -o nounset
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
@@ -27,8 +26,9 @@ get_artifacts_url() {
   if [ -n "${PULL_NUMBER:-}" ]; then
     artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-tests/${REPO_OWNER}-${REPO_NAME}/artifacts/${project}"
   else
-    local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}"
-    local part_2="${REPO_OWNER}-${REPO_NAME}-${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}"
+    local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}" # e.g. "e2e-tests-aks-helm-nightly"
+    local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}" # e.g. "aks-helm-nightly"
+    local part_2="redhat-developer-rhdh-${suite_name}" # e.g. "redhat-developer-rhdh-aks-helm-nightly"
     # Override part_2 based for specific cases that do not follow the standard naming convention.
     case "$JOB_NAME" in
       *osd-gcp*)
@@ -46,22 +46,10 @@ get_artifacts_url() {
   echo "${artifacts_complete_url}"
 }
 
-get_overall_results() {
-  local overall_status=0
-  for ((i = 1; i <= ${#STATUS_FAILED_TO_DEPLOY[@]}; i++)); do
-    if [[ "${STATUS_FAILED_TO_DEPLOY[i]}" == "true" ]] || [[ "${STATUS_TEST_FAILED[i]}" == "true" ]]; then
-      overall_status=1
-      break
-    fi
-  done
-  echo "${overall_status}"
-}
-
 get_slack_alert_text() {
   # TODO: Remove set -x after debugging
   set -x
   URL_CI_RESULTS=$(get_job_url)
-  OVERALL_RESULT=$(get_overall_results)
   local notification_text
   if [[ $OVERALL_RESULT == 0 ]]; then
     notification_text=":done-circle-check: \`${JOB_NAME}\`, 📜 <$URL_CI_RESULTS|logs>."
@@ -111,6 +99,12 @@ main() {
   fi
   if ! mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"; then
     echo "Notice: $SHARED_DIR/STATUS_URL_REPORTPORTAL.txt not found." >&2
+  fi
+  if [[ -f "$SHARED_DIR/OVERALL_RESULT.txt" ]]; then
+    OVERALL_RESULT=$(<"$SHARED_DIR/OVERALL_RESULT.txt")
+  else
+    echo "Notice: $SHARED_DIR/OVERALL_RESULT.txt not found, setting OVERALL_RESULT to 1." >&2
+    OVERALL_RESULT=1
   fi
 
   echo "Getting Slack alert message"
