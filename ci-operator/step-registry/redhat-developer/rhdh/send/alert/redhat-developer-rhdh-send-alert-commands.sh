@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -o errexit
+set +o nounset
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
@@ -88,16 +89,27 @@ main() {
   # fi
 
   echo "Reading results from $SHARED_DIR"
-  if ! mapfile -t STATUS_DEPLOYMENT_NAMESPACE < "$SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt"; then
+  if [[ -f "$SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt" ]]; then
+    mapfile -t STATUS_DEPLOYMENT_NAMESPACE < "$SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt"
+  else
     echo "Notice: $SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt not found." >&2
   fi
-  if ! mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"; then
+
+  if [[ -f "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt" ]]; then
+    mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"
+  else
     echo "Notice: $SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt not found." >&2
   fi
-  if ! mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"; then
+
+  if [[ -f "$SHARED_DIR/STATUS_TEST_FAILED.txt" ]]; then
+    mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"
+  else
     echo "Notice: $SHARED_DIR/STATUS_TEST_FAILED.txt not found." >&2
   fi
-  if ! mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"; then
+
+  if [[ -f "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt" ]]; then
+    mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"
+  else
     echo "Notice: $SHARED_DIR/STATUS_URL_REPORTPORTAL.txt not found." >&2
   fi
   if [[ -f "$SHARED_DIR/OVERALL_RESULT.txt" ]]; then
