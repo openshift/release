@@ -590,6 +590,21 @@ fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc
 fi
+if [ "${TARGET_MINOR_VERSION}" -ge "19" ] && check_ota_case_enabled "OCP-70980"; then
+    export OC_ENABLE_CMD_UPGRADE_RECOMMEND=true
+    export OC_ENABLE_CMD_UPGRADE_RECOMMEND_PRECHECK=true
+
+    run_command "oc create serviceaccount monitorer"
+    run_command "oc adm policy add-cluster-role-to-user cluster-admin --serviceaccount=monitorer"
+
+    token=$(oc create token monitorer)
+    output=$(oc adm upgrade recommend --token="${token}")
+
+    if ! [[ "${output}" =~ "The following conditions" ]]; then
+        echo -e "There is not precheck output: \n ${output}"
+        return 1
+    fi
+fi
 upgrade
 check_upgrade_status
 
