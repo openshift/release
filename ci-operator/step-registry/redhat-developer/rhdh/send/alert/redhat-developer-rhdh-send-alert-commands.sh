@@ -62,7 +62,7 @@ get_slack_alert_text() {
       else
         notification_text="${notification_text}\n• \`${STATUS_DEPLOYMENT_NAMESPACE[i]}\` :deployments: deployed, "
         if [[ "${STATUS_TEST_FAILED[i]}" == "true" ]]; then
-          notification_text="${notification_text}:circleci-fail: test failed, "
+          notification_text="${notification_text}:circleci-fail: ${STATUS_NUMBER_OF_TEST_FAILED[i]} tests failed, "
         else
           notification_text="${notification_text}:circleci-pass: test passed, "
         fi
@@ -92,16 +92,26 @@ main() {
   else
     echo "Notice: $SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt not found." >&2
   fi
-  if ! mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"; then
+  if [[ -f "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt" ]]; then
+    mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"
+  else
     echo "Notice: $SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt not found." >&2
   fi
-
   if [[ -f "$SHARED_DIR/STATUS_TEST_FAILED.txt" ]]; then
     mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"
   else
     echo "Notice: $SHARED_DIR/STATUS_TEST_FAILED.txt not found." >&2
   fi
-
+  if [[ -f "$SHARED_DIR/STATUS_TEST_FAILED.txt" ]]; then
+    mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"
+  else
+    echo "Notice: $SHARED_DIR/STATUS_TEST_FAILED.txt not found." >&2
+  fi
+  if [[ -f "$SHARED_DIR/STATUS_NUMBER_OF_TEST_FAILED.txt" ]]; then
+    mapfile -t STATUS_NUMBER_OF_TEST_FAILED < "$SHARED_DIR/STATUS_NUMBER_OF_TEST_FAILED.txt"
+  else
+    echo "Notice: $SHARED_DIR/STATUS_NUMBER_OF_TEST_FAILED.txt not found." >&2
+  fi
   if [[ -f "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt" ]]; then
     mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"
   else
