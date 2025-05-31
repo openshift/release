@@ -26,6 +26,8 @@ fi
 
 OCPINSTALL=openshift-install
 
+
+
 export PATH=/tmp/bin:$PATH
 
 function wait_for_domain_deletion() {
