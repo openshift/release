@@ -19,11 +19,20 @@ echo "SHARED_DIR=${SHARED_DIR}"
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "KUBECONFIG=${KUBECONFIG}"
 
+ROX_SCANNER_V4_ENABLED=${ROX_SCANNER_V4_ENABLED:-true}
+echo "ROX_SCANNER_V4_ENABLED=${ROX_SCANNER_V4_ENABLED}"
+
+export SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS:-}
+echo "SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}"
+SCANNER_V4_MATCHER_READINESS_MAX_WAIT=${SCANNER_V4_MATCHER_READINESS_MAX_WAIT:-3600}
+
 TMP_CI_NAMESPACE="acs-ci-temp"
 echo "TMP_CI_NAMESPACE=${TMP_CI_NAMESPACE}"
 
 ACS_VERSION_TAG=""
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+
+SMALL_INSTALL=${SMALL_INSTALL:-true}
 
 SCRATCH=$(mktemp -d)
 echo "SCRATCH=${SCRATCH}"
@@ -45,9 +54,10 @@ trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
 function retry() {
-  for (( i = 0; i < 10; i++ )); do
-    "$@" && return 0
+  "$@" && return 0  # unrolled 1 to simplify sleep only between tries
+  for (( i = 0; i < 9; i++ )); do
     sleep 30
+    "$@" && return 0
   done
   return 1
 }
@@ -55,9 +65,11 @@ function retry() {
 function wait_deploy() {
   retry oc -n stackrox rollout status deploy/"$1" --timeout=300s \
     || {
-      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
-      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
-      exit 1
+      echo "oc describe -n stackrox deploy/$1"
+      oc describe -n stackrox deploy/"$1" || true
+      echo "oc logs -n stackrox --selector=\"app==$1\" --all-containers --pod-running-timeout=30s --tail=20"
+      oc logs -n stackrox --selector="app==$1" --all-containers --pod-running-timeout=30s --tail=20
+      return 1
     }
 }
 
@@ -147,22 +159,55 @@ function install_central_with_helm() {
   # copied from https://github.com/stackrox/stackrox/blob/7e49062da60fbe153d811e42dbcedf8df10bef5a/scripts/quick-helm-install.sh#L31
   installflags=('--set' 'central.persistence.none=true')
   installflags+=('--set' 'imagePullSecrets.allowNone=true')
-  SMALL_INSTALL=true
+
   if [[ "${SMALL_INSTALL}" == "true" ]]; then
-      installflags+=('--set' 'central.resources.requests.memory=1Gi')
-      installflags+=('--set' 'central.resources.requests.cpu=1')
-      installflags+=('--set' 'central.resources.limits.memory=4Gi')
-      installflags+=('--set' 'central.resources.limits.cpu=1')
-      installflags+=('--set' 'central.db.resources.requests.memory=1Gi')
-      installflags+=('--set' 'central.db.resources.requests.cpu=500m')
-      installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
-      installflags+=('--set' 'central.db.resources.limits.cpu=1')
-      installflags+=('--set' 'scanner.autoscaling.disable=true')
-      installflags+=('--set' 'scanner.replicas=1')
-      installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
-      installflags+=('--set' 'scanner.resources.requests.cpu=500m')
-      installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
-      installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+    installflags+=('--set' 'central.resources.requests.memory=1Gi')
+    installflags+=('--set' 'central.resources.requests.cpu=1')
+    installflags+=('--set' 'central.resources.limits.memory=4Gi')
+    installflags+=('--set' 'central.resources.limits.cpu=1')
+    installflags+=('--set' 'central.db.resources.requests.memory=1Gi')
+    installflags+=('--set' 'central.db.resources.requests.cpu=500m')
+    installflags+=('--set' 'central.db.resources.limits.memory=4Gi')
+    installflags+=('--set' 'central.db.resources.limits.cpu=1')
+    installflags+=('--set' 'scanner.autoscaling.disable=true')
+    installflags+=('--set' 'scanner.replicas=1')
+    installflags+=('--set' 'scanner.resources.requests.memory=500Mi')
+    installflags+=('--set' 'scanner.resources.requests.cpu=500m')
+    installflags+=('--set' 'scanner.resources.limits.memory=2500Mi')
+    installflags+=('--set' 'scanner.resources.limits.cpu=2000m')
+    if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
+      installflags+=('--set' 'scannerV4.scannerComponent=Enabled')
+      installflags+=('--set' 'scannerV4.indexer.scaling.autoScaling=Disabled')
+      installflags+=('--set' 'scannerV4.indexer.scaling.replicas=1')
+      installflags+=('--set' 'scannerV4.indexer.resources.requests.cpu=600m')
+      installflags+=('--set' 'scannerV4.indexer.resources.requests.memory=1500Mi')
+      installflags+=('--set' 'scannerV4.indexer.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.indexer.resources.limits.memory=2Gi')
+      installflags+=('--set' 'scannerV4.matcher.scaling.autoScaling=Disabled')
+      installflags+=('--set' 'scannerV4.matcher.scaling.replicas=1')
+      installflags+=('--set' 'scannerV4.matcher.resources.requests.cpu=600m')
+      installflags+=('--set' 'scannerV4.matcher.resources.requests.memory=5Gi')
+      installflags+=('--set' 'scannerV4.matcher.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.matcher.resources.limits.memory=5500Mi')
+      installflags+=('--set' 'scannerV4.db.resources.requests.cpu=200m')
+      installflags+=('--set' 'scannerV4.db.resources.requests.memory=2Gi')
+      installflags+=('--set' 'scannerV4.db.resources.limits.cpu=1000m')
+      installflags+=('--set' 'scannerV4.db.resources.limits.memory=2500Mi')
+    fi
+  fi
+
+  if [[ "${ROX_SCANNER_V4_ENABLED}" != "true" ]]; then
+    installflags+=('--set' 'scannerV4.disable=true')
+  else
+    installflags+=('--set' 'scannerV4.disable=false')
+    if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
+      # stackrox helm template _metadata.tpl parses 'customize' into values for target matching:
+      # https://github.com/stackrox/stackrox/blob/ae87894195796f9a88295af39a83451dbbb96c51/image/templates/helm/shared/templates/_metadata.tpl#L160-L181
+      # matched for "scanner-v4-matcher" in matcher deployment template:
+      # https://github.com/stackrox/stackrox/blob/62c5f12ba8c3acc0c3d92a71c79221edf25a765f/image/templates/helm/shared/templates/02-scanner-v4-07-matcher-deployment.yaml#L80C9-L80C103
+      # `{{ define "srox._envVars" }}` -> `{{- include "srox.envVars" (list . "deployment" "scanner-v4-matcher" "matcher") | nindent 8 }}`
+      installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}")
+    fi
   fi
 
   installflags+=('--set' "central.adminPassword.value=${ROX_PASSWORD}")
@@ -203,11 +248,13 @@ function install_secured_cluster_with_helm() {
   --set imagePullSecrets.allowNone=true
 }
 
+echo '>>> Begin setup'
 fetch_last_nightly_tag
 prepare_helm_templates
-install_helm
+helm version || install_helm
 
 install_central_with_helm
+
 echo ">>> Wait for 'stackrox-central-services' deployments"
 wait_deploy central-db
 wait_deploy central
@@ -247,3 +294,21 @@ done
 # Cleanup nohup
 kill -9 "$(cat "${SCRATCH}/port_forward_pid")"
 rm "${SCRATCH}/port_forward_pid"
+
+if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
+  echo ">>> Wait for 'stackrox scanner-v4' deployments"
+  wait_deploy scanner-v4-db
+  wait_deploy scanner-v4-indexer
+  if [[ -n "${SCANNER_V4_MATCHER_READINESS}" ]]; then
+    # Cannot use wait_deploy because the matcher deployment progress deadline is 300s, and the rollout check fails at the progress deadline.
+    echo '>>> Wait for scanner-v4-matcher condition=Ready'
+    kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' -n stackrox \
+      --timeout="${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}s" \
+      || { kubectl logs --selector 'app=scanner-v4-matcher' -n stackrox --timestamps; exit 1; }
+  else
+    wait_deploy scanner-v4-matcher "${SCANNER_V4_MATCHER_READINESS_MAX_WAIT}"
+  fi
+fi
+
+kubectl get nodes -o wide
+kubectl get pods -o wide --namespace stackrox
