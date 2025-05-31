@@ -1139,7 +1139,6 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
       NAME_PREFIX: ocpe2e
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
       TEST_PROFILE: ocpe2e-rosa-shared-vpc
@@ -1151,15 +1150,19 @@ tests:
   cron: 22 18 5,12,19,26 * *
   steps:
     cluster_profile: aws-sd-qe
+    dependency_overrides:
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.19-prerelease-aws-efs-csi-driver-operator
     env:
       CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
+      # E2E_RUN_TAGS: '@rosa'
       NAME_PREFIX: ocpe2e
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      # TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
       TEST_PROFILE: ocpe2e-rosa-advanced
       VERSION: "4.20"
     test:
-    - chain: openshift-e2e-test-qe
+    # - chain: openshift-e2e-test-qe
+    - chain: storage-conf-csi-optional-aws-efs-cross-account
+    - ref: wait
     workflow: rosa-lifecycle-advanced
 - as: aws-rosa-non-sts-advanced-stage-f7
   cron: 21 11 7,14,21,30 * *
