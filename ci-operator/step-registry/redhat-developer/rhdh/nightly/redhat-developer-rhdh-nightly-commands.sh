@@ -8,6 +8,8 @@ export OPENSHIFT_PASSWORD
 export OPENSHIFT_API
 export OPENSHIFT_USERNAME
 
+export JOB_NAME="periodic-ci-redhat-developer-rhdh-main-e2e-tests-nightly"
+
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' "$KUBECONFIG")"
 OPENSHIFT_USERNAME="kubeadmin"
 
