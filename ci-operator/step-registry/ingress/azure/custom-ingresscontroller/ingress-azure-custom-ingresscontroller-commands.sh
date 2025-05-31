@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 AZURE_REGION="${LEASED_RESOURCE}"
@@ -23,6 +22,12 @@ AZURE_BASE_DOMAIN="$(oc get -o jsonpath='{.spec.baseDomain}' dns.config cluster)
 Infra_ID=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
 canary_host=$(oc get route canary -n openshift-ingress-canary -o jsonpath='{.status.ingress[0].host}')
 Image_ID=$(oc get machines -n openshift-machine-api -o jsonpath='{.items[0].spec.providerSpec.value.image.resourceID}')
+CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
+echo "OCP Version: $CLUSTER_VERSION"
+ocp_major_version=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1)
+ocp_minor_version=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f2,2)
+echo "OCP Major Version: $ocp_major_version"
+echo "OCP Minor Version: $ocp_minor_version"
 
 echo "$(date -u --rfc-3339=seconds) Create a new subnet for the infrastructure nodes"
 az network vnet subnet create -g ${CLUSTER_NAME}-rg --vnet-name ${CLUSTER_NAME}-vnet -n ${CLUSTER_NAME}-ingress-subnet --address-prefixes 10.0.64.0/24 --network-security-group ${CLUSTER_NAME}-nsg
@@ -42,6 +47,11 @@ spec:
       ingress: "true"
 EOF
 
+AZURE_MANAGED_IDENTITY='managedIdentity: ""'
+if (( ocp_minor_version >= 18 && ocp_major_version == 4 )); then
+    AZURE_MANAGED_IDENTITY="managedIdentity: ${Infra_ID}-identity"
+fi
+echo AZURE_MANAGED_IDENTITY
 echo "Create the infra machineset with label ingress: 'true'"
 oc create -f - <<EOF
 apiVersion: machine.openshift.io/v1beta1
@@ -86,7 +96,7 @@ spec:
             version: ""
           kind: AzureMachineProviderSpec
           location: ${AZURE_REGION}
-          managedIdentity: ${Infra_ID}-identity
+          ${AZURE_MANAGED_IDENTITY}
           metadata: {}
           networkResourceGroup: ${CLUSTER_NAME}-rg
           osDisk:
