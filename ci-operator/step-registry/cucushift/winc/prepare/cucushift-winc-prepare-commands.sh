@@ -133,7 +133,7 @@ echo "Waiting for Windows nodes to come up in Running state"
 while [[ $(oc -n openshift-machine-api get machineset/${winworker_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${winworker_machineset_replicas}" ]]; do echo -n "." && sleep 10; done
 
 # Make sure the Windows nodes get in Ready state
-oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=15m
+oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=515m
 
 # Choose the Windows container vesion depending on the Windows version
 # installed on the Windows workers
