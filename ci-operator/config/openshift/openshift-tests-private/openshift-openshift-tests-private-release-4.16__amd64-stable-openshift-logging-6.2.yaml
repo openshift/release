@@ -57,16 +57,14 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: gcp-ipi-proxy-oidc-amd-f14-logging
-  cron: 7 1 14,28 * *
+- as: gcp-ipi-sno-amd64-f14-logging
+  cron: 1 15 21 * *
   steps:
     cluster_profile: gcp-observability
     env:
-      COMPUTE_NODE_TYPE: e2-standard-8
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FILTERS_ADDITIONAL: ""
-      FORCE_SUCCESS_EXIT: "true"
+      COMPUTE_NODE_TYPE: n1-standard-8
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
+      OCP_ARCH: amd64
       OPERATORS: |
         [
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
@@ -79,12 +77,12 @@ tests:
       TEST_IMPORTANCE: Critical|High|Medium
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
-      TEST_TIMEOUT: "15"
+      TEST_TIMEOUT: "30"
     test:
     - ref: enable-qe-catalogsource-logging
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+    workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
 zz_generated_metadata:
   branch: release-4.16
   org: openshift
