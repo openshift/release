@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -o errexit
+set +o nounset
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
@@ -23,9 +24,8 @@ get_artifacts_url() {
 
   local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
   local artifacts_complete_url
-  if [ -n "${PULL_NUMBER:-}" ]; then
-    artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-tests/${REPO_OWNER}-${REPO_NAME}/artifacts/${project}"
-  else
+  JOB_NAME="periodic-ci-redhat-developer-rhdh-main-e2e-tests-nightly"
+
     local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}" # e.g. "e2e-tests-aks-helm-nightly"
     local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}" # e.g. "aks-helm-nightly"
     local part_2="redhat-developer-rhdh-${suite_name}" # e.g. "redhat-developer-rhdh-aks-helm-nightly"
@@ -42,7 +42,6 @@ get_artifacts_url() {
       ;;
     esac
     artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${project}"
-  fi
   echo "${artifacts_complete_url}"
 }
 
@@ -63,7 +62,7 @@ get_slack_alert_text() {
       else
         notification_text="${notification_text}\n• \`${STATUS_DEPLOYMENT_NAMESPACE[i]}\` :deployments: deployed, "
         if [[ "${STATUS_TEST_FAILED[i]}" == "true" ]]; then
-          notification_text="${notification_text}:circleci-fail: test failed, "
+          notification_text="${notification_text}:circleci-fail: ${STATUS_NUMBER_OF_TEST_FAILED[i]} tests failed, "
         else
           notification_text="${notification_text}:circleci-pass: test passed, "
         fi
@@ -87,19 +86,24 @@ main() {
   #   exit 0
   # fi
 
-  echo "Reading results from $SHARED_DIR"
-  if ! mapfile -t STATUS_DEPLOYMENT_NAMESPACE < "$SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt"; then
-    echo "Notice: $SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt not found." >&2
-  fi
-  if ! mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"; then
-    echo "Notice: $SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt not found." >&2
-  fi
-  if ! mapfile -t STATUS_TEST_FAILED < "$SHARED_DIR/STATUS_TEST_FAILED.txt"; then
-    echo "Notice: $SHARED_DIR/STATUS_TEST_FAILED.txt not found." >&2
-  fi
-  if ! mapfile -t STATUS_URL_REPORTPORTAL < "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"; then
-    echo "Notice: $SHARED_DIR/STATUS_URL_REPORTPORTAL.txt not found." >&2
-  fi
+  echo "Reading status from $SHARED_DIR"
+  local status_variables=(
+    "STATUS_DEPLOYMENT_NAMESPACE"
+    "STATUS_FAILED_TO_DEPLOY"
+    "STATUS_TEST_FAILED"
+    "STATUS_NUMBER_OF_TEST_FAILED"
+    "STATUS_URL_REPORTPORTAL"
+  )
+  for status in "${status_variables[@]}"; do
+    local file_name="${status}.txt"
+    if [[ -f "$SHARED_DIR/$file_name" ]]; then
+      echo "Reading $SHARED_DIR/$file_name"
+      mapfile -t "${status}" < "$SHARED_DIR/$file_name"
+    else
+      echo "Notice: $SHARED_DIR/$file_name not found." >&2
+    fi
+  done
+
   if [[ -f "$SHARED_DIR/OVERALL_RESULT.txt" ]]; then
     OVERALL_RESULT=$(<"$SHARED_DIR/OVERALL_RESULT.txt")
   else
@@ -121,13 +125,17 @@ main() {
   else
     echo "Sending Slack notification with the following text:"
     echo "==================================================="
-    echo "${notification_text}"
+    echo "${SLACK_ALERT_MESSAGE}"
     echo "==================================================="
-    curl -X POST -H 'Content-type: application/json' \
-      --data "{\"text\":\"${notification_text}\"}" \
-      "$SLACK_NIGHTLY_WEBHOOK_URL"
-    echo "Alert message successfully sent to Slack."
-    exit 0
+    if ! curl -X POST -H 'Content-type: application/json' \
+      --data "{\"text\":\"${SLACK_ALERT_MESSAGE}\"}" \
+      "$SLACK_NIGHTLY_WEBHOOK_URL"; then
+      echo "Failed to send alert message to Slack, error: $?"
+      exit 1
+    else
+      echo "Alert message successfully sent to Slack."
+      exit 0
+    fi
   fi
 }
 
