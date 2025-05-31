@@ -24,9 +24,8 @@ get_artifacts_url() {
 
   local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
   local artifacts_complete_url
-  if [ -n "${PULL_NUMBER:-}" ]; then
-    artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-tests/${REPO_OWNER}-${REPO_NAME}/artifacts/${project}"
-  else
+  JOB_NAME="periodic-ci-redhat-developer-rhdh-main-e2e-tests-nightly"
+
     local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}" # e.g. "e2e-tests-aks-helm-nightly"
     local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}" # e.g. "aks-helm-nightly"
     local part_2="redhat-developer-rhdh-${suite_name}" # e.g. "redhat-developer-rhdh-aks-helm-nightly"
@@ -43,7 +42,6 @@ get_artifacts_url() {
       ;;
     esac
     artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${project}"
-  fi
   echo "${artifacts_complete_url}"
 }
 
@@ -94,10 +92,7 @@ main() {
   else
     echo "Notice: $SHARED_DIR/STATUS_DEPLOYMENT_NAMESPACE.txt not found." >&2
   fi
-
-  if [[ -f "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt" ]]; then
-    mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"
-  else
+  if ! mapfile -t STATUS_FAILED_TO_DEPLOY < "$SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt"; then
     echo "Notice: $SHARED_DIR/STATUS_FAILED_TO_DEPLOY.txt not found." >&2
   fi
 
