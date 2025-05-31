@@ -59,6 +59,19 @@ function wait_for_mount_targets_deleted() {
     done
 }
 
+# Cross account clusters switch to the shared account
+if grep -qi "efs-csi-cross-account" "${STORAGECLASS_LOCATION}"; then
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  logger "INFO" "Using shared AWS account ..."
+
+  # clean vpc peering if exists, it only created for cross account clusters
+  if test -s "${SHARED_DIR}/vpc_peering_id" ; then
+    vpc_peering_id=$(cat "$SHARED_DIR/vpc_peering_id")
+    aws ec2 delete-vpc-peering-connection --region "${REGION}" --vpc-peering-connection-id "${vpc_peering_id}"
+    logger "INFO" "Aws vpc-peering-connection ${vpc_peering_id} deleted ..."
+  fi
+fi
+
 # Delete each Access Point
 for ap in $(aws efs describe-access-points --region "${REGION}" --file-system-id "${FILESYSTEM_ID}" --query 'AccessPoints[*].AccessPointId' --output text); do
   aws efs delete-access-point --region "${REGION}" --access-point-id "$ap"
