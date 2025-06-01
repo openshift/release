@@ -166,7 +166,7 @@ function upgrade_cluster_to () {
   # Upgrade cluster
   start_time=$(date +"%s")
   while true; do
-    sleep 120
+    sleep 300
     log "Wait for the cluster upgrading finished ..."
     current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
     if [[ "$current_version" == "$recommended_version" ]]; then
