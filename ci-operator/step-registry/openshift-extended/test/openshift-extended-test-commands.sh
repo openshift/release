@@ -348,7 +348,9 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
-    extended-platform-tests run all --dry-run | \
+    echo "SHARD_ARGS=\"${SHARD_ARGS}\""
+
+    extended-platform-tests run all --dry-run ${SHARD_ARGS} | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
@@ -398,7 +400,7 @@ function run {
         -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     else
-        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
+        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL}  \
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
