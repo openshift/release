@@ -156,6 +156,10 @@ sriov "should run pod without RDMA"
 # TESTNAME
 sriov "Configure rdma namespace"
 
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -190,6 +194,10 @@ sriov "should run pod without RDMA"
 # TESTNAME
 sriov "Configure rdma namespace"
 
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -223,6 +231,10 @@ sriov "should run pod without RDMA"
 # tests that are very slow
 # TESTNAME
 sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
 
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
