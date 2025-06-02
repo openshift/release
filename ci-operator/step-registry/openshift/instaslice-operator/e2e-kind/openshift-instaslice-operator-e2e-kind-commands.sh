@@ -117,18 +117,18 @@ set -eux
   sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 
   echo "Checking NVIDIA driver availability with nvidia-smi..."
-  MAX_RETRIES=5
-  RETRY_DELAY=5
+  MAX_RETRIES=10
+  RETRY_DELAY_SECONDS=10
   attempt=1
 
   while ! nvidia-smi > /dev/null 2>&1; do
-    echo "[$attempt/$MAX_RETRIES] nvidia-smi failed. Retrying in $RETRY_DELAY seconds..."
+    echo "[$attempt/$MAX_RETRIES] nvidia-smi failed. Retrying in $RETRY_DELAY_SECONDS seconds..."
     if [ "$attempt" -ge "$MAX_RETRIES" ]; then
       echo "nvidia-smi failed after $MAX_RETRIES attempts. Exiting."
       exit 1
     fi
     attempt=$((attempt + 1))
-    sleep $RETRY_DELAY
+    sleep $RETRY_DELAY_SECONDS
   done
 
   echo "nvidia-smi succeeded. NVIDIA driver is available."
