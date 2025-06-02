@@ -8,8 +8,10 @@ from typing import Dict, List, Set
 import click
 import requests
 import yaml
+from google.api_core.exceptions import NotFound, PermissionDenied
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
+from google.cloud import secretmanager
 
 # Test Platform's project in GCP Secret Manager
 PROJECT_ID = "openshift-ci-secrets"
@@ -21,7 +23,7 @@ CONFIG_PATH = "https://raw.githubusercontent.com/openshift/release/master/core-s
 INDEX_SECRET_NAME = "secret-index"
 
 # The string reserved for the service account secret associated with each collection.
-UPDATER_SA_NAME = "updater-service-account"
+UPDATER_SA_SECRET_NAME = "updater-service-account"
 
 
 def ensure_authentication():
@@ -48,6 +50,14 @@ def validate_collection(_ctx, _param, value):
 
 
 def validate_secret_name(_ctx, _param, value):
+    if value == INDEX_SECRET_NAME:
+        raise click.ClickException(
+            f"The name '{INDEX_SECRET_NAME}' is reserved for internal use and cannot be used as a secret name."
+        )
+    if value == UPDATER_SA_SECRET_NAME:
+        raise click.ClickException(
+            f"The name '{UPDATER_SA_SECRET_NAME}' is reserved for internal use and cannot be used as a secret name."
+        )
     if not re.fullmatch("[A-Za-z0-9-]+", value):
         raise click.BadParameter("May only contain letters, numbers or dashes.")
     return value
@@ -181,3 +191,60 @@ def check_if_collection_exists(collection: str) -> bool:
     """
     s = get_collections()
     return collection in s
+
+
+def get_secrets_from_index(
+    client: secretmanager.SecretManagerServiceClient, collection: str
+) -> List[str]:
+    """
+    Gets the secrets listed in the index secret of the collection.
+
+    Args:
+        client (secretmanager.SecretManagerServiceClient): Secret Manager client.
+        collection (str): Name of the collection.
+
+    Returns:
+        List[str]: A list of secrets.
+    """
+    index_secret = client.secret_version_path(
+        PROJECT_ID, get_secret_name(collection, INDEX_SECRET_NAME), "latest"
+    )
+    try:
+        response = client.access_secret_version(request={"name": index_secret})
+    except PermissionDenied:
+        raise click.UsageError(
+            f"Access denied: You do not have permission to list secrets in collection '{collection}'."
+        )
+    except Exception as e:
+        raise click.ClickException(
+            f"Failed to list secrets for collection '{collection}': {e}"
+        )
+
+    try:
+        secret_list = yaml.safe_load(response.payload.data.decode("UTF-8"))
+    except yaml.YAMLError as e:
+        click.echo("Failed to parse the index secret:", e)
+
+    return secret_list
+
+
+# TODO: edit docs
+def update_index_secret(
+    client: secretmanager.SecretManagerServiceClient,
+    collection: str,
+    secret_names: List[str],
+):
+    """Update the index secret for the collection with a new list of secrets."""
+
+    name = client.secret_path(
+        PROJECT_ID, get_secret_name(collection, INDEX_SECRET_NAME)
+    )
+    payload = yaml.safe_dump(sorted(secret_names))
+    try:
+        client.add_secret_version(
+            parent=name, payload={"data": payload.encode("utf-8")}
+        )
+    except NotFound:
+        raise click.ClickException(
+            f"Index secret not found for collection '{collection}'"
+        )

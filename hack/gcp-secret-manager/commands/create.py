@@ -2,7 +2,7 @@
 # pylint: disable=E0401, C0413
 
 import re
-from typing import Dict
+from typing import Dict, List
 
 import click
 from google.api_core.exceptions import NotFound, PermissionDenied
@@ -12,6 +12,8 @@ from util import (
     check_if_collection_exists,
     create_payload,
     get_secret_name,
+    get_secrets_from_index,
+    update_index_secret,
     validate_collection,
     validate_secret_name,
     validate_secret_source,
@@ -67,7 +69,7 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
             "See: https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/"
         )
     client = secretmanager.SecretManagerServiceClient()
-    check_if_secret_already_exists(collection, secret, client)
+    index_secrets = check_and_handle_existing_secret(collection, secret, client)
 
     click.echo(
         "To help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
@@ -94,6 +96,10 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
                 "data": create_payload(from_file, from_literal),
             },
         )
+        # Add the new secret into the index
+        index_secrets.append(secret)
+        update_index_secret(client, collection, index_secrets)
+
         click.echo(f"Secret '{secret}' created")
     except PermissionDenied:
         raise click.ClickException(
@@ -103,17 +109,42 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
         raise click.ClickException(f"Failed to create secret '{secret}': {e}") from e
 
 
-def check_if_secret_already_exists(
+def check_and_handle_existing_secret(
     collection: str, secret: str, client: secretmanager.SecretManagerServiceClient
-):
-    name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
+) -> List[str]:
+    """
+    Ensures secret state is consistent between GSM and the index secret.
+
+    - If secret exists in GSM and index → raise error.
+    - If secret exists in GSM but not in index → delete it.
+    - If secret is in index but not GSM → remove it from index.
+    - If secret is in neither → do nothing.
+
+    Returns:
+        List[str]: Updated list of secrets from the index.
+    """
+
+    full_secret_path = client.secret_path(
+        PROJECT_ID, get_secret_name(collection, secret)
+    )
+    index_secrets = get_secrets_from_index(client, collection)
+
     try:
-        client.get_secret(request={"name": name})
-        raise click.ClickException(
-            f"Secret '{secret}' already exists in collection '{collection}'."
-        )
+        client.get_secret(request={"name": full_secret_path})
+        if secret in index_secrets:
+            raise click.ClickException(
+                f"Secret '{secret}' already exists in collection '{collection}'."
+            )
+        else:
+            # Exists in GSM but not in index, indicating an inconsistent state;
+            # delete the old secret and allow recreate.
+            client.delete_secret(request={"name": full_secret_path})
     except NotFound:
-        return
+        if secret in index_secrets:
+            # Exists in index but not in GSM: index is stale — fix it.
+            index_secrets.remove(secret)
+            update_index_secret(client, collection, index_secrets)
+        return index_secrets  # Secret doesn't exist, proceed with creation.
 
 
 def prompt_for_labels() -> Dict[str, str]:

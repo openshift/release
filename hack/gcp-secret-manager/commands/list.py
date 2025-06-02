@@ -5,12 +5,11 @@ import json
 from typing import Dict, List
 
 import click
-from google.api_core.exceptions import PermissionDenied
 from google.cloud import secretmanager
 from util import (
-    PROJECT_ID,
     ensure_authentication,
     get_group_collections,
+    get_secrets_from_index,
     validate_collection,
 )
 
@@ -83,29 +82,11 @@ def list_collections_for_group(
 
 
 def list_secrets_for_collection(collection: str, output: str):
-    client = secretmanager.SecretManagerServiceClient()
-    try:
-        response = client.list_secrets(
-            request=secretmanager.ListSecretsRequest(
-                {"parent": f"projects/{PROJECT_ID}", "filter": f"name:{collection}__"}
-            )
-        )
-    except PermissionDenied:
-        raise click.UsageError(
-            f"Access denied: You do not have permission to list secrets in collection '{collection}'."
-        )
-    except Exception as e:
-        raise click.ClickException(
-            f"Failed to list secrets for collection '{collection}': {e}"
-        )
-
-    secrets = []
-    for secret in response:
-        s = secret.name.split("/")[-1]
-        if s.startswith(f"{collection}__"):
-            secrets.append(s.partition("__")[2])
-
+    secret_list = get_secrets_from_index(
+        secretmanager.SecretManagerServiceClient(), collection
+    )
     if output == "json":
-        click.echo(json.dumps(secrets, indent=2))
+        click.echo(json.dumps(secret_list, indent=2))
     else:
-        click.echo("\n".join(secrets))
+        for secret in secret_list:
+            click.echo(secret)

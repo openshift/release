@@ -8,6 +8,8 @@ from util import (
     PROJECT_ID,
     ensure_authentication,
     get_secret_name,
+    get_secrets_from_index,
+    update_index_secret,
     validate_collection,
     validate_secret_name,
 )
@@ -34,19 +36,27 @@ def delete(collection: str, secret: str):
     """Delete a secret from the specified collection."""
 
     ensure_authentication()
+    client = secretmanager.SecretManagerServiceClient()
 
     try:
-        client = secretmanager.SecretManagerServiceClient()
-        name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
-        client.delete_secret(name=name)
-        click.echo(f"Secret '{secret}' deleted")
+        client.delete_secret(
+            name=client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
+        )
     except NotFound:
-        raise click.UsageError(
-            f"Secret '{secret}' not found in collection '{collection}' (project: {PROJECT_ID})."
+        raise click.ClickException(
+            f"Secret '{secret}' not found in collection '{collection}'."
         )
     except PermissionDenied:
-        raise click.UsageError(
+        raise click.ClickException(
             f"Access denied: You do not have permission to delete secret '{secret}'."
         )
     except Exception as e:
         raise click.UsageError(f"Error deleting secret '{secret}': {e}")
+
+    # Delete the secret from the index
+    index_secrets = get_secrets_from_index(client, collection)
+    if secret in index_secrets:
+        index_secrets.remove(secret)
+        update_index_secret(client, collection, index_secrets)
+
+    click.echo(f"Secret '{secret}' deleted from collection '{collection}'.")
