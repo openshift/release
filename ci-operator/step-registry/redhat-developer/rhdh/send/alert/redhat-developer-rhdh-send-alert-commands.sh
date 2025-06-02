@@ -46,10 +46,9 @@ get_artifacts_url() {
 }
 
 get_slack_alert_text() {
-  # TODO: Remove set -x after debugging
-  set -x
   URL_CI_RESULTS=$(get_job_url)
   local notification_text
+
   if [[ $OVERALL_RESULT == 0 ]]; then
     notification_text=":done-circle-check: \`${JOB_NAME}\`, 📜 <$URL_CI_RESULTS|logs>."
   else
@@ -74,17 +73,15 @@ get_slack_alert_text() {
       notification_text="${notification_text}📦 <${URL_ARTIFACTS[i]}|artifacts>."
     done
   fi
-  # TODO: Remove set +x after debugging
-  set +x
+
   echo "${notification_text}"
 }
 
 main() {
-  # TODO: Uncomment this after debugging
-  # if [[ "$JOB_TYPE" != "periodic" ]]; then
-  #   echo "This job is not a nightly job, skipping alert."
-  #   exit 0
-  # fi
+  if [[ "$JOB_TYPE" != "periodic" ]]; then
+    echo "This job is not a nightly job, skipping alert."
+    exit 0
+  fi
 
   echo "Reading status from $SHARED_DIR"
   local status_variables=(
