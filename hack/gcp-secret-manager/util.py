@@ -17,6 +17,12 @@ PROJECT_ID = "openshift-ci-secrets"
 # The YAML config which defines which groups have access to which secret collections.
 CONFIG_PATH = "https://raw.githubusercontent.com/openshift/release/master/core-services/sync-rover-groups/_config.yaml"
 
+# The string reserved for the index secret associated with each collection.
+INDEX_SECRET_NAME = "secret-index"
+
+# The string reserved for the service account secret associated with each collection.
+UPDATER_SA_NAME = "updater-service-account"
+
 
 def ensure_authentication():
     """
