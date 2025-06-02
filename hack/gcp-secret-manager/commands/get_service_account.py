@@ -8,7 +8,7 @@ from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
-    UPDATER_SA_NAME,
+    UPDATER_SA_SECRET_NAME,
     ensure_authentication,
     validate_collection,
     get_secret_name,
@@ -29,7 +29,7 @@ def get_service_account(collection: str):
 
     ensure_authentication()
     client = secretmanager.SecretManagerServiceClient()
-    secret_id = get_secret_name(collection, UPDATER_SA_NAME)
+    secret_id = get_secret_name(collection, UPDATER_SA_SECRET_NAME)
     name = client.secret_version_path(PROJECT_ID, secret_id, "latest")
 
     try:
