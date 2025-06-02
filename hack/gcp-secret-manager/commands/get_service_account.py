@@ -6,7 +6,13 @@ import json
 import click
 from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
-from util import PROJECT_ID, ensure_authentication, validate_collection
+from util import (
+    PROJECT_ID,
+    UPDATER_SA_NAME,
+    ensure_authentication,
+    validate_collection,
+    get_secret_name,
+)
 
 
 @click.command(name="get-sa")
@@ -22,11 +28,9 @@ def get_service_account(collection: str):
     """Retrieve the service account associated with a secret collection."""
 
     ensure_authentication()
-
-    secret_id = f"{collection}__updater-service-account"
-    name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
-
     client = secretmanager.SecretManagerServiceClient()
+    secret_id = get_secret_name(collection, UPDATER_SA_NAME)
+    name = client.secret_version_path(PROJECT_ID, secret_id, "latest")
 
     try:
         response = client.access_secret_version(request={"name": name})
