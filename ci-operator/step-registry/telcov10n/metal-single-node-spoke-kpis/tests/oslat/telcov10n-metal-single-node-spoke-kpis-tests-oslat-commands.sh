@@ -223,11 +223,13 @@ function run_ansible_playbook {
 
 function setup_test_result_for_component_readiness {
 
-  sed \
-    -e 's@<testsuite name=".*" @<testsuite name="telco-verification" @g' \
-    -e 's@<testcase name="@<testcase name="[Jira: Telco Performance] @g' \
+  set -x
+  sed -E \
+    -e 's/(<testsuite name=")[^"]+/\1telco-verification/' \
+    -e "s/<testcase name=\"([^\"]+)\"/<testcase name='${TEST_COMPONENT} \1'/" \
     ${test_results_artifacts_append}*.xml \
       >| "${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME}_telco_kpi_test_results.xml"
+  set +x
 
   ls -l ${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME}_telco_kpi_test_results.xml
   cat ${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME}_telco_kpi_test_results.xml
