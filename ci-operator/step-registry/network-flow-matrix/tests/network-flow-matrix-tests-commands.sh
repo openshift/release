@@ -59,12 +59,17 @@ if version_greater_than "$cluster_version" "$KREW_REQUIRED_VERSION_THRESHOLD"; t
   ${SHARED_DIR}/krew/${KREW} install krew
   export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"  
   # install commatrix-krew plugin
-  oc krew install --manifest=cmd/commatrix-krew.yaml
+  mkdir -p /tmp/bin && \
+        chgrp root /tmp/bin && \
+        chmod -R a+w /tmp/bin
+
+  go mod vendor
+  make build
+  make install INSTALL_DIR=/tmp/bin/
   # cleanUP
   rm -rf "${SHARED_DIR}/krew"
 fi
 
-go mod vendor
-EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" SUITE="${SUITE}" \
+PATH="/tmp/bin:$PATH" EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" SUITE="${SUITE}" \
 OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FILE}" OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT="${OPEN_PORTS_TO_IGNORE_IN_DOC_TEST_FORMAT}" make e2e-test
 popd || exit

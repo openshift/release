@@ -87,6 +87,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  splat-ci-virtctl:
+    name: splat-virtctl
+    namespace: ci
+    tag: latest
   vsphere-ci-python:
     name: vsphere-python
     namespace: ci
@@ -208,6 +212,27 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-oc
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    COPY virtctl /usr/bin/virtctl
+    COPY openshift-install /usr/bin/openshift-install
+  from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    splat-ci-virtctl:
+      paths:
+      - destination_dir: .
+        source_path: /virtctl
+    upi-installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/openshift-install
+  to: virtctl
 promotion:
   to:
   - excluded_images:
@@ -353,6 +378,14 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-private
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-private
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-user-provisioned-dns
@@ -812,6 +845,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - always_run: false
@@ -832,6 +866,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: openstack-manifests
@@ -951,6 +986,18 @@ tests:
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-vsphere-ovn-hybrid-env
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      NETWORK_TYPE: multi-tenant
+    workflow: openshift-e2e-vsphere-hybrid-env
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-crc
   optional: true
   steps:
@@ -1061,7 +1108,8 @@ tests:
         export AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
         hack/go-integration-test.sh
       credentials:
-      - mount_path: /var/secrets/registry-pull-secret
+      - collection: ""
+        mount_path: /var/secrets/registry-pull-secret
         name: registry-pull-credentials
         namespace: test-credentials
       dependencies:
@@ -1195,6 +1243,7 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: azure4
     env:
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: None
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
@@ -1207,6 +1256,7 @@ tests:
     pre:
     - chain: ipi-conf-azure
     - ref: ipi-conf-azure-osimage
+    - ref: ipi-conf-azure-identity
     - ref: ovn-conf
     - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install

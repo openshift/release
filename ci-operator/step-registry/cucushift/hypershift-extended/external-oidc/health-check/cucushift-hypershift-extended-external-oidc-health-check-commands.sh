@@ -57,7 +57,7 @@ fi
 # Further check the special fields in kube-apiserver config
 if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
     # Ensure the extra and uid fields not only exist and but also are not empty
-    if grep -q '"extra":\[{"key".*"uid":{"' <<< "$mc_auth_config"; then
+    if grep -q '"extra":\[{"key"' <<< "$mc_auth_config" && grep -q '"uid":{"' <<< "$mc_auth_config"; then
         echo "External OIDC uid and extra settings are configured in kube-apiserver"
     else
         echo "$mc_auth_config"

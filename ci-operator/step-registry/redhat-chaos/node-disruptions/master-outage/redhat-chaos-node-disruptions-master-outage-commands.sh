@@ -60,8 +60,6 @@ elif [ "$platform" = "IBMCloud" ]; then
     export IBMC_URL
     IBMC_APIKEY=$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-api-key)
     export IBMC_APIKEY
-    ACTION="$CLOUD_TYPE-node-reboot"
-    export ACTION
     NODE_NAME=$(oc get nodes -l $LABEL_SELECTOR --no-headers | head -1 | awk '{printf $1}' )
     export NODE_NAME
     export TIMEOUT=320
