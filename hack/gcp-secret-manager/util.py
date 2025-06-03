@@ -228,13 +228,19 @@ def get_secrets_from_index(
     return secret_list
 
 
-# TODO: edit docs
 def update_index_secret(
     client: secretmanager.SecretManagerServiceClient,
     collection: str,
     secret_names: List[str],
 ):
-    """Update the index secret for the collection with a new list of secrets."""
+    """
+    Updates the index secret for the collection with a new list of secrets.
+
+    Args:
+        client (secretmanager.SecretManagerServiceClient): Secret Manager client.
+        collection (str): Name of the collection.
+        secret_names (List[str]): A list of the new list of secrets to write into the index.
+    """
 
     name = client.secret_path(
         PROJECT_ID, get_secret_name(collection, INDEX_SECRET_NAME)
