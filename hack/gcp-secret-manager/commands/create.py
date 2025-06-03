@@ -135,16 +135,17 @@ def check_and_handle_existing_secret(
             raise click.ClickException(
                 f"Secret '{secret}' already exists in collection '{collection}'."
             )
-        else:
-            # Exists in GSM but not in index, indicating an inconsistent state;
-            # delete the old secret and allow recreate.
-            client.delete_secret(request={"name": full_secret_path})
+
+        # Exists in GSM but not in index, indicating an inconsistent state;
+        # delete the old secret and allow recreate.
+        client.delete_secret(request={"name": full_secret_path})
     except NotFound:
         if secret in index_secrets:
             # Exists in index but not in GSM: index is stale — fix it.
             index_secrets.remove(secret)
             update_index_secret(client, collection, index_secrets)
-        return index_secrets  # Secret doesn't exist, proceed with creation.
+
+    return index_secrets
 
 
 def prompt_for_labels() -> Dict[str, str]:
