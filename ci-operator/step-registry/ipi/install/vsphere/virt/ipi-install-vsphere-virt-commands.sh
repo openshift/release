@@ -13,6 +13,7 @@ fi
 VIRT_KUBECONFIG=/var/run/vault/vsphere-ibmcloud-config/vsphere-virt-kubeconfig
 CLUSTER_KUBECONFIG=${SHARED_DIR}/kubeconfig
 VM_NETWORK_PATCH=/var/run/vault/vsphere-ibmcloud-config/vm-network-patch.json
+INFRA_PATCH=$(cat /var/run/vault/vsphere-ibmcloud-config/vsphere-virt-infra-patch)
 
 VM_NAME="$(oc get infrastructure cluster -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.status.infrastructureName')-bm"
 VM_NAMESPACE="${NAMESPACE}"
@@ -36,6 +37,8 @@ function approve_csrs() {
   done
 }
 
+# Patch test cluster to have CIDR for non-vSphere node
+oc patch infrastructure cluster --type json -p "${INFRA_PATCH}" --kubeconfig=${CLUSTER_KUBECONFIG}
 
 # Generate YAML for creation VM
 echo "$(date -u --rfc-3339=seconds) - Generating ignition data"
@@ -46,7 +49,7 @@ echo ${VIRT_IMAGE}
 IGNITION_DATA=$(oc get secret worker-user-data -n openshift-machine-api -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.data.userData')
 
 echo "$(date -u --rfc-3339=seconds) - Generating virtual machine yaml"
-virtctl create vm --name ${VM_NAME} --instancetype ci-baremetal --volume-containerdisk src:${VIRT_IMAGE} --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual -n ${VM_NAMESPACE} > "${SHARED_DIR}/vm.yaml"
+virtctl create vm --name ${VM_NAME} --instancetype ci-baremetal --volume-import type:registry,url:docker://${VIRT_IMAGE},size:60Gi,pullmethod:node --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual -n ${VM_NAMESPACE} > "${SHARED_DIR}/vm.yaml"
 
 # Create VM (VM will not be running)
 echo "$(date -u --rfc-3339=seconds) - Creating virtual machine"

@@ -30,8 +30,8 @@ function post_step_actions()
   echo "--- INSTALL_BASE_DIR ---"
   find ${INSTALL_BASE_DIR} -type f
   echo "--- RESULTS ---"
-  echo -e "region\tcluster_name\tinfra_id\tinstall\thealth_check\tdestroy"
-  jq -r '.[] | [.region, .cluster_name, .infra_id, .install_result, .health_check_result, .destroy_result] | @tsv' $RESULT
+  echo -e "region\tcluster_name\tinfra_id\tAMI_check\tinstall\thealth_check"
+  jq -r '.[] | [.region, .cluster_name, .infra_id, .is_AMI_ready, .install_result, .health_check_result] | @tsv' $RESULT
   set -o errexit
 }
 
