@@ -79,20 +79,8 @@ tests:
   steps:
     cluster_profile: aws-managed-rosa-rhoai-qe
     env:
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-            [
-              {"step": "rhoai-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "rhoai-opendatahub-tests", "failure_type": "test_failure", "classification": "RHOAI Test Failure", "jira_project": "RHOAIENG-22952", "group": {"name": "interop-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
-            ]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19","rosa-managed","rhoai"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: obarhaim@redhat.com
-      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
-      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
-      FIREWATCH_DEFAULT_JIRA_PROJECT: RHOAIENG-22952
+      CLUSTER_NAME_PREFIX: rhoai
+      CLUSTER1_CONFIG: platform=rosa;region=us-east-1;version=4.19;channel-group=stable;compute-machine-type=m5.2xlarge;timeout=2h;replicas=3;fips=false;ocm-env=stage
       OPERATORS: |
         [
             {"name": "authorino-operator", "source": "redhat-operators", "channel": "tech-preview-v1", "install_namespace": "openshift-operators"},
@@ -106,7 +94,28 @@ tests:
     - ref: rhoai-deploy-dsc
     - ref: rhoai-opendatahub-tests
     - ref: rhoai-tests
-    workflow: firewatch-rosa-aws-sts
+    workflow: cluster
+- as: rhoai-interop-aws-osd
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: aws-managed-osd-rhoai-qe
+    env:
+      CLUSTER_NAME_PREFIX: rhoai
+      CLUSTER1_CONFIG: platform=aws-osd;region=us-east-1;version=4.19;channel-group=stable;compute-machine-type=m5.2xlarge;timeout=2h;replicas=3;fips=false;ocm-env=stage
+      OPERATORS: |
+        [
+            {"name": "authorino-operator", "source": "redhat-operators", "channel": "tech-preview-v1", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
+            {"name": "rhods-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
+        ]
+      TEST_MARKERS: ocp_interop
+    test:
+    - ref: install-operators
+    - ref: rhoai-deploy-dsc
+    - ref: rhoai-opendatahub-tests
+    - ref: rhoai-tests
+    workflow: cluster
 zz_generated_metadata:
   branch: release-2.19
   org: red-hat-data-services
