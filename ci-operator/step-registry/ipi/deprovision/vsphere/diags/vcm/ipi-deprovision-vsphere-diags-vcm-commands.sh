@@ -474,6 +474,7 @@ EOF
         <div id="chart-div">
           <div class="chart-container" style="text-align: center">
             <h4>Screenshot taken at the conclusion of the job</h4>
+            To access the journal for this node, check the artifacts in ipi-deprovision-vsphere-diags-vcm.
             <img id="vm-screenshot"></img>
           </div>
           <hr>
@@ -617,6 +618,12 @@ async function processMaster(url, metricLabel, chart, prefix) {
     document.getElementById('vm-screenshot')
       .src = 'data:image/png;base64,' + screenShotBase64Elem.innerHTML
   }
+
+  journalBase64Elem = document.getElementById(url+"-journal")
+  if (journalBase64Elem != null) {
+    document.getElementById('vm-journal')
+      .text = atob(journalBase64Elem.innerHTML)
+  }  
   console.log(newData);
   chart.data = newData;
   chart.update();
