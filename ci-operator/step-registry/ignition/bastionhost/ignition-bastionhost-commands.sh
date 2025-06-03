@@ -220,9 +220,10 @@ timeout = 300
 EOF
 
 RSYNCD_CONFIG_CONTENT=$(cat ${workdir}/rsyncd.conf | base64 -w0)
-RSYNCD_CONFIG_CONTENT=$(cat ${workdir}/rsyncd.conf | base64 -w0 | base64 -d -w0)
-RSYNCD_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/rsyncd.service | sed 's/\"/\\"/g')
 
+RSYNCD_CONFIG_CONTENT=$(sed 's/"/\\"/g' "${workdir}/rsyncd.conf" | awk '{printf "%s\\n", $0}')
+RSYNCD_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/rsyncd.service | sed 's/\"/\\"/g')
+echo "=========${RSYNCD_CONFIG_CONTENT}=============="
 # rsync ignition
 rsyncd_ignition_patch=$(mktemp)
 cat > "${rsyncd_ignition_patch}" << EOF
@@ -233,7 +234,7 @@ cat > "${rsyncd_ignition_patch}" << EOF
         "path": "/etc/rsyncd.conf",
         "overwrite": true,
         "contents": {
-          "source": "data:text/plain;${RSYNCD_CONFIG_CONTENT}"
+          "source": "${RSYNCD_CONFIG_CONTENT}"
         },
         "mode": 420
       }
