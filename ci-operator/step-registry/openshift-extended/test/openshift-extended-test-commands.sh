@@ -87,6 +87,10 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+if [ -f "${SHARED_DIR}/runtime_env" ]; then
+    source "${SHARED_DIR}/runtime_env"
+fi
+
 # restore external oidc cache dir for oc
 if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
     echo "Restoring external OIDC cache dir for oc"
@@ -344,7 +348,9 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
-    extended-platform-tests run all --dry-run | \
+    echo "SHARD_ARGS=\"${SHARD_ARGS}\""
+
+    extended-platform-tests run all --dry-run ${SHARD_ARGS:-} | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"

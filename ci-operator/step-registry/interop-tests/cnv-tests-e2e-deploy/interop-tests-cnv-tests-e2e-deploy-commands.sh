@@ -27,7 +27,6 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 
 set -x
-START_TIME=$(date "+%s")
 
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
@@ -47,19 +46,7 @@ fi
 # Run the tests
 make deploy_test || exit_code=$?
 
-FINISH_TIME=$(date "+%s")
-DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
-
-if [[ ${DIFF_TIME} -le 720 ]]; then
-    echo ""
-    echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
-    echo "  😴 😴 😴"
-    sleep 7200
-    exit 1
-else
-    echo "Finished in: ${DIFF_TIME} sec"
-fi
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
