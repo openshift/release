@@ -220,6 +220,7 @@ timeout = 300
 EOF
 
 RSYNCD_CONFIG_CONTENT=$(cat ${workdir}/rsyncd.conf | base64 -w0)
+RSYNCD_CONFIG_CONTENT=$(cat ${workdir}/rsyncd.conf | base64 -w0 | base64 -d -w0)
 RSYNCD_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/rsyncd.service | sed 's/\"/\\"/g')
 
 # rsync ignition
@@ -232,7 +233,7 @@ cat > "${rsyncd_ignition_patch}" << EOF
         "path": "/etc/rsyncd.conf",
         "overwrite": true,
         "contents": {
-          "source": "data:text/plain;base64,${RSYNCD_CONFIG_CONTENT}"
+          "source": "data:text/plain;${RSYNCD_CONFIG_CONTENT}"
         },
         "mode": 420
       }
