@@ -91,6 +91,14 @@ queue ${ARTIFACT_DIR}/useraccounts.json  oc --insecure-skip-tls-verify --request
 queue ${ARTIFACT_DIR}/usersignups.json  oc --insecure-skip-tls-verify --request-timeout=5s get usersignups.toolchain.dev.openshift.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/usertiers.json  oc --insecure-skip-tls-verify --request-timeout=5s get usertiers.toolchain.dev.openshift.com --all-namespaces -o json
 
+# Kueue Resources
+queue ${ARTIFACT_DIR}/admissionchecks.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get admissionchecks.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/clusterqueues.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get clusterqueues.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/localqueues.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get localqueues.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/resourceflavors.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get resourceflavors.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/workloadpriorityclasses.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get workloadpriorityclasses.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/workloads.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get workloads.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/kueues.operator.openshift.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get kueues.operator.openshift.io --all-namespaces -o json
 
 # Non-namespaced resources
 queue ${ARTIFACT_DIR}/idlers.json  oc --insecure-skip-tls-verify --request-timeout=5s get idlers.toolchain.dev.openshift.com -o json
