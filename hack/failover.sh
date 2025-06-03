@@ -10,7 +10,7 @@
 # ./hack/failover.sh --disable-cluster=build01
 #
 # When the newly disabled cluster the default one, you need to set another one as a default:
-# ./hack/failover.sh --disable-cluster=build01 --default-cluster=build02
+# ./hack/failover.sh --disable-cluster=build01 --default-cluster=build04
 #
 # Use the --enable-cluster option to mark a cluster as enabled and dispatch jobs between all enabled clusters:
 # ./hack/failover.sh --enable-cluster=build01
