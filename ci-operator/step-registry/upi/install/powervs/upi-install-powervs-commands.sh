@@ -19,6 +19,6 @@ export POWERVS_JENKINS_TOKEN
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on PowerVS"
 /usr/local/bin/python3.9 /cluster/powervs.py
 
-sleep 1200s
+sleep=1200s
 
 cp -rp --target-directory "${SHARED_DIR}" /tmp/output/*
