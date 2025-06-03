@@ -16,6 +16,8 @@ trap copyArtifacts EXIT
 cd stage-quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results 
 yarn install
 
+echo "whu test"
+
 export CYPRESS_QUAY_API_TOKEN="$QUAY_API_TOKEN"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
 export CYPRESS_QUAY_USER="$QUAY_USERNAME"
