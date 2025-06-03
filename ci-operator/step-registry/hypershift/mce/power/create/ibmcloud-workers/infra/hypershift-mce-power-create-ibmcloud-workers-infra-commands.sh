@@ -163,7 +163,7 @@ create_power_vms() {
   export IBMCLOUD_TRACE=true
 
   echo "$(date) Creating VSI in PowerVS instance"
-  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix --replicant-affinity-policy affinity
+  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix --replicant-affinity-policy none
 
   # Adding sleep as it would take some time for VMs to get alive to retrieve the network interface details like ip and mac
   sleep 90s

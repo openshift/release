@@ -26,5 +26,5 @@ make ci-secret-generator
 run --job "periodic-ci-secret-bootstrap"
 run --job "periodic-openshift-release-master-app-ci-apply"
 run --job "periodic-openshift-release-master-build01-apply"
-run --job "periodic-openshift-release-master-build02-apply"
+run --job "periodic-openshift-release-master-build04-apply"
 run --job "periodic-openshift-release-master-vsphere-apply"
