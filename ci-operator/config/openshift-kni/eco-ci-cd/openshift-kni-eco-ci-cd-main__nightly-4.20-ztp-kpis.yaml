@@ -29,11 +29,34 @@ tests:
 - as: telcov10n-metal-single-node-spoke-kpis
   capabilities:
   - intranet
-  cron: 0 3 * * *
+  cron: 0 2 * * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: 10.6.157.20
+      BIOS_SETTINGS: |-
+        ---
+        WorkloadProfile: TelcoOptimizedProfile
+      BIOS_VALIDATIONS: |-
+        ---
+        # Settings are based on https://docs.openshift.com/container-platform/4.17/edge_computing/ztp-reference-cluster-configuration-for-vdu.html
+        # Additional settings taken from https://access.redhat.com/articles/7032040
+        CpuInterconnectBusLinkPower: Disabled # Uncore Frequency Scaling
+        EnergyEfficientTurbo: Disabled
+        EnergyPerformanceBias: MaxPower
+        LogicalProc: Enabled # Enabel Hyper-Threading (SMT)
+        PackageCStates: Disabled # Enable or Disable C0/C1 state
+        ProcAvxP1: Level2
+        ProcC1E: Disabled # Disable C1E state
+        ProcCStates: Enabled # Performance P-limit; Enabled - OS controlled
+        ProcPwrPerf: SysDbpmTelco # CPU Power and Performance Policy
+        ProcTurboMode: Enabled # Enable turbo boost
+        SecureBoot: Disabled # TODO: SecureBoot is disabled on this setup - starting OCP 4.17 it's required, unless it interferes with sideloading kernel
+        SecureBootMode: DeployedMode
+        SecureBootPolicy: Standard
+        SriovGlobalEnable: Enabled
+        SubNumaCluster: Disabled
+        UncoreFrequency: MaxUFS # Uncore Frequency
       CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.20
       CATALOGSOURCE_NAME: prega-operators-4-20
       DU_PROFILE: v4.20
@@ -87,7 +110,7 @@ tests:
                     sources:
                       - disabled: true
                         name: community-operators
-                      - disabled: true
+                      - disabled: false
                         name: certified-operators
                       - disabled: true
                         name: redhat-operators
@@ -104,6 +127,16 @@ tests:
                     source: prega-operators-4-20
                 - fileName: SriovOperatorStatus.yaml
                   policyName: "subscriptions-policy"
+                # SR-IOV FEC
+                - fileName: AcceleratorsNS.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: AcceleratorsOperGroup.yaml
+                  policyName: "subscriptions-policy"
+                - fileName: AcceleratorsSubscription.yaml
+                  policyName: "subscriptions-policy"
+                  spec:
+                    source: certified-operators
+                    # channel: "stable"
                 # PTP
                 - fileName: PtpSubscriptionNS.yaml
                   policyName: "subscriptions-policy"
@@ -329,7 +362,8 @@ tests:
       SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
       SOCKS5_PROXY: socks5h://10.6.157.20:3124
     test:
-    - ref: telcov10n-metal-single-node-spoke-kpis-tests
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-telco-operators
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-oslat
     workflow: telcov10n-metal-single-node-spoke-kpis
 zz_generated_metadata:
   branch: main

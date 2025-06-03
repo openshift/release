@@ -5,6 +5,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+LATEST_RELEASE="$(curl -s "https://api.github.com/repos/openshift/release/contents/ci-operator/config/openshift/release?ref=master" | jq -r '.[].name' | grep -E '^openshift-release-master__nightly-[0-9]+\.[0-9]+\.yaml$' | sed -E 's/^openshift-release-master__nightly-([0-9]+\.[0-9]+)\.yaml$/\1/' | sort -V | tail -n1)"
+export LATEST_RELEASE
 build_images(){
 oc delete namespace openshift-ptp || true
 oc create namespace openshift-ptp -o yaml | oc label -f - pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged || true
@@ -83,19 +85,32 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
-          cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
+          export LATEST_RELEASE="LATEST_RELEASE_VAL"
+
+          # run latest release on upstream main branch
+          if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
+            echo "Running latest release $LATEST_RELEASE on upstream main branch"
+            git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/ptp-operator.git
+          else
+            git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          fi
+          cd ptp-operator
           # OCPBUGS-52327 fix build due to libresolv.so link error
           sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
           if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
             sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
             make docker-build
           else
-            # Dockerfile is updated to upstream in 4.19+
-            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ocp
-            podman build -t ${IMG} -f Dockerfile.ocp
+            # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions
+            if [ -f "Dockerfile.ocp" ]; then
+              DOCKERFILE="Dockerfile.ocp"
+            else
+              DOCKERFILE="Dockerfile.ci"
+            fi
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" "$DOCKERFILE"
+            podman build -t "${IMG}" -f "$DOCKERFILE"
           fi
           podman push ${IMG} --tls-verify=false
           cd ..
@@ -123,6 +138,7 @@ spec:
   jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#LATEST_RELEASE_VAL#${LATEST_RELEASE}#" <<<"$jobdefinition")
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
@@ -218,7 +234,12 @@ export CNF_ORIGIN_TESTS
 # always use the latest test code
 export TEST_BRANCH="main"
 
-export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
+# run latest release on upstream main branch
+if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
+  export PTP_UNDER_TEST_BRANCH="main"
+else
+  export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
+fi
 export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
@@ -243,8 +264,13 @@ export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-op
 build_images
 
 # deploy ptp-operator
-
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+# run latest release on upstream main branch
+if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
+  echo "Running latest release $LATEST_RELEASE on upstream main branch"
+  git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+else
+  git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+fi
 
 cd ptp-operator-under-test
 
@@ -290,7 +316,8 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+# always run test from latest upstream
+git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 

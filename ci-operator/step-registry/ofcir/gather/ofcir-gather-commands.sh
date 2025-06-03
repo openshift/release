@@ -199,3 +199,46 @@ if [[ "$PROVIDER" = "ibmcloud" ]]; then
     ansible-playbook gather_ibm_classic_metadata.yaml -i "${SHARED_DIR}/inventory" -vv
 fi
 
+cat > gather_aws_metadata.yaml <<-'EOF'
+- name: Make sure inventory contains at least one host
+  hosts: localhost
+  tasks:
+    - fail:
+        msg: "[ERROR] Empty inventory. No host available."
+      when: groups.all | length == 0
+
+- name: Gather AWS EC2 instance metadata
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Get IMDSv2 token from EC2 metadata service
+      ansible.builtin.uri:
+        url: "http://169.254.169.254/latest/api/token"
+        method: PUT
+        headers:
+          "X-aws-ec2-metadata-token-ttl-seconds": "21600"
+        return_content: yes
+      register: aws_metadata_token
+      no_log: true
+
+    - name: Fetch EC2 instance identity document
+      ansible.builtin.uri:
+        url: "http://169.254.169.254/latest/dynamic/instance-identity/document"
+        return_content: yes
+        headers:
+          "X-aws-ec2-metadata-token": "{{ aws_metadata_token.content }}"
+      register: aws_metadata_doc
+      no_log: true
+
+    - name: Write AWS metadata JSON to artifact directory
+      local_action:
+        module: ansible.builtin.copy
+        dest: "{{ lookup('env','ARTIFACT_DIR') }}/aws-metadata.json"
+        content: "{{ aws_metadata_doc.content }}"
+
+EOF
+
+if [[ "$PROVIDER" = "aws" ]]; then
+    echo "Provider is AWS, gathering metadata..."
+    ansible-playbook gather_aws_metadata.yaml -i "${SHARED_DIR}/inventory" -vv
+fi

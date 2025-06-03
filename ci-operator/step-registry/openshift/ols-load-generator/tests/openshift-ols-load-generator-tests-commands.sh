@@ -150,6 +150,37 @@ subjects:
   name: default
   namespace: ols-load-test
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-loadgen-to-api
+  namespace: openshift-lightspeed
+  labels:
+    app.kubernetes.io/component: application-server
+    app.kubernetes.io/managed-by: lightspeed-operator
+    app.kubernetes.io/name: lightspeed-service-api
+    app.kubernetes.io/part-of: openshift-lightspeed
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: application-server
+      app.kubernetes.io/managed-by: lightspeed-operator
+      app.kubernetes.io/name: lightspeed-service-api
+      app.kubernetes.io/part-of: openshift-lightspeed
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          job-name: ols-load-generator-orchestrator
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ols-load-test
+    ports:
+    - protocol: TCP
+      port: 8443
+---
 apiVersion: batch/v1
 kind: Job
 metadata:

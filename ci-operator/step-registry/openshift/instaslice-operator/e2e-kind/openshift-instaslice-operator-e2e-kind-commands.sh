@@ -12,7 +12,7 @@ VM_NAME="prow-e2e-vm-${PROW_JOB_ID}"
 GOOGLE_COMPUTE_ZONE="us-central1-f"
 GOOGLE_COMPUTE_REGION="us-central1"
 MACHINE_TYPE="a2-highgpu-1g"
-IMAGE_FAMILY="ubuntu-2204-lts"
+IMAGE_FAMILY="ubuntu-2404-lts-amd64"
 IMAGE_PROJECT="ubuntu-os-cloud"
 GOOGLE_COMPUTE_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
@@ -82,7 +82,7 @@ gcloud compute ssh "$VM_NAME" --zone="$GOOGLE_COMPUTE_ZONE" --command='
 
   # NVIDIA Driver Ubuntu installation
   sudo apt install linux-headers-$(uname -r) -y
-  export distro=ubuntu2204 arch=x86_64 arch_ext=amd64
+  export distro=ubuntu2404 arch=x86_64 arch_ext=amd64
   wget https://developer.download.nvidia.com/compute/cuda/repos/$distro/$arch/cuda-keyring_1.1-1_all.deb
   sudo dpkg -i cuda-keyring_1.1-1_all.deb
   sudo apt update
@@ -115,6 +115,23 @@ set -eux
   sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
   sudo systemctl restart docker
   sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
+
+  echo "Checking NVIDIA driver availability with nvidia-smi..."
+  MAX_RETRIES=10
+  RETRY_DELAY_SECONDS=10
+  attempt=1
+
+  while ! nvidia-smi > /dev/null 2>&1; do
+    echo "[$attempt/$MAX_RETRIES] nvidia-smi failed. Retrying in $RETRY_DELAY_SECONDS seconds..."
+    if [ "$attempt" -ge "$MAX_RETRIES" ]; then
+      echo "nvidia-smi failed after $MAX_RETRIES attempts. Exiting."
+      exit 1
+    fi
+    attempt=$((attempt + 1))
+    sleep $RETRY_DELAY_SECONDS
+  done
+
+  echo "nvidia-smi succeeded. NVIDIA driver is available."
 
   # Enable MIG on the GPU
   nvidia-smi
