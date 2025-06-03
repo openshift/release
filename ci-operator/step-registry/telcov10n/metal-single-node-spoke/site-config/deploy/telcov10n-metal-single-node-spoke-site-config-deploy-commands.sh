@@ -272,7 +272,7 @@ resources:
 
 configMapGenerator:
   - files:
-    - sno-extra-manifest/imageContentSourcePolicy.yaml
+    $(add_icsp_cr_if_exists)
 $(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
     name: extra-manifests-cm
     namespace: ${SPOKE_CLUSTER_NAME}
@@ -280,6 +280,11 @@ $(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
 generatorOptions:
   disableNameSuffixHash: true
 EOK
+}
+
+function add_icsp_cr_if_exists {
+  [ -f "${SHARED_DIR}/imageContentSourcePolicy.yaml" ] && \
+    echo "- sno-extra-manifest/imageContentSourcePolicy.yaml"
 }
 
 function generate_ztp_cluster_manifests {
@@ -310,6 +315,7 @@ function generate_ztp_cluster_manifests {
 
     SPOKE_CLUSTER_NAME=${NAMESPACE}
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
+    echo -n "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}" >| ${SHARED_DIR}/hostname_with_base_domain
 
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
@@ -465,15 +471,18 @@ function get_openshift_baremetal_install_tool {
   echo "************ telcov10n Extract RHCOS images: Getting openshift-baremetal-install tool ************"
 
   set -x
-  pull_secret=${SHARED_DIR}/pull-secret
-  oc adm release extract -a ${pull_secret} --command=openshift-baremetal-install ${RELEASE_IMAGE_LATEST}
-  attempts=0
-  while sleep 5s ; do
-    ./openshift-baremetal-install version && break
-    [ $(( attempts=${attempts} + 1 )) -lt 2 ] || exit 1
-  done
+  local rel_img
+  if [ -n "${PULL_NUMBER:-}" ] && [ -n "${SET_SPECIFIC_RELEASE_IMAGE}" ]; then
+    rel_img="${SET_SPECIFIC_RELEASE_IMAGE}"
+  else
+    rel_img=${RELEASE_IMAGE_LATEST}
+  fi
 
-  echo -n "$(./openshift-baremetal-install version | head -1 | awk '{print $2}')" > ${SHARED_DIR}/cluster-image-set-ref.txt
+  local pull_secret
+  pull_secret=${SHARED_DIR}/pull-secret
+
+  echo -n "${rel_img}" > ${SHARED_DIR}/release-image-tag.txt
+  echo -n "$(extract_cluster_image_set_reference ${rel_img} ${pull_secret})" > ${SHARED_DIR}/cluster-image-set-ref.txt
   set +x
 }
 

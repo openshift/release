@@ -156,6 +156,10 @@ sriov "should run pod without RDMA"
 # TESTNAME
 sriov "Configure rdma namespace"
 
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -190,6 +194,10 @@ sriov "should run pod without RDMA"
 # TESTNAME
 sriov "Configure rdma namespace"
 
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -206,6 +214,43 @@ EOF
 fi
 }
 
+function create_tests_temp_skip_list_20 {
+# List of temporarly skipped tests for 4.20
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
 
 function is_bm_node {
     node=$1
@@ -376,7 +421,7 @@ checkout_submodules(){
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
 # Set go version
-if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+if [[ "$T5CI_VERSION" == "4.12" ]]; then
     source $HOME/golang-1.19
 elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
     source $HOME/golang-1.20
@@ -435,9 +480,9 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.19" ]]; then
+if [[ "$T5CI_VERSION" == "4.20" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.17"
+    export CNF_TESTS_IMAGE="cnf-tests:4.19"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
@@ -459,7 +504,7 @@ fi
 pushd $CNF_REPO_DIR
 echo "******** Checking out pull request for repository cnf-features-deploy if exists"
 check_for_pr "openshift-kni" "cnf-features-deploy"
-if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.13" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
+if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
@@ -483,7 +528,7 @@ if [[ "$CNF_BRANCH" == *"4."* ]]; then
     skip_function_name="create_tests_temp_skip_list_${function_version}"
 else
     # In case of master branch
-    skip_function_name=create_tests_temp_skip_list_18
+    skip_function_name=create_tests_temp_skip_list_20
 fi
 if declare -f "$skip_function_name" > /dev/null; then
     echo "Executing $skip_function_name for skipping tests"

@@ -19,6 +19,9 @@ ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 ret=0
 
+IC_CONTROL_PLANE_NODE_COUNT=3
+IC_COMPUTE_NODE_COUNT=2
+
 # following regions will be tested
 REGIONS_LIST=${ARTIFACT_DIR}/regions.txt
 RESULT=${SHARED_DIR}/result.json
@@ -45,8 +48,8 @@ function post_step_actions()
   echo "--- INSTALL_BASE_DIR ---"
   find ${INSTALL_BASE_DIR} -type f
   echo "--- RESULTS ---"
-  echo -e "region\tcluster_name\tinfra_id\tinstall\thealth_check"
-  jq -r '.[] | [.region, .cluster_name, .infra_id, .install_result, .health_check_result] | @tsv' $RESULT
+  echo -e "region\tcluster_name\tinfra_id\tAMI_check\tinstall\thealth_check"
+  jq -r '.[] | [.region, .cluster_name, .infra_id, .is_AMI_ready, .install_result, .health_check_result] | @tsv' $RESULT
 }
 
 function is_empty() {
@@ -198,13 +201,49 @@ function get_install_dir()
   echo "${INSTALL_BASE_DIR}/$(get_cluster_name $region)"
 }
 
+function get_zones_json()
+{
+  local region=$1
+  local t
+  t="${ARTIFACT_DIR}/$(get_cluster_name $region)/zones.json"
+  if [[ ! -d "$(dirname $t)" ]]; then
+    mkdir -p "$(dirname $t)"
+  fi
+  echo $t
+}
+
+function get_nodes_json()
+{
+  local region=$1
+  local t
+  t="${ARTIFACT_DIR}/$(get_cluster_name $region)/nodes.json"
+  if [[ ! -d "$(dirname $t)" ]]; then
+    mkdir -p "$(dirname $t)"
+  fi
+  echo $t
+}
+
+function get_machines_json()
+{
+  local region=$1
+  local t
+  t="${ARTIFACT_DIR}/$(get_cluster_name $region)/machines.json"
+  if [[ ! -d "$(dirname $t)" ]]; then
+    mkdir -p "$(dirname $t)"
+  fi
+  echo $t
+}
+
 function create_install_config()
 {
   local region=$1
   local cluster_name=$2
   local install_dir=$3
 
-  cat > ${install_dir}/install-config.yaml << EOF
+  local config
+  config=${install_dir}/install-config.yaml
+
+  cat > ${config} << EOF
 apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 compute:
@@ -212,13 +251,13 @@ compute:
   hyperthreading: Enabled
   name: worker
   platform: {}
-  replicas: 2
+  replicas: ${IC_COMPUTE_NODE_COUNT}
 controlPlane:
   architecture: ${OCP_ARCH}
   hyperthreading: Enabled
   name: master
   platform: {}
-  replicas: 3
+  replicas: ${IC_CONTROL_PLANE_NODE_COUNT}
 metadata:
   creationTimestamp: null
   name: ${cluster_name}
@@ -240,42 +279,42 @@ sshKey: |
   ${ssh_pub_key}
 EOF
 
-  patch=$(mktemp)
   if [[ ${CONTROL_PLANE_INSTANCE_TYPE} != "" ]]; then
-    cat > "${patch}" << EOF
-controlPlane:
-  platform:
-    aws:
-      type: ${CONTROL_PLANE_INSTANCE_TYPE}
-EOF
-    yq-go m -x -i ${install_dir}/install-config.yaml "${patch}"
+    yq-v4 eval -i '.controlPlane.platform.aws.type = env(CONTROL_PLANE_INSTANCE_TYPE)' "${config}"
   fi
 
   if [[ ${COMPUTE_NODE_TYPE} != "" ]]; then
-    cat > "${patch}" << EOF
-compute:
-- platform:
-    aws:
-      type: ${COMPUTE_NODE_TYPE}
-EOF
-    yq-go m -x -i ${install_dir}/install-config.yaml "${patch}"
+    yq-v4 eval -i '.compute[0].platform.aws.type = env(COMPUTE_NODE_TYPE)' "${config}"
   fi
 
-  local az
-  az=$(aws ec2 --region $region describe-availability-zones --filters Name=zone-type,Values=availability-zone Name=opt-in-status,Values=opt-in-not-required | jq -r '.AvailabilityZones[0].ZoneName')
-  if ! is_empty "$az"; then
-    cat > "${patch}" << EOF
-controlPlane:
-  platform:
-    aws:
-      zones: [${az}]
-compute:
-- platform:
-    aws:
-      zones: [${az}]
-EOF
-      yq-go m -x -i ${install_dir}/install-config.yaml "${patch}"
+  # local azs
+  # azs=$(jq -r '.AvailabilityZones[] | select(.ZoneType=="availability-zone") | .ZoneName' "$(get_zones_json ${region})")
+  # for az in ${azs}; do
+  #   export az
+  #   yq-v4 eval -i '.controlPlane.platform.aws.zones += [env(az)]' "${config}"
+  #   yq-v4 eval -i '.compute[0].platform.aws.zones += [env(az)]' "${config}"
+  #   unset az
+  # done
+
+  if [[ ${EDGE_ZONE_TYPES} != "" ]]; then
+    local edge_zones
+    edge_zones=$(jq -r --arg t ${EDGE_ZONE_TYPES} '.AvailabilityZones[] | select(.ZoneType==$t) | .ZoneName' "$(get_zones_json ${region})")
+    IC_EDGE_NODE_COUNT=$(jq -r --arg t ${EDGE_ZONE_TYPES} '[.AvailabilityZones[] | select(.ZoneType==$t)] | length' "$(get_zones_json ${region})")
+    export IC_EDGE_NODE_COUNT
+    yq-v4 eval -i '.compute[1].architecture = env(OCP_ARCH)' "${config}"
+    yq-v4 eval -i '.compute[1].hyperthreading = "Enabled"' "${config}"
+    yq-v4 eval -i '.compute[1].name = "edge"' "${config}"
+    for edge_zone in ${edge_zones}; do
+      export edge_zone
+      yq-v4 eval -i '.compute[1].platform.aws.zones += [env(edge_zone)]' "${config}"
+      unset edge_zone
+    done
+    yq-v4 eval -i '.compute[1].replicas = env(IC_EDGE_NODE_COUNT)' "${config}"
   fi
+
+  echo "install-config.yaml:"
+  yq-v4 '({"compute": .compute, "controlPlane": .controlPlane, "platform": .platform})' ${install_dir}/install-config.yaml > /tmp/ic-summary.yaml
+  yq-v4 e /tmp/ic-summary.yaml
 }
 
 function run_command() {
@@ -500,7 +539,90 @@ function check_pod() {
     run_command "oc get pods --all-namespaces"
 }
 
+function all_nodes()
+{
+  local region=$1
+  local control_plane_node_count
+  local compute_node_count
+  local nodes_json
+  local node_ret
+  local machines_json
+  node_ret=0
+
+  nodes_json="$(get_nodes_json $region)"
+  machines_json="$(get_machines_json $region)"
+
+  oc get machines.machine.openshift.io -n openshift-machine-api -ojson > $machines_json
+  oc get node -ojson > $nodes_json
+
+  oc get machines.machine.openshift.io -n openshift-machine-api -owide
+  oc get node -owide
+
+  control_plane_node_count=$(jq -r '.items | map(select(.metadata.labels."node-role.kubernetes.io/master"?)) | length' "${nodes_json}")
+  compute_node_count=$(jq -r '.items | map(select(.metadata.labels."node-role.kubernetes.io/worker"? and (.metadata.labels."node-role.kubernetes.io/edge"? | not))) | length' "${nodes_json}")
+
+  echo "control_plane_node_count: ${control_plane_node_count}, except: ${IC_CONTROL_PLANE_NODE_COUNT}"
+  echo "compute_node_count: ${compute_node_count}, except: ${IC_COMPUTE_NODE_COUNT}"
+
+  if [[ "${control_plane_node_count}" != "${IC_CONTROL_PLANE_NODE_COUNT}" ]]; then
+      node_ret=$((node_ret+1))
+  fi
+
+  if [[ "${compute_node_count}" != "${IC_COMPUTE_NODE_COUNT}" ]]; then
+      node_ret=$((node_ret+1))
+  fi
+
+  if [[ ${EDGE_ZONE_TYPES} != "" ]]; then
+
+    # total
+    local edge_node_count
+    IC_EDGE_NODE_COUNT=$(jq -r --arg t ${EDGE_ZONE_TYPES} '[.AvailabilityZones[] | select(.ZoneType==$t)] | length' "$(get_zones_json ${region})")
+    edge_node_count=$(jq -r '.items | map(select(.metadata.labels."node-role.kubernetes.io/edge"?)) | length' "${nodes_json}")
+    echo "edge_node_count: ${edge_node_count}, except: ${IC_EDGE_NODE_COUNT}"
+
+    if [[ "${edge_node_count}" != "${IC_EDGE_NODE_COUNT}" ]]; then
+      node_ret=$((node_ret+1))
+    fi
+
+    # each edge zone
+    local edge_zones
+    local c
+    edge_zones=$(jq -r --arg t ${EDGE_ZONE_TYPES} '.AvailabilityZones[] | select(.ZoneType==$t) | .ZoneName' "$(get_zones_json ${region})")
+    for edge_zone in ${edge_zones}; do
+      c=$(jq -r --arg z ${edge_zone} '[.items[] | select(.spec.providerID | contains($z))] | length' ${nodes_json})
+      echo "edge zone: ${edge_zone}, count: $c"
+      if (( c != 1 )); then
+        node_ret=$((node_ret+1))
+      fi
+    done
+  fi
+  return ${node_ret}
+}
+
+function check_node_count()
+{
+  local region=$1
+  local try=1
+  local total=30
+  local interval=60
+  while [[ ${try} -le ${total} ]]; do
+      echo "Check nodes status (try ${try} / ${total})"
+
+      if ! all_nodes ${region}; then
+          sleep ${interval}
+          (( try++ ))
+          continue
+      else
+          echo "Nodes count is expected."
+          return 0
+      fi
+  done
+  return 1
+}
+
 function health_check() {
+
+  local region=$1
 
   EXPECTED_VERSION=$(oc get clusterversion/version -o json | jq -r '.status.history[0].version')
   export EXPECTED_VERSION
@@ -518,6 +640,9 @@ function health_check() {
 
   echo "Step #4: check all pods are in status running or complete"
   check_pod || return 1
+
+  echo "Step #5: check node count"
+  check_node_count ${region} || return 1
 }
 
 function report_install_result()
@@ -534,6 +659,14 @@ function report_health_check_result()
   local fail_or_pass=$2
   echo ">>> ${fail_or_pass}: HEALTH CHECK: ${region} $(get_cluster_name $region)"
   cat <<< "$(jq --arg region ${region} --arg m ${fail_or_pass} '.[$region].health_check_result = $m' "${RESULT}")" > ${RESULT}
+}
+
+function report_amiid_result()
+{
+  local region=$1
+  local fail_or_pass=$2
+  echo ">>> ${fail_or_pass}: AMI ID CHECK: ${region} $(get_cluster_name $region)"
+  cat <<< "$(jq --arg region ${region} --arg m ${fail_or_pass} '.[$region].is_AMI_ready = $m' "${RESULT}")" > ${RESULT}
 }
 
 
@@ -559,6 +692,7 @@ while IFS= read -r region; do
   "infra_id": "NA",
   "install_result": "NA",
   "health_check_result": "NA",
+  "is_AMI_ready": "NA",
   "destroy_result": "NA",
   "metadata": ""
 }
@@ -574,14 +708,45 @@ i=0
 while IFS= read -r region; do
     set +o errexit
     let i+=1
-    # init result
+
+    zones_json=$(get_zones_json ${region})
+    aws --region $region ec2 describe-availability-zones --filters Name=opt-in-status,Values=opted-in,opt-in-not-required > ${zones_json}
+    if [[ ${EDGE_ZONE_TYPES} != "" ]]; then
+      edge_node_count=$(jq -r --arg t ${EDGE_ZONE_TYPES} '[.AvailabilityZones[] | select(.ZoneType==$t)] | length' ${zones_json})
+      if ((edge_node_count==0)); then
+        echo "================================================================"
+        echo "Skip region [${region}], no ${EDGE_ZONE_TYPES} was found."
+        echo "================================================================"
+        continue
+      fi
+    fi
+
     cluster_name=$(get_cluster_name "${region}")
-    install_dir=$(get_install_dir "${region}")
+    install_dir=$(get_install_dir "${region}")    
     mkdir -p ${install_dir}
 
     echo "================================================================"
     echo "Creating cluster [${region}][${cluster_name}], ${i}/${total}"
     echo "================================================================"
+
+    # checking if AMI is ready
+    ami_exist=0
+    for ARCH in aarch64 x86_64;
+    do
+      
+      amiid=$(openshift-install coreos print-stream-json | jq -r --arg a $ARCH --arg r $region '.architectures[$a].images.aws.regions[$r].image')
+      echo "AMI id $region $ARCH: $amiid"
+      if is_empty "$amiid"; then
+        ami_exist=1
+      fi
+    done
+
+    if [[ "${ami_exist}" == "0" ]]; then
+      report_amiid_result "${region}" "PASS"
+    else
+      report_amiid_result "${region}" "FAIL"
+    fi
+
     create_install_config $region $cluster_name $install_dir
 
     # create manifests
@@ -644,7 +809,7 @@ while IFS= read -r region; do
 
     if [[ -f ${install_dir}/auth/kubeconfig ]]; then
       export KUBECONFIG=${install_dir}/auth/kubeconfig
-      health_check
+      health_check "${region}"
       health_ret=$?
       ret=$((ret+health_ret))
 
@@ -659,4 +824,5 @@ while IFS= read -r region; do
     fi
     set -o errexit
 done < ${REGIONS_LIST}
+
 exit $ret

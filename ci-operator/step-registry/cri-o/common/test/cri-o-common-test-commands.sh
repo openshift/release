@@ -14,6 +14,9 @@ cd /workdir
 branch=$(git rev-parse --abbrev-ref HEAD)
 echo "Printing the current branch of cri-o: $branch"
 
+# wait until the host is ready
+timeout 3m bash -c "until ssh -q ${SSHOPTS[*]} ${IP} exit; do sleep 10; done"
+
 # Trying to copy the content from /src
 tar -czf - . | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
 echo "Transferring source done"
