@@ -885,6 +885,7 @@ fi
 export SUCCESS_CASE_SET=""
 export FAILURE_CASE_SET=""
 
+sleep 12h
 set +e
 if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
