@@ -1,26 +1,26 @@
 base_images:
-  assisted-image-service:
-    name: ocm-2.13
-    namespace: edge-infrastructure
-    tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: ocm-2.13
+    tag: ocm-2.14
   assisted-service-scripts:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   dev-scripts:
@@ -30,104 +30,90 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.assisted_installer_agent
-  to: assisted-installer-agent
-- dockerfile_path: Dockerfile.assisted_installer_agent-build
-  to: assisted-installer-agent-build
-- dockerfile_literal: |
-    FROM base
-    COPY . .
-  from: src
-  to: assisted-installer-agent-src
+- dockerfile_path: Dockerfile.image-service
+  to: assisted-image-service
+- dockerfile_path: Dockerfile.image-service-build
+  to: assisted-image-service-build
 promotion:
   to:
-  - name: ocm-2.13
+  - name: ocm-2.14
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
+  latest-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  go mod vendor
-  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
 - as: mirror-nightly-image
   cron: '@daily'
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: assisted-image-service
     env:
-      RELEASE_TAG_PREFIX: ocm-2.13
+      RELEASE_TAG_PREFIX: ocm-2.14
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: assisted-image-service
     env:
-      RELEASE_TAG_PREFIX: ocm-2.13
+      RELEASE_TAG_PREFIX: ocm-2.14
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
-    export GOCACHE=/tmp/gocache
-    export GOMODCACHE=/tmp/gomodcache
+    export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
     clone: true
-    from: assisted-installer-agent-build
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-- as: unit-test
+    from: assisted-image-service-build
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: test
   commands: |
     export GOCACHE=/tmp/gocache
     export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
-    make REPORTS=${ARTIFACT_DIR} unit-test
+    make test
   container:
     clone: true
-    from: assisted-installer-agent-build
+    from: assisted-image-service-build
   secret:
     mount_path: /tmp/secret
-    name: assisted-installer-agent-codecov-token
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-- as: unit-test-postsubmit
+    name: assisted-image-service-codecov-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: test-postsubmit
   commands: |
     export GOCACHE=/tmp/gocache
     export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
-    make REPORTS=${ARTIFACT_DIR} unit-test
+    make test
   container:
     clone: true
-    from: assisted-installer-agent-build
+    from: assisted-image-service-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
-    name: assisted-installer-agent-codecov-token
-- as: subsystem-test
+    name: assisted-image-service-codecov-token
+- always_run: false
+  as: e2e-ai-operator-ztp
   cluster: build05
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-ofcir-agent
-- as: subsystem-test-periodic
-  cluster: build05
-  cron: 00 20 * * 4,1
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-ofcir-agent
-- as: e2e-ai-operator-ztp
-  cluster: build05
-  pipeline_run_if_changed: ^(hack/.*|pkg/.*|src/.*|scripts/.*|vendor/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore)$
+  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -138,6 +124,6 @@ tests:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
 zz_generated_metadata:
-  branch: release-ocm-2.13
+  branch: release-ocm-2.14
   org: openshift
-  repo: assisted-installer-agent
+  repo: assisted-image-service
