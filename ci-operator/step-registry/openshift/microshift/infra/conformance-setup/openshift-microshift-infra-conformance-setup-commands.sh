@@ -34,6 +34,8 @@ ci_clone_src
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"
 
+curl -o /go/src/github.com/openshift/microshift/origin/skip-optional-components.txt https://raw.githubusercontent.com/pacevedom/microshift/98f5ab252e0d47d77345c93ab356b3d2b34ea262/origin/skip-optional-components.txt
+
 if "${OPTIONAL_RPMS}"; then
   if [ -f /go/src/github.com/openshift/microshift/origin/skip-optional-components.txt ]; then
     cat /go/src/github.com/openshift/microshift/origin/skip-optional-components.txt >> "${SHARED_DIR}/conformance-skip.txt"
