@@ -951,7 +951,7 @@ if [ ${ret} -gt 0 ]; then
     fi
   done
 fi
-
+sleep=1200s
 echo "SKIP_WAIT_FOR=${SKIP_WAIT_FOR}"
 if ! ${SKIP_WAIT_FOR}; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
