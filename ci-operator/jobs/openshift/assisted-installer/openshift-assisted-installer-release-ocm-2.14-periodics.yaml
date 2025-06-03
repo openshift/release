@@ -1,17 +1,17 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
-  cron: 47 3 * * *
+  cluster: build05
+  cron: 38 0 * * *
   decorate: true
   extra_refs:
-  - base_ref: release-ocm-2.13
+  - base_ref: release-ocm-2.14
     org: openshift
-    repo: assisted-installer-agent
+    repo: assisted-installer
   labels:
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-installer-agent-release-ocm-2.13-mirror-nightly-image
+  name: periodic-ci-openshift-assisted-installer-release-ocm-2.14-mirror-nightly-image
   spec:
     containers:
     - args:
@@ -60,29 +60,25 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 00 20 * * 4,1
+  cron: 51 1 * * *
   decorate: true
   extra_refs:
-  - base_ref: release-ocm-2.13
+  - base_ref: release-ocm-2.14
     org: openshift
-    repo: assisted-installer-agent
+    repo: assisted-installer
   labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci-operator.openshift.io/cluster: build05
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-installer-agent-release-ocm-2.13-subsystem-test-periodic
+  name: periodic-ci-openshift-assisted-installer-release-ocm-2.14-mirror-nightly-image-controller
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=subsystem-test-periodic
+      - --target=mirror-nightly-image-controller
       command:
       - ci-operator
       image: ci-operator:latest
@@ -92,9 +88,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -112,12 +105,6 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
