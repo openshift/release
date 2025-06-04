@@ -23,7 +23,7 @@ oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
-export NAMESPACE=$TARGET_NAMESPACE
+export NAMESPACE=$TEST_NAMESPACE
 
 while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
   echo "start kraken not found yet, waiting"
