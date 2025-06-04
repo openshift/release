@@ -451,7 +451,7 @@ function check_upgrade_status() {
 
     # https://issues.redhat.com//browse/OTA-861
     # When upgrade is processing, Upgradeable will be set to false
-    sleep 60 # while waiting for condition to populate
+    sleep 120 # while waiting for condition to populate
     local case_id="OCP-25473"
     if [[ "$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].status}')" != "False" ]] \
       && [[ "$TARGET_MINOR_VERSION" -gt 18 ]]; then
