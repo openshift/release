@@ -1,6 +1,7 @@
 # Ignore dynamic imports
 # pylint: disable=E0401, C0413
 
+import os
 import re
 from typing import Dict, List, Set
 
@@ -119,10 +120,19 @@ def get_group_collections() -> Dict[str, List[str]]:
         each value is a list of secret collections associated with that group.
     """
     try:
-        response = requests.get(CONFIG_PATH)
-        data = yaml.safe_load(response.text)
-    except Exception as e:
-        raise click.ClickException(f"Failed to list collections: {e}")
+        config_data = requests.get(CONFIG_PATH, timeout=5)
+        data = yaml.safe_load(config_data.text)
+    except requests.exceptions.RequestException:
+        click.echo(
+            "Failed to fetch configuration from GitHub. Falling back to local config in the release repository..."
+        )
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        release_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+        local_config_path = os.path.join(
+            release_root, "core-services", "sync-rover-groups", "_config.yaml"
+        )
+        with open(local_config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
 
     result = {}
 
