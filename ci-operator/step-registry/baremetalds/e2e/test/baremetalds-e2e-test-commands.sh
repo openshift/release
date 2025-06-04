@@ -141,6 +141,7 @@ RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
 MIRROR_RESULT_LOG=/tmp/image_mirror-\${RELEASE_TAG}.log
 
 MIRRORCOMMAND="oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+  --keep-manifest-list \
   --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} \
   --to=\${MIRRORED_RELEASE_IMAGE} \
   --to-release-image=\${MIRRORED_RELEASE_IMAGE}:\${RELEASE_TAG}"
