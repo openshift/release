@@ -16,3 +16,5 @@ for file in "$SECRETS_DIR"/*; do
     cat "$file"
   fi
 done
+
+sleep 20m
