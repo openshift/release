@@ -233,11 +233,18 @@ cp -rvf ~/pull-secret /run/secrets/ci.openshift.io/cluster-profile
 # Mirror test images
 DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
 export KUBECONFIG=/root/.kube/config
-openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
-oc image mirror -f /tmp/mirror --registry-config ~/pull-secret
-echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
-oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.redhat.io/rhel8/httpd-24:latest ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-12-registry-k8s-io-e2e-test-images-httpd-2-4-38-4-lYFH2l3oSS5xEICa
 
+set +e
+for retry in {1..5}
+do
+    echo "[$(date)] Retrying test image mirror #${retry}"
+    openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror && \
+    oc image mirror -f /tmp/mirror --registry-config ~/pull-secret && \
+    break
+    sleep 15
+done
+set -e
+echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
 
 # Build registries.conf
 tail -n 12 /tmp/oc-mirror.output | tee /tmp/icsp.yaml
