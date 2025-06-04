@@ -27,16 +27,8 @@ resources:
 tests:
 - always_run: false
   as: tempo-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-tracing
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
   steps:
+    cluster_profile: gcp-observability
     env:
       OPERATORS: |
         [
@@ -47,13 +39,15 @@ tests:
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927217
+      SKIP_TESTS: tests/e2e-openshift-object-stores/*sts* tests/e2e-openshift-object-stores/*ibm*
+        tests/e2e-openshift-object-stores/*azure* tests/e2e-openshift-object-stores/*aws*
       TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928198
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

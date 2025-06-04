@@ -10,7 +10,8 @@ oc version
 #export env variabels for Go test cases
 export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
 export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
-export QUAYREGISTRY_QUAY_VERSION=${QUAYREGISTRY_QUAY_VERSION}
+export CSO_INDEX_IMAGE_BUILD=${CSO_INDEX_IMAGE_BUILD}
+export QUAY_VERSION=${QUAY_VERSION}
 
 echo "Run extended-platform-tests"
 extended-platform-tests run all --dry-run | grep -E ${QUAY_UPGRADE_TESTCASE} | extended-platform-tests run --timeout 240m --junit-dir="${ARTIFACT_DIR}" -f - || true

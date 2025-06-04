@@ -17,7 +17,7 @@ echo 'Running foreman-deploy.sh'
 USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
 for i in $(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
-  hammer -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
+  hammer --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
   sleep 10
   badfish -H mgmt-$i -u $USER -p $PWD -i ~/badfish_interfaces.yml -t foreman
 done

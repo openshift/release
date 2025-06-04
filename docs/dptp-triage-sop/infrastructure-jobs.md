@@ -184,7 +184,7 @@ a team, organization or something similar.
 
 ## `periodic-openshift-release-fast-forward`
 
-This job runs [repo-brancher](https://github.com/openshift/ci-tools/tree/master/cmd/repo-brancher) in `fast-forward` mode
+This job runs [repo-brancher](https://github.com/openshift/ci-tools/tree/main/cmd/repo-brancher) in `fast-forward` mode
 in an attempt to fast-forward git content from the current development branch to the future branches if they already exist.
 
 #### Useful links
@@ -214,7 +214,7 @@ The repo is in a bad state where someone has pushed directly to the future relea
 
 ## `periodic-check-gh-automation`
 
-This job runs [`check-gh-automation`](https://github.com/openshift/ci-tools/tree/master/cmd/check-gh-automation) in order 
+This job runs [`check-gh-automation`](https://github.com/openshift/ci-tools/tree/main/cmd/check-gh-automation) in order 
 to verify that all repos with CI configured are accessible by our automation. It checks that `openshift-merge-robot` and `openshift-ci-robot`
 are collaborators in each repo that has a directory in the [prow config](https://github.com/openshift/release/tree/master/core-services/prow/02_config).
 
@@ -246,7 +246,7 @@ additional `ignore` parameter.
 
 ## `periodic-openshift-release-private-org-sync`
 
-This job runs [`private-org-sync`](https://github.com/openshift/ci-tools/tree/master/cmd/private-org-sync) to
+This job runs [`private-org-sync`](https://github.com/openshift/ci-tools/tree/main/cmd/private-org-sync) to
 sync `openshift-priv`
 mirror repos with their respective "public" repos.
 
@@ -302,3 +302,27 @@ $ rg registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2 ./core-services
 
 $ oc image mirror --keep-manifest-list --skip-multiple-scopes --force --registry-config /tmp/.dockerconfigjson quay.io/kubevirt/prom-metrics-linter:v0.0.2 registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2
 ```
+
+## `periodic-prow-auto-config-brancher`
+This job runs [`autoconfigbrancher`](https://github.com/openshift/ci-tools/tree/main/cmd/autoconfigbrancher).
+
+#### Useful Links
+
+- [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-prow-auto-config-brancher)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+
+### Failed to get pullspec
+
+#### Symptom
+
+```
+Failed to get pullspec for version range `>4.19.0-0 <4.20.0-0`" error="failed to request latest release: server responded with 404: no tags exist within the release that satisfy the request\n
+```
+
+#### Culprit
+
+Th job is trying to find a cluster pool image for a version range that does not exist in the hive cluster. This can happen as a result of a new release being created.
+
+#### Resolution
+
+Create a PR similar to this one: https://github.com/openshift/release/pull/65517

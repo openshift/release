@@ -5,8 +5,8 @@ workflow:
     - chain: ipi-conf-vsphere
     - chain: ipi-conf-vsphere-nested-host-groups
     - chain: ipi-install-vsphere
-    - ref: storage-conf-csi-vsphere
-    - ref: storage-obj-save    
+    - ref: storage-conf-csi-vsphere-topology
+    - ref: storage-obj-save
     test:
     - ref: openshift-e2e-test
     post:
@@ -16,7 +16,8 @@ workflow:
     env:      
       POOLS: "vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3"
       NETWORK_TYPE: nested-multi-tenant
-      HOSTS: 2      
+      # Set "HOSTS: 1" to make sure each zone have 1 nested esxi host
+      HOSTS: 1   
       FEATURE_GATES: '["VSphereHostVMGroupZonal=true"]'
       FEATURE_SET: CustomNoUpgrade
       OPENSHIFT_REQUIRED_CORES: 48
@@ -25,6 +26,9 @@ workflow:
       TEST_CSI_DRIVER_MANIFEST: manifest-vsphere.yaml
       TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-vsphere.yaml
       TEST_SUITE: openshift/csi
+      # The vm-host zonal is used in a vsan stretched cluster, which is using the same shared datastore across zones by default
+      # configure as using different local datastores across zones by set "USING_NESTED_SHARED_DATASTORE: false"
+      USING_NESTED_SHARED_DATASTORE: "false"
   documentation: |-
     Deploys a nested vCenter 8 with 2 hosts, each of which are in their own host group and
     run e2e csi testsuite.

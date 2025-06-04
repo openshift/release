@@ -1,8 +1,9 @@
 # Ignore dynamic imports
 # pylint: disable=E0401, C0413
 
+import os
 import re
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import click
 import requests
@@ -110,7 +111,7 @@ def create_payload(from_file: str, from_literal: str) -> bytes:
         raise click.UsageError(f"Failed to read file '{from_file}': {e}")
 
 
-def get_secret_collections() -> Dict[str, List[str]]:
+def get_group_collections() -> Dict[str, List[str]]:
     """
     Returns a dictionary mapping each group to its associated secret collections.
 
@@ -119,10 +120,19 @@ def get_secret_collections() -> Dict[str, List[str]]:
         each value is a list of secret collections associated with that group.
     """
     try:
-        response = requests.get(CONFIG_PATH)
-        data = yaml.safe_load(response.text)
-    except Exception as e:
-        raise click.ClickException(f"Failed to list collections: {e}")
+        config_data = requests.get(CONFIG_PATH, timeout=5)
+        data = yaml.safe_load(config_data.text)
+    except requests.exceptions.RequestException:
+        click.echo(
+            "Failed to fetch configuration from GitHub. Falling back to local config in the release repository..."
+        )
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        release_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+        local_config_path = os.path.join(
+            release_root, "core-services", "sync-rover-groups", "_config.yaml"
+        )
+        with open(local_config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
 
     result = {}
 
@@ -132,3 +142,36 @@ def get_secret_collections() -> Dict[str, List[str]]:
             result[group_name] = sorted(collections)
 
     return result
+
+
+def get_collections() -> Set[str]:
+    """
+    Returns a set of all existing collections.
+
+    Returns:
+        Set[str]: A set containing all secret collections.
+    """
+    colls_dict = get_group_collections()
+    colls_set = set()
+
+    for _, collections in colls_dict.items():
+        for c in collections:
+            colls_set.add(c)
+
+    return colls_set
+
+
+def check_if_collection_exists(collection: str) -> bool:
+    """
+    Verifies that the collection exists in the configuration file
+    in the release repository (source of truth).
+
+    Args:
+        collection (str): Name of the collection to check.
+
+    Returns:
+        bool: True if collection is one of the defined collections
+        in the configuration file, False otherwise.
+    """
+    s = get_collections()
+    return collection in s
