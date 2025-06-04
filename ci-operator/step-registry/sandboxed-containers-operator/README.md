@@ -30,6 +30,11 @@ The [sandboxed-containers-operator-pre](./pre/) chain wraps the steps that prepa
 
 This chain is meant to be referenced in the `pre` condition of the workflow.
 
+### sandboxed-containers-operator-ipi-azure-pre
+
+The [sandboxed-containers-operator-ipi-azure-pre](./ipi/azure-pre/) chain customize [ipi-azure-pre](../ipi/azure/pre/)
+to allow creating the Openshift cluster by default in the **eastus** region of Azure.
+
 ## workflows
 
 Here is the list of workflows.
