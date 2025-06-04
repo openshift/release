@@ -15,8 +15,8 @@ export QUAY_VERSION=${QUAY_VERSION}
 
 #qbo upgrade
 
-QUAY_REGISTRY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
-QUAY_ACCESS_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
+QUAY_REGISTRY_ROUTE=$([ -f "${SHARED_DIR}/quayroute" ] && cat "$SHARED_DIR"/quayroute || echo "") #https://quayhostname
+QUAY_ACCESS_TOKEN=$([ -f "${SHARED_DIR}/quay_oauth2_token" ] && cat "$SHARED_DIR"/quay_oauth2_token || echo "")
 
 export QBO_INDEX_IMAGE_BUILD
 export QUAY_REGISTRY_ROUTE
