@@ -572,8 +572,12 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
-echo "Enabling log forwarding manifests..."
-cat >"manifests/99_journal_forward_machine_config_master.yaml" <<-EOF
+JOURNAL_LOGGING_ENABLED="$(cat /var/run/vault/vsphere-ibmcloud-config/journal-logging-enabled)"
+JOURNAL_LOGGING_ENABLED="${JOURNAL_LOGGING_ENABLED,,}"
+
+if [[ "${JOURNAL_LOGGING_ENABLED}" == "true" ]]; then
+  echo "Enabling journal forwarding machine config manifests..."
+  cat >"manifests/99_journal_forward_machine_config_master.yaml" <<-EOF
 ---
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -612,7 +616,7 @@ spec:
             WantedBy=multi-user.target
 EOF
 
-cat >"manifests/99_journal_forward_machine_config_compute.yaml" <<-EOF
+  cat >"manifests/99_journal_forward_machine_config_compute.yaml" <<-EOF
 ---
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -650,6 +654,7 @@ spec:
             [Install]
             WantedBy=multi-user.target
 EOF
+fi 
 
 # remove channel from CVO
 sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
