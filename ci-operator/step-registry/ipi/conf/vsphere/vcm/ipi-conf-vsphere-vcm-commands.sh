@@ -273,3 +273,88 @@ if [ ${Z_VERSION} -gt 9 ]; then
     echo "$(date -u --rfc-3339=seconds) - pull-through cache force disabled"
   fi
 fi
+
+JOURNAL_LOGGING_ENABLED="$(cat /var/run/vault/vsphere-ibmcloud-config/journal-logging-enabled)"
+JOURNAL_LOGGING_ENABLED="${JOURNAL_LOGGING_ENABLED,,}"
+
+if [[ "${JOURNAL_LOGGING_ENABLED}" == "true" ]]; then
+  echo "Enabling journal forwarding machine config manifests..."
+
+  cat >"${SHARED_DIR}/manifest_99_jrnl_cp.yml" <<-EOF
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: journal-forwarder-master
+spec:
+  config:
+    storage:
+      files:
+      - contents:
+          source: data:;base64,IyEvYmluL3NoCgppZiBbICIkIyIgLWd0IDAgXTsgdGhlbgogICAgIyBXZSBoYXZlIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIE91dHB1dCB0aGVtIHdpdGggbmV3bGluZXMgaW4tYmV0d2Vlbi4KICAgIHByaW50ZiAnJXNcbicgIiRAIgplbHNlCiAgICAjIE5vIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIEp1c3QgcGFzcyBzdGRpbiBvbi4KICAgIGNhdApmaSB8CndoaWxlIElGUz0gcmVhZCAtciBzdHJpbmc7IGRvCiAgICBjdXJsIC1YIFBPU1QgXAogICAgIC1IICJDb250ZW50LVR5cGU6IHRleHQvcGxhaW4iIFwKICAgICAtSCAibm9kZS1pZDogJChob3N0bmFtZSkiIFwKICAgICAtZCAiJHN0cmluZyIgXAogICAgIGh0dHA6Ly9sb2ctZ2F0aGVyLnZtYy5jaS5vcGVuc2hpZnQub3JnOjgwMDAgPiAvZGV2L251bGwgMj4mMQpkb25l
+        mode: 0777
+        overwrite: true
+        path: /var/journal-gather-forwarder/forward.sh
+    
+    ignition:
+      version: 3.4.0
+    systemd:
+      units:
+        - name: journal-forwarder.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Forwards the journal to log server
+            After=network.target
+            Wants=network-online.target
+            [Service]
+            Restart=always
+            Type=simple
+            RestartSec=30
+            ExecStart=/bin/sh -c "stdbuf -oL journalctl -f | /var/journal-gather-forwarder/forward.sh"
+            Environment=
+            [Install]
+            WantedBy=multi-user.target
+EOF
+
+  cat >"${SHARED_DIR}/manifest_99_jrnl_compute.yml" <<-EOF
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: journal-forwarder-compute
+spec:
+  config:
+    storage:
+      files:
+      - contents:
+          source: data:;base64,IyEvYmluL3NoCgppZiBbICIkIyIgLWd0IDAgXTsgdGhlbgogICAgIyBXZSBoYXZlIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIE91dHB1dCB0aGVtIHdpdGggbmV3bGluZXMgaW4tYmV0d2Vlbi4KICAgIHByaW50ZiAnJXNcbicgIiRAIgplbHNlCiAgICAjIE5vIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIEp1c3QgcGFzcyBzdGRpbiBvbi4KICAgIGNhdApmaSB8CndoaWxlIElGUz0gcmVhZCAtciBzdHJpbmc7IGRvCiAgICBjdXJsIC1YIFBPU1QgXAogICAgIC1IICJDb250ZW50LVR5cGU6IHRleHQvcGxhaW4iIFwKICAgICAtSCAibm9kZS1pZDogJChob3N0bmFtZSkiIFwKICAgICAtZCAiJHN0cmluZyIgXAogICAgIGh0dHA6Ly9sb2ctZ2F0aGVyLnZtYy5jaS5vcGVuc2hpZnQub3JnOjgwMDAgPiAvZGV2L251bGwgMj4mMQpkb25l
+        mode: 0777
+        overwrite: true
+        path: /var/journal-gather-forwarder/forward.sh
+    
+    ignition:
+      version: 3.4.0
+    systemd:
+      units:
+        - name: journal-forwarder.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Forwards the journal to log server
+            After=network.target
+            Wants=network-online.target
+            [Service]
+            Restart=always
+            Type=simple
+            RestartSec=30
+            ExecStart=/bin/sh -c "stdbuf -oL journalctl -f | /var/journal-gather-forwarder/forward.sh"
+            Environment=
+            [Install]
+            WantedBy=multi-user.target
+EOF
+fi 
