@@ -19,7 +19,10 @@ import glob
 import json
 from junitparser import JUnitXml, TestSuite
 
-def parse_known_failures():
+# Constants
+SUCCESS_MESSAGE = "✅ All tests passed or were skipped"
+
+def parse_known_failures() -> list:
     """
     Parse the KNOWN_FAILURES environment variable.
     Expected format: JSON array of test identifiers
@@ -60,7 +63,7 @@ def is_known_failure(test_case_name, known_failures):
     
     return False
 
-def verify_junit_reports(directory):
+def verify_junit_reports(directory) -> int:
     """
     Verify all JUnit XML reports in the given directory.
     Returns 1 if any test failed, 0 if all tests passed or were skipped.
@@ -143,7 +146,7 @@ def verify_junit_reports(directory):
         print(f"❌ {failed_tests} test(s) failed")
         return 1
     else:
-        success_msg = "✅ All tests passed or were skipped"
+        success_msg = SUCCESS_MESSAGE
         if skipped_known_failures > 0:
             success_msg += f" ({skipped_known_failures} known failures ignored)"
         print(success_msg)
