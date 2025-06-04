@@ -15,6 +15,10 @@ base_images:
     name: network-observability-cli
     namespace: netobserv
     tag: ci
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -109,6 +113,17 @@ images:
         yum clean all && rm -rf /var/cache/yum/* /tmp/*
   from: tools
   to: tests-private-baseui
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ocp-qe-perfscale-ci
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-burner
 - dockerfile_literal: |
     FROM bin AS bin
     FROM this-is-ignored-and-not-used
