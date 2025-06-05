@@ -107,11 +107,10 @@ function upgrade_cluster_to () {
     fi
 
     rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1 || true
-    upgrade_sched=$(rosa list upgrade -c $cluster_id)
-    echo $upgrade_sched
+    rosa list upgrade -c $cluster_id
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
-      current_sched=$(echo $upgrade_sched | grep -Ei 'started|scheduled|pending' | awk '{print$1}')
+      current_sched=$(rosa list upgrade -c $cluster_id | grep -Ei 'started|scheduled|pending' | awk '{print$1}')
       if [[ "$current_sched" == "$recommended_version" ]]; then
         log "Upgrade is already scheduled to the right version"
         log "$upgrade_info"
@@ -181,6 +180,10 @@ function upgrade_cluster_to () {
     if [[ "$current_version" == "$recommended_version" ]]; then
       record_cluster "timers.ocp_upgrade" "${recommended_version}" $(( $(date +"%s") - "${start_time}" ))
       log "Upgrade the cluster $cluster_id to the openshift version $recommended_version successfully after $(( $(date +"%s") - ${start_time} )) seconds"
+      set_proxy
+      log "Cluster state after upgrade"
+      oc get clusteroperators
+      unset_proxy
       break
     fi
 
