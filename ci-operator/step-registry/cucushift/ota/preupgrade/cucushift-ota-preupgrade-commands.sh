@@ -514,7 +514,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to-image with to multi arch" \
     "oc adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:f44f1570d0b88a75034da9109211bb39672bc1a5d063133a50dcda7c12469ca7 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
 
@@ -522,7 +522,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to with to multi arch" \
     "oc adm upgrade --to 4.10.0 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
     # verify not progressing.
