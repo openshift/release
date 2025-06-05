@@ -331,6 +331,38 @@ function suite() {
     set +x
 }
 
+function ensureipsecfullenabled() {
+  while true; do
+    if oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes -o json | jq '.status.desiredNumberScheduled == .status.currentNumberScheduled and .status.desiredNumberScheduled == .status.numberReady' | grep -q true; then
+      break
+    fi
+    echo "Waiting for ovn-ipsec-host DaemonSet to be ready"
+    sleep 5
+  done
+  ensureclusteroperatorsready
+}
+
+function ensureipsecexternalenabled() {
+  while true; do
+    if ! oc get daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes; then
+      break
+    fi
+    echo "Waiting for ovn-ipsec-host DaemonSet to be deleted"
+    sleep 5
+  done
+  ensureclusteroperatorsready
+}
+
+function ensureclusteroperatorsready() {
+  until
+    oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+  do
+    sleep 30 && echo "Cluster Operators Degraded=True,Progressing=True,or Available=False";
+  done
+}
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 
 oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
@@ -515,6 +547,22 @@ suite-conformance)
     ;;
 suite)
     suite
+    ;;
+ipsec-suite)
+     # Rollout IPsec Full mode and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full"}}}}}'
+     ensureipsecfullenabled
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec External mode and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"External"}}}}}'
+     ensureipsecexternalenabled
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec Full mode with NAT-T encapsulation and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full", "full":{"encapsulation": "Always"}}}}}}'
+     ensureipsecfullenabled
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"
