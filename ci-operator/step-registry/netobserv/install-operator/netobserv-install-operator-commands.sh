@@ -120,7 +120,7 @@ patch_csv_images(){
   CSV=$(oc get csv -n openshift-netobserv-operator | grep -iE "net.*observ" | awk '{print $1}')
 
   # patch as Downstream to scrape metrics
-  oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p='[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/3/value", "value": "true"}]'
+  oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p='[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/4/value", "value": "true"}]'
 
   if [[ $PATCH_EBPFAGENT_IMAGE ]]; then
     PATCH="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0/value\", \"value\": \"$PATCH_EBPFAGENT_IMAGE\"}]"
