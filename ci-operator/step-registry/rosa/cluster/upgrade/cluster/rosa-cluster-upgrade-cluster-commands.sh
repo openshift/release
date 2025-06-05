@@ -112,7 +112,7 @@ function upgrade_cluster_to () {
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
       current_sched=$(echo $upgrade_sched | grep -Ei 'started|scheduled|pending' | awk '{print$1}')
-      if [[ "$current_sched" == $recommended_version ]]; then
+      if [[ "$current_sched" == "$recommended_version" ]]; then
         log "Upgrade is already scheduled to the right version"
         log "$upgrade_info"
       else
@@ -158,7 +158,7 @@ function upgrade_cluster_to () {
         # ROSA cluster kubeadmin user auth is required for this patch command
         ocm get /api/clusters_mgmt/v1/clusters/"$cluster_id"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/kubeconfig-$cluster_id"
         set_proxy
-        log "oc patch mcp worker --patch '{"spec":{"maxUnavailable": "'"${NP_MAX_UNAVAILABLE}"'"}}' --type=merge"
+        log "oc patch mcp worker with maxUnavailable to ${NP_MAX_UNAVAILABLE}"
         oc --kubeconfig "${SHARED_DIR}/kubeconfig-$cluster_id" patch mcp worker --patch '{"spec":{"maxUnavailable": "'"${NP_MAX_UNAVAILABLE}"'"}}' --type=merge
         unset_proxy
       else
