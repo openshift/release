@@ -55,7 +55,7 @@ echo "deprovisioning clusters with an expirationDate before ${aws_cluster_age_cu
 # --region is necessary when there is no profile customization
 for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ); do
 	echo "deprovisioning in AWS region ${region} ..."
-	aws ec2 describe-vpcs --output json --region us-east-1 | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | .Key' > /tmp/clusters
+	aws ec2 describe-vpcs --output json --region ${region} | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | .Key' > /tmp/clusters
 	while read cluster; do
 		workdir="${logdir}/${cluster:22}"
 		mkdir -p "${workdir}"
