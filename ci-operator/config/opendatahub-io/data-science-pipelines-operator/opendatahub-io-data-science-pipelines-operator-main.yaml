@@ -1,8 +1,18 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y --nodocs make git golang docker python3-pip python39 && \
+        ln -s $(which pip3) /usr/bin/pip && \
+        alternatives --set python3 /usr/bin/python3.9 && \
+        ln -s /usr/bin/python3.9 /usr/bin/python && \
+        ln -s /cli/oc /usr/bin/kubectl && \
+        curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz" \
+        | tar -xz -C /usr/local/bin
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: data-science-pipelines-operator
 releases:
   latest:
     release:
@@ -27,8 +37,15 @@ tests:
     test:
     - as: integration-test-odh-dspo
       cli: latest
-      commands: |
-        echo "Add tests"
+      commands: "export GIT_WORKSPACE=$(pwd)\nexport DSPA_PATH=tests/resources/dspa-lite-tls.yaml\nexport
+        CONTAINER_CLI=podman\nexport RUN_PKG_UPLOADER_IN_CONTAINER=false\nexport KUBECONFIGPATH=${KUBECONFIG}\ncd
+        ${GIT_WORKSPACE}/.github/scripts/tests\n\ncurl -O https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_kustomize.v5.6.0_linux_amd64\nmv
+        kustomize_kustomize.v5.6.0_linux_amd64 kustomize\nchmod +x kustomize\nexport
+        PATH=`pwd`:$PATH\necho \"Python version is:\" \npython --version\nsh tests.sh
+        --openshift-ci\n"
+      dependencies:
+      - env: DSPO_IMAGE_REF
+        name: data-science-pipelines-operator
       from: src
       resources:
         requests:
