@@ -17,6 +17,7 @@ QUAY_OAUTH_TOKEN=$([ -f "${SHARED_DIR}/quay_oauth2_token" ] && cat "$SHARED_DIR"
 echo "STAGE_USERNAME: $STAGE_USERNAME"
 echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN $QUAY_ROUTE"
 
+
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
