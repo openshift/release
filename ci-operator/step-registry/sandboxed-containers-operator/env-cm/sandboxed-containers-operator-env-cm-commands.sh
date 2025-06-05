@@ -3,7 +3,6 @@
 catsrcname="kataci-index"
 # TODO: should use configurable branch instead of 'devel'?
 podvm_img_url="https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/devel/config/peerpods/podvm/"
-runtimeclass="kata"
 test_workload="kata"
 configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
 
@@ -20,7 +19,6 @@ else
 fi
 
 if [[ "$ENABLEPEERPODS" == "true" ]]; then
-  runtimeclass="kata-remote"
   # TODO: figure how to to set workload "coco" when CoCo testing
   test_workload="peer-pods"
 fi
@@ -42,7 +40,7 @@ data:
   eligibleSingleNode: "false"
   enableGPU: "${ENABLEGPU}"
   podvmImageUrl: "${podvm_img_url}"
-  runtimeClassName: "${runtimeclass}"
+  runtimeClassName: "${RUNTIMECLASS}"
   enablePeerPods: "${ENABLEPEERPODS}"
   mustgatherimage: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
   workloadImage: "quay.io/openshift/origin-hello-openshift"
