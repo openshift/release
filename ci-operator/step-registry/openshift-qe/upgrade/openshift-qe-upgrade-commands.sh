@@ -65,7 +65,7 @@ while [[ $IF_DEGRADED == *true* ]];
 do
 	echo -n "."&&sleep 10
 	RETRY=$(($RETRY + 1 ))
-	if [[ $RETRY -gt 60 ]];then
+	if [[ $RETRY -gt 120 ]];then
 		echo "The cluster operator isn't ready, skipping upgrade"
 		echo "-----------------------------------------------------------"
 		oc get co
