@@ -72,6 +72,7 @@ tests/e2e-pdb \
 tests/e2e-opampbridge \
 tests/e2e-otel \
 tests/e2e-multi-instrumentation \
+tests/e2e-targetallocator-cr \
 tests/e2e-targetallocator || any_errors=true
 
 # Set the operator args required for tests execution.
