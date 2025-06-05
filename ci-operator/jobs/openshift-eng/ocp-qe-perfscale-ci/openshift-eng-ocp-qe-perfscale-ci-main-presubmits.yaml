@@ -11058,6 +11058,83 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
+    context: ci/prow/azure-4.19-nightly-multi-loaded-upgrade-from-4.18-multi-loaded-upgrade-417to418-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+      ci-operator.openshift.io/variant: azure-4.19-nightly-multi-loaded-upgrade-from-4.18
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-azure-4.19-nightly-multi-loaded-upgrade-from-4.18-multi-loaded-upgrade-417to418-24nodes
+    rerun_command: /test azure-4.19-nightly-multi-loaded-upgrade-from-4.18-multi-loaded-upgrade-417to418-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=multi-loaded-upgrade-417to418-24nodes
+        - --variant=azure-4.19-nightly-multi-loaded-upgrade-from-4.18
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(azure-4.19-nightly-multi-loaded-upgrade-from-4.18-multi-loaded-upgrade-417to418-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/azure-4.19-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -12013,7 +12090,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.14-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -12101,7 +12178,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.14-nightly-x86-data-path-9nodes
     decorate: true
     decoration_config:
@@ -12190,7 +12267,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.14-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -12267,7 +12344,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.14-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -12355,7 +12432,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.14-nightly-x86-node-density-heavy-etcd-fips-24nodes
     decorate: true
     decoration_config:
@@ -12444,7 +12521,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.15-nightly-arm-control-plane-arm-3nodes
     decorate: true
     decoration_config:
@@ -12522,7 +12599,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.15-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -12610,7 +12687,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.15-nightly-x86-data-path-9nodes
     decorate: true
     decoration_config:
@@ -12699,7 +12776,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.15-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -12776,7 +12853,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.15-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -12864,7 +12941,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.15-nightly-x86-node-density-heavy-etcd-fips-24nodes
     decorate: true
     decoration_config:
@@ -12953,7 +13030,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.16-nightly-x86-cluster-density-v2-etcd-fips-120nodes
     decorate: true
     decoration_config:
@@ -13031,7 +13108,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.16-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -13119,7 +13196,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.16-nightly-x86-control-plane-etcd-fips-120nodes
     decorate: true
     decoration_config:
@@ -13197,7 +13274,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.16-nightly-x86-data-path-9nodes
     decorate: true
     decoration_config:
@@ -13286,7 +13363,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.16-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -13363,7 +13440,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.16-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -13451,7 +13528,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.16-nightly-x86-node-density-heavy-etcd-fips-24nodes
     decorate: true
     decoration_config:
@@ -13540,7 +13617,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.17-nightly-x86-cluster-density-v2-etcd-fips-120nodes
     decorate: true
     decoration_config:
@@ -13618,7 +13695,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.17-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -13706,7 +13783,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.17-nightly-x86-control-plane-etcd-fips-120nodes
     decorate: true
     decoration_config:
@@ -13784,7 +13861,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.17-nightly-x86-data-path-9nodes
     decorate: true
     decoration_config:
@@ -13873,7 +13950,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.17-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -13950,7 +14027,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.17-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -14038,7 +14115,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.18-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -14126,7 +14203,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.18-nightly-x86-control-plane-etcd-fips-120nodes
     decorate: true
     decoration_config:
@@ -14204,7 +14281,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.18-nightly-x86-control-plane-ipsec-3nodes
     decorate: true
     decoration_config:
@@ -14282,7 +14359,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.18-nightly-x86-data-path-9nodes
     decorate: true
     decoration_config:
@@ -14371,7 +14448,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.18-nightly-x86-loaded-upgrade-from-4.17-loaded-upgrade-417to418-24nodes
     decorate: true
     decoration_config:
@@ -14448,7 +14525,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.18-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -14525,7 +14602,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.18-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -14613,7 +14690,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.19-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -14701,7 +14778,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.19-nightly-x86-control-plane-etcd-fips-120nodes
     decorate: true
     decoration_config:
@@ -14779,7 +14856,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.19-nightly-x86-control-plane-ipsec-3nodes
     decorate: true
     decoration_config:
@@ -14857,7 +14934,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.19-nightly-x86-data-path-9nodes
     decorate: true
     decoration_config:
@@ -14946,7 +15023,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.19-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -15023,7 +15100,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.19-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -24130,7 +24207,7 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 4h0m0s
+      timeout: 5h0m0s
     labels:
       capability/sshd-bastion: sshd-bastion
       ci-operator.openshift.io/cloud: nutanix
@@ -24390,6 +24467,96 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(nutanix-4.18-nightly-x86-node-density-heavy-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/nutanix-4.19-nightly-x86-control-plane-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 4h0m0s
+    labels:
+      capability/sshd-bastion: sshd-bastion
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix-qe-zone
+      ci-operator.openshift.io/variant: nutanix-4.19-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-nutanix-4.19-nightly-x86-control-plane-24nodes
+    reporter_config:
+      slack:
+        channel: '#ocp-qe-scale-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test nutanix-4.19-nightly-x86-control-plane-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=control-plane-24nodes
+        - --variant=nutanix-4.19-nightly-x86
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(nutanix-4.19-nightly-x86-control-plane-24nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
