@@ -43,7 +43,7 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 UUID=$(uuidgen)
 
-# Inicialize the environment, indexing not required
+# Initialize the environment, indexing not required
 
 WORKLOAD=web-burner-init EXTRA_FLAGS="--uuid=${UUID} --gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD}" ./run.sh
 
