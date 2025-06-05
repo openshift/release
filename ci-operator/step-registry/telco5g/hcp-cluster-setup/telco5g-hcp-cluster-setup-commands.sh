@@ -57,7 +57,7 @@ if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
     INTERNAL=true
     INTERNAL_ONLY=true
 # Using internalbos temporarily 
-    CL_SEARCH="internalbos"
+    CL_SEARCH="computeqe"
     HOSTS_NUMBER=" --number 2"
 fi
 
