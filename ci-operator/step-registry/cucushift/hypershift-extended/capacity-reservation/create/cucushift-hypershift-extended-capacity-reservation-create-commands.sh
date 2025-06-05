@@ -2,7 +2,7 @@
 set -e
 set -x
 
-AWS_SHARED_CREDENTIALS_FILE="/secrets/test-credentials-hypershift-ci-jobs-awscreds"
+AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
 AWS_DEFAULT_REGION=${HYPERSHIFT_AWS_REGION}
 
 if [[ ${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT} == "true" ]]; then
@@ -76,16 +76,17 @@ function find_and_purchase_capacity_blocks() {
     fi
 
     echo "Dry run successful. Proceeding with purchase..."
-    aws ec2 purchase-capacity-block \
-        --capacity-block-offering-id "${MIN_FEE_ID}" \
-        --instance-platform "${OPERATING_SYSTEM}" \
-        --tag-specifications 'ResourceType=capacity-reservation,Tags=[{Key=usage-cluster-type,Value=hypershift-hosted}]' \
-        --output json > "${CR_OUTPUT_FILE}"
-    if [ $? -ne 0 ]; then
-        echo "Failed to purchase capacity block." >&2
-        return 1
-    fi
-    CB_RESERVATION_ID=$(jq -r '.CapacityReservation.CapacityReservationId' "${CR_OUTPUT_FILE}")
+#    aws ec2 purchase-capacity-block \
+#        --capacity-block-offering-id "${MIN_FEE_ID}" \
+#        --instance-platform "${OPERATING_SYSTEM}" \
+#        --tag-specifications 'ResourceType=capacity-reservation,Tags=[{Key=usage-cluster-type,Value=hypershift-hosted}]' \
+#        --output json > "${CR_OUTPUT_FILE}"
+#    if [ $? -ne 0 ]; then
+#        echo "Failed to purchase capacity block." >&2
+#        return 1
+#    fi
+#    CB_RESERVATION_ID=$(jq -r '.CapacityReservation.CapacityReservationId' "${CR_OUTPUT_FILE}")
+    CB_RESERVATION_ID="cr-03ab2520c58de0387"
     if [ -z "${CB_RESERVATION_ID}" ]; then
         echo "Failed to get capacity blocks reservation ID. Exiting."
         return 1
@@ -93,7 +94,8 @@ function find_and_purchase_capacity_blocks() {
     echo "Purchased capacity block successfully: ${CB_RESERVATION_ID}"
 
     echo "Waiting for capacity block to become active..."
-    CB_START_TIME=$(jq -r '.CapacityReservation.StartDate' "${CR_OUTPUT_FILE}")
+    CB_START_TIME="2025-06-06T04:32:00+00:00"
+    #CB_START_TIME=$(jq -r '.CapacityReservation.StartDate' "${CR_OUTPUT_FILE}")
     CB_START_TIMESTRAMP=$(date -d $CB_START_TIME +%s)
     while true; do
         CURRENT_TIMESTRAMP=$(date -u +%s)

@@ -2,7 +2,7 @@
 set -e
 set -x
 
-AWS_SHARED_CREDENTIALS_FILE="/secrets/test-credentials-hypershift-ci-jobs-awscreds"
+AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
 AWS_DEFAULT_REGION=${HYPERSHIFT_AWS_REGION}
 
 if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
