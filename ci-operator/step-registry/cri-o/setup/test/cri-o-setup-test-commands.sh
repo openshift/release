@@ -11,6 +11,7 @@ ${SHARED_DIR}/login_script.sh
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
+    set -xeuo pipefail
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
     ansible-playbook setup-main.yml --connection=local -vvv
