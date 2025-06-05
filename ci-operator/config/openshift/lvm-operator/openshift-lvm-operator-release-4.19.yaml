@@ -4,15 +4,15 @@ base_images:
     namespace: ocp
     tag: v1.31.0
   must-gather:
-    name: "4.20"
+    name: "4.19"
     namespace: ocp
     tag: must-gather
-  ocp_4.20_base-rhel9:
-    name: "4.20"
+  ocp_4.19_base-rhel9:
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
   operator-sdk:
-    name: "4.20"
+    name: "4.19"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make build build-vgmanager
@@ -20,10 +20,10 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.20
+    tag: rhel-9-golang-1.23-openshift-4.19
 images:
 - dockerfile_literal: |-
-    FROM ocp_4.20_base-rhel9
+    FROM ocp_4.19_base-rhel9
     RUN dnf install -y make git python3 python3-pip patch
     RUN pip3 install pre-commit
 
@@ -47,7 +47,7 @@ images:
     RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
     RUN chmod +x ${SNYK_DIR}/snyk
     ENV PATH=$PATH:${SNYK_DIR}
-  from: ocp_4.20_base-rhel9
+  from: ocp_4.19_base-rhel9
   inputs:
     root:
       as:
@@ -55,7 +55,7 @@ images:
   to: lvms-pre-commit
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
       - fedora:latest
   to: lvm-operator
@@ -70,31 +70,16 @@ operator:
   substitutions:
   - pullspec: quay.io/lvms_dev/lvms-operator:latest
     with: pipeline:lvm-operator
-promotion:
-  to:
-  - additional_images:
-      lvm-operator-bundle: lvm-operator-bundle
-    excluded_images:
-    - lvms-pre-commit
-    namespace: lvms
-    tag: latest
-    tag_by_commit: true
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.19"
       namespace: ocp
-  multi-latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.20"
 resources:
   '*':
     limits:
@@ -158,11 +143,9 @@ tests:
     name: lvms-snyk-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
-  cron: '@daily'
-  presubmit: true
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -177,25 +160,11 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-gather
-      cli: latest
-      commands: |
-        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
-      dependencies:
-      - env: GATHER_IMG
-        name: lvms-must-gather
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
 - as: e2e-aws
-  cron: '@daily'
-  presubmit: true
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -205,57 +174,13 @@ tests:
     - as: e2e-test
       cli: latest
       commands: DISK_INSTALL=true make e2e
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: e2e-gather
-      cli: latest
-      commands: |
-        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
-      dependencies:
-      - env: GATHER_IMG
-        name: lvms-must-gather
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
-- as: e2e-aws-hypershift
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OO_BUNDLE: lvm-operator-bundle
-      RELEASE_IMAGE_LATEST: release:multi-latest
-    env:
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-storage
-    test:
-    - as: e2e-test
-      cli: latest
-      commands: DISK_INSTALL=true make e2e
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: e2e-gather
-      cli: latest
-      commands: |
-        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
-      dependencies:
-      - env: GATHER_IMG
-        name: lvms-must-gather
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
-  branch: main
+  branch: release-4.19
   org: openshift
   repo: lvm-operator
