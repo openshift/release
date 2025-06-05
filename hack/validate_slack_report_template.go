@@ -47,7 +47,7 @@ metadata:
   uid: 32120952-00cb-4563-8f11-63aa0e521527
 spec:
   agent: kubernetes
-  cluster: build02
+  cluster: build04
   decoration_config:
     censor_secrets: true
     gcs_configuration:
