@@ -36,11 +36,17 @@ fi
 
 # Function to copy artifacts to the artifact directory after test run.
 function copyArtifacts {
-  if [ -d "gui_test_screenshots" ]; then
-    cp -r gui_test_screenshots "${ARTIFACT_DIR}/gui_test_screenshots"
-    echo "Artifacts copied successfully."
+  if [ -d "/tmp/monitoring-plugin/web/cypress/screenshots/" ]; then
+    cp -r tmp/monitoring-plugin/web/cypress/screenshots/ "${ARTIFACT_DIR}/screenshots"
+    echo "Screenshots copied successfully."
   else
-    echo "Directory gui_test_screenshots does not exist. Nothing to copy."
+    echo "Directory screenshots does not exist. Nothing to copy."
+  fi
+  if [ -d "/tmp/monitoring-plugin/web/cypress/videos/" ]; then
+    cp -r tmp/monitoring-plugin/web/cypress/videos/ "${ARTIFACT_DIR}/videos"
+    echo "Videos copied successfully."
+  else
+    echo "Directory videos does not exist. Nothing to copy."
   fi
 }
 
