@@ -145,17 +145,21 @@ registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
 oc registry login --to "${new_pull_secret}"
 
-workdir="${SHARED_DIR}/mirror_new"
-mkdir ${workdir}
-#$(oc adm release info $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE  -o=json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name') 
-cd ${workdir}
-oc image extract "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:8ed5e8148da1bae076a46d11bf7c4137183b3a5daddd5d5b80812ce24c322f8a" --path=/usr/bin/oc-mirror:.
-chmod +x ${workdir}/oc-mirror
+changeOCMirror=false
+if ! changeOCMirror ; then
+    oc_mirror_bin="oc-mirror"
+else
+    workdir="${SHARED_DIR}/mirror_new"
+    mkdir ${workdir}
+    #$(oc adm release info $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE  -o=json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name') 
+    cd ${workdir}
+    oc image extract "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:8ed5e8148da1bae076a46d11bf7c4137183b3a5daddd5d5b80812ce24c322f8a" --path=/usr/bin/oc-mirror:.
+    chmod +x ${workdir}/oc-mirror
+    oc_mirror_bin="$workdir/oc-mirror"
+    run_command "which '${oc_mirror_bin}'"
+fi
 
-oc_mirror_bin="$workdir/oc-mirror"
-run_command "which '${oc_mirror_bin}'"
 run_command "'${oc_mirror_bin}' version --output=yaml"
-
 
 # set the imagesetconfigure
 image_set_config="image_set_config.yaml"
