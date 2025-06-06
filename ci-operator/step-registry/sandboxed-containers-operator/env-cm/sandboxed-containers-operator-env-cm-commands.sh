@@ -1,6 +1,5 @@
 #!/bin/bash
 
-catsrcname="kataci-index"
 # TODO: should use configurable branch instead of 'devel'?
 podvm_img_url="https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/devel/config/peerpods/podvm/"
 configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
@@ -13,8 +12,6 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   # TODO: implement me.
   echo "Apply catalog source. Not implemented."
   exit 1
-else
-  catsrcname="redhat-operators"
 fi
 
 cat <<EOF | tee "${configmap_path}"
@@ -24,7 +21,7 @@ metadata:
   name: osc-config
   namespace: default
 data:
-  catalogsourcename: "${catsrcname}"
+  catalogsourcename: "${CATALOG_SOURCE_NAME}"
   operatorVer: "${OPERATOR_INDEX_VERSION}"
   channel: "${OPERATOR_UPDATE_CHANNEL}"
   redirectNeeded: "true"
