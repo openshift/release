@@ -258,6 +258,7 @@ else
 fi
 rm -f "${rsyncd_ignition_patch}"
 
+
 ## ----------------------------------------------------------------
 # MIRROR REGISTORY
 # /opt/registry-$port/auth/htpasswd
