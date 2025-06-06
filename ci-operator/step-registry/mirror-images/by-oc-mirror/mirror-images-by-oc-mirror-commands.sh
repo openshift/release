@@ -23,6 +23,33 @@ handle_error() {
     fi
 }
 
+function check_signed() {
+    local digest algorithm hash_value response try max_retries payload="${1}"
+    if [[ "${payload}" =~ "@sha256:" ]]; then
+        digest="$(echo "${payload}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
+    algorithm="$(echo "${digest}" | cut -f1 -d:)"
+    hash_value="$(echo "${digest}" | cut -f2 -d:)"
+    try=0
+    max_retries=3
+    response=0
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        (( try += 1 ))
+        sleep 60
+    done
+    if (( response == 200 )); then
+        echo "${payload} is signed" && return 0
+    else
+        echo "Seem like ${payload} is not signed" && return 1
+    fi
+}
+
 trap 'handle_error; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 #trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
@@ -122,7 +149,7 @@ workdir="${SHARED_DIR}/mirror_new"
 mkdir ${workdir}
 #$(oc adm release info $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE  -o=json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name') 
 cd ${workdir}
-oc image extract "registry.build10.ci.openshift.org/ci-ln-z8zk6kb/stable@sha256:e98b71286773a4f293367bebfd15c4d233371d71328a16572255d9ac665bd62d" --path=/usr/bin/oc-mirror:.
+oc image extract "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:8ed5e8148da1bae076a46d11bf7c4137183b3a5daddd5d5b80812ce24c322f8a" --path=/usr/bin/oc-mirror:.
 chmod +x ${workdir}/oc-mirror
 
 oc_mirror_bin="$workdir/oc-mirror"
