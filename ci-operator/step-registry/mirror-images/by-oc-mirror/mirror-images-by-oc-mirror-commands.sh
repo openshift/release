@@ -15,11 +15,11 @@ EXIT_CODE=100
 handle_error() {
     EXIT_CODE=$?
     if [ $EXIT_CODE -ne 0 ]; then
-        echo "Error occurred with exit code $EXIT_CODE. Waiting for 15 hours before exiting..."
+        echo "Error occurred with exit code $EXIT_CODE. Waiting for 5 hours before exiting..."
         cp -f /usr/bin/oc-mirror ${SHARED_DIR}
         echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
         ls ${SHARED_DIR}
-        sleep 15h
+        sleep 5h
     fi
 }
 
@@ -50,7 +50,7 @@ function check_signed() {
     fi
 }
 
-trap 'handle_error; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+trap 'handle_error; if [[ "$?" == 0 ]]; then echo "waiting..."; sleep 5h; EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 #trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
