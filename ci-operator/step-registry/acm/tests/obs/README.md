@@ -14,7 +14,7 @@ To run the OBSERVABILITY interop tests defined in the step [acm-tests-obs-ref](.
 
 ## Process
 
-- This ref runs a [script from product QE's repo](https://github.com/stolostron/observability_core_automation/blob/release-2.7/execute_obs_interop_commands.sh) that kicks off dingko tests where we create and update the multicluster observability.
+- This ref runs a [script from product QE's repo](https://github.com/stolostron/multicluster-observability-operator/blob/release-2.13/execute_obs_interop_commands.sh) that kicks off dingko tests where we create and update the multicluster observability.
 
 ## Requirements
 
