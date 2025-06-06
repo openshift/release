@@ -122,9 +122,26 @@ then
         source "${SHARED_DIR}/mirror-proxy-conf.sh"
 fi
 
-# execute the mirror command
 cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} | tee '${mirror_output}'"
-run_command "$cmd"
+
+MAX_ATTEMPTS=5
+ATTEMPTS=0
+SUCCESS=false
+while [ "${SUCCESS}" = false ] && (( ATTEMPTS++ < MAX_ATTEMPTS )); do
+  echo "Mirroring images attempt ${ATTEMPTS}/${MAX_ATTEMPTS}"
+  if run_command "$cmd"; then
+    echo "Mirroring images was successful in attempt $ATTEMPTS"
+    SUCCESS=true
+  else
+    echo "Mirroring images attempt $ATTEMPTS failed. Trying again..."
+    sleep 120
+  fi
+done
+
+if [ $SUCCESS = false ]; then
+  echo "Mirroring test images failed after $ATTEMPTS attempts, exiting ..."
+  exit 1
+fi
 
 line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
 install_end_line_num=$(expr ${line_num} - 3) &&

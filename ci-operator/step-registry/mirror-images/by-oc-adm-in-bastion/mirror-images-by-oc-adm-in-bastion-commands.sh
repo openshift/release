@@ -154,10 +154,30 @@ fi
 
 # mirror images in bastion host, which will increase mirror upload speed
 cmd="${OC_BIN} adm release -a '${remote_pull_secret}' mirror ${args[*]}"
+cmd_with_ssh="ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} \
+              \"${cmd}\" | tee ${mirror_output}"
 echo "Remote Command: ${cmd}"
-# shellcheck disable=SC2090
-ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} \
-"${cmd}" | tee "${mirror_output}"
+
+MAX_ATTEMPTS=5
+ATTEMPTS=0
+SUCCESS=false
+while [ "${SUCCESS}" = false ] && (( ATTEMPTS++ < MAX_ATTEMPTS )); do
+  echo "Mirroring images attempt ${ATTEMPTS}/${MAX_ATTEMPTS}"
+
+  # shellcheck disable=SC2090
+  if run_command "$cmd_with_ssh"; then
+    echo "Mirroring images was successful in attempt $ATTEMPTS"
+    SUCCESS=true
+  else
+    echo "Mirroring images attempt $ATTEMPTS failed. Trying again..."
+    sleep 120
+  fi
+done
+
+if [ $SUCCESS = false ]; then
+  echo "Mirroring test images failed after $ATTEMPTS attempts, exiting ..."
+  exit 1
+fi
 
 line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
 install_end_line_num=$(expr ${line_num} - 3) &&
