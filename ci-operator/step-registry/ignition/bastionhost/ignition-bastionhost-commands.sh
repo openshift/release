@@ -220,10 +220,8 @@ timeout = 300
 EOF
 
 RSYNCD_CONFIG_CONTENT=$(cat ${workdir}/rsyncd.conf | base64 -w0)
-
-RSYNCD_CONFIG_CONTENT=$(sed 's/"/\\"/g' "${workdir}/rsyncd.conf" | awk '{printf "%s\\n", $0}')
 RSYNCD_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/rsyncd.service | sed 's/\"/\\"/g')
-echo "=========${RSYNCD_CONFIG_CONTENT}=============="
+
 # rsync ignition
 rsyncd_ignition_patch=$(mktemp)
 cat > "${rsyncd_ignition_patch}" << EOF
@@ -234,7 +232,7 @@ cat > "${rsyncd_ignition_patch}" << EOF
         "path": "/etc/rsyncd.conf",
         "overwrite": true,
         "contents": {
-          "source": "${RSYNCD_CONFIG_CONTENT}"
+          "source": "data:text/plain;base64,${RSYNCD_CONFIG_CONTENT}"
         },
         "mode": 420
       }
@@ -259,6 +257,7 @@ else
   patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
 fi
 rm -f "${rsyncd_ignition_patch}"
+
 
 ## ----------------------------------------------------------------
 # MIRROR REGISTORY
