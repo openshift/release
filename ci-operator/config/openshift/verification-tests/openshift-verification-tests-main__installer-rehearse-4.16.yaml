@@ -26,16 +26,22 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: azure-qe
     env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_AZURE_REGION: eastus
       SLEEP_DURATION: 8h
       SPOT_INSTANCES: "false"
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - chain: ipi-azure-post
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-provision
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
 zz_generated_metadata:
   branch: main
   org: openshift
