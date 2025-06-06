@@ -10,6 +10,17 @@ Please refer to the `*-ref.yaml` file in their source code for the full list of 
 
 The [sandboxed-containers-operator-get-kata-rpm](./get-kata-rpm/) step downloads the kata-containers rpm from Brew and copy it over the cluster worker nodes.
 
+This step run in a `upi-installer` container, therefore, the image should be referenced
+in the `base_images` section of the job's yaml, as for example:
+
+```yaml
+base_images:
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+```
+
 ### sandboxed-containers-operator-peerpods-param-cm
 
 The [sandboxed-containers-operator-peerpods-param-cm](./peerpods/param-cm/) step creates the peerpods-param-cm configmap. Currently only Azure is supported and it will do the needed networking setup for OSC to work properly on this cloud provider.
