@@ -80,3 +80,4 @@ hack/ci-test-e2e.sh -test.v \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
   ${RUN_UPGRADE_PARAM} &
 wait $!
+
