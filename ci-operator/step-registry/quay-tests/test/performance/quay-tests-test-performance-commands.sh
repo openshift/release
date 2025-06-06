@@ -7,9 +7,9 @@ set -o nounset
 
 # QUAY_ROUTE="https://stage.quay.io" #https://quayhostname
 
-STAGE_USERNAME=$(cat /var/run/quaystage/username)
-STAGE_PASSWORD=$(cat /var/run/quaystage/password)
-STAGE_TOKEN=$(cat /var/run/quaystage/oauth)
+STAGE_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
+STAGE_PASSWORD=$(cat /var/run/quay-qe-stagequayio-secret/password)
+STAGE_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 
 QUAY_ROUTE=$([ -f "${SHARED_DIR}/quayroute" ] && cat "$SHARED_DIR"/quayroute | "https://stage.quay.io") #https://quayhostname
 QUAY_OAUTH_TOKEN=$([ -f "${SHARED_DIR}/quay_oauth2_token" ] && cat "$SHARED_DIR"/quay_oauth2_token | $STAGE_TOKEN)
