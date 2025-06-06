@@ -172,6 +172,7 @@ if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
 fi
 
+RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.16.17-x86_64"
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
