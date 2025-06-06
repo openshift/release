@@ -31,6 +31,9 @@ export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
 export WORKLOAD="quay-load-test"
 
+echo $WORKLOAD
+return 0
+
 # curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
 #   --header "Content-Type: application/json" \
 #   --header "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
