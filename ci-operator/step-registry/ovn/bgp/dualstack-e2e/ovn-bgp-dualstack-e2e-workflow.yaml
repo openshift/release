@@ -1,0 +1,24 @@
+workflow:
+  as: ovn-bgp-dualstack-e2e
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local
+    pre:
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-e2e-ovn-bgp-pre
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow executes the common end-to-end test suite on a cluster provisioned by running dev-scripts
+    on a packet server with both IPv4 and IPv6 enabled with the cluster configured to advertise the default
+    network with BGP.
