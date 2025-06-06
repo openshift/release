@@ -341,7 +341,9 @@ function load_env {
   export HUB_CLUSTER_INGRESS_IPv6
 
   # shellcheck disable=SC2089
+  set -x
   HUB_CLUSTER_OPERATORS="$(echo ${OPERATORS} | jq --compact-output '[.[].name]')"
+  set +x
   # shellcheck disable=SC2090
   export HUB_CLUSTER_OPERATORS
 
