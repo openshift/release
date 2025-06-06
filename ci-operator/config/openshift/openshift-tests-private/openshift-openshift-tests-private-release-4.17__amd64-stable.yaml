@@ -175,6 +175,52 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
+- as: aws-rosa-hcp-advanced-stage-critical-f999
+  cron: 24 19 16 6 *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "servicemesh-smcp-install", "failure_type": "all", "classification": "Infrastructure Provisioning - SMCP Install", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "pod_failure", "classification": "Maistra Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "test_failure", "classification": "Maistra Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-lp","rosa-hypershift-lp","servicemesh-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mkralik@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Maistra","QE"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GATEWAY_API_ENABLED: "true"
+      NAME_PREFIX: ocpe2e
+      OPERATORS: |
+        [
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
+        ]
+      SMCP_OPERATOR_VERSION: 2.6.0
+      SMCP_VERSION: "2.6"
+      TEST_GROUP: interop
+      TEST_PROFILE: ocpe2e-rosa-hcp-advanced
+      VERSION: "4.17"
+    test:
+    - ref: ipi-install-rbac
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: install-operators
+    - ref: servicemesh-maistra-test-tool-execute
+    - ref: servicemesh-smcp-install
+    - ref: servicemesh-kiali-int-tests-execute
+    - ref: firewatch-report-issues
+    workflow: rosa-lifecycle-advanced
 - as: aws-rosa-hcp-advanced-stage-critical-f14
   cron: 54 3 5,19 * *
   steps:
