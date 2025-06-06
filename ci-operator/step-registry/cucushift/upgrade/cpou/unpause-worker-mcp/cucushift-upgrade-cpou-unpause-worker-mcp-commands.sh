@@ -90,8 +90,6 @@ for mcp in "${normal_mcp_arr[@]}"
 do
     check_mcp ${mcp} "True"
 done
-current_minor_ver="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -f2 -d.)"
-echo -e "current minor version: ${current_minor_ver} \n"
 
 IFS=" " read -r -a arr <<<"$PAUSED_MCP_NAME"
 for mcp in "${arr[@]}";
