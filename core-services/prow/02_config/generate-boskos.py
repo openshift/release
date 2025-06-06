@@ -219,7 +219,8 @@ CONFIG = {
         'default': 40,
     },
     'oex-aws-qe-quota-slice': {
-        'default': 40,
+        'us-east-2': 30,
+        'us-west-2': 30,
     },
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
