@@ -1,34 +1,73 @@
 base_images:
-  base:
-    name: cucushift
-    namespace: ci
-    tag: latest
-binary_build_commands: go build ./tools/cmd/...
-build_root:
-  image_stream_tag:
-    name: builder
+  ansible:
+    name: "4.20"
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
-images:
-- dockerfile_path: tools/openshift-ci/Dockerfile
-  from: base
-  to: verification-tests
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.20"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: check-upgrade-tags
-  commands: make check-upgrade-tags
-  container:
-    from: bin
-  optional: true
-  run_if_changed: features/upgrade/.*/.*.feature
+- as: ibmcloud-ipi-disc-priv-oc-mirror
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe-2
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-cw8fy22/release:latest
+      MIRROR_BIN: oc-mirror
+      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
+      SLEEP_DURATION: 5h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+- as: azure-ipi-disc-fullyprivate-firewall-idms-oc-mirror
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-cw8fy22/release:latest
+      ENABLE_IDMS: "yes"
+      MIRROR_BIN: oc-mirror
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-firewall
 zz_generated_metadata:
   branch: main
   org: openshift
