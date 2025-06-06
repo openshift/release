@@ -3,7 +3,6 @@
 catsrcname="kataci-index"
 # TODO: should use configurable branch instead of 'devel'?
 podvm_img_url="https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/devel/config/peerpods/podvm/"
-test_workload="kata"
 configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
 
 # TODO: still needed? 600 seconds will cause the step timeout?
@@ -16,11 +15,6 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   exit 1
 else
   catsrcname="redhat-operators"
-fi
-
-if [[ "$ENABLEPEERPODS" == "true" ]]; then
-  # TODO: figure how to to set workload "coco" when CoCo testing
-  test_workload="peer-pods"
 fi
 
 cat <<EOF | tee "${configmap_path}"
@@ -43,9 +37,9 @@ data:
   runtimeClassName: "${RUNTIMECLASS}"
   enablePeerPods: "${ENABLEPEERPODS}"
   mustgatherimage: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
-  workloadImage: "quay.io/openshift/origin-hello-openshift"
+  workloadImage: "${WORKLOAD_IMAGE}"
   installKataRPM: "${INSTALL_KATA_RPM}"
-  workloadToTest: "${test_workload}"
+  workloadToTest: "${WORKLOAD_TO_TEST}"
 EOF
 
 oc create -f "${configmap_path}"
