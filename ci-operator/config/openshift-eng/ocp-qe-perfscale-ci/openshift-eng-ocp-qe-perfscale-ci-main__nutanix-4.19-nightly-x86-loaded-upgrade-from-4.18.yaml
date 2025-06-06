@@ -4,14 +4,12 @@ build_root:
     namespace: ci
     tag: latest
 releases:
-  initial:
-    prerelease:
-      architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.18.0-0
-        upper: 4.19.0-0
   latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.18"
+  target:
     candidate:
       architecture: amd64
       product: ocp
@@ -24,22 +22,20 @@ resources:
       memory: 200Mi
 tests:
 - as: loaded-upgrade-418to419-24nodes
-  cluster: build01
   steps:
     allow_skip_on_success: true
     cluster_profile: nutanix-qe-zone
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       COMPUTE_CPU: "8"
       COMPUTE_MEMORY: "32000"
       COMPUTE_REPLICAS: "3"
-      MAX_UNAVAILABLE: "3"
       WORKER_REPLICA_COUNT: "24"
     test:
-    - chain: workers-scale
-    - chain: openshift-qe-upgrade
+    - chain: openshift-qe-upgrade-max-unavailable
+    - ref: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-upgrade-qe-sanity
+    - ref: openshift-qe-connectivity-check
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
   timeout: 6h0m0s
 zz_generated_metadata:
