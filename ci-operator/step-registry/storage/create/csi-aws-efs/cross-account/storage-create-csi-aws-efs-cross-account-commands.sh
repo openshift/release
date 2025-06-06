@@ -257,24 +257,24 @@ cat <<EOF > "${SHARED_DIR}"/AssumeRoleInlinePolicyPolicyInAccountA.json
 }
 EOF
 
-# STS standlone cluster the operator installed with specified role
-if [[ -s "${SHARED_DIR}/efs-csi-driver-operator-role-arn" ]]; then
-  EFS_CSI_DRIVER_OPERATOR_ROLE_ARN=$(cat "${SHARED_DIR}"/efs-csi-driver-operator-role-arn)
-  EFS_CSI_DRIVER_OPERATOR_ROLE="${EFS_CSI_DRIVER_OPERATOR_ROLE_ARN##*/}"
-  aws iam put-role-policy \
-    --role-name "${EFS_CSI_DRIVER_OPERATOR_ROLE}"  \
-    --policy-name efs-cross-account-inline-policy \
-    --policy-document file://"${SHARED_DIR}"/AssumeRoleInlinePolicyPolicyInAccountA.json
-  logger "INFO" "Attach the inline Policies to the efs csi driver operator Role $EFS_CSI_DRIVER_OPERATOR_ROLE in account A"
-else
-  # Non STS standlone cluster the operator uses the credentialsrequest user
-  EFS_CSI_DRIVER_OPERATOR_USER=$(oc -n openshift-cloud-credential-operator get credentialsrequest/openshift-aws-efs-csi-driver -o json | jq -r '.status.providerStatus.user')
-  aws iam put-user-policy \
-    --user-name "${EFS_CSI_DRIVER_OPERATOR_USER}"  \
-    --policy-name efs-cross-account-inline-policy \
-    --policy-document file://"${SHARED_DIR}"/AssumeRoleInlinePolicyPolicyInAccountA.json
-  logger "INFO" "Attach the inline Policies to the efs csi driver operator user $EFS_CSI_DRIVER_OPERATOR_USER in account A"
-fi
+# # STS standlone cluster the operator installed with specified role
+# if [[ -s "${SHARED_DIR}/efs-csi-driver-operator-role-arn" ]]; then
+#   EFS_CSI_DRIVER_OPERATOR_ROLE_ARN=$(cat "${SHARED_DIR}"/efs-csi-driver-operator-role-arn)
+#   EFS_CSI_DRIVER_OPERATOR_ROLE="${EFS_CSI_DRIVER_OPERATOR_ROLE_ARN##*/}"
+#   aws iam put-role-policy \
+#     --role-name "${EFS_CSI_DRIVER_OPERATOR_ROLE}"  \
+#     --policy-name efs-cross-account-inline-policy \
+#     --policy-document file://"${SHARED_DIR}"/AssumeRoleInlinePolicyPolicyInAccountA.json
+#   logger "INFO" "Attach the inline Policies to the efs csi driver operator Role $EFS_CSI_DRIVER_OPERATOR_ROLE in account A"
+# else
+#   # Non STS standlone cluster the operator uses the credentialsrequest user
+#   EFS_CSI_DRIVER_OPERATOR_USER=$(oc -n openshift-cloud-credential-operator get credentialsrequest/openshift-aws-efs-csi-driver -o json | jq -r '.status.providerStatus.user')
+#   aws iam put-user-policy \
+#     --user-name "${EFS_CSI_DRIVER_OPERATOR_USER}"  \
+#     --policy-name efs-cross-account-inline-policy \
+#     --policy-document file://"${SHARED_DIR}"/AssumeRoleInlinePolicyPolicyInAccountA.json
+#   logger "INFO" "Attach the inline Policies to the efs csi driver operator user $EFS_CSI_DRIVER_OPERATOR_USER in account A"
+# fi
 
 # STEP. Add the efs full access to master/control plane role which used for driver controller delete volume(access point)
 aws iam attach-role-policy \
