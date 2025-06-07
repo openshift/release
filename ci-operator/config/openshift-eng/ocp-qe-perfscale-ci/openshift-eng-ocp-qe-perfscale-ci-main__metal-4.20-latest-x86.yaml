@@ -8,17 +8,17 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: weekly-6nodes
+- as: daily-6nodes
   capabilities:
   - intranet
-  cron: 0 0 * * 4
+  cron: 0 0 * * 2
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
@@ -29,7 +29,7 @@ tests:
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest
+      OCP_VERSION: candidate-4.20
       PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
@@ -38,7 +38,37 @@ tests:
     - chain: openshift-qe-cluster-health
     - chain: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-node-density
     - chain: openshift-qe-node-density-heavy
+  timeout: 8h0m0s
+- as: daily-virt-6nodes
+  capabilities:
+  - intranet
+  cron: 0 8 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CNV_VERSION: "4.20"
+      CONFIG: config/standard-scalelab.yml
+      CRUCIBLE: "false"
+      INFRA: "true"
+      NUM_WORKER_NODES: "6"
+      OCP_BUILD: dev
+      OCP_VERSION: candidate-4.20
+      PUBLIC_VLAN: "true"
+      VM: "true"
+      VMI_READY_THRESHOLD: "180"
+      VMS_PER_NODE: "200"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-deploy
+    - chain: openshift-qe-installer-bm-day2-cnv
+    - chain: openshift-qe-cluster-health
+    - chain: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-virt-density
   timeout: 8h0m0s
 - always_run: false
   as: deploy-6nodes
@@ -51,7 +81,7 @@ tests:
       CRUCIBLE: "false"
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest
+      OCP_VERSION: candidate-4.20
       PUBLIC_VLAN: "true"
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -67,7 +97,7 @@ tests:
     env:
       CRUCIBLE: "false"
       OCP_BUILD: dev
-      OCP_VERSION: latest
+      OCP_VERSION: latest-4.20
       PUBLIC_VLAN: "true"
       TYPE: sno
     test:
@@ -84,10 +114,9 @@ tests:
     env:
       BAREMETAL: "true"
       CRUCIBLE: "false"
-      KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest
+      OCP_VERSION: candidate-4.20
       PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
@@ -95,46 +124,6 @@ tests:
     - chain: openshift-qe-installer-bm-deploy
     - chain: openshift-qe-node-density-heavy
   timeout: 7h0m0s
-- always_run: false
-  as: virt-density-6nodes
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      CNV_VERSION: 4.19.0
-      CRUCIBLE: "false"
-      NUM_WORKER_NODES: "6"
-      OCP_BUILD: dev
-      OCP_VERSION: latest
-      PUBLIC_VLAN: "true"
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-cnv
-    - chain: openshift-qe-virt-density
-- always_run: false
-  as: virt-udn-density-6nodes
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      CRUCIBLE: "false"
-      KUBE_BURNER_VERSION: 1.6.4
-      NUM_WORKER_NODES: "6"
-      OCP_BUILD: dev
-      OCP_VERSION: latest
-      PUBLIC_VLAN: "true"
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-cnv
-    - chain: openshift-qe-virt-udn-density
 - always_run: false
   as: data-path-6nodes
   capabilities:
@@ -149,7 +138,7 @@ tests:
       INFRA: "true"
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest
+      OCP_VERSION: candidate-4.20
       PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
@@ -158,33 +147,7 @@ tests:
     - chain: openshift-qe-installer-bm-deploy
     - chain: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
-  timeout: 8h0m0s
-- always_run: false
-  as: data-path-cnv-6nodes
-  capabilities:
-  - intranet
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      CNV_VERSION: 4.19.0
-      CRUCIBLE: "false"
-      INFRA: "true"
-      NUM_WORKER_NODES: "6"
-      OCP_BUILD: dev
-      OCP_VERSION: latest
-      PUBLIC_VLAN: "true"
-      RUN_CERBERUS: "false"
-      TELCO: "false"
-      VM: "true"
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-installer-bm-day2-cnv
-    - chain: openshift-qe-network-vm-perf
-    - chain: openshift-qe-data-path-tests
-  timeout: 8h0m0s
+  timeout: 7h55m0s
 - always_run: false
   as: web-burner-node-density-6nodes
   capabilities:
@@ -195,10 +158,9 @@ tests:
     env:
       BAREMETAL: "true"
       CRUCIBLE: "false"
-      KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest
+      OCP_VERSION: candidate-4.20
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
@@ -219,7 +181,7 @@ tests:
       LIMIT_COUNT: "1"
       NUM_WORKER_NODES: "6"
       OCP_BUILD: dev
-      OCP_VERSION: latest
+      OCP_VERSION: candidate-4.20
       WORKLOAD: web-burner-cluster-density
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -231,4 +193,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: metal-dev-latest-x86
+  variant: metal-4.20-latest-x86
