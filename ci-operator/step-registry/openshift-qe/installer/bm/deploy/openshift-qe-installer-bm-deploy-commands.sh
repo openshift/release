@@ -16,6 +16,7 @@ PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
 BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
