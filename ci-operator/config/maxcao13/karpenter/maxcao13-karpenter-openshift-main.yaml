@@ -1,0 +1,26 @@
+build_root:
+  from_repository: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make openshift-toolchain
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: test-bin
+- as: verify
+  commands: |
+      export GOCACHE=/tmp/
+      export GOLANGCI_LINT_CACHE=/tmp/.cache
+      make openshift-verify
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: openshift-main
+  org: maxcao13
+  repo: karpenter
