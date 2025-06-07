@@ -60,6 +60,7 @@ echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
 
 WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
 export WORKSPACE_NAME
+echo "IC Workspace name: ${WORKSPACE_NAME}"
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
@@ -345,7 +346,6 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
-    echo "Running apply"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
         -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
         -state="${SHARED_DIR}"/terraform.tfstate \
@@ -365,6 +365,12 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
+    echo "Running apply"
+    while true
+    do
+        echo "sleep $(date)"
+        sleep 10s
+    done
     echo "Finished Running"
 
     echo "Extracting the terraformm output from the state file"
