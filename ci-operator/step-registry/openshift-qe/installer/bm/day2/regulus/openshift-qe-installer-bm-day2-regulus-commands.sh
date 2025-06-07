@@ -16,6 +16,8 @@ debug_echo() {
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 BASTION="${BASTION:-}"
+LAB_CLOUD="${LAB_CLOUD:-}"
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 
 if [ -z "${RUNLOCAL:-}" ]; then
   bastion=$(cat  /bm/address)
@@ -25,7 +27,7 @@ else
   SSH_ARGS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 fi
 
-regulus_repo="/root/REGULUS/regulus-$(date "+%Y-%m-%d-%H-%M-%S")"
+regulus_repo="/root/REGULUS/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
 install-regulus() {
   ssh ${SSH_ARGS} root@${bastion} "
     REG_PR='${REG_PR}' PULL_NUMBER='${PULL_NUMBER}' REPO_NAME='${REPO_NAME}' REG_BRANCH='${REG_BRANCH}'
