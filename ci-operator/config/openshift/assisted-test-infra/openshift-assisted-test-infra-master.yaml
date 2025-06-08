@@ -77,16 +77,14 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.19
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ha-kube-api-4-19
+- as: e2e-metal-assisted-ha-kube-api-ipv4-4-19
   cluster: build05
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        KUBE_API=true
         ENABLE_KUBE_API=true
-        ISO_IMAGE_TYPE=minimal-iso
         IPv4=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
@@ -569,43 +567,6 @@ tests:
       TEST_TYPE: extensive
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-kube-api-net-suite-4-19
-  cluster: build05
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_MASTERS=1
-        ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        WORKER_DISK=40000000000
-        OPENSHIFT_VERSION=4.19
-    workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-kube-api-net-suite-4-19-periodic
-  cluster: build05
-  cron: 30 04 * * 0,2,4
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_MASTERS=1
-        ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-        WORKER_DISK=40000000000
-        OPENSHIFT_VERSION=4.19
-      CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
-    workflow: assisted-ofcir-baremetal
-- always_run: false
   as: e2e-metal-assisted-ha-kube-api-ipv6-4-19
   cluster: build05
   optional: true
@@ -613,10 +574,36 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        KUBE_API=true
         ENABLE_KUBE_API=true
         IPv6=true
         ISO_IMAGE_TYPE=minimal-iso
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ha-kube-api-ipv6-4-19-periodic
+  cluster: build05
+  cron: 30 06 * * 0,2,4
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        ENABLE_KUBE_API=true
+        IPv6=true
+        ISO_IMAGE_TYPE=minimal-iso
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ha-kube-api-ipv4-4-19-periodic
+  cluster: build05
+  cron: 30 07 * * 0,2,4
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        ENABLE_KUBE_API=true
+        IPvd=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.19
