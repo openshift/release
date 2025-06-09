@@ -146,7 +146,7 @@ cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.lo
 oc registry login --to "${new_pull_secret}"
 
 changeOCMirror=false
-if ! changeOCMirror ; then
+if ! ${changeOCMirror} ; then
     oc_mirror_bin="oc-mirror"
 else
     workdir="${SHARED_DIR}/mirror_new"
