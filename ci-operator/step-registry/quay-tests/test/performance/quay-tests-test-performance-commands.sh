@@ -7,9 +7,9 @@ set -o nounset
 
 # QUAY_ROUTE="https://stage.quay.io" #https://quayhostname
 
-STAGE_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
-STAGE_PASSWORD=$(cat /var/run/quay-qe-stagequayio-secret/password)
-STAGE_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
+STAGE_USERNAME=$(cat /var/run/stagequayqe/username)
+STAGE_PASSWORD=$(cat /var/run/stagequayqe/password)
+STAGE_TOKEN=$(cat /var/run/stagequayqe/oauth)
 
 QUAY_ROUTE=$([ -f "${SHARED_DIR}/quayroute" ] && cat "$SHARED_DIR"/quayroute || echo "https://stage.quay.io") #https://quayhostname
 QUAY_OAUTH_TOKEN=$([ -f "${SHARED_DIR}/quay_oauth2_token" ] && cat "$SHARED_DIR"/quay_oauth2_token || echo "$STAGE_TOKEN")
@@ -39,7 +39,7 @@ curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
   --data-raw '{
         "name": "'"${quay_perf_organization}"'",
         "email": "testperf@testperf.com"
-    }' -k
+    }' -k || true
 
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
