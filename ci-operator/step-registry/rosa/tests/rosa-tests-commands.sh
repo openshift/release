@@ -21,7 +21,7 @@ log(){
 
 # functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
 #configure aws
-aws_region=${REGION:-$LEASED_RESOURCE}
+aws_region=${REGION:-us-east-2}
 configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
 configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 
