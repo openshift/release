@@ -100,6 +100,38 @@ spec:
     - mirrors:
         - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
       source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
+---
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: trustee-registry
+spec:
+  imageTagMirrors:
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee
+      source: registry.redhat.io/confidential-compute-attestation-tech-preview
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
+      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
+      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
+---
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: trustee-registry
+spec:
+  imageDigestMirrors:
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee
+      source: registry.redhat.io/confidential-compute-attestation-tech-preview
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
+      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
+      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
 EOF
 
   oc apply -f "${mirror_path}"
@@ -108,6 +140,7 @@ EOF
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   mirror_konflux
   create_catsrc "${CATALOG_SOURCE_NAME}" "${OPERATOR_INDEX_VERSION}" "${OPERATOR_INDEX_IMAGE}"
+  create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_INDEX_VERSION}" "${TRUSTEE_INDEX_IMAGE}"
 fi
 
 cat <<EOF | tee "${configmap_path}"
@@ -128,6 +161,8 @@ data:
   enableGPU: "${ENABLEGPU}"
   podvmImageUrl: "${podvm_img_url}"
   runtimeClassName: "${RUNTIMECLASS}"
+  trusteeCatalogSourcename: "${TRUSTEE_CATALOG_SOURCE_NAME}"
+  trusteeUrl: "${TRUSTEE_URL}"
   enablePeerPods: "${ENABLEPEERPODS}"
   mustgatherimage: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
   workloadImage: "${WORKLOAD_IMAGE}"
