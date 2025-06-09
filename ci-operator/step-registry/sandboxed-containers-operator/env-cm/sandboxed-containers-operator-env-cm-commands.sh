@@ -164,7 +164,7 @@ data:
   trusteeCatalogSourcename: "${TRUSTEE_CATALOG_SOURCE_NAME}"
   trusteeUrl: "${TRUSTEE_URL}"
   enablePeerPods: "${ENABLEPEERPODS}"
-  mustgatherimage: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+  mustgatherimage: "${MUST_GATHER_IMAGE}"
   workloadImage: "${WORKLOAD_IMAGE}"
   installKataRPM: "${INSTALL_KATA_RPM}"
   workloadToTest: "${WORKLOAD_TO_TEST}"
