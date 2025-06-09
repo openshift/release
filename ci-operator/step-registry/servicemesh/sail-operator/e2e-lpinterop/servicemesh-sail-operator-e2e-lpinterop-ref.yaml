@@ -1,0 +1,44 @@
+ref:
+  as: servicemesh-sail-operator-e2e-lpinterop
+  from: src
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  timeout: 2h0m0s
+  commands: servicemesh-sail-operator-e2e-lpinterop-commands.sh
+  env:
+  - name: BUILD_WITH_CONTAINER
+    default: "0"
+    documentation: |-
+      Set the environment variable BUILD_WITH_CONTAINER to use a container to build the repo and run the tests inside a container
+  - name: VERSIONS_YAML_FILE
+    default: "versions.ossm.yaml"
+    documentation: |-
+      The name of the versions.yaml file to use. versions.ossm.yaml contains supported versions for productized sail operator (ossm)
+  - name: EXPECTED_REGISTRY
+    default: "^registry.redhat.io"
+    documentation: |-
+      Which registry should be expected in tests for checking correct images.
+  - name: SKIP_BUILD
+    default: "true"
+    documentation: |-
+      If set to true, the test will skip the build process and an existing operator image will be used to deploy the operator and run the test. (productized sail operator is already in the cluster before tests in lpiterop pipeline)
+  - name: SKIP_DEPLOY
+    default: "true"
+    documentation: |-
+      If set to true, the test will skip the deployment of the operator. This is useful when the operator is already deployed in the cluster, and you want to run the test only. (productized sail operator is already in the cluster before tests in lpiterop pipeline)
+  - name: OPERATOR_NAMESPACE
+    default: "openshift-operators"
+    documentation: |-
+      The namespace where the operator is (skip_deploy=true) or will be deployed (skip_deploy=false) and the test will run.
+  - name: DEPLOYMENT_NAME
+    default: "servicemesh-operator3"
+    documentation: |-
+      The name of the operator deployment.
+  - name: GINKGO_FLAGS
+    default: "-v --keep-going"
+  - name: VERBOSE
+    default: "true"
+  documentation: |-
+    Executes sail operator e2e tests (with default values against product operator (ossm operator)). Ensure that your pipeline has `maistra-builder` as the build root, since `from: src` is used here and the script expects the sail repository to be in the root directory.
