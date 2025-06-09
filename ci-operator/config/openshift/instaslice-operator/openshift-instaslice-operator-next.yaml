@@ -1,3 +1,8 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.63.4
 build_root:
   image_stream_tag:
     name: release
@@ -30,13 +35,16 @@ tests:
   commands: |
     #!/bin/bash
 
+    export GO_REQUIRED_MIN_VERSION=""
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    make lint
+
+    golangci-lint --timeout=5m ./pkg/...
+    
   container:
     clone: true
-    from: src
+    from: golangci-lint
 - as: unit
   commands: |
     #!/bin/bash
