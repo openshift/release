@@ -5,6 +5,14 @@ set -o nounset
 
 # 1, Prepare Quay performance test environment
 
+STAGE_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
+STAGE_PASSWORD=$(cat /var/run/quay-qe-stagequayio-secret/password)
+STAGE_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
+
+echo "STAGE_USERNAME: $STAGE_USERNAME"
+echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
+
+
 QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
 QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
 
