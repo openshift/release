@@ -2,7 +2,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 trap finish TERM QUIT
 
@@ -50,12 +49,12 @@ fi
 logdir="${ARTIFACTS}/deprovision"
 mkdir -p "${logdir}"
 
-aws_cluster_age_cutoff="$(TZ="UTC" date --date="${CLUSTER_TTL}" '+%Y-%m-%dT%H:%M+0000')"
+aws_cluster_age_cutoff="$(TZ=":Africa/Abidjan" date --date="${CLUSTER_TTL}" '+%Y-%m-%dT%H:%M+0000')"
 echo "deprovisioning clusters with an expirationDate before ${aws_cluster_age_cutoff} in AWS ..."
 # --region is necessary when there is no profile customization
 for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ); do
 	echo "deprovisioning in AWS region ${region} ..."
-	aws ec2 describe-vpcs --output json --region us-east-1 | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | .Key' > /tmp/clusters
+	aws ec2 describe-vpcs --output json --region ${region} | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | .Key' > /tmp/clusters
 	while read cluster; do
 		workdir="${logdir}/${cluster:22}"
 		mkdir -p "${workdir}"
