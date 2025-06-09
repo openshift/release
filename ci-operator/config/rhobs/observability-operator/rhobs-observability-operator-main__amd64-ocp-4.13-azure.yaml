@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.13"
     namespace: ocp
     tag: cli
   observability-operator-test-harness:
@@ -17,7 +17,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -26,20 +26,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: stage
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-coo
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.14"
-  cron: 0 6 1 7 *
+- as: coo-stage
+  cron: 8 8 29 2 *
   steps:
+    cluster_profile: azure-observability
     env:
-      COO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib@sha256:d6701b6c133679addc472618cec4c12372e208836f4b5a840fceeb1cc533df81
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      COO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib@sha256:5bddb8b2826fc6a68b5115854f7248233569ddd2f5087525a996610689e0c6ef
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}
@@ -48,9 +41,9 @@ tests:
     - ref: rhobs-konflux-catalogsource
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: rhobs
   repo: observability-operator
-  variant: ocp-4.14-coo
+  variant: amd64-ocp-4.13-azure
