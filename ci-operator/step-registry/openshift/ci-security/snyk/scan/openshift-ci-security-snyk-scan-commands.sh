@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export SNYK_LOG_LEVEL=trace
-
 SNYK_TOKEN="$(cat $SNYK_TOKEN_PATH)"
 export SNYK_TOKEN
 
