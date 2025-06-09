@@ -34,6 +34,8 @@ function config_nodepool() {
     echo "$EXTRA_FLARGS"    
 }
 
+sleep 2h
+
 eval "/usr/bin/hypershift create nodepool aws \
   --cluster-name  ${CLUSTER_NAME} \
   --name additional-${CLUSTER_NAME} \
