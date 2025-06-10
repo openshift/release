@@ -123,6 +123,9 @@ spec:
     name: $custom_mcp_name
   imageBuilder:
     imageBuilderType: Job
+  # baseImagePullSecret is optional, but we need to provide it or the test cases that need to use an empty pull-secret will fail because OCL will not be able to know how to pull the base image
+  baseImagePullSecret:
+    name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
   renderedImagePushSecret:
     name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
   renderedImagePushSpec: "quay.io/mcoqe/layering:ocl-$custom_mcp_name"
