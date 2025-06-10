@@ -38,25 +38,22 @@ def delete(collection: str, secret: str):
     ensure_authentication()
     client = secretmanager.SecretManagerServiceClient()
 
+    index_secrets = get_secrets_from_index(client, collection)
+    if secret not in index_secrets:
+        raise click.ClickException(
+            f"Secret '{secret}' not found in collection '{collection}'."
+        )
     try:
         client.delete_secret(
             name=client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
         )
-    except NotFound:
-        raise click.ClickException(
-            f"Secret '{secret}' not found in collection '{collection}'."
-        )
-    except PermissionDenied:
-        raise click.ClickException(
-            f"Access denied: You do not have permission to delete secret '{secret}'."
-        )
-    except Exception as e:
-        raise click.UsageError(f"Error deleting secret '{secret}': {e}")
-
-    # Delete the secret from the index
-    index_secrets = get_secrets_from_index(client, collection)
-    if secret in index_secrets:
         index_secrets.remove(secret)
         update_index_secret(client, collection, index_secrets)
-
-    click.echo(f"Secret '{secret}' deleted from collection '{collection}'.")
+        click.echo(f"Secret '{secret}' deleted from collection '{collection}'.")
+    except NotFound:
+        # Secret doesn't exist in GCP but is in index;
+        # remove from index to fix inconsistent state.
+        index_secrets.remove(secret)
+        update_index_secret(client, collection, index_secrets)
+    except Exception as e:
+        raise click.ClickException(f"Failed to delete secret '{secret}': {e}")
