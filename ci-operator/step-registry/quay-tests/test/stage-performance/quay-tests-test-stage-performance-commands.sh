@@ -24,7 +24,7 @@ echo "QUAY_ROUTE: $QUAY_ROUTE"
 #Create organization "perftest" and namespace "quay-perf" for Quay stage-performance test
 export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
-export WORKLOAD="quay-load-test"
+export WORKLOAD="quayio-stage-load-test"
 
 # if quay_perf_organization already exists, skip creation
 quay_perf_organization_exists=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -119,7 +119,7 @@ spec:
     spec:
       containers:
       - name: python
-        image: quay.io/quay-qetest/quay-load:stage
+        image: quay.io/quay-qetest/quay-load:latest
         securityContext:
           privileged: true
         env:
@@ -138,7 +138,7 @@ spec:
           - name: ES_INDEX
             value: "quay-vegeta"
           - name: PUSH_PULL_IMAGE
-            value: "quay.io/quay-qetest/quay-load:stage"
+            value: "quay.io/quay-qetest/quay-load:latest"
           - name: PUSH_PULL_ES_INDEX
             value: "quay-push-pull"
           - name: PUSH_PULL_NUMBERS
