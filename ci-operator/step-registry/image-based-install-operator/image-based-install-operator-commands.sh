@@ -44,7 +44,7 @@ oc create namespace ibi-cluster --dry-run=client -oyaml | oc apply -f -
 
 oc create secret generic pull-secret -n ibi-cluster --type=kubernetes.io/dockerconfigjson --from-file=.dockerconfigjson=${PULL_SECRET_FILE}
 
-export SEED_VERSION=$(cat /home/ib-orchestrate-vm/seed-version)
+export SEED_RELEASE_IMAGE=$(cat /home/ib-orchestrate-vm/seed-release-image)
 
 echo "### Configuring dns for ibi cluster on the host"
 export IBI_VM_IP=$(cat /home/ib-orchestrate-vm/ibi-vm-ip)
@@ -65,7 +65,7 @@ kind: ClusterImageSet
 metadata:
   name: ibi-cluster-image-set
 spec:
-  releaseImage: quay.io/openshift-release-dev/ocp-release:${SEED_VERSION}-x86_64
+  releaseImage: ${SEED_RELEASE_IMAGE}
 ---
 apiVersion: extensions.hive.openshift.io/v1alpha1
 kind: ImageClusterInstall
