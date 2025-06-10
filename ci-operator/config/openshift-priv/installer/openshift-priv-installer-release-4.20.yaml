@@ -1279,6 +1279,37 @@ tests:
     - chain: ipi-install
     - ref: ipi-azure-rbac
   timeout: 6h0m0s
+- as: azure-private
+  optional: true
+  run_if_changed: azure
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: azure4
+    env:
+      BASTION_BOOT_IMAGE: azureopenshift:aro4:aro_417:417.94.20240701
+      PUBLISH: Internal
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - chain: gather-network
+    - chain: gather-core-dump
+    - ref: gather-azure-cli
+    - ref: gather-azure-resource
+    - chain: ipi-deprovision
+    - ref: azure-deprovision-resourcegroup
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - chain: azure-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-provisionednetwork
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - chain: cucushift-installer-check
+    - chain: cucushift-installer-check-azure-private
+    test:
+    - chain: cucushift-installer-check-cluster-health
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-external-aws
   optional: true
