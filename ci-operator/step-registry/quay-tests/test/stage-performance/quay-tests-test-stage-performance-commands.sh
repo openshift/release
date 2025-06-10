@@ -4,10 +4,9 @@
 set -o nounset
 
 # 1, Prepare Quay stage-performance test environment
-
-STAGE_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
-STAGE_PASSWORD=$(cat /var/run/quay-qe-stagequayio-secret/password)
-STAGE_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
+STAGE_USERNAME=$(cat /var/run/stagequayqe/username)
+STAGE_PASSWORD=$(cat /var/run/stagequayqe/password)
+STAGE_TOKEN=$(cat /var/run/stagequayqe/oauth)
 
 echo "STAGE_USERNAME: $STAGE_USERNAME"
 echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
@@ -153,6 +152,10 @@ spec:
           - name: TEST_PHASES
             value: "${TEST_PHASES}"
             # value: "LOAD,RUN,DELETE"
+          - name: QUAY_USERNAME
+            value: "${STAGE_USERNAME}"   
+          - name: QUAY_PASSWORD
+            value: "${STAGE_PASSWORD}"     
         resources:
           requests:
             cpu: "1"
@@ -195,7 +198,7 @@ date
 
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "job end $end_time and status $JOB_STATUS"
-
+sleep 20m
 # 4, Send the stage-performance test data to ELK
 # original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
 
