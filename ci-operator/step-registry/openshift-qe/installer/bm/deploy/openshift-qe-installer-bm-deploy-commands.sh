@@ -16,6 +16,7 @@ PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
 BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
@@ -92,7 +93,7 @@ if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
     echo "Modifying PXE loader of server $i ..."
-    hammer --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
+    hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
   done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
@@ -138,7 +139,7 @@ if [[ $LAB == "performancelab" ]]; then
 elif [[ $LAB == "scalelab" ]]; then
   export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
 fi
-envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)

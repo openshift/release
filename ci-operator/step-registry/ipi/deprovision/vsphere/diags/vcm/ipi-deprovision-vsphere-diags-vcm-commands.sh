@@ -257,6 +257,10 @@ function collect_diagnostic_data {
               echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
               govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
 
+              # attempt to get and clean up node journals
+              curl -H "node-id: ${vmname}" -o "${vcenter_state}/${vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000
+              curl -X DELETE -H "node-id: ${vmname}" http://log-gather.vmc.ci.openshift.org:8000
+              
               METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
               JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
           done
@@ -470,6 +474,7 @@ EOF
         <div id="chart-div">
           <div class="chart-container" style="text-align: center">
             <h4>Screenshot taken at the conclusion of the job</h4>
+            To access the journal for this node, check the artifacts in ipi-deprovision-vsphere-diags-vcm.
             <img id="vm-screenshot"></img>
           </div>
           <hr>
@@ -613,6 +618,12 @@ async function processMaster(url, metricLabel, chart, prefix) {
     document.getElementById('vm-screenshot')
       .src = 'data:image/png;base64,' + screenShotBase64Elem.innerHTML
   }
+
+  journalBase64Elem = document.getElementById(url+"-journal")
+  if (journalBase64Elem != null) {
+    document.getElementById('vm-journal')
+      .text = atob(journalBase64Elem.innerHTML)
+  }  
   console.log(newData);
   chart.data = newData;
   chart.update();

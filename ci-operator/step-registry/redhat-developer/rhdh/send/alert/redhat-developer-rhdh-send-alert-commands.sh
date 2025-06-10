@@ -24,7 +24,6 @@ get_artifacts_url() {
 
   local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
   local artifacts_complete_url
-  JOB_NAME="periodic-ci-redhat-developer-rhdh-main-e2e-tests-nightly"
 
     local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}" # e.g. "e2e-tests-aks-helm-nightly"
     local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}" # e.g. "aks-helm-nightly"
@@ -53,7 +52,7 @@ get_slack_alert_text() {
     notification_text=":done-circle-check: \`${JOB_NAME}\`, 📜 <$URL_CI_RESULTS|logs>."
   else
     notification_text=':failed: `'"${JOB_NAME}"'`, 📜 <'"$URL_CI_RESULTS"'|logs>, <!subteam^S07BMJ56R8S>.'
-    for ((i = 1; i <= ${#STATUS_DEPLOYMENT_NAMESPACE[@]}; i++)); do
+    for ((i = 0; i < ${#STATUS_DEPLOYMENT_NAMESPACE[@]}; i++)); do
       URL_ARTIFACTS[i]=$(get_artifacts_url "${STATUS_DEPLOYMENT_NAMESPACE[i]}")
       URL_PLAYWRIGHT[i]="${URL_ARTIFACTS[i]}/index.html"
       if [[ "${STATUS_FAILED_TO_DEPLOY[i]}" == "true" ]]; then
@@ -63,7 +62,7 @@ get_slack_alert_text() {
         if [[ "${STATUS_TEST_FAILED[i]}" == "true" ]]; then
           notification_text="${notification_text}:circleci-fail: ${STATUS_NUMBER_OF_TEST_FAILED[i]} tests failed, "
         else
-          notification_text="${notification_text}:circleci-pass: test passed, "
+          notification_text="${notification_text}:circleci-pass: tests passed, "
         fi
         notification_text="${notification_text}:playwright: <${URL_PLAYWRIGHT[i]}|Playwright>, "
         if [[ "${STATUS_URL_REPORTPORTAL[i]}" != "" ]]; then

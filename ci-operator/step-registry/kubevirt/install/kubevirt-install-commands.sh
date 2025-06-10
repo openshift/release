@@ -159,6 +159,7 @@ spec:
     primaryUserDefinedNetworkBinding: true
   virtualMachineOptions:
     disableSerialConsoleLog: false
+  enableCommonBootImageImport: false
   logVerbosityConfig:
     kubevirt:
       virtLauncher: 8
