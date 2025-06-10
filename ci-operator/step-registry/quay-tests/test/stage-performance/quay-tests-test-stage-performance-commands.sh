@@ -1,12 +1,19 @@
 #!/bin/bash
-#refer to https://github.com/quay/quay-performance-scripts
+#refer to https://github.com/quay/quay-stage-performance-scripts
 
 set -o nounset
 
-# 1, Prepare Quay performance test environment
+# 1, Prepare Quay stage-performance test environment
 
-QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute) #https://quayhostname
-QUAY_OAUTH_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
+STAGE_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
+STAGE_PASSWORD=$(cat /var/run/quay-qe-stagequayio-secret/password)
+STAGE_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
+
+echo "STAGE_USERNAME: $STAGE_USERNAME"
+echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
+
+QUAY_ROUTE="https://stage.quay.io" #https://quayhostname
+QUAY_OAUTH_TOKEN=$STAGE_TOKEN
 
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
@@ -15,23 +22,33 @@ ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
 echo "QUAY_ROUTE: $QUAY_ROUTE"
 
-#Create organization "perftest" and namespace "quay-perf" for Quay performance test
+#Create organization "perftest" and namespace "quay-perf" for Quay stage-performance test
 export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
 export WORKLOAD="quay-load-test"
 
-curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
-  --header "Content-Type: application/json" \
-  --header "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
-  --data-raw '{
+# if quay_perf_organization already exists, skip creation
+quay_perf_organization_exists=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X GET \
+  -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+  "https://stage.quay.io/api/v1/organization/${quay_perf_organization}")
+if [ "$quay_perf_organization_exists" -eq 200 ]; then
+  echo "Organization ${quay_perf_organization} already exists, skipping creation."
+else 
+  # If it does not exist, create it
+  curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
+    --header "Content-Type: application/json" \
+    --header "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+    --data-raw '{
         "name": "'"${quay_perf_organization}"'",
         "email": "testperf@testperf.com"
     }' -k
+fi
 
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
 
-# 2, Deploy Quay performance test job
+# 2, Deploy Quay stage-performance test job
 
 QUAY_ROUTE=${QUAY_ROUTE#https://} #remove "https://"
 cat <<EOF | oc apply -f -
@@ -165,7 +182,7 @@ fi
 
 sleep 120 #wait pod start
 
-# Fetch UUID,JOB_START etc required data to dashboard 
+# Fetch UUID,JOB_START etc required data to dashboard
 TEST_UUID=$(oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" | grep 'test_uuid' | sed -n 's/^.*test_uuid=\s*\(\S*\).*$/\1/p')
 echo "job start: $start_time"
 
@@ -179,7 +196,7 @@ date
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "job end $end_time and status $JOB_STATUS"
 
-# 4, Send the performance test data to ELK
+# 4, Send the stage-performance test data to ELK
 # original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
 
 export ES_SERVER="${ELK_SERVER}"
@@ -195,6 +212,6 @@ export CONCURRENCY
 export PUSH_PULL_NUMBERS
 export ADDITIONAL_PARAMS
 
-# Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/ 
+# Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
 source utility/e2e-benchmarking.sh || true
-echo "Quay performance test finised"
+echo "Quay stage-performance test finised"
