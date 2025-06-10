@@ -27,6 +27,42 @@ _curl_jobs_retrieve() {
     _curl_qm -X POST "https://$queue_manager_tls_host/jobs/retrieve?uuid=$1"
 }
 
+_curl_jobs_retrieve_with_retry() {
+    local out
+    local rc
+
+    local try_count="$1"
+    local sleeptime="$2"
+    shift 2
+
+    local try_count0="$try_count"
+
+    while : ; do
+        rc=0
+        out="$(_curl_jobs_retrieve "$@" 2>/dev/null)" || rc="$?"
+        if [ "$rc" -eq 0 ] ; then
+            printf '%s\n' "$out"
+            return 0
+        fi
+
+        # Try at least once, but at most $try_count times.
+        try_count="$((try_count - 1))"
+        if [ "$try_count" -le 0 ] ; then
+            echo "Failure to retrieve job after $try_count0 tries"
+            return 1
+        fi
+
+        sleep "$sleeptime"
+
+        # Try to re-resolve the name.
+        local ip
+        ip="$(resolve_name "$queue_manager_tls_host" "${nameservers[@]}")" || :
+        if [ -n "$ip" ] ; then
+            queue_manager_tls_ip="$ip"
+        fi
+    done
+}
+
 _json_get() {
     printf '%s' "$1" | jq -r "$2" 2>/dev/null
 }
@@ -86,7 +122,7 @@ queue_manager_tls_crt="/var/run/token/jenkins-secrets/queue-manager-tls-crt"
 queue_manager_tls_ip="$(resolve_name "$queue_manager_tls_host" "${nameservers[@]}")" || :
 
 if [ -z "$queue_manager_tls_ip" ] ; then
-    echo "Failure to resolve \"queue-manager-tls-host\" using \"nameservers\". Check the secrets in the vault."
+    echo "Failure to resolve \"queue-manager-tls-host\" using \"${nameservers[*]}\""
     exit 1
 fi
 
@@ -103,7 +139,8 @@ uuid="$(_json_get "$submit_response" '.message')"
 echo "Started job in queue manager: UUID=$uuid, return_code=$return_code. Start polling"
 
 while true ; do
-    retrieve_response="$(_curl_jobs_retrieve "$uuid")" || die "Failure checking job status in queue-manager"
+    retrieve_response="$(_curl_jobs_retrieve_with_retry 5 1 "$uuid")" \
+        || die "Failure checking job status in queue-manager"
 
     return_code="$(_json_get "$retrieve_response" '.return_code')"
 
