@@ -8,7 +8,7 @@ from typing import Dict, List, Set
 import click
 import requests
 import yaml
-from google.api_core.exceptions import NotFound, PermissionDenied
+from google.api_core.exceptions import PermissionDenied
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import secretmanager
@@ -250,7 +250,5 @@ def update_index_secret(
         client.add_secret_version(
             parent=name, payload={"data": payload.encode("utf-8")}
         )
-    except NotFound:
-        raise click.ClickException(
-            f"Index secret not found for collection '{collection}'"
-        )
+    except Exception as e:
+        raise click.ClickException(f"Error while updating index: '{e}'")
