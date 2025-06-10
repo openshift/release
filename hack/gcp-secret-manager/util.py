@@ -251,4 +251,8 @@ def update_index_secret(
             parent=name, payload={"data": payload.encode("utf-8")}
         )
     except Exception as e:
-        raise click.ClickException(f"Error while updating index: '{e}'")
+        raise click.ClickException(
+            f"Error while updating index: '{e}'. "
+            "This could point to an inconsistent state. "
+            "Please contact Test Platform to clean up manually."
+        )
