@@ -1,14 +1,18 @@
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs make git golang docker python3-pip python39 && \
+      FROM registry.access.redhat.com/ubi8/go-toolset:1.23
+      USER root
+      RUN yum install -y --nodocs python3-pip python39 && \
         ln -s $(which pip3) /usr/bin/pip && \
         alternatives --set python3 /usr/bin/python3.9 && \
         ln -s /usr/bin/python3.9 /usr/bin/python && \
-        ln -s /cli/oc /usr/bin/kubectl && \
-        curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz" \
-        | tar -xz -C /usr/local/bin
+        curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz" | tar -xz -C /usr/local/bin && \
+        ln -s /cli/oc /usr/bin/kubectl
+      RUN mkdir /go && \
+        chgrp -R 0 /go && \
+        chmod -R g=u /go
+      USER default
 images:
 - context_dir: .
   dockerfile_path: Dockerfile
