@@ -49,7 +49,7 @@ elif $INTERNAL; then
 fi
 
 # We run SRIOV jobs only on internal network
-if [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
+if [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     CL_SEARCH="internalbos"
 fi
 
@@ -90,9 +90,9 @@ if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG $TOPOLOGY_SELECTION"
 elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
-elif [[ "$T5CI_JOB_TYPE"  == "sno-cnftests" ]]; then
+elif [[ "$T5CI_JOB_TYPE"  == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE"  == "sno-ztp-cnftests" ]] | ; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
-elif [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
+elif [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
 fi
 
