@@ -50,3 +50,6 @@ fi
 echo "$RUN_COMMAND"
 
 ${RUN_COMMAND}
+
+# add sleep to debug
+sleep 2h
