@@ -53,6 +53,11 @@ elif $INTERNAL; then
     CL_SEARCH="any"
 fi
 
+# We run SRIOV jobs only on internal network
+if [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
+    CL_SEARCH="internalbos"
+fi
+
 echo $CL_SEARCH
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
