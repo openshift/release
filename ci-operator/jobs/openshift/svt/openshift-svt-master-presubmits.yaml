@@ -754,6 +754,83 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build07
+    context: ci/prow/regression-aws-4.19-nightly-x86-large-secrets-ocp-65206
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: regression-aws-4.19-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-svt-master-regression-aws-4.19-nightly-x86-large-secrets-ocp-65206
+    rerun_command: /test regression-aws-4.19-nightly-x86-large-secrets-ocp-65206
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=large-secrets-ocp-65206
+        - --variant=regression-aws-4.19-nightly-x86
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(regression-aws-4.19-nightly-x86-large-secrets-ocp-65206|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build07
     context: ci/prow/regression-aws-4.19-nightly-x86-network-mixed-scenario-ocp-72791
     decorate: true
     decoration_config:
@@ -908,7 +985,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build07
-    context: ci/prow/regression-aws-4.19-nightly-x86-regression-scale-affinity-rules
+    context: ci/prow/regression-aws-4.19-nightly-x86-regression-scale-affinity-rule-ocp-18082-ocp-18083
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -919,8 +996,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-regression-aws-4.19-nightly-x86-regression-scale-affinity-rules
-    rerun_command: /test regression-aws-4.19-nightly-x86-regression-scale-affinity-rules
+    name: pull-ci-openshift-svt-master-regression-aws-4.19-nightly-x86-regression-scale-affinity-rule-ocp-18082-ocp-18083
+    rerun_command: /test regression-aws-4.19-nightly-x86-regression-scale-affinity-rule-ocp-18082-ocp-18083
     spec:
       containers:
       - args:
@@ -929,7 +1006,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=regression-scale-affinity-rules
+        - --target=regression-scale-affinity-rule-ocp-18082-ocp-18083
         - --variant=regression-aws-4.19-nightly-x86
         command:
         - ci-operator
@@ -978,14 +1055,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(regression-aws-4.19-nightly-x86-regression-scale-affinity-rules|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(regression-aws-4.19-nightly-x86-regression-scale-affinity-rule-ocp-18082-ocp-18083|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build07
-    context: ci/prow/regression-aws-4.19-nightly-x86-regression-scale-loaded-projects
+    context: ci/prow/regression-aws-4.19-nightly-x86-regression-scale-loaded-projects-ocp-9461
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -996,8 +1073,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-svt-master-regression-aws-4.19-nightly-x86-regression-scale-loaded-projects
-    rerun_command: /test regression-aws-4.19-nightly-x86-regression-scale-loaded-projects
+    name: pull-ci-openshift-svt-master-regression-aws-4.19-nightly-x86-regression-scale-loaded-projects-ocp-9461
+    rerun_command: /test regression-aws-4.19-nightly-x86-regression-scale-loaded-projects-ocp-9461
     spec:
       containers:
       - args:
@@ -1006,7 +1083,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=regression-scale-loaded-projects
+        - --target=regression-scale-loaded-projects-ocp-9461
         - --variant=regression-aws-4.19-nightly-x86
         command:
         - ci-operator
@@ -1055,7 +1132,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(regression-aws-4.19-nightly-x86-regression-scale-loaded-projects|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(regression-aws-4.19-nightly-x86-regression-scale-loaded-projects-ocp-9461|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
