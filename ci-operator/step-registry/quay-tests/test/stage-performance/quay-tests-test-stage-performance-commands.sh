@@ -1,5 +1,5 @@
 #!/bin/bash
-#refer to https://github.com/quay/quay-stage-performance-scripts
+#refer to https://github.com/quay/quay-performance-scripts
 
 set -o nounset
 
@@ -8,10 +8,7 @@ STAGE_USERNAME=$(cat /var/run/stagequayqe/username)
 STAGE_PASSWORD=$(cat /var/run/stagequayqe/password)
 STAGE_TOKEN=$(cat /var/run/stagequayqe/oauth)
 
-# echo "STAGE_USERNAME: $STAGE_USERNAME"
-# echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
-
-QUAY_ROUTE="https://stage.quay.io" #https://quayhostname
+QUAY_ROUTE="https://stage.quay.io"
 QUAY_OAUTH_TOKEN=$STAGE_TOKEN
 
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
@@ -19,12 +16,10 @@ ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
-echo "QUAY_ROUTE: $QUAY_ROUTE"
 
 #Create organization "perftest" and namespace "quay-perf" for Quay stage-performance test
 export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
-
 
 # if quay_perf_organization already exists, skip creation
 quay_perf_organization_exists=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -198,7 +193,7 @@ date
 
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "job end $end_time and status $JOB_STATUS"
-sleep 20m
+sleep 10
 # 4, Send the stage-performance test data to ELK
 # original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
 
@@ -208,8 +203,8 @@ export UUID="${TEST_UUID}"
 export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
-export WORKLOAD="quayio-stage-load-test"
-# export WORKLOAD="quay-load-test"
+# export WORKLOAD="quayio-stage-load-test"
+export WORKLOAD="quay-load-test"
 export TEST_PHASES="${TEST_PHASES}"
 export HITSIZE
 export CONCURRENCY
@@ -220,7 +215,7 @@ export ADDITIONAL_PARAMS
 source utility/e2e-benchmarking.sh || true
 echo "Quay stage-performance test finised"
 
-#clean created repository
+######################## Clean UP ##################
 # This will delete all repositories created under the test organization
 echo "Cleaning up repositories in organization ${quay_perf_organization}..."
 
