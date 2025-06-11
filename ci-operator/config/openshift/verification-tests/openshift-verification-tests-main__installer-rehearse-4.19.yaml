@@ -90,6 +90,17 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+- as: installer-rehearse-ibmcloud-rotation
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_GATES: '["ShortCertRotation=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 6h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:
