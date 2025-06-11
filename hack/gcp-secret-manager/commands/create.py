@@ -5,7 +5,7 @@ import re
 from typing import Dict, List
 
 import click
-from google.api_core.exceptions import NotFound, PermissionDenied
+from google.api_core.exceptions import NotFound
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
