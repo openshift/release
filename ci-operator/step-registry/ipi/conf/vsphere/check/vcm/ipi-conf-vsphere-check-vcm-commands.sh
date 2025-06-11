@@ -224,6 +224,11 @@ fi
 PROW_JOB_TYPE="$(echo ${JOB_SPEC} | jq -r '.type')"
 PROW_JOB="$(echo ${JOB_SPEC} | jq -r '.job')"
 PROW_BUILD_ID="$(echo ${JOB_SPEC} | jq -r '.buildid')"
+PROW_GS_BUCKET="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.bucket')"
+JOB_URL_PREFIX="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.job_url_prefix // empty')"
+if [[ "${JOB_URL_PREFIX}" == "" ]]; then
+  JOB_URL_PREFIX="https://prow.ci.openshift.org/view/"
+fi
 
 # The following will only be present for presubmits
 GIT_ORG="$(echo ${JOB_SPEC} | jq -r '.refs.org')"
@@ -232,7 +237,9 @@ GIT_PR="$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')"
 
 LEASE_ANNOTATIONS="prow-job-type: \"${PROW_JOB_TYPE}\"
     prow-job-name: \"${PROW_JOB}\"
-    prow-build-id: \"${PROW_BUILD_ID}\""
+    prow-build-id: \"${PROW_BUILD_ID}\"
+    prow-gs-bucket: \"${PROW_GS_BUCKET}\"
+    prow-url-prefix: \"${JOB_URL_PREFIX}\""
 if [[ "${PROW_JOB_TYPE}" == "presubmit" ]]; then
   LEASE_ANNOTATIONS="${LEASE_ANNOTATIONS}
     git-org: \"${GIT_ORG}\"
