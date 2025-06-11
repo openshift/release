@@ -1,0 +1,46 @@
+ref:
+  as: assisted-baremetal-operator-publish
+  from: assisted-service-scripts
+  cli: latest
+  commands: github-downstream-sync-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+    - mount_path: /secrets/openshift-edge-bot
+      name: openshift-edge-bot
+      namespace: test-credentials
+  timeout: 15m0s
+  grace_period: 1m0s
+  env:
+    - name: DEFAULT_BRANCH
+      default: master
+      documentation: |-
+        The upstream branch to merge from
+    - name: UPSTREAM_REPO
+      default: ""
+      documentation: |-
+        The upstream repo to merge from
+    - name: DOWNSTREAM_REPO
+      default: ""
+      documentation: |-
+        The downstream repo to merge in to
+    - name: MIN_COMMITS
+      default: ""
+      documentation: |-
+        The minumum number of new commits needed in order to create a new sync PR
+    - name: SECRETS_PATH
+      default: /secrets
+      documentation: |-
+        The directory where credentials will be mounted.
+    - name: GITHUB_SECRET
+      default: "openshift-edge-bot"
+      documentation: |-
+        The name of the kube secret that contains the GitHub token file.
+    - name: GITHUB_SECRET_FILE
+      default: token
+      documentation: |-
+        THe name of the file in GITHUB_SECRET containing the GitHub token.
+  documentation: |-
+    Check if a "DownStream Merge [MM-DD-YYYY]" PR is needed, and create one if so.
