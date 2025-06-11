@@ -1,23 +1,91 @@
-binary_build_commands: echo no
+base_images:
+  base-rhel9:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.18
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build --warn-undefined-variables
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.22
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base-rhel9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.18
+  to: zero-trust-workload-identity-manager
+operator:
+  bundles:
+  - as: zero-trust-workload-identity-manager-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: openshift.io/zero-trust-workload-identity-manager:latest
+    with: pipeline:zero-trust-workload-identity-manager
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: echo test
 tests:
 - as: verify
   commands: |
-    echo verify
+    make verify --warn-undefined-variables
   container:
     from: src
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: src
+- as: e2e-operator
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.18"
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace zero-trust-workload-identity-manager
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n zero-trust-workload-identity-manager "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n zero-trust-workload-identity-manager deployment zero-trust-workload-identity-manager-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: zero-trust-workload-identity-manager-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
