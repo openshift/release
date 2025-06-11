@@ -489,6 +489,28 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
+- as: e2e-metal-ovn-two-node-arbiter-disasterrecovery-destructive
+  cluster: build05
+  cron: '@weekly'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-metal-ovn-two-node-arbiter-disasterrecovery
+  cluster: build05
+  cron: '@weekly'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS_DISASTERRECOVERY: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly
+      TEST_SCENARIOS_DISASTERRECOVERY: Apiserver|backup|restore|quorum|etcd|CEO|77921|42183|67718|50205|51109|53767|59377|68658|77922
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: baremetalds-two-node-arbiter
 - as: e2e-vsphere-ovn-techpreview
   interval: 168h
   steps:
