@@ -1,4 +1,8 @@
 base_images:
+  opendatahub-tests:
+    name: opendatahub-tests
+    namespace: ci
+    tag: latest
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -54,6 +58,31 @@ tests:
       IMAGE_REPO: odh-model-controller
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: run-opendatahub-tests
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    cluster_profile: aws-opendatahub
+    dependencies:
+      ODH_MODEL_CONTROLLER_IMAGE: odh-model-controller
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+      OPERATORS: |
+        [
+            {"name": "authorino-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group":"serverless-operator"},
+            {"name": "rhods-operator", "source": "redhat-operators", "channel": "fast", "install_namespace": "redhat-ods-operator", "operator_group":"rhods-ai-operator"}
+        ]
+      SET_AWS_ENV_VARS: "false"
+      TEST_MARKERS: minio
+    test:
+    - ref: rhoai-patch-component-deployment-odh-model-controller
+    - ref: rhoai-opendatahub-tests
+    workflow: rhoai-opendatahub-tests
 zz_generated_metadata:
   branch: incubating
   org: opendatahub-io
