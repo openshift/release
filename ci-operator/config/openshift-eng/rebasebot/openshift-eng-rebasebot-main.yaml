@@ -1,23 +1,24 @@
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi9/python-39
+      FROM registry.access.redhat.com/ubi9/python-312
 
-      # Install go toolset
       USER root
 
-      ENV GO_VERSION=1.20
-      RUN curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | \
-      tar -C /usr/local -zxvf - go/bin go/pkg/tool
+      ENV GO_VERSION=1.24.3
       ENV PATH="/usr/local/go/bin:$PATH"
 
-      USER default
+      RUN dnf install -y tar gzip git make && \
+          curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | \
+          tar -C /usr/local -zxvf - go/ && \
+          python -m pip install uv
 
       # Prow expects to be able to check out a repo under /go
-      USER 0:0
-      WORKDIR /go
-      RUN chown 1001:1001 .
+      RUN mkdir -p /go && \
+      chown 1001:1001 /go && \
+      chmod 755 /go
 
+      WORKDIR /go
       USER 1001:1001
 images:
 - dockerfile_path: Containerfile
