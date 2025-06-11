@@ -8,8 +8,8 @@ STAGE_USERNAME=$(cat /var/run/stagequayqe/username)
 STAGE_PASSWORD=$(cat /var/run/stagequayqe/password)
 STAGE_TOKEN=$(cat /var/run/stagequayqe/oauth)
 
-echo "STAGE_USERNAME: $STAGE_USERNAME"
-echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
+# echo "STAGE_USERNAME: $STAGE_USERNAME"
+# echo "STAGE_PASSWORD: $STAGE_PASSWORD $STAGE_TOKEN"
 
 QUAY_ROUTE="https://stage.quay.io" #https://quayhostname
 QUAY_OAUTH_TOKEN=$STAGE_TOKEN
@@ -24,7 +24,7 @@ echo "QUAY_ROUTE: $QUAY_ROUTE"
 #Create organization "perftest" and namespace "quay-perf" for Quay stage-performance test
 export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
-export WORKLOAD="quayio-stage-load-test"
+
 
 # if quay_perf_organization already exists, skip creation
 quay_perf_organization_exists=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -166,7 +166,7 @@ spec:
 
 EOF
 
-echo "the Perf Job needs about 2~3 hours to complete"
+echo "the Perf Job needs about 1 hour to complete"
 echo "check the OCP Quay Perf Job, if it complete, go to AWS OpenSearch to generate index pattern and get Quay Perf metrics"
 
 #Wait until the quay perf testing job complete, and show the job status
@@ -208,7 +208,8 @@ export UUID="${TEST_UUID}"
 export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
-export WORKLOAD="quay-load-test"
+export WORKLOAD="quayio-stage-load-test"
+# export WORKLOAD="quay-load-test"
 export TEST_PHASES="${TEST_PHASES}"
 export HITSIZE
 export CONCURRENCY
@@ -218,3 +219,20 @@ export ADDITIONAL_PARAMS
 # Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
 source utility/e2e-benchmarking.sh || true
 echo "Quay stage-performance test finised"
+
+#clean created repository
+# This will delete all repositories created under the test organization
+echo "Cleaning up repositories in organization ${quay_perf_organization}..."
+
+repos=$(curl -s -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+  "https://$QUAY_ROUTE/api/v1/repository?namespace=${quay_perf_organization}" | jq -r '.repositories[].name')
+
+for repo in $repos; do
+  echo "Deleting repository: ${quay_perf_organization}/${repo}"
+  curl -s -X DELETE \
+    -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+    "https://$QUAY_ROUTE/api/v1/repository/${quay_perf_organization}/${repo}" -o /dev/null
+done
+
+echo "Repository cleanup complete."
+
