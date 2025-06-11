@@ -4,12 +4,11 @@
 set -o nounset
 
 # 1, Prepare Quay stage-performance test environment
+QUAY_ROUTE="https://stage.quay.io"
+
 STAGE_USERNAME=$(cat /var/run/stagequayqe/username)
 STAGE_PASSWORD=$(cat /var/run/stagequayqe/password)
-STAGE_TOKEN=$(cat /var/run/stagequayqe/oauth)
-
-QUAY_ROUTE="https://stage.quay.io"
-QUAY_OAUTH_TOKEN=$STAGE_TOKEN
+QUAY_OAUTH_TOKEN=$(cat /var/run/stagequayqe/oauth)
 
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
@@ -22,11 +21,11 @@ export quay_perf_organization="perftest"
 export quay_perf_namespace="quay-perf"
 
 # if quay_perf_organization already exists, skip creation
-quay_perf_organization_exists=$(curl -s -o /dev/null -w "%{http_code}" \
+perf_organization_exists=$(curl -s -o /dev/null -w "%{http_code}" \
   -X GET \
   -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
   "https://stage.quay.io/api/v1/organization/${quay_perf_organization}")
-if [ "$quay_perf_organization_exists" -eq 200 ]; then
+if [ "$perf_organization_exists" -eq 200 ]; then
   echo "Organization ${quay_perf_organization} already exists, skipping creation."
 else 
   # If it does not exist, create it
@@ -203,8 +202,7 @@ export UUID="${TEST_UUID}"
 export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
-# export WORKLOAD="quayio-stage-load-test"
-export WORKLOAD="quay-load-test"
+export WORKLOAD="quayio-stage-load-test"
 export TEST_PHASES="${TEST_PHASES}"
 export HITSIZE
 export CONCURRENCY
@@ -213,7 +211,7 @@ export ADDITIONAL_PARAMS
 
 # Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
 source utility/e2e-benchmarking.sh || true
-echo "Quay stage-performance test finised"
+echo "Quay stage performance test finised"
 
 ######################## Clean UP ##################
 # This will delete all repositories created under the test organization
