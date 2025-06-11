@@ -20,7 +20,7 @@ PROJECT_ID = "openshift-ci-secrets"
 CONFIG_PATH = "https://raw.githubusercontent.com/openshift/release/master/core-services/sync-rover-groups/_config.yaml"
 
 # The string reserved for the index secret associated with each collection.
-INDEX_SECRET_NAME = "secret-index"
+INDEX_SECRET_NAME = "__index"
 
 # The string reserved for the service account secret associated with each collection.
 UPDATER_SA_SECRET_NAME = "updater-service-account"
