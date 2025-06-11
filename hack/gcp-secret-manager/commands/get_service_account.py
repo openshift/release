@@ -4,14 +4,14 @@
 import json
 
 import click
-from google.api_core.exceptions import NotFound, PermissionDenied
+from google.api_core.exceptions import NotFound
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
     UPDATER_SA_SECRET_NAME,
     ensure_authentication,
-    validate_collection,
     get_secret_name,
+    validate_collection,
 )
 
 
