@@ -37,8 +37,8 @@ if [ -z "$POLICY_ARN" ]; then
 fi
 
 echo "Successfully read Policy ARN: $POLICY_ARN"
-echo "Detaching policy from user '$USER_NAME'..."
-aws iam detach-user-policy --user-name "$USER_NAME" --policy-arn "$POLICY_ARN" || true
+echo "Detaching policy from user '$AWS_USER_NAME'..."
+aws iam detach-user-policy --user-name "$AWS_USER_NAME" --policy-arn "$POLICY_ARN" || true
 echo "Policy detachment step complete."
 
 echo "Deleting policy '$POLICY_ARN'..."
