@@ -3,6 +3,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.20"
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 releases:
   latest:
     release:
@@ -21,25 +25,10 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      CUSTOM_AZURE_REGION: eastus
-      LOKI_ENABLED: "false"
-      SLEEP_DURATION: 3h
-      SPOT_INSTANCES: "false"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_SCENARIOS: C00102
       TEST_TIMEOUT: "75"
-    post:
-    - ref: cucushift-installer-wait
-    - chain: ipi-azure-post
-    pre:
-    - chain: ipi-conf-azure
-    - ref: ipi-conf-azure-custom-region
-    - chain: azure-provision-service-principal-minimal-permission
-    - chain: ipi-install
-    - ref: ipi-azure-rbac
-    test:
-    - ref: openshift-extended-test
+    workflow: sandboxed-containers-operator-e2e-azure
 zz_generated_metadata:
   branch: devel
   org: openshift
