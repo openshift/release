@@ -16,8 +16,6 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: |
-  pwd
-  ls -al
   make openshift-toolchain
   # build the aws-karpenter-provider-aws image injected with the karpenter-core deps under test
   karpenter_core_dir=$(pwd)
@@ -35,13 +33,10 @@ images:
     FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
     WORKDIR /go/src/github.com/maxcao13/karpenter
     COPY . .
-    RUN ls -al
-    RUN ls -al karpenter-provider-aws
 
     FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
     ARG TARGETARCH
     COPY --from=builder /go/src/github.com/maxcao13/karpenter/karpenter-provider-aws/karpenter-provider-aws-${TARGETARCH} /usr/bin/karpenter-provider-aws
-    RUN ls -al /usr/bin
     LABEL io.k8s.display-name="Karpenter AWS provider for OpenShift" \
           io.k8s.description="Karpenter is a Kubernetes Node Autoscaler built for flexibility, performance, and simplicity."
     LABEL io.openshift.release.operator=true
