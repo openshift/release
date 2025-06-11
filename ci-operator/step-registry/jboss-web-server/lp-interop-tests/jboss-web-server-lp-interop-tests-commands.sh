@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "Run JWS Interop testing..."
 SECRETS_DIR="/tmp/secrets/tests"
-mkdir -p  ${ARTIFACT_DIR}/jws_artifacts/jws-5
+mkdir -p  ${ARTIFACT_DIR}/jws_artifacts/jws-6
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
 
@@ -107,10 +107,10 @@ sleep 1200
 
 echo "Retrieve test results..."
 
-oc cp jws-test-image/jws-test-pod:/opt/artifacts/jws-5.x/ "${ARTIFACT_DIR}/jws_artifacts/jws-5/"
+oc cp jws-test-image/jws-test-pod:/opt/artifacts/jws-6.x/ "${ARTIFACT_DIR}/jws_artifacts/jws-6/"
 
-for file in "${ARTIFACT_DIR}/jws_artifacts/jws-5/target/surefire-reports/"*.xml; do
-  cp "$file" "${ARTIFACT_DIR}/junit_jws_5_$(basename $file .xml).xml"
+for file in "${ARTIFACT_DIR}/jws_artifacts/jws-6/target/surefire-reports/"*.xml; do
+  cp "$file" "${ARTIFACT_DIR}/junit_jws_6_$(basename $file .xml).xml"
 done
 
 result=`cat ${ARTIFACT_DIR}/junit_*.xml | sed 's/"//g'`
