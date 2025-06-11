@@ -35,16 +35,12 @@ def get_service_account(collection: str):
     try:
         response = client.access_secret_version(request={"name": name})
     except NotFound:
-        raise click.UsageError(
-            f"Secret '{secret_id}' not found in project '{PROJECT_ID}'"
-        )
-    except PermissionDenied as e:
         raise click.ClickException(
-            f"Error while accessing '{secret_id}' secret: {e.message}"
+            f"{UPDATER_SA_SECRET_NAME} credentials not found in project '{PROJECT_ID}'"
         )
     except Exception as e:
         raise click.ClickException(
-            f"Error while accessing '{secret_id}' secret: {e}"
+            f"Failed to access '{UPDATER_SA_SECRET_NAME}' credentials: {e}"
         ) from e
 
     payload = response.payload.data.decode("UTF-8")
