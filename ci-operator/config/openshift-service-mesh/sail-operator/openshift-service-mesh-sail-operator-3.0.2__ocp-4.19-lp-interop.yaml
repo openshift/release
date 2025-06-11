@@ -35,7 +35,8 @@ tests:
             [
               {"step": "check-ossm-operator-version", "failure_type": "all", "classification": "Check latest OSSM version", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "servicemesh-sail-operator-e2e-lpinterop", "failure_type": "pod_failure", "classification": "Sail e2e Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-sail-operator-e2e-lpinterop", "failure_type": "test_failure", "classification": "Sail e2e Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "servicemesh-sail-operator-e2e-lpinterop", "failure_type": "test_failure", "classification": "Sail e2e Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-istio-install", "failure_type": "all", "classification": "Infrastructure Provisioning - Istio Install", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
@@ -45,9 +46,14 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ISTIO_VERSION: v1.24.5
+      KIALI_VERSION: v2.4
       OPERATORS: |
         [
-            {"name": "servicemeshoperator3", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
+            {"name": "servicemeshoperator3", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"}
         ]
       OSSM_OPERATOR_DESIRED_VERSION: servicemeshoperator3.v3.0.2
       USER_TAGS: |
@@ -73,6 +79,7 @@ tests:
           memory: 200Mi
       timeout: 10m0s
     - ref: servicemesh-sail-operator-e2e-lpinterop
+    - ref: servicemesh-istio-install
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: 3.0.2
