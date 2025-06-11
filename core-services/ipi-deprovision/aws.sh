@@ -2,7 +2,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 trap finish TERM QUIT
 
@@ -50,7 +49,7 @@ fi
 logdir="${ARTIFACTS}/deprovision"
 mkdir -p "${logdir}"
 
-aws_cluster_age_cutoff="$(TZ="UTC" date --date="${CLUSTER_TTL}" '+%Y-%m-%dT%H:%M+0000')"
+aws_cluster_age_cutoff="$(TZ=":Africa/Abidjan" date --date="${CLUSTER_TTL}" '+%Y-%m-%dT%H:%M+0000')"
 echo "deprovisioning clusters with an expirationDate before ${aws_cluster_age_cutoff} in AWS ..."
 # --region is necessary when there is no profile customization
 for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ); do
