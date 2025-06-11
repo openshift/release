@@ -22,8 +22,8 @@ REGION=${REGION:-$LEASED_RESOURCE}
 
 # get user arn
 export AWS_USER_NAME=$(aws sts get-caller-identity --query 'Arn' --output text | cut -d'/' -f2)
-POLICY_NAME="SecretsCSI-Test-Permissions"
-POLICY_FILE=${ARTIFACT_DIR}/sscsi_iam_policy.json
+POLICY_NAME="SSCSI-IAM-POLICY-${UNIQUE_HASH}"
+POLICY_FILE=${ARTIFACT_DIR}/sscsi_aws_iam_policy.json
 
 echo "Starting IAM permission setup for user: '$AWS_USER_NAME'..."
 cat > "$POLICY_FILE" <<EOF
@@ -61,13 +61,11 @@ cat > "$POLICY_FILE" <<EOF
 }
 EOF
 echo "Policy document created successfully."
-echo ""
 
 echo "Fetching AWS Account ID..."
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
 POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${POLICY_NAME}"
 echo "Constructed Policy ARN: $POLICY_ARN"
-echo ""
 
 echo "Checking if policy '$POLICY_NAME' exists..."
 if aws iam get-policy --policy-arn "$POLICY_ARN" > /dev/null 2>&1; then
@@ -79,16 +77,13 @@ else
         --policy-document "file://${POLICY_FILE}"
     echo "Policy created successfully."
 fi
-echo ""
 
 echo "Attaching policy '$POLICY_NAME' to user '$AWS_USER_NAME'..."
 aws iam attach-user-policy \
     --user-name "$AWS_USER_NAME" \
     --policy-arn "$POLICY_ARN"
 echo "Policy attached successfully."
-echo ""
 
-# Verify that the policy is attached.
 echo "Verifying policy attachment..."
 if aws iam list-attached-user-policies --user-name "$AWS_USER_NAME" | grep -q "$POLICY_ARN"; then
     echo "Verification successful: Policy '$POLICY_NAME' is correctly attached to user '$AWS_USER_NAME'."
@@ -96,5 +91,8 @@ else
     echo "Verification failed: Could not confirm policy attachment."
     exit 1
 fi
-echo ""
+
+echo "Saving policy arn: ${POLICY_ARN}"
+echo "${POLICY_ARN}" > ${SHARED_DIR}/sscsi_aws_iam_policy_arn
+
 echo "All steps completed successfully!"
