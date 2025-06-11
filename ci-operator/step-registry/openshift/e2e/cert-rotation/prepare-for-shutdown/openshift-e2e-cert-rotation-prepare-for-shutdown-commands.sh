@@ -76,7 +76,7 @@ if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
 
   echo "Approving CSRs at $(date +%X)"
-  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
+  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving kubernetes.io/kubelet-serving)
   for field in ${fields[@]}; do
     (( required_csrs=${#nodes[@]} ))
     approved_csrs=0
