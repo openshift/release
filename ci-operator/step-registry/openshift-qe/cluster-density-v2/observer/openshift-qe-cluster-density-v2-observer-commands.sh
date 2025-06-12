@@ -7,32 +7,27 @@ set -o xtrace
 set -x
 ls
 
-
-
 function cd_cleanup() {
 
   echo "killing cd-v2 observer"
-  kill -15 ${cd_pid}
-  
   date
   ls 
   oc get ns
+  if [[ -n ${cd_pid} ]]; 
+    kill -15 ${cd_pid}
+    folder_name=$(ls -t -d /tmp/*/ | head -1)
+    jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${ARTIFACT_DIR}/index_data.json
 
-  folder_name=$(ls -t -d /tmp/*/ | head -1)
-  jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${ARTIFACT_DIR}/index_data.json
+    if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+        metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
+        cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+    fi
 
-
-  if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
-      metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
-      cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+    echo "{'cluster_density': $rc}" >> ${ARTIFACT_DIR}/observer_status.json
   fi
-
-  echo "{'cluster_density': $rc}" >> ${ARTIFACT_DIR}/observer_status.json
-
   exit 0
   
 }
-
 
 trap cd_cleanup EXIT SIGTERM SIGINT
 
@@ -48,14 +43,12 @@ source ./venv_qe/bin/activate
 oc version
 
 while [ ! -f "${KUBECONFIG}" ]; do
-  printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 10
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 if [[ $WAIT_FOR_NS == "true" ]]; then
   while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
-    echo "start kraken not found yet, waiting"
     sleep 10
   done
 fi
@@ -84,7 +77,6 @@ cd_pid="$!"
 
 jobs -p
 while [[ -z $(cat $cd_logs | grep "signal=terminated") ]]; do 
-  echo "sleep wait for next iteration"
   sleep 10
   date
 done
