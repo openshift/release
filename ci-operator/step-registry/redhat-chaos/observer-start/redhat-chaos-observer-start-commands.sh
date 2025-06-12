@@ -14,6 +14,7 @@ metadata:
   creationTimestamp: 
   labels:
     name: pause-amd64
+    app: observer-status
 spec:
   containers:
   - name: pause-amd64
@@ -25,6 +26,7 @@ spec:
   dnsPolicy: ClusterFirst
 EOF
 
+oc wait --for=condition=Ready=true po $POD_NAME -n $TEST_NAMESPACE --timeout=300s
 
 oc get pods -n $TEST_NAMESPACE
 

@@ -9,10 +9,12 @@ ls
 
 function cerberus_cleanup() {
 
+
+  curl_status=$(curl -X GET http://0.0.0.0:8080)
   echo "killing cerberus observer"
   kill -15 ${cerberus_pid}
   
-  c_status=$(cat /tmp/cerberus_status)
+  # c_status=$(cat /tmp/cerberus_status)
   date
   ls 
   oc get ns
@@ -22,11 +24,11 @@ function cerberus_cleanup() {
   oc cluster-info
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
-  echo '{"cerberus": '$c_status'}' >> test.json
+  echo '{"cerberus": '$curl_status'}' >> test.json
   oc cp -n $TEST_NAMESPACE test.json $POD_NAME:/tmp/test.json 
-
-  cat final_cerberus_info.json
   
+  output=$(oc rsh -n $TEST_NAMESPACE $POD_NAME cat /tmp/test.json)
+  echo "pod rsh $output"
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 
