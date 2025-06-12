@@ -13,7 +13,7 @@ function cd_cleanup() {
   date
   ls 
   oc get ns
-  if [[ -n ${cd_pid} ]]; 
+  if [[ -n ${cd_pid} ]]; then
     kill -15 ${cd_pid}
     folder_name=$(ls -t -d /tmp/*/ | head -1)
     jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${ARTIFACT_DIR}/index_data.json
