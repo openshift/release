@@ -122,7 +122,19 @@ yq-go m -x -i "${CONFIG}" "${IMAGE_ID_PATCH}"
 # Instance type
 if [[ ${USE_MARKETPLACE_CONTRACT_NODE_TYPE_ONLY} == "yes" ]]; then
   NODE_TYPE_PATCH="${ARTIFACT_DIR}/install-config-marketplace-instance-type.yaml.patch"
-  node_type="m5.2xlarge"
+
+  case "${CLUSTER_TYPE:-}" in
+    aws)
+      node_type="m6i.xlarge"
+      ;;
+    aws-usgov)
+      node_type="m5.2xlarge"
+      ;;
+    *)
+      echo "Unsupported cluster type: ${CLUSTER_TYPE:-}"
+      exit 1
+  esac
+
   echo "Replace instance type with $node_type which presents in the contract."
   
 

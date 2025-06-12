@@ -47,6 +47,11 @@ elif $INTERNAL; then
     CL_SEARCH="any"
 fi
 
+# We run SRIOV jobs only on internal network
+if [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
+    CL_SEARCH="internalbos"
+fi
+
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
 ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
