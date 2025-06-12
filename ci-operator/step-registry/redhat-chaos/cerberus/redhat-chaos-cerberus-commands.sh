@@ -9,7 +9,6 @@ ls
 
 function cerberus_cleanup() {
 
-
   curl_status=$(curl -X GET http://0.0.0.0:8080)
   echo "killing cerberus observer"
   kill -15 ${cerberus_pid}
@@ -33,7 +32,6 @@ function cerberus_cleanup() {
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 
 while [ ! -f "${KUBECONFIG}" ]; do
-  printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 10
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
@@ -55,8 +53,6 @@ jobs
 
 jobs -p
 while [[ -z $(cat $cerberus_logs | grep "signal=terminated") ]]; do 
-  echo "sleep wait for next iteration"
   sleep 10
   date
-  cat /tmp/cerberus_status
 done
