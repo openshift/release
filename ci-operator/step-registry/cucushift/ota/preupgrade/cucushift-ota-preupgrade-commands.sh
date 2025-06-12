@@ -189,7 +189,7 @@ function verify_nonhetero(){
     # return not required for single command, its the return by default
     verify_output \
     "cvo image pre-transition is non-hetero" \
-    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') --authfile /tmp/secret/.dockerconfigjson | jq .mediaType" \
     "application/vnd.docker.distribution.manifest.v2+json"
 }
 
@@ -881,6 +881,9 @@ fi
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+#export pull-secrets from live cluster for skopeo inspect to use
+run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --to=/tmp/secret/"
 
 export SUCCESS_CASE_SET=""
 export FAILURE_CASE_SET=""
