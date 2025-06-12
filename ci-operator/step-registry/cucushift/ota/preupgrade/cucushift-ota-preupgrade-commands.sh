@@ -580,6 +580,9 @@ function pre-OCP-60397(){
     # set testing graph
     set_upstream_graph "https://arm64.ocp.releases.ci.openshift.org/graph" || return 1
 
+    # wait for status change
+    sleep 60
+
     # check RetrievedUpdates=True
     verify_retrieved_updates  || return 1
 
