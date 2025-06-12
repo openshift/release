@@ -3,6 +3,10 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: latest
+  ci_tests-private-baseui:
+    name: tests-private-baseui
+    namespace: ci
+    tag: latest
   cli:
     name: "4.20"
     namespace: ocp
@@ -18,6 +22,19 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.20
 images:
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_*.rpm
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ci_tests-private-baseui
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-ui
 - dockerfile_literal: |
     FROM bin AS builder
     FROM this-is-ignored-and-not-used
@@ -35,6 +52,7 @@ promotion:
   to:
   - disabled: true
     excluded_images:
+    - tests-private-ui
     - tests-private-newpr
     name: "4.20"
     namespace: ocp
