@@ -202,7 +202,7 @@ export UUID="${TEST_UUID}"
 export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
-export WORKLOAD="quayio-stage-load-test"
+export WORKLOAD="quay-load-test"
 export TEST_PHASES="${TEST_PHASES}"
 export HITSIZE
 export CONCURRENCY
