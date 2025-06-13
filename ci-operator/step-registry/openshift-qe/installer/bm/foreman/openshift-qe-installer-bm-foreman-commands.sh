@@ -9,6 +9,9 @@ set -x
 
 SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat "/secret/address")
+LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+export LAB_CLOUD
 
 # 1. Set the corresponding host on the lab Foreman instance
 # 2. Use badfish to set the boot interface and bounce the box
