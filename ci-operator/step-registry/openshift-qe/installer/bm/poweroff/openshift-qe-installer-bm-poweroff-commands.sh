@@ -7,6 +7,10 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
+LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+export LAB_CLOUD
+
 SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat "/secret/address")
 
