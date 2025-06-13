@@ -890,9 +890,6 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-#export pull-secrets from live cluster for skopeo inspect to use
-run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --to=/tmp/secret/"
-
 export SUCCESS_CASE_SET=""
 export FAILURE_CASE_SET=""
 
