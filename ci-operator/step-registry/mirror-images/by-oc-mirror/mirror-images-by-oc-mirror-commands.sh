@@ -11,13 +11,55 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # post check steps after cluster installation, exit code 101 if failed,
 # save to install-post-check-status.txt
 EXIT_CODE=100
-trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
+handle_error() {
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "Error occurred with exit code $EXIT_CODE. Waiting for 5 hours before exiting..."
+        cp -f /usr/bin/oc-mirror ${SHARED_DIR}
+        echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
+        ls ${SHARED_DIR}
+        sleep 5h
+    fi
+}
+
+function check_signed() {
+    local digest algorithm hash_value response try max_retries payload="${1}"
+    if [[ "${payload}" =~ "@sha256:" ]]; then
+        digest="$(echo "${payload}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
+    algorithm="$(echo "${digest}" | cut -f1 -d:)"
+    hash_value="$(echo "${digest}" | cut -f2 -d:)"
+    try=0
+    max_retries=3
+    response=0
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        (( try += 1 ))
+        sleep 60
+    done
+    if (( response == 200 )); then
+        echo "${payload} is signed" && return 0
+    else
+        echo "Seem like ${payload} is not signed" && return 1
+    fi
+}
+
+trap 'handle_error; if [[ "$?" == 0 ]]; then echo "waiting..."; sleep 5h; EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
+#trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
   echo "users specifically do not use oc-mirror to run mirror"
   exit 0
 fi
 
+set -x
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -103,38 +145,21 @@ registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
 oc registry login --to "${new_pull_secret}"
 
-# This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
-#if ! whoami &> /dev/null; then
-#    user_name=$(id -u)
-#else
-#    user_name=$(whoami)
-#fi
-#for file in /etc/subuid /etc/subgid; do
-#    if grep -q "$user_name" $file; then
-#        echo "$user_name is already set in $file"
-#    else
-#        last_line=$(tail -1 $file)
-#        if [[ -n "$last_line" ]]; then
-#            n=$(echo "$last_line" | awk -F: '{print $2}')
-#            m=$(echo "$last_line" | awk -F: '{print $3}')
-#            start_id=$((n + m))
-#        else
-#            echo "no any existing users in $file"
-#            start_id="100000"
-#        fi
-#        if [[ -w $file ]]; then
-#            echo "${user_name}:${start_id}:65536" >> $file
-#            echo "successfully updated $file"
-#        else
-#            echo "$file is not writeable, and user matching this uid is not found."
-#            exit 1
-#        fi
-#    fi
-#done
+changeOCMirror=false
+if ! ${changeOCMirror} ; then
+    oc_mirror_bin="oc-mirror"
+else
+    workdir="${SHARED_DIR}/mirror_new"
+    mkdir ${workdir}
+    #$(oc adm release info $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE  -o=json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name') 
+    cd ${workdir}
+    oc image extract "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:8ed5e8148da1bae076a46d11bf7c4137183b3a5daddd5d5b80812ce24c322f8a" --path=/usr/bin/oc-mirror:.
+    chmod +x ${workdir}/oc-mirror
+    oc_mirror_bin="$workdir/oc-mirror"
+    run_command "which '${oc_mirror_bin}'"
+fi
 
-oc_mirror_bin="oc-mirror"
 run_command "'${oc_mirror_bin}' version --output=yaml"
-
 
 # set the imagesetconfigure
 image_set_config="image_set_config.yaml"
