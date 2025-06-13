@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+
 AZURE_AUTH_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-updater-v2/client-id)"
 AZURE_AUTH_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-updater-v2/client-secret-value)"
 AZURE_AUTH_TENANT_ID="$(</var/run/hypershift-ext-oidc-app-updater-v2/tenant-id)"
