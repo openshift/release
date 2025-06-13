@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   observability-operator-test-harness:
@@ -9,15 +9,21 @@ base_images:
     tag: latest
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -26,20 +32,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: stage
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs-coo
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.15"
-  cron: 0 6 1 8 *
+- as: coo-stage
+  cron: 8 8 29 2 *
   steps:
+    cluster_profile: gcp-observability
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      COO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib@sha256:59b76329ece935709c7685107ccfc865217113a622311ee69e66ac3ee8584565
+      COO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib@sha256:3494550fd27d0cc9fdada63db1387ae13b5a3210b3f1fd8f3a7874f1dd6f8621
+      OCP_ARCH: arm64
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}
@@ -48,9 +49,9 @@ tests:
     - ref: rhobs-konflux-catalogsource
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: rhobs
   repo: observability-operator
-  variant: ocp-4.15-coo
+  variant: arm64-ocp-4.16-gcp
