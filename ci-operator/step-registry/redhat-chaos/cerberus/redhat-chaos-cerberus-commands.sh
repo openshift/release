@@ -24,9 +24,11 @@ function cerberus_cleanup() {
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$curl_status'}' >> test.json
-  oc cp -n $TEST_NAMESPACE test.json $POD_NAME:/tmp/test.json 
   
-  output=$(oc rsh -n $TEST_NAMESPACE $POD_NAME cat /tmp/test.json)
+  CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
+
+  oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
+  output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
   echo "pod rsh $output"
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
