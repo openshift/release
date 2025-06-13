@@ -117,7 +117,7 @@ mirror:
     packages:
     - name: lightspeed-operator
       channels:
-      - name: alpha
+      - name: stable
 EOF
 
     run_command "cd /tmp"
