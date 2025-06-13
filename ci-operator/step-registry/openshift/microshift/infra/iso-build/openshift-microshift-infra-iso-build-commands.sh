@@ -61,7 +61,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
             if [ "$y" -eq "$MINOR_VERSION" ]; then
                 bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "rc" "${out_path}"
             else
-                for versions_back in $(seq 0 5); do
+                for versions_back in $(seq 0 2); do
                     bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "zstream" "${out_path}" "${versions_back}"
                 done 
             fi
