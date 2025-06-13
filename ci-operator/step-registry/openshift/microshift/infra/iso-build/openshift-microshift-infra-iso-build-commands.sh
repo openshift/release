@@ -26,6 +26,8 @@ cd ~/microshift
 export CI_JOB_NAME="${JOB_NAME}"
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
+elif [[ "${JOB_NAME}" =~ .*e2e-aws-qe-cache-.* ]] ; then
+    ./test/bin/ci_phase_iso_build.sh -update_qe_cache
 else
     ./test/bin/ci_phase_iso_build.sh
 fi
@@ -53,13 +55,13 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
         y_latest="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
-        for y in $(seq 14 "${y_latest}"); do
+        for y in $(seq 18 18); do
             ocpversion="4.${y}"
             bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "nightly" "${out_path}"
             if [ "$y" -eq "$y_latest" ]; then
                 bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "rc" "${out_path}"
             else
-                for versions_back in $(seq 0 2); do
+                for versions_back in $(seq 0 5); do
                     bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "zstream" "${out_path}" "${versions_back}"
                 done 
             fi
