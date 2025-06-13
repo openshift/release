@@ -70,6 +70,7 @@ fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
+mkdir -p ${ARTIFACT_DIR}/cluster-density
 cd_logs=${ARTIFACT_DIR}/cluster-density/cd_observer_logs.out
 
 ./run.sh > $cd_logs 2>&1 &
