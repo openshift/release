@@ -58,8 +58,9 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
         for y in $(seq 14 "${MINOR_VERSION}"); do
             ocpversion="4.${y}"
             bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "nightly" "${out_path}"
-            if [ "$y" -eq "$MINOR_VERSION" ]; then
+            if [ "$y" -ge "$PREVIOUS_MINOR_VERSION" ]; then
                 bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "rc" "${out_path}"
+                bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "ec" "${out_path}"
             else
                 for versions_back in $(seq 0 2); do
                     bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "zstream" "${out_path}" "${versions_back}"
