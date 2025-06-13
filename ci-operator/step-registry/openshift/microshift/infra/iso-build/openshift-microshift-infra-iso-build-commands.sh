@@ -51,9 +51,19 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     # brew to be included in the source repository archive
     pushd "${src_path}" &>/dev/null
     if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
-        ocpversion="4.$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
+        y_latest="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
-        bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "${out_path}"
+        for y in $(seq 14 "${y_latest}"); do
+            ocpversion="4.${y}"
+            bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "nightly" "${out_path}"
+            if [ "$y" -eq "$y_latest" ]; then
+                bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "rc" "${out_path}"
+            else
+                for versions_back in $(seq 0 2); do
+                    bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "zstream" "${out_path}" "${versions_back}"
+                done 
+            fi
+        done
     fi
     popd &>/dev/null
 fi
