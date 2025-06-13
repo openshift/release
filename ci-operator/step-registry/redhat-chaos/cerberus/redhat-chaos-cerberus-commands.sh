@@ -9,10 +9,11 @@ ls
 
 function cerberus_cleanup() {
 
+  curl_status=$(curl -X GET http://0.0.0.0:8080)
   echo "killing cerberus observer"
   kill -15 ${cerberus_pid}
   
-  c_status=$(cat /tmp/cerberus_status)
+  # c_status=$(cat /tmp/cerberus_status)
   date
   ls 
   oc get ns
@@ -22,16 +23,17 @@ function cerberus_cleanup() {
   oc cluster-info
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
-  echo '{"cerberus": '$c_status'}' >> test.json
-  oc cp -n $TEST_NAMESPACE test.json $POD_NAME:/tmp/test.json 
-
-  cat final_cerberus_info.json
+  echo '{"cerberus": '$curl_status'}' >> test.json
   
+  CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
+
+  oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
+  output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
+  echo "pod rsh $output"
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 
 while [ ! -f "${KUBECONFIG}" ]; do
-  printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 10
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
@@ -53,8 +55,6 @@ jobs
 
 jobs -p
 while [[ -z $(cat $cerberus_logs | grep "signal=terminated") ]]; do 
-  echo "sleep wait for next iteration"
   sleep 10
   date
-  cat /tmp/cerberus_status
 done
