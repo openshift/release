@@ -55,7 +55,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
         y_latest="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
-        for y in $(seq 18 18); do
+        for y in $(seq 14 "${y_latest}"); do
             ocpversion="4.${y}"
             bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "nightly" "${out_path}"
             if [ "$y" -eq "$y_latest" ]; then
