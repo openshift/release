@@ -34,14 +34,13 @@ images:
     FROM src AS builder
     RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
         curl -skL ${MIRRORURL}/ocp/latest-4.15/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
-        tar -xzvf openshift-client-linux.tar.gz && ./oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs > /usr/local/ocp_version && \
-        curl -skL ${MIRRORURL}/ocp/$(cat /usr/local/ocp_version)/opm-src.tar.gz -o opm-src.tar.gz && tar -zxf opm-src.tar.gz && \
+        tar -xzvf openshift-client-linux.tar.gz && VER=$(./oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs) && \
+        curl -skL ${MIRRORURL}/ocp/${VER}/opm-src.tar.gz -o opm-src.tar.gz && tar -zxf opm-src.tar.gz && \
         pushd operator-framework-olm* && make build/opm && mv ./bin/opm /tmp/opm && popd
     FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
     FROM this-is-ignored-and-not-used
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
     COPY --from=builder /tmp/opm /usr/bin/
-    COPY --from=builder /usr/local/ocp_version /usr/local/ocp_version
     COPY --from=netobservcli /oc-netobserv /usr/bin/
     COPY --from=quay.io/hypershift/hypershift-operator:latest usr/bin/hypershift /usr/bin/hypershift
     COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
