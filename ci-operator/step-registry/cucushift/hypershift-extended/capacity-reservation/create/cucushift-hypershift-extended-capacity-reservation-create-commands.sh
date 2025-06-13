@@ -38,7 +38,7 @@ function create_ondemand_capacity_reservation() {
     fi
 
     echo "On-demand capacity reservation created: ${RESERVATION_ID}"
-    echo "{\"OnDemand\":\"${RESERVATION_ID}\"}" | jq . > "${SHARED_DIR}/reservation_id"
+    echo "$RESERVATION_ID" > "${SHARED_DIR}/reservation_id"
 
 }
 
@@ -116,7 +116,7 @@ function find_and_purchase_capacity_blocks() {
         echo "The current status is: $STATE"
         return 1
     fi
-    echo "{\"CapacityBlocks\":\"${CB_RESERVATION_ID}\"}" | jq . > "${SHARED_DIR}/reservation_id"
+    echo "$RESERVATION_ID" > "${SHARED_DIR}/reservation_id"
 }
 
 # Compare the avaliable capacity blocks, return the least cost one

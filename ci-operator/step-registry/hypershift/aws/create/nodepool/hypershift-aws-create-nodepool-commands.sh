@@ -16,22 +16,24 @@ function config_nodepool() {
     local RESERVATION_ID=""
     local EXTRA_FLARGS=""
     if [[ -n "${NODEPOOL_TENANCY}" || -n "${NODEPOOL_CAPACITY_RESERVATION}" ]]; then
-        curl -L "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/jq && chmod +x /tmp/jq
-        curl -L "https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq && chmod +x /tmp/yq
         EXTRA_FLARGS+=$( echo " --render > /tmp/np.yaml " )
     fi
 
     if [[ -f "${SHARED_DIR}/reservation_id" && -n "${NODEPOOL_CAPACITY_RESERVATION}" ]]; then
-        RESERVATION_ID=$(cat ${SHARED_DIR}/reservation_id | /tmp/jq -r ".\"${NODEPOOL_CAPACITY_RESERVATION}\"")
-        EXTRA_FLARGS+=" && /tmp/yq e -i '.spec.platform.aws.placement.capacityReservation = {\"id\": \"${RESERVATION_ID}\", \"marketType\": \"${NODEPOOL_CAPACITY_RESERVATION}\"}' /tmp/np.yaml"
+        RESERVATION_ID=$(cat ${SHARED_DIR}/reservation_id)
+        EXTRA_FLARGS+=' && sed -i "/^    aws:/a \      placement:\\n        capacityReservation:\\n          id: '${RESERVATION_ID}'\\n          marketType: '${NODEPOOL_CAPACITY_RESERVATION}'" /tmp/np.yaml'
     fi
     if [[ -n "${NODEPOOL_TENANCY}" ]]; then
-        EXTRA_FLARGS+=" && /tmp/yq e -i '.spec.platform.aws.placement.tenancy = \"${NODEPOOL_TENANCY}\"' /tmp/np.yaml"
+        if [[ -n "${NODEPOOL_CAPACITY_RESERVATION}" ]]; then
+            EXTRA_FLARGS+=' && sed -i "/^      placement:/a \        tenancy: '$NODEPOOL_TENANCY'" /tmp/np.yaml'
+        else
+            EXTRA_FLARGS+=' && sed -i "/^    aws:/a \      placement:\\n        tenancy: '${NODEPOOL_TENANCY}'" /tmp/np.yaml'
+        fi
     fi
     if [[ -n "${NODEPOOL_TENANCY}" || -n "${NODEPOOL_CAPACITY_RESERVATION}" ]]; then
       EXTRA_FLARGS+=" && oc apply -f /tmp/np.yaml"
     fi
-    echo "$EXTRA_FLARGS"    
+    echo "$EXTRA_FLARGS"  
 }
 
 eval "/usr/bin/hypershift create nodepool aws \
