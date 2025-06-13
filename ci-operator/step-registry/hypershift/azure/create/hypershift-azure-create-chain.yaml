@@ -244,7 +244,7 @@ chain:
       
       MANAGED_IDENTITIES_FILE="${SHARED_DIR}/managed-identities.json"
       if [[ -f "$MANAGED_IDENTITIES_FILE" ]]; then
-        EXTRA_ARGS+=" --managed-identities-file ${SHARED_DIR}/managed-identities.json"
+        EXTRA_ARGS+=" --managed-identities-file ${SHARED_DIR}/managed-identities.json  --data-plane-identities-file /etc/hypershift-aro-azurecreds/dataplane-identities.json"
       fi
       
       if [[ -n $HYPERSHIFT_OLM_CATALOG_PLACEMENT ]]; then
@@ -335,7 +335,7 @@ chain:
       
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
-      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+      oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
       echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
