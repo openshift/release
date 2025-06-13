@@ -43,13 +43,13 @@ source ./venv_qe/bin/activate
 oc version
 
 while [ ! -f "${KUBECONFIG}" ]; do
-  sleep 10
+  sleep 30
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 if [[ $WAIT_FOR_NS == "true" ]]; then
   while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
-    sleep 10
+    sleep 30
   done
 fi
 
