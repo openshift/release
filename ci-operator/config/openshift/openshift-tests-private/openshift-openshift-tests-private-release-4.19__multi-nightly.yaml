@@ -1997,6 +1997,21 @@ tests:
     - ref: masters-machinenameprefix
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-disc-priv-mini-perm-arm-amd-day0-f28-debug
+  cron: 21 8 24 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_ARCH: amd64
+      CONTROL_ARCH: arm64
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.20.0-ec.0-x86_64
+      E2E_RUN_TAGS: '@disconnected'
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - ref: wait
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
 - as: gcp-ipi-disc-priv-mini-perm-arm-amd-day0-f28
   cron: 21 8 24 * *
   steps:

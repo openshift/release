@@ -22,7 +22,8 @@ function pr_debug_mode_waiting {
     now=$(date +%s)
     if [ ${END_TIME} -lt ${now} ] ; then
       echo "Time out reached. Exiting by timeout..."
-      break
+      # Just to fore go to the post step destroy cluster, skip the tests
+      exit 1
     else
       echo "Now:     $(date -d @${now})"
       echo "Timeout: $(date -d @${END_TIME})"
