@@ -299,7 +299,7 @@ spec:
         path: /var/journal-gather-forwarder/forward.sh
     
     ignition:
-      version: 3.4.0
+      version: 3.2.0
     systemd:
       units:
         - name: journal-forwarder.service
@@ -338,7 +338,7 @@ spec:
         path: /var/journal-gather-forwarder/forward.sh
     
     ignition:
-      version: 3.4.0
+      version: 3.2.0
     systemd:
       units:
         - name: journal-forwarder.service
