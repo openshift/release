@@ -22,7 +22,7 @@ function cd_cleanup() {
         metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
         cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
     fi
-
+    rc=$(cat $folder_name/index_data.json | jq .jobStatus | tr -d '"' |sed "s/success/0/g" | sed "s/failure/1/g")
     echo "{'cluster_density': $rc}" >> ${ARTIFACT_DIR}/observer_status.json
   fi
   exit 0
