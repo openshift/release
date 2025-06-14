@@ -36,10 +36,10 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle-release
     source: registry.redhat.io/compliance/openshift-file-integrity-operator-bundle
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-release
     source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
 EOF
 		echo "!!! fail to create the ICSP"
