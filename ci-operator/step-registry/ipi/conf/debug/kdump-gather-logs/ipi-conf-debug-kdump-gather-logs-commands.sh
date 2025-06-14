@@ -11,6 +11,7 @@ output_path="${ARTIFACT_DIR}/kdump"
 # Gather the kdump logs from the specified node, if they exist
 function gather_kdump_logs_from_node {
   echo "INFO: Gathering kdump logs for ""$1"""
+  sleep 100m
 
   # Start the debug pod and force it to stay up until removed
   echo "INFO: Starting debug pod on node/$1"
@@ -24,7 +25,7 @@ function gather_kdump_logs_from_node {
     if ((SECONDS > $TIMEOUT)); then
       break
     fi
-
+    
     # Get the debug pods name
     echo "DEBUG: Checking for debug pod on node/$1 attempt: $((SECONDS / 2 + 1))"
     debug_pod=$(oc get pods --namespace="default" 2>/dev/null | grep "$1-debug" | cut -d' ' -f1) # || true)
