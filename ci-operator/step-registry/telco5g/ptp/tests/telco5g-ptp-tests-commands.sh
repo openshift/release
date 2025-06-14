@@ -228,7 +228,7 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
     fi
   done
 fi
-
+echo "DZK"
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
