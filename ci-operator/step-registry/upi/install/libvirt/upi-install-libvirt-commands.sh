@@ -81,6 +81,8 @@ else
   ${VIRSH} pool-autostart ${POOL_NAME}
   ${VIRSH} pool-start ${POOL_NAME}
 fi
+echo "Adding sleep"
+sleep 300s
 
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
