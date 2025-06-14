@@ -54,6 +54,13 @@ export SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 podman pull ${SEED_IMAGE}
 export SEED_VERSION=$(podman inspect ${SEED_IMAGE} | jq '.[0].Labels."com.openshift.lifecycle-agent.seed_cluster_info"' | jq -R -s 'split(",")' | grep seed_cluster_ocp_version | jq -R -s 'split(":")'[1] | jq -R -s 'split(",")'[0] | sed -E 's/(\\|,|\")//g')
 echo ${SEED_VERSION} > seed-version
+
+podman create --name seed-image "${SEED_IMAGE}" 2>/dev/null
+podman cp seed-image:containers.list ./containers.list
+podman rm -f seed-image
+seed_release_image=$(cat containers.list | grep release@sha256)
+echo ${seed_release_image} > seed-release-image
+
 export OPENSHIFT_INSTALLER_BIN="/usr/bin/openshift-install"
 export IBI_INSTALLATION_DISK="/dev/sda"
 export IBI_VM_NAME=$(virsh --connect=${LIBVIRT_DEFAULT_URI} domname ${IBI_UUID})
