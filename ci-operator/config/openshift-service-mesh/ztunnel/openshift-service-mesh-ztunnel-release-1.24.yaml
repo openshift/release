@@ -1,0 +1,46 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "3.0"
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: sync-upstream-ztunnel-1.24
+  commands: |
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export GITHUB_TOKEN_PATH=/creds-github/token
+    export MERGE_BRANCH=release-1.24
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=ztunnel \
+    --branch=release-1.24 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    --modifier=merge_upstream_ztunnel_1.24 \
+    --cmd=./ossm/merge_upstream.sh
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+zz_generated_metadata:
+  branch: release-1.24
+  org: openshift-service-mesh
+  repo: ztunnel
