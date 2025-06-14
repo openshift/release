@@ -17,6 +17,8 @@ else
   exit 1
 fi
 
+sleep 3000
+
 CLUSTER_NAME=$(oc get infrastructure cluster -o json | jq -r '.status.apiServerURL' | awk -F.  '{print$2}')
 echo "Updating security group rules for data-path test on cluster $CLUSTER_NAME"
 
@@ -29,3 +31,5 @@ do
     aws ec2 authorize-security-group-ingress --group-id $sg --protocol tcp --port 10000-61000 --cidr 0.0.0.0/0
     aws ec2 authorize-security-group-ingress --group-id $sg --protocol udp --port 10000-61000 --cidr 0.0.0.0/0
 done
+
+sleep 3000
