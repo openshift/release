@@ -2,7 +2,6 @@
 
 set -o nounset
 
-
 output_code=1
 
 CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
