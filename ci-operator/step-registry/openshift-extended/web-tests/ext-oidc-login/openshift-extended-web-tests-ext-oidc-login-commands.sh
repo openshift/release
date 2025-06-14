@@ -16,12 +16,6 @@ if ! oc get clusteroperator console; then
     exit 1
 fi
 
-echo "Making sure that the active cluster is a Hypershift hosted cluster"
-if oc get node | grep master; then
-    echo "The active cluster is not a Hypershift hosted cluster, exiting"
-    exit 1
-fi
-
 echo "Making sure that the active cluster is using external OIDC"
 if ! (oc get authentication cluster -o=jsonpath='{.spec.type}' --kubeconfig="${KUBECONFIG}" | grep OIDC); then
     echo "The active cluster is not using external OIDC, exiting"
@@ -73,7 +67,7 @@ done < "$temp_file"
 
 TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
 cat > "${TEST_RESULT_FILE}" <<- EOF
-openshift-extended-web-tests-ext-oidc-cli-login:
+openshift-extended-web-tests-ext-oidc-login:
   total: ${results[tests]}
   failures: ${results[failures]}
   errors: ${results[errors]}
