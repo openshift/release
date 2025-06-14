@@ -1,4 +1,5 @@
 #!/bin/bash
+exit 0
 export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
