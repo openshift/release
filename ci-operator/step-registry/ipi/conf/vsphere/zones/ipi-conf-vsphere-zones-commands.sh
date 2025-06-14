@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This Script is deprecated and should no longer be used.  Its being removed from all chains in favor of ipi-conf-vsphere-vcm
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -8,6 +10,8 @@ if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
   echo "using VCM sibling of this step"
   exit 0
 fi
+
+echo "This script is deprecated.  Legacy jobs can continue to use this but should be migrated to use cluster profile vsphere-elastic"
 
 # ensure vsphere_portgroup is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
