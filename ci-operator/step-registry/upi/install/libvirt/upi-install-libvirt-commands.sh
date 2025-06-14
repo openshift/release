@@ -435,6 +435,7 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   restart_nodes &
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
+  sleep=7000s
 else
   ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete &
 fi
