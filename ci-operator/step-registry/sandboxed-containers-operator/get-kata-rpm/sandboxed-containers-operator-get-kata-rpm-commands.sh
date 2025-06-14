@@ -20,6 +20,9 @@ KATA_RPM_BUILD_URL="${KATA_RPM_BASE_URL}/${ver}/${build}/${arch}/kata-containers
 
 md5sum_file="${KATA_RPM_BUILD_MD5SUM}  kata-containers.rpm"
 curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}"
+echo "Debug:"
+ls -l kata-containers.rpm || true
+echo "Checking against md5sum ${KATA_RPM_BUILD_MD5SUM}"
 echo "${md5sum_file}" | md5sum -c -
 
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
