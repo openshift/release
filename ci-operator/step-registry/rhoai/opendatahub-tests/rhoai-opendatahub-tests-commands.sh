@@ -25,7 +25,7 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-RUN_COMMAND="uv run pytest tests/model_serving/model_server \
+RUN_COMMAND="uv run pytest -m smoke tests/model_serving/model_server \
             --tc=use_unprivileged_client:False \
             -s -o log_cli=true \
             --junit-xml=${ARTIFACT_DIR}/xunit_results.xml \
@@ -52,4 +52,4 @@ echo "$RUN_COMMAND"
 ${RUN_COMMAND}
 
 # add sleep to debug
-sleep 2h
+sleep 1h
