@@ -47,6 +47,7 @@ if [[ -e "${OIDC_CONFIG_FILE}" ]]; then
   oidc_config_id=$(cat "${OIDC_CONFIG_FILE}" | jq -r '.id')
 
   echo "Start deleting the oidc config ${oidc_config_id}..."
+  sleep 86400
   rosa delete oidc-provider -y --mode auto --oidc-config-id ${oidc_config_id} | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" || true
   rosa delete oidc-config -y --mode auto --oidc-config-id ${oidc_config_id}
 else
