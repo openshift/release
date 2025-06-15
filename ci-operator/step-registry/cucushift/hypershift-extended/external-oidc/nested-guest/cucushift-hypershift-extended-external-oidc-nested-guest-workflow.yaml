@@ -1,0 +1,24 @@
+workflow:
+  as: cucushift-hypershift-extended-external-oidc-nested-guest
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - chain: cucushift-hypershift-extended-install-private
+    - chain: hypershift-aws-create
+    - ref: cucushift-hypershift-extended-external-oidc-enable
+    - ref: cucushift-hypershift-extended-external-oidc-health-check
+    - ref: cucushift-hypershift-extended-external-oidc-console-app-redirect-uri-add
+    - ref: openshift-extended-web-tests-ext-oidc-cli-login
+    - ref: cucushift-hypershift-extended-external-oidc-grant-user-role
+    test:
+    - ref: openshift-extended-test
+    post:
+      - chain: hypershift-dump
+      - chain: hypershift-aws-destroy
+      - chain: hypershift-destroy-nested-management-cluster
+  documentation: |-
+    This workflow creates and later destroy a public Hypershift hosted cluster on AWS using external OIDC. 
+    oc commands issued during the tests will be executed as an external user and will target the hosted cluster.
+    Note that it is impossible to run Cucushift test cases against such a hosted cluster 
+    as it can only have one (external) user.
