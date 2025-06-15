@@ -21,9 +21,12 @@ images:
   to: kueue-operator
 - dockerfile_literal: |
     FROM src
-    RUN dnf install -y skopeo git podman && dnf clean all
+    RUN dnf install -y skopeo git buildah && dnf clean all
   from: src
   to: kueue-operator-src
+- context_dir: .
+  dockerfile_path: bundle.Dockerfile
+  to: kueue-operator-bundle
 resources:
   '*':
     requests:
@@ -151,8 +154,29 @@ tests:
 
         echo "Git status:"
         git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
+        export OPERATOR_IMAGE=quay.io/rh-pbhojara/testrepo/kueue-operator:latest
         echo "Using Operator Image: ${OPERATOR_IMAGE}"
+
+        mkdir -p bin
+        export OPERATOR_SDK_VERSION="v1.37.0"
+        OS=$(uname | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
+        URL="https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_${OS}_${ARCH}"
+        curl -sSL -o bin/operator-sdk "$URL"
+        chmod +x bin/operator-sdk
+        export OPERATOR_SDK="$(pwd)/bin/operator-sdk"
+        $OPERATOR_SDK version
+
+        make get-kueue-image
+        export KUEUE_IMAGE=$(< .kueue_image)
+        echo "Using KUEUE_IMAGE = ${KUEUE_IMAGE}"
+
+        hack/update-deploy-files.sh ${OPERATOR_IMAGE} ${KUEUE_IMAGE}
+        ${OPERATOR_SDK} generate bundle --input-dir deploy/ --version 0.1.0
+        hack/revert-deploy-files.sh ${OPERATOR_IMAGE} ${KUEUE_IMAGE}
+        buildah bud --isolation=chroot -f bundle.Dockerfile -t pipeline:kueue-operator-bundle .
+        $OPERATOR_SDK run bundle --namespace openshift-kueue-operator pipeline:kueue-operator-bundle
+
         make e2e-ci-test
       from: kueue-operator-src
       resources:
