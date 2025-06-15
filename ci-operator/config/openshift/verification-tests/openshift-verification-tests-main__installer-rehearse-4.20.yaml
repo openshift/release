@@ -41,6 +41,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-d9kl3b2/release:latest
+    workflow: cucushift-installer-rehearse-aws-ipi-workers-marketplace
+- as: installer-rehearse-gcp
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_OSIMAGE: projects/redhat-marketplace-dev/global/images/redhat-coreos-opp-419-x86-64-20250513-02
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-dev/global/images/redhat-coreos-opp-419-x86-64-20250513-02
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-d9kl3b2/release:latest
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
