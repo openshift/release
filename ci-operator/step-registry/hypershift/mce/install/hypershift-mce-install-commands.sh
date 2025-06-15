@@ -261,6 +261,7 @@ echo "wait for addon to Available"
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
 if [[ ${OVERRIDE_HO_IMAGE} ]] ; then
+  oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' > "${SHARED_DIR}/hypershift_operator_image"
   oc apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
