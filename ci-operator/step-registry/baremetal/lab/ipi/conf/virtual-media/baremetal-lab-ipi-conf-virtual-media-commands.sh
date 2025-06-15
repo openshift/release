@@ -10,6 +10,12 @@ cat > "$SHARED_DIR/redfish_patch_install_config.yaml" <<EOF
 platform:
   baremetal:
     provisioningNetwork: Disabled
+    provisioningDHCPRange: 172.22.0.10,172.22.0.254
+    provisioningIP: 172.22.0.3
+    provisioningInterface: enp1s0
+    provisioningNetworkCIDR: 172.22.0.0/24
+    virtualMediaViaExternalNetwork: true 
+
     hosts:
 EOF
 
