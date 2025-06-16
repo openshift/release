@@ -615,6 +615,19 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-capacity-reservation-gpu-guest-f999
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: p4d.24xlarge
+      ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_HC_ZONES: us-east-1d
+      HYPERSHIFT_NODE_COUNT: "1"
+      NODEPOOL_CAPACITY_RESERVATION: CapacityBlocks
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+    workflow: cucushift-hypershift-extended-capacity-reservation
 - as: aws-ipi-ovn-hypershift-fips-guest-openldap-f14
   cron: 18 20 6,20 * *
   steps:
@@ -684,16 +697,20 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-guest-dynamic-dns-advanced-f7
-  cron: 56 11 3,10,19,26 * *
+- as: aws-ipi-ovn-hypershift-guest-dynamic-dns-ondemand-advanced-f7
+  cron: 43 22 4,11,18,25 * *
   steps:
     cluster_profile: aws-qe
     env:
+      ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: m5.large
+      ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
       BASE_DOMAIN: qe.devcluster.openshift.com
       DYNAMIC_DNS_ENABLED: "true"
       HYPERSHIFT_DYNAMIC_DNS: hypershift-qe-dns.qe.devcluster.openshift.com
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_HC_ZONES: us-east-1a
       HYPERSHIFT_NODE_COUNT: "1"
+      NODEPOOL_CAPACITY_RESERVATION: OnDemand
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -726,7 +743,7 @@ tests:
     test:
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-ipi-cilium-hypershift-guest
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-cilium
 - as: aws-ipi-ovn-hypershift-guest-longduration-f14
   cron: 13 18 4,18 * *
   steps:
@@ -1442,12 +1459,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@ota'
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: OTA
-      TEST_TIMEOUT: "75"
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-confidentialvm-vmgueststateonly-mini-perm-f7
   cron: 13 12 6,15,22,29 * *
@@ -2460,48 +2473,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-f7-longrun-tp-mco-p1
-  cluster: build05
-  cron: 21 4 1,10,17,24 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FEATURE_SET=TechPreviewNoUpgrade
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-f7-longrun-tp-mco-p2
-  cluster: build05
-  cron: 21 6 2,11,18,25 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FEATURE_SET=TechPreviewNoUpgrade
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P2&
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-f7-longrun-tp-mco-p3
-  cluster: build05
-  cron: 21 8 3,12,19,26 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FEATURE_SET=TechPreviewNoUpgrade
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
