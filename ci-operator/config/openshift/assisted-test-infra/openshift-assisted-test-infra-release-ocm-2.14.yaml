@@ -1,0 +1,221 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-service
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM base
+    COPY . .
+  from: src
+  to: assisted-test-infra
+- dockerfile_path: Dockerfile.assisted-test-infra
+  to: assisted-test-infra-internal
+promotion:
+  to:
+  - name: ocm-2.14
+    namespace: edge-infrastructure
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  latest-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: assisted-test-infra-internal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-late-binding-single-node-4-19
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.14
+        WORKER_DISK=40000000000
+        OPENSHIFT_VERSION=4.19
+      POST_INSTALL_COMMANDS: |
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_kube_api_parallel
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-late-unbinding-single-node-4-19
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.14
+        WORKER_DISK=40000000000
+        OPENSHIFT_VERSION=4.19
+      POST_INSTALL_COMMANDS: |
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export HOLD_INSTALLATION=true
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_kube_api_parallel
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-net-suite-4-19
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.14
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        WORKER_DISK=40000000000
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ha-kube-api-4-19-periodic
+  cluster: build05
+  cron: 30 05 * * 1,3,5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        ENABLE_KUBE_API=true
+        IPv4=true
+        OPENSHIFT_VERSION=4.19
+        SERVICE_BASE_REF=release-ocm-2.14
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ha-kube-api-4-19
+  cluster: build05
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        ENABLE_KUBE_API=true
+        IPv4=true
+        OPENSHIFT_VERSION=4.19
+        SERVICE_BASE_REF=release-ocm-2.14
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api-ipv6-4-19
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.14
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        IPv6=true
+        ISO_IMAGE_TYPE=minimal-iso
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-vsphere-assisted-kube-api-4-19
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.14
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        NUM_WORKERS=0
+        IPv4=true
+        ISO_IMAGE_TYPE=minimal-iso
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        OPENSHIFT_VERSION=4.19
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- always_run: false
+  as: e2e-metal-assisted-kube-api-reclaim-single-node-4-19
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.14
+        RECLAIM_HOSTS=true
+        ENABLE_KUBE_API=true
+        TEST_FUNC=test_late_binding_kube_api_sno
+        TEST=./src/tests/test_kube_api.py
+        MAKEFILE_TARGET=test
+        WORKER_DISK=40000000000
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-reclaim-4-19
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.14
+        RECLAIM_HOSTS=true
+        ENABLE_KUBE_API=true
+        TEST_FUNC=test_late_binding_kube_api_ipv4_highly_available
+        TEST=./src/tests/test_kube_api.py
+        MAKEFILE_TARGET=test
+        WORKER_DISK=40000000000
+        OPENSHIFT_VERSION=4.19
+    workflow: assisted-ofcir-baremetal
+zz_generated_metadata:
+  branch: release-ocm-2.14
+  org: openshift
+  repo: assisted-test-infra

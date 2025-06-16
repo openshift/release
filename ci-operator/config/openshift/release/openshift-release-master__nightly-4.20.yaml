@@ -4,27 +4,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -75,6 +75,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
   upi-installer:
     name: "4.20"
     namespace: ocp
@@ -469,6 +473,18 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
+- as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
+  cluster: build05
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
+- as: e2e-metal-ovn-two-node-fencing-extended
+  cluster: build05
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-extended
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -509,7 +525,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: upi-vsphere-platform-external-ccm
-  timeout: 6h0m0s
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
   steps:
@@ -539,7 +555,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-staticip
-  timeout: 6h0m0s
+  timeout: 5h0m0s
 - as: e2e-vsphere-externallb-ovn
   interval: 168h
   steps:
@@ -559,6 +575,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
+  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-techpreview-serial
   interval: 168h
   steps:
@@ -569,6 +586,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
+  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-upi
   interval: 168h
   steps:
@@ -580,6 +598,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
+  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-upi-serial
   interval: 168h
   steps:
@@ -591,6 +610,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
+  timeout: 5h0m0s
 - as: e2e-vsphere-csi-operator-test
   cron: '@daily'
   steps:
@@ -664,7 +684,7 @@ tests:
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
-  timeout: 6h0m0s
+  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-hybrid-env
   cron: '@yearly'
   steps:
@@ -674,7 +694,7 @@ tests:
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
     workflow: openshift-e2e-vsphere-hybrid-env
-  timeout: 6h0m0s
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -1797,6 +1817,16 @@ tests:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
   timeout: 6h0m0s
+- as: e2e-aws-ovn-ipsec-upgrade
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
 zz_generated_metadata:
   branch: master
   org: openshift

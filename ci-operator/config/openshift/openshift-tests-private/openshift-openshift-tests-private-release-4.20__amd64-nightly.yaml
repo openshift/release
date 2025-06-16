@@ -47,6 +47,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.20"
+  tests-private-burner:
+    name: tests-private-burner
+    namespace: ci
+    tag: "4.20"
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -134,6 +138,7 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
@@ -260,6 +265,22 @@ tests:
     test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f14-stress-olm
+  cron: 13 14 2,16 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: gcp-ipi-f14-stress-olm
+  cron: 7 15 9,23 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: aws-ipi-tp-ocl-f7
   cron: 5 11 4,11,18,25 * *
   steps:
@@ -590,6 +611,19 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-capacity-reservation-gpu-guest-f999
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: p4d.24xlarge
+      ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_HC_ZONES: us-east-1d
+      HYPERSHIFT_NODE_COUNT: "1"
+      NODEPOOL_CAPACITY_RESERVATION: CapacityBlocks
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+    workflow: cucushift-hypershift-extended-capacity-reservation
 - as: aws-ipi-ovn-hypershift-fips-guest-openldap-f14
   cron: 33 7 14,30 * *
   steps:
@@ -659,14 +693,20 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-guest-advanced-f7
-  cron: 11 21 5,14,21,28 * *
+- as: aws-ipi-ovn-hypershift-guest-dynamic-dns-ondemand-advanced-f7
+  cron: 3 7 2,9,16,25 * *
   steps:
     cluster_profile: aws-qe
     env:
+      ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: m5.large
+      ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
       BASE_DOMAIN: qe.devcluster.openshift.com
+      DYNAMIC_DNS_ENABLED: "true"
+      HYPERSHIFT_DYNAMIC_DNS: hypershift-qe-dns.qe.devcluster.openshift.com
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_HC_ZONES: us-east-1a
       HYPERSHIFT_NODE_COUNT: "1"
+      NODEPOOL_CAPACITY_RESERVATION: OnDemand
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -699,7 +739,7 @@ tests:
     test:
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-ipi-cilium-hypershift-guest
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-cilium
 - as: aws-ipi-ovn-hypershift-guest-longduration-f14
   cron: 7 4 4,18 * *
   steps:
@@ -1415,12 +1455,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@ota'
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: OTA
-      TEST_TIMEOUT: "75"
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-confidentialvm-vmgueststateonly-mini-perm-f7
   cron: 9 1 6,15,22,29 * *
@@ -2193,6 +2229,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-sno-agent-dualstack-dynamic-f14-stress-olm
+  capabilities:
+  - intranet
+  cron: 25 13 16,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "true"
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress
+    workflow: baremetal-lab-agent-install-network-dynamic
 - as: baremetal-ha-agent-dualstack-dynamic-fips-f14
   capabilities:
   - intranet
@@ -2397,48 +2453,6 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-f7-longrun-tp-mco-p1
-  cluster: build05
-  cron: 51 18 6,13,20,27 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FEATURE_SET=TechPreviewNoUpgrade
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-f7-longrun-tp-mco-p2
-  cluster: build05
-  cron: 6 10 9,16,23,30 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FEATURE_SET=TechPreviewNoUpgrade
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P2&
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-f7-longrun-tp-mco-p3
-  cluster: build05
-  cron: 38 23 5,12,21,28 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      DEVSCRIPTS_CONFIG: |
-        FEATURE_SET=TechPreviewNoUpgrade
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-fips-f14
   cluster: build05
   cron: 1 10 9,23 * *
@@ -2528,6 +2542,36 @@ tests:
     - ref: olmv1-disable-default-clustercatalogs
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-ipv6-ipsec-f14
+  cluster: build05
+  cron: 28 22 6,20 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - ref: olmv1-disable-default-clustercatalogs
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipsec
+- as: baremetalds-ipi-ovn-ipv6-ipsec-f28-destructive
+  cluster: build05
+  cron: 3 8 15 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - ref: olmv1-disable-default-clustercatalogs
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipsec
 - as: baremetalds-ipi-ovn-lvms-f14-disasterrecovery
   cluster: build05
   cron: 1 13 5,25 * *
@@ -3026,7 +3070,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: ibmcloud-ipi-private-f14-disasterrecovery
-  cron: 10 21 1,15 * *
+  cron: 0 3 6,20 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -3515,9 +3559,6 @@ tests:
   cron: 20 8 3,10,19,26 * *
   steps:
     cluster_profile: vsphere-elastic
-    env:
-      MULTI_STAGE_OVERRIDE_CYPRESS_NOO_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
-      MULTI_STAGE_OVERRIDE_NETOBSERV_CS_IMAGE: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi

@@ -33,15 +33,14 @@ images:
 - dockerfile_literal: |
     FROM src AS builder
     RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
-        curl -skL ${MIRRORURL}/ocp/stable-4.15/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
-        tar -xzvf openshift-client-linux.tar.gz && ./oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs > /usr/local/ocp_version && \
-        curl -skL ${MIRRORURL}/ocp/$(cat /usr/local/ocp_version)/opm-src.tar.gz -o opm-src.tar.gz && tar -zxf opm-src.tar.gz && \
+        curl -skL ${MIRRORURL}/ocp/latest-4.15/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
+        tar -xzvf openshift-client-linux.tar.gz && VER=$(./oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs) && \
+        curl -skL ${MIRRORURL}/ocp/${VER}/opm-src.tar.gz -o opm-src.tar.gz && tar -zxf opm-src.tar.gz && \
         pushd operator-framework-olm* && make build/opm && mv ./bin/opm /tmp/opm && popd
     FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
     FROM this-is-ignored-and-not-used
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
     COPY --from=builder /tmp/opm /usr/bin/
-    COPY --from=builder /usr/local/ocp_version /usr/local/ocp_version
     COPY --from=netobservcli /oc-netobserv /usr/bin/
     COPY --from=quay.io/hypershift/hypershift-operator:latest usr/bin/hypershift /usr/bin/hypershift
     COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
@@ -66,9 +65,10 @@ images:
         chmod g+w /etc/passwd && \
         MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
         opm version && \
-        curl -skL ${MIRRORURL}/ocp/stable-4.15/oc-mirror.tar.gz -o oc-mirror.tar.gz && \
+        curl -skL ${MIRRORURL}/ocp/latest-4.15/oc-mirror.tar.gz -o oc-mirror.tar.gz && \
         tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
-        curl -skL ${MIRRORURL}/operator-sdk/$(cat /usr/local/ocp_version)/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
+        VER=$(curl -skL ${MIRRORURL}/operator-sdk/ | grep 'class="name"' | grep -o -E '4.15.[0-9]+' | sort -V | tail -1) && \
+        curl -skL ${MIRRORURL}/operator-sdk/${VER}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
         tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
         curl -skL ${MIRRORURL}/rosa/latest/rosa-linux.tar.gz -o rosa.tar.gz && \
         tar -C /usr/bin/ -xf rosa.tar.gz && chmod 755 /usr/bin/rosa && rosa version && rm -f rosa.tar.gz && \
@@ -143,7 +143,6 @@ images:
 promotion:
   to:
   - excluded_images:
-    - tests-private-ui
     - tests-private-newpr
     namespace: ci
     tag: "4.15"
@@ -170,10 +169,6 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
-  e2e-aws:
-    requests:
-      cpu: "4"
-      memory: 4Gi
 test_binary_build_commands: make test
 tests:
 - as: title-check
