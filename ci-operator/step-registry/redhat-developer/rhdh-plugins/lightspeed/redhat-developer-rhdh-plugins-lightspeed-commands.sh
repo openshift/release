@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd workspaces/lightspeed
+cd workspaces/lightspeed || exit
 
 yarn
 yarn tsc
