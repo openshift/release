@@ -1,6 +1,8 @@
 #!/bin/bash
 
-cd workspaces/lightspeed || exit
+git clone https://github.com/redhat-developer/rhdh-plugins
+
+cd rhdh-plugins/workspaces/lightspeed || exit
 
 yarn
 yarn tsc
