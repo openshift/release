@@ -48,7 +48,7 @@ function check_signed() {
         digest="$(echo "${payload}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
     else
-        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
+        digest="$(oc image info "${payload}" -o json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["digest"])')"
         echo "The target image is using tagname pullspec, its digest is ${digest}"
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
