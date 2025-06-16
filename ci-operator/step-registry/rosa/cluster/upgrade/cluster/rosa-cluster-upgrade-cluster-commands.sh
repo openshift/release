@@ -114,6 +114,7 @@ function upgrade_cluster_to () {
       if [[ "$current_sched" == "$recommended_version" ]]; then
         log "Upgrade is already scheduled to the right version"
         log "$upgrade_info"
+        break
       else
         log "Waiting for the previous upgrade schedule to be removed."
         sleep 120
