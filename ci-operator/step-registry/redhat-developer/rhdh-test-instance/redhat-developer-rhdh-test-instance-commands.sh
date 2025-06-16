@@ -49,10 +49,9 @@ export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="redhat-developer"
-GITHUB_REPOSITORY_NAME="rhdh"
+GITHUB_REPOSITORY_NAME="rhdh-test-instance"
 
-export QUAY_REPO RELEASE_BRANCH_NAME
-QUAY_REPO="rhdh-community/rhdh"
+export RELEASE_BRANCH_NAME
 # Get the base branch name based on job.
 RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
 
