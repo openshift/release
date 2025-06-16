@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cd workspaces/lightspeed
 
 yarn
