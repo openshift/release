@@ -580,6 +580,9 @@ function pre-OCP-60397(){
     # set testing graph
     set_upstream_graph "https://arm64.ocp.releases.ci.openshift.org/graph" || return 1
 
+    # wait for status change
+    sleep 60
+
     # check RetrievedUpdates=True
     verify_retrieved_updates  || return 1
 
@@ -600,8 +603,13 @@ function pre-OCP-60397(){
     "architecture=\"arm64\"" \
     || return 1
 
+    #export pull-secrets from live cluster for skopeo inspect to use
+    run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --confirm --to=/tmp/secret/"
     # verify cvo image still non-hetero
-    verify_nonhetero || return 1
+    verify_output \
+    "cvo image pre-transition is non-hetero" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') --authfile /tmp/secret/.dockerconfigjson | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.v2+json" || return 1
 
     # clear the upgrade
     if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
