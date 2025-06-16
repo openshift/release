@@ -413,6 +413,9 @@ function create_machineset() {
     echo -e "Reference Machineset Name: $REF_MACHINESET_NAME \nNODE_REPLICAS: $NODE_REPLICAS\nMACHINESET_TYPE: $MACHINESET_TYPE\nNODE_INSTANCE_TYPE: $NODE_INSTANCE_TYPE\nINSTANCE_VCPU: $INSTANCE_VCPU\nNODE_CPU_COUNT: $NODE_CPU_COUNT\nNODE_CPU_CORE_PER_SOCKET_COUNT: $NODE_CPU_CORE_PER_SOCKET_COUNT\nINSTANCE_MEMORYSIZE: $INSTANCE_MEMORYSIZE\ncpusPerSocket: $cpusPerSocket\nnNODE_MEMORY_SIZE: $NODE_MEMORY_SIZE\nVOLUME_TYPE: $VOLUME_TYPE\nVOLUME_SIZE: $VOLUME_SIZE\nVOLUME_IOPS: $VOLUME_IOPS"
     echo "It's normal if some ENV is empty, vsphere and nutanix use INSTANCE_VCPU/NODE_CPU_COUNT instead of NODE_INSTANCE_TYPE"
     echo "###########################################################################################"
+    echo "Remove autoscaling.openshift.io/machineautoscaler: openshift-machine-api/worker-autoscaling"
+    sed -i "/autoscaling.openshift.io/d" /tmp/machineset.json
+    sed -i "/cluster-api-autoscaler/d" /tmp/machineset.json
     if [[ $MACHINESET_TYPE == "infra" ]];then
         cat /tmp/machineset.json | jq '.spec.template.spec.metadata.labels."node-role.kubernetes.io/infra" = ""' | oc create -f -
     elif [[ $MACHINESET_TYPE == "workload" ]];then
