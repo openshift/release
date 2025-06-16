@@ -604,7 +604,7 @@ function pre-OCP-60397(){
     || return 1
 
     #export pull-secrets from live cluster for skopeo inspect to use
-    run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --to=/tmp/secret/"
+    run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --confirm --to=/tmp/secret/"
     # verify cvo image still non-hetero
     verify_output \
     "cvo image pre-transition is non-hetero" \
