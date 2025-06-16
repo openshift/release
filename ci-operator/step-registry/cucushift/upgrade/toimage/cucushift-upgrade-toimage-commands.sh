@@ -558,7 +558,6 @@ run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
 export TARGET_MINOR_VERSION=""
-export OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE="registry.build10.ci.openshift.org/ci-ln-4g7tytb/release:latest"
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
