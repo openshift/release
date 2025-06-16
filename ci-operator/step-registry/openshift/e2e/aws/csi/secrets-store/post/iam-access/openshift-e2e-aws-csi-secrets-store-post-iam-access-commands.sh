@@ -21,7 +21,7 @@ fi
 REGION=${REGION:-$LEASED_RESOURCE}
 
 # get user arn
-export AWS_USER_NAME=$(aws sts get-caller-identity --query 'Arn' --output text | cut -d'/' -f2)
+AWS_USER_NAME=$(aws sts get-caller-identity --query 'Arn' --output text | cut -d'/' -f2)
 # The file where the policy ARN is stored.
 POLICY_ARN_FILE="${SHARED_DIR}/sscsi_aws_iam_policy_arn"
 

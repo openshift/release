@@ -21,7 +21,7 @@ fi
 REGION=${REGION:-$LEASED_RESOURCE}
 
 # get user arn
-export AWS_USER_NAME=$(aws sts get-caller-identity --query 'Arn' --output text | cut -d'/' -f2)
+AWS_USER_NAME=$(aws sts get-caller-identity --query 'Arn' --output text | cut -d'/' -f2)
 POLICY_NAME="SSCSI-IAM-POLICY-${UNIQUE_HASH}"
 POLICY_FILE=${ARTIFACT_DIR}/sscsi_aws_iam_policy.json
 
