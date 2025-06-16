@@ -12,8 +12,8 @@ function cd_cleanup() {
   echo "killing cd-v2 observer"
   date
   ls 
-  oc get ns
-  if [[ $(jobs -p | grep -q "^$cd_pid$") ]]; then
+  jobs -p 
+  if [[ -n $(jobs -p | grep -q "^$cd_pid$") ]]; then
     kill -15 ${cd_pid}
     folder_name=$(ls -t -d /tmp/*/ | head -1)
     jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${ARTIFACT_DIR}/index_data.json
