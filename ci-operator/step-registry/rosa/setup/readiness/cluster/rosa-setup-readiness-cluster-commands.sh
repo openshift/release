@@ -7,7 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-60}
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-}
 CLUSTER_TIMEOUT_M="${CLUSTER_TIMEOUT}m"
 
 log(){

@@ -32,7 +32,7 @@ configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 # Log in to rosa/ocm
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 rosa_login ${OCM_LOGIN_ENV} $OCM_TOKEN
-
+rosa init
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
