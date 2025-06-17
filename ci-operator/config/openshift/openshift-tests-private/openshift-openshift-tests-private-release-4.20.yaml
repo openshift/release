@@ -121,30 +121,7 @@ tests:
         curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${HOME} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
         mkdir -p ${HOME}/gcloudconfig && export CLOUDSDK_CONFIG=${HOME}/gcloudconfig && export PATH=$PATH:${HOME}/google-cloud-sdk/bin
 
-        export MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
-        curl -s -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o glx.tar.gz && tar -C ${HOME} -xvf glx.tar.gz govc && rm -f glx.tar.gz
-
-        CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/candidate
-        curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp/ -o ocp.html && curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp-dev-preview/ -o pre.html
-        ecver=$(grep -E "<a href=\"candidate-4\.18" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V"
-        if [ "V${ecver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp-dev-preview/${ecver}; fi
-        rcgaver=$(grep -E "<a href=\"4\.18" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V"
-        if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/${rcgaver}; fi
-        curl -s -k -L ${CLIENTURL}/opm-linux-rhel9.tar.gz -o opm.tar.gz && tar -C ${HOME} -xzvf opm.tar.gz && mv ${HOME}/opm-rhel9 ${HOME}/opm && rm -fr opm.tar.gz
-        curl -s -k -L ${CLIENTURL}/oc-mirror.rhel9.tar.gz -o om.tar.gz && tar -C ${HOME} -xzvf om.tar.gz && chmod +x ${HOME}/oc-mirror && rm -f om.tar.gz
-
-        SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/pre-release
-        curl -s -k -L ${MIRROR2URL}/x86_64/clients/operator-sdk/ -o sdk.html
-        optsdkver=$(grep -E "<a href=\"4\.18" sdk.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo ${optsdkver}
-        if [ "V${optsdkver}V" != "VV"  ]; then SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/${optsdkver}; fi
-        curl -s -k -L ${SDKURL}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz
-        tar -C ${HOME} -xzvf opt-sdk.tar.gz && mv ${HOME}/x86_64/operator-sdk ${HOME} && rm -fr opt-sdk.tar.gz ${HOME}/x86_64
-
-        oc image extract quay.io/hypershift/hypershift-operator:latest --file=/usr/bin/hypershift && mv hypershift "${HOME}" && chmod 755 "${HOME}"/hypershift
-        oc image extract quay.io/openshifttest/openshift4-tools:v2 --file=/tmp/OpenShift4-tools.tar && tar -C "${HOME}" -xf OpenShift4-tools.tar && rm -fr OpenShift4-tools.tar
-
-        export PATH=$PATH:$HOME:/usr/local/krew/bin:${HOME}/OpenShift4-tools
-        opm version
+        export PATH=$PATH:$HOME/.krew/bin:/usr/local/krew/bin:/opt/OpenShift4-tools
 
         if ! which kubectl; then
           ln -s "$(which oc)" ${HOME}/kubectl
