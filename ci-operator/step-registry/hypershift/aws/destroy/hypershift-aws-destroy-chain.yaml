@@ -15,6 +15,9 @@ chain:
     - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
+    - name: HYPERSHIFT_HC_NUMBER
+      default: "1"
+      documentation: "If set to greater than one, it would destroy multiple hosted clusters"
     commands: |-
       set -exuo pipefail
       
@@ -28,22 +31,28 @@ chain:
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
       HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
       
+      HC_COUNT=$HYPERSHIFT_HC_NUMBER
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-      bin/hypershift destroy cluster aws \
-        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
-        --name ${CLUSTER_NAME} \
-        --region ${HC_REGION} \
-        --base-domain ${DOMAIN} \
-        --cluster-grace-period 40m
-      echo "$(date) Finished deleting cluster"
+      for ((index = 1; index <= HC_COUNT; index++)); do
+        if [[ $index -gt 1 ]]; then
+          CLUSTER_NAME=$CLUSTER_NAME$index
+        fi
+        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+        bin/hypershift destroy cluster aws \
+          --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
+          --name ${CLUSTER_NAME} \
+          --region ${HC_REGION} \
+          --base-domain ${DOMAIN} \
+          --cluster-grace-period 40m
+        echo "$(date) Finished deleting cluster"
+      done
     from: hypershift-operator
     grace_period: 5m0s
     resources:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 45m0s
+    timeout: 90m0s
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
