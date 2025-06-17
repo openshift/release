@@ -341,7 +341,50 @@ tests:
       OCP_ARCH: arm64
       SIZE_VARIANT: compact
     test:
-    - chain: openshift-upgrade-qe-test
+    - as: pre-notifier
+      commands: curl -d "cluster is ready for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}" ntfy.sh/swghosh-openshift-ci
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi 
+    - as: sleeper-one
+      commands: |
+        #!/bin/bash
+        total_duration=6900 # 1h55m, timeout is 2h
+        elapsed_time=0
+        while [ $elapsed_time -lt $total_duration ]; do
+            sleep 30
+            elapsed_time=$((elapsed_time + 30))
+            echo "Elapsed time: $((elapsed_time / 3600)) hours $(( (elapsed_time % 3600) / 60 )) minutes $((elapsed_time % 60)) seconds"
+        done
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    - as: sleeper-two
+      commands: |
+        #!/bin/bash
+        total_duration=6900 # 1h55m, timeout is 2h
+        elapsed_time=0
+        while [ $elapsed_time -lt $total_duration ]; do
+            sleep 30
+            elapsed_time=$((elapsed_time + 30))
+            echo "Elapsed time: $((elapsed_time / 3600)) hours $(( (elapsed_time % 3600) / 60 )) minutes $((elapsed_time % 60)) seconds"
+        done
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    - as: post-notifier
+      commands: curl -d "cluster about to be destroyed for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}" ntfy.sh/swghosh-openshift-ci
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi 
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-etcd-encryption
 - as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f60
   cron: 24 6 6 1,3,5,7,9,11 *
