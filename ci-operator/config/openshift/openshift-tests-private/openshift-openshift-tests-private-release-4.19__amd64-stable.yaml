@@ -237,7 +237,7 @@ tests:
       TEST_PROFILE: ocpe2e-rosa-shared-vpc
       VERSION: "4.19"
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cucushift-installer-check-cluster-health
     workflow: rosa-lifecycle-advanced
 - as: aws-rosa-advanced-stage-f7
   cron: 50 20 4,11,18,25 * *
@@ -295,7 +295,7 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa'
+      E2E_RUN_TAGS: '@rosa and @critical'
       NAME_PREFIX: ocpe2e
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_IMPORTANCE: Critical
@@ -311,7 +311,7 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa'
+      E2E_RUN_TAGS: '@rosa and @critical'
       NAME_PREFIX: ocpe2e
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_IMPORTANCE: Critical
@@ -341,7 +341,7 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa'
+      E2E_RUN_TAGS: '@rosa and @critical'
       NAME_PREFIX: ocpe2e
       REGION: us-west-2
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
@@ -357,8 +357,91 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa'
+      E2E_RUN_TAGS: '@rosa and @critical'
       NAME_PREFIX: ocpe2e
+      REGION: us-west-2
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: ocpe2e-rosa-hcp-zero-egress
+      VERSION: "4.19"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-private-advanced
+- as: aws-rosa-hcp-advanced-int-f7
+  cron: 45 5 5,12,19,26 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa and @critical'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: ocpe2e-rosa-hcp-advanced
+      VERSION: "4.19"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-shared-vpc-advanced-int-f7
+  cron: 45 5 1,8,15,21 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa and @critical'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: ocpe2e-rosa-hcp-shared-vpc-advanced
+      VERSION: "4.19"
+    test:
+    - chain: multiarch-tuning-operator
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-external-auth-stage-full-int-f7
+  cron: 49 18 2,9,16,23 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: ocpe2e-rosa-hcp-external-auth
+      VERSION: "4.19"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-lifecycle-external-auth-advanced
+- as: aws-rosa-hcp-pl-int-f7
+  cron: 31 13 5,12,19,26 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa and @critical'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      REGION: us-west-2
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+      TEST_PROFILE: ocpe2e-rosa-hcp-pl
+      VERSION: "4.19"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-private-advanced
+- as: aws-rosa-hcp-zero-egress-int-f7
+  cron: 45 5 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa and @critical'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
       REGION: us-west-2
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_IMPORTANCE: Critical
