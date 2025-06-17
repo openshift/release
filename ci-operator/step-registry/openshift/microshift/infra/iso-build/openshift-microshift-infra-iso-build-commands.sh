@@ -26,8 +26,6 @@ cd ~/microshift
 export CI_JOB_NAME="${JOB_NAME}"
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
-elif [[ "${JOB_NAME}" =~ .*e2e-aws-qe-cache-.* ]] ; then
-    ./test/bin/ci_phase_iso_build.sh -update_qe_cache
 else
     ./test/bin/ci_phase_iso_build.sh
 fi
@@ -55,11 +53,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
         ocpversion="4.$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
-        if [[ "${JOB_NAME}" =~ .*e2e-aws-qe-cache-.* ]] ; then
-            bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "${VERSION_TYPE}" "${out_path}"
-        else
-            bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "nightly" "${out_path}"
-        fi
+        bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "${out_path}"
     fi
     popd &>/dev/null
 fi
