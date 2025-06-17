@@ -57,6 +57,21 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
+#download and install oc 
+sleep 20m
+echo "Downloading oc"
+# export PATH=$PATH:/usr/local/bin/
+echo "PATH: ${PATH}"
+mkdir -p /tmp/bin
+export PATH=$PATH:/tmp/bin/
+echo "PATH: ${PATH}"
+
+curl -skL https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/amd64/openshift-client-linux-amd64-rhel8.tar.gz -o /tmp/openshift-client-linux.tar.gz && \
+            tar -C /tmp/ -zxvf /tmp/openshift-client-linux.tar.gz && \
+            cp /tmp/oc /tmp/bin/
+
+oc version
+
 # download openshift-install from the payload
 echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
@@ -521,5 +536,8 @@ if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
 fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+
+echo "sleeping for 30 mins"
+sleep 30m
 
 touch ${INSTALL_DIR}/install-complete
