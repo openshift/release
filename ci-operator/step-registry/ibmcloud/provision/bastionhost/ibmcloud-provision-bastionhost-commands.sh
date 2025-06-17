@@ -28,10 +28,21 @@ function check_vpc() {
     "${IBMCLOUD_CLI}" is vpc ${vpcName} --show-attached --output JSON > "${vpc_info_file}" || return 1
 }
 
+EXIT_CODE=100
+handle_error() {
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "Error occurred with exit code $EXIT_CODE. Waiting for 15 hours before exiting..."
+        echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
+        sleep 15h
+    fi
+}
 #####################################
 ##############Initialize#############
 #####################################
 ibmcloud_login
+
+trap 'handle_error; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 #create the bastion host based on the info (ibmcloud-provision-vpc ${SHARED_DIR}/customer_vpc_subnets.yaml), output ip info to ${SHARED_DIR}/bastion-info.yaml
 cluster_name="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_info_yaml="${SHARED_DIR}/bastion-info.yaml"
@@ -79,6 +90,7 @@ run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound icmp --remot
 run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote \"0.0.0.0/0\" --port-min=5000 --port-max=5000"
 run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote \"0.0.0.0/0\" --port-min=6001 --port-max=6002"
 run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote \"0.0.0.0/0\" --port-min=873 --port-max=873"
+run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote \"0.0.0.0/0\" --port-min=8443 --port-max=8443"
 
 echo "Created bastion instance"
 run_command "${IBMCLOUD_CLI} is instance-create ${bastion_name} ${vpcName} ${zone} ${MACHINE_TYPE} ${subnet} --image ${IMAGE} --user-data "@${bastion_ignition_file}" --output JSON"
