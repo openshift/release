@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Set varaibles needed to login to AWS
+# Set variables needed to login to AWS
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_CONFIG_FILE=$CLUSTER_PROFILE_DIR/.aws
 
