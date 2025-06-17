@@ -12,7 +12,7 @@ function cd_cleanup() {
   echo "killing cd-v2 observer"
   date
   ls 
-  jobs -p 
+  jobs -l
   if [[ -n $(jobs -p | grep -q "^$cd_pid$") ]]; then
     kill -15 ${cd_pid}
     folder_name=$(ls -t -d /tmp/*/ | head -1)
@@ -76,7 +76,10 @@ cd_logs=${ARTIFACT_DIR}/cluster-density/cd_observer_logs.out
 ./run.sh > $cd_logs 2>&1 &
 cd_pid="$!"
 
-jobs -p
+ps -ef | grep run
+
+jobs -l
+
 while [[ -z $(cat $cd_logs | grep "signal=terminated") ]]; do 
   sleep 10
   date
