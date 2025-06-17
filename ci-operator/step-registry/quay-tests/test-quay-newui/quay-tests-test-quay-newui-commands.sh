@@ -14,6 +14,7 @@ cd new-ui-tests
 skopeo -v
 oc version
 terraform version
+git-lfs  --version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
 #Create Artifact Directory:
