@@ -212,6 +212,7 @@ else
     echo "Downloading new rhcos image..."
     curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME} || true
 
+
     # Resize the rhcos image to match the volume capacity
     echo "Resizing rhcos image to match volume capacity..."
     qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
@@ -521,5 +522,6 @@ if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
 fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+
 
 touch ${INSTALL_DIR}/install-complete
