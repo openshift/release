@@ -12,6 +12,7 @@ additional_trust_bundle="${SHARED_DIR}/additional_trust_bundle"
 
 if [[ $CLUSTER_TYPE == "nutanix" ]]; then
   if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    echo >> "${additional_trust_bundle}"
     cat "${CLUSTER_PROFILE_DIR}"/prismcentral.pem >> "${additional_trust_bundle}"
   fi
 else
