@@ -189,6 +189,11 @@ function run_automation() {
     echo "Running init"
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/ init -upgrade -no-color
     echo "Running plan"
+    while [ ! -f /tmp/end-terminal ]
+    do
+        echo "Sleeping [$(date)]"
+        sleep 10s
+    done
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/ plan -var-file=data/var.tfvars -no-color
     echo "Running apply"
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/ apply -var-file=data/var.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
