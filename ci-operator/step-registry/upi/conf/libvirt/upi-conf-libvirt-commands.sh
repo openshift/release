@@ -10,8 +10,6 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-
-
 # ensure leases file is present
 if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   echo "Couldn't find lease config file"
@@ -57,7 +55,7 @@ controlPlane:
   replicas: ${CONTROL_COUNT}
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14
+  - cidr: 10.8.0.0/14
     hostPrefix: 23
   machineNetwork:
   - cidr: "192.168.$(leaseLookup "subnet").0/24"
@@ -106,5 +104,19 @@ spec:
         mode: 0644
         overwrite: true
         path: /etc/sysctl.conf
+      - path: /usr/local/bin/append-chrony.sh
+        mode: 0755
+        overwrite: true
+        contents:
+          source: data:text/plain;charset=utf-8;base64,ZWNobyAic2VydmVyIDEwLjEzMC4zNC4xMDEgaWJ1cnN0IiA+PiAvZXRjL2Nocm9ueS5jb25m
+      - path: /etc/systemd/system/append-chrony.service
+        mode: 0644
+        overwrite: true
+        contents:
+          source: data:text/plain;charset=utf-8;base64,W3VuaXRdCkRlc2NyaXB0aW9uPUFwcGVuZCBjdXN0b20gY2hyb255IGNvbmYKQWZ0ZXI9bXVsdGktdXNlci5zZXJ2aWNlLmNvbmZpZwoKW1NlcnZpY2VdClR5cGU9b25lc2hvdApFeGVjU3RhcnQ9L3Vzci9sb2NhbC9iaW4vYXBwZW5kLWNocm9ueS5zaAoKW0luc3RhbGxdCldhbnRlZGJ5PW11bHRpLXVzZXIudGFyZ2V0Cg==
+    systemd:
+      units:
+      - name: append-chrony.service
+        enabled: true
 EOF
 fi
