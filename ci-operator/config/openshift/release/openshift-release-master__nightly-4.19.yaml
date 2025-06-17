@@ -75,6 +75,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -465,6 +469,18 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
+- as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
+  cluster: build05
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
+- as: e2e-metal-ovn-two-node-fencing-extended
+  cluster: build05
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-extended
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -1795,6 +1811,16 @@ tests:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
   timeout: 6h0m0s
+- as: e2e-aws-ovn-ipsec-upgrade
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
 zz_generated_metadata:
   branch: master
   org: openshift

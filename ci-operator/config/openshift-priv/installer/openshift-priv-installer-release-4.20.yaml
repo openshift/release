@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -382,13 +382,39 @@ tests:
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-private
+  as: aws-private
   optional: true
   run_if_changed: aws
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-private
-  timeout: 6h0m0s
+    env:
+      PUBLISH: Internal
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - chain: gather-network
+    - chain: gather-core-dump
+    - ref: gather-aws-console
+    - chain: ipi-deprovision
+    - ref: aws-deprovision-security-group
+    - ref: aws-deprovision-stacks
+    - ref: aws-deprovision-s3buckets
+    pre:
+    - ref: ipi-conf
+    - ref: aws-provision-vpc-shared
+    - chain: aws-provision-bastionhost
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-custom-security-groups
+    - ref: proxy-config-generate
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+    - ref: aws-provision-tags-for-byo-vpc
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-aws-private
+    test:
+    - chain: cucushift-installer-check-cluster-health
+  timeout: 4h0m0s
 - always_run: false
   as: e2e-aws-ovn-user-provisioned-dns
   optional: true
@@ -652,6 +678,21 @@ tests:
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-resourcegroup
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-multidisk-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-azure-multidisk
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-upgrade
@@ -1263,6 +1304,37 @@ tests:
     - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install
     - ref: ipi-azure-rbac
+  timeout: 6h0m0s
+- as: azure-private
+  optional: true
+  run_if_changed: azure
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: azure4
+    env:
+      BASTION_BOOT_IMAGE: azureopenshift:aro4:aro_417:417.94.20240701
+      PUBLISH: Internal
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - chain: gather-network
+    - chain: gather-core-dump
+    - ref: gather-azure-cli
+    - ref: gather-azure-resource
+    - chain: ipi-deprovision
+    - ref: azure-deprovision-resourcegroup
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - chain: azure-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-provisionednetwork
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - chain: cucushift-installer-check
+    - chain: cucushift-installer-check-azure-private
+    test:
+    - chain: cucushift-installer-check-cluster-health
   timeout: 6h0m0s
 - always_run: false
   as: e2e-external-aws

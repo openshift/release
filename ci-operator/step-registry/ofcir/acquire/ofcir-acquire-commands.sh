@@ -84,9 +84,9 @@ function getCIR(){
     PORTFILE=$SHARED_DIR/server-sshport
     CIRFILE=$SHARED_DIR/cir
 
-    # ofcir may be unavailable in the cluster(or the ingress machinery), retry once incase we get unlucky,
-    # we don't want to overdo it on the retries incase we start leaking CIR's
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 1 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
+    # ofcir may be unavailable in the cluster(or the ingress machinery), retry
+    # we can retry several times, preventing CIR leaking should be done by OFCIR with pool size
+    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 15 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="
