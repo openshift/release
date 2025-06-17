@@ -37,7 +37,7 @@ if [[ -n ${MCE} ]] ; then
   fi
 fi
 
-function SUPPORT_NP_SKEW() {
+function support_np_skew() {
   curl -L "https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq && chmod +x /tmp/yq
   local EXTRA_FLARGS=""
   if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && -n "$MCE" ]]; then
@@ -215,7 +215,7 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(SUPPORT_NP_SKEW)"
+    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
 fi
 
 
