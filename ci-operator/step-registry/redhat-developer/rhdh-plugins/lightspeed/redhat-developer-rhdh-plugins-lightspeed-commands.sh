@@ -1,4 +1,6 @@
 #!/bin/bash
+whoami
+cat /etc/subuid
 
 git clone https://github.com/redhat-developer/rhdh-plugins
 
