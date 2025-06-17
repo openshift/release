@@ -61,7 +61,7 @@ if [[ $(uname -m) == "x86_64" ]]; then
 else
   butane_filename="butane-$(uname -m)"
 fi
-  
+
 curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/butane/latest/$butane_filename --output "/tmp/butane" && chmod +x "/tmp/butane"
 /tmp/butane "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu" -o "${SHARED_DIR}/manifest_99_${node_role}_kdump.yml"
 
