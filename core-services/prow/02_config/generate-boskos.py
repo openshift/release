@@ -141,6 +141,12 @@ CONFIG = {
     'aws-devfile-quota-slice': {
         'us-west-2': 10
     },
+    'aws-mco-qe-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+        'us-west-1': 10,
+        'us-west-2': 10,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -423,6 +429,9 @@ CONFIG = {
     },
     'aws-perfscale-quota-slice': {
         'us-west-2': 10,
+    },
+    'aws-perfscale-okd-quota-slice': {
+        'us-east-1': 1,
     },
     'aws-stackrox-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues

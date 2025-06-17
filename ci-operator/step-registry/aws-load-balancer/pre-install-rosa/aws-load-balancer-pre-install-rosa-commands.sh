@@ -24,6 +24,11 @@ E2E_INPUT_OPERATOR_ROLE_ARN="operator-role-arn"
 E2E_INPUT_CONTROLLER_ROLE_ARN="controller-role-arn"
 E2E_WAFV2_WEB_ACL_NAME="echoserver-acl-${UNIQUE_HASH}"
 E2E_WAF_WEB_ACL_NAME="echoserverclassicacl${UNIQUE_HASH}"
+# Skip creation of deprecated waf-regional (WAF Classic) Web ACL
+# AWS WAF Classic (v1) support will end on September 30, 2025.
+# Effective May 1st, 2025, the creation of new WebACL v1 is no longer permitted.
+# https://issues.redhat.com//browse/OCPBUGS-57320
+SKIP_WAF_WEB_ACL_CREATION=true
 
 if [ -f "${AWSCRED}" ]; then
     echo "=> configuring aws"
@@ -84,7 +89,11 @@ echo "=> ensuring e2e wafv2 web acl"
 aws wafv2 create-web-acl --name "${E2E_WAFV2_WEB_ACL_NAME}" --scope REGIONAL --default-action '{"Block":{}}'  --visibility-config '{"MetricName":"echoserver","CloudWatchMetricsEnabled": false,"SampledRequestsEnabled":false}' || true
 aws wafv2 list-web-acls --scope REGIONAL --output json | grep "webacl/${E2E_WAFV2_WEB_ACL_NAME}" | cut -d: -f2- | tr -d \",' ' > ${E2E_INPUT_DIR}/${E2E_INPUT_WAFV2_WEBACL}
 
-echo "=> ensuring e2e wafregional web acl"
-WAFREGIONAL_CHANGE_TOKEN=$(aws waf-regional get-change-token --output json | jq -r .ChangeToken)
-aws waf-regional create-web-acl --name "${E2E_WAF_WEB_ACL_NAME}" --metric-name "${E2E_WAF_WEB_ACL_NAME}" --default-action '{"Type":"BLOCK"}' --change-token "${WAFREGIONAL_CHANGE_TOKEN}" || true
-aws waf-regional list-web-acls --output json | grep -B1 "${E2E_WAF_WEB_ACL_NAME}" | grep WebACLId | tr -d \",' ' | cut -d: -f2 > ${E2E_INPUT_DIR}/${E2E_INPUT_WAF_WEBACL}
+if $SKIP_WAF_WEB_ACL_CREATION; then
+  echo "=> skipping e2e wafregional web acl as SKIP_WAF_WEB_ACL_CREATION is true"
+else
+  echo "=> ensuring e2e wafregional web acl"
+  WAFREGIONAL_CHANGE_TOKEN=$(aws waf-regional get-change-token --output json | jq -r .ChangeToken)
+  aws waf-regional create-web-acl --name "${E2E_WAF_WEB_ACL_NAME}" --metric-name "${E2E_WAF_WEB_ACL_NAME}" --default-action '{"Type":"BLOCK"}' --change-token "${WAFREGIONAL_CHANGE_TOKEN}" || true
+  aws waf-regional list-web-acls --output json | grep -B1 "${E2E_WAF_WEB_ACL_NAME}" | grep WebACLId | tr -d \",' ' | cut -d: -f2 > ${E2E_INPUT_DIR}/${E2E_INPUT_WAF_WEBACL}
+fi
