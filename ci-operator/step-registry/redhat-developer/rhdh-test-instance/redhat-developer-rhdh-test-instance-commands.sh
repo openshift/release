@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
@@ -60,16 +62,14 @@ git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
 git checkout "$RELEASE_BRANCH_NAME" || exit
 
-git config --global user.name "rhdh-qe"
-git config --global user.email "rhdh-qe@redhat.com"
-
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
 fi
 
-echo "############## Current branch ##############"
-echo "Current branch: $(git branch --show-current)"
+# Install & login to gh cli
+GH_VERSION=2.49.0 && curl -sL https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz | tar xz && export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+echo "$(cat /tmp/secrets/GH_BOT_PAT)" | gh auth login --with-token
 
 bash ./deploy.sh
