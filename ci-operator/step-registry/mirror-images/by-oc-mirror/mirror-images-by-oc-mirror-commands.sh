@@ -23,33 +23,6 @@ handle_error() {
     fi
 }
 
-function check_signed() {
-    local digest algorithm hash_value response try max_retries payload="${1}"
-    if [[ "${payload}" =~ "@sha256:" ]]; then
-        digest="$(echo "${payload}" | cut -f2 -d@)"
-        echo "The target image is using digest pullspec, its digest is ${digest}"
-    else
-        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
-        echo "The target image is using tagname pullspec, its digest is ${digest}"
-    fi
-    algorithm="$(echo "${digest}" | cut -f1 -d:)"
-    hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    try=0
-    max_retries=3
-    response=0
-    while (( try < max_retries && response != 200 )); do
-        echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
-        (( try += 1 ))
-        sleep 60
-    done
-    if (( response == 200 )); then
-        echo "${payload} is signed" && return 0
-    else
-        echo "Seem like ${payload} is not signed" && return 1
-    fi
-}
-
 trap 'handle_error; if [[ "$?" == 0 ]]; then echo "waiting..."; sleep 5h; EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 #trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
