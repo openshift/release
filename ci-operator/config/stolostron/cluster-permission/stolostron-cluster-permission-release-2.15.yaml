@@ -22,7 +22,8 @@ images:
   to: cluster-permission
 promotion:
   to:
-  - name: "2.15"
+  - disabled: true
+    name: "2.15"
     namespace: stolostron
 resources:
   '*':
@@ -69,12 +70,31 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: cluster-permission
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-permission
     env:
-      DESTINATION_BRANCH: release-2.15
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: cluster-permission
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true
   steps:
@@ -82,10 +102,10 @@ tests:
       SOURCE_IMAGE_REF: cluster-permission
     env:
       IMAGE_REPO: cluster-permission
-      IMAGE_TAG: latest
+      IMAGE_TAG: 2.15.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.15
   org: stolostron
   repo: cluster-permission
