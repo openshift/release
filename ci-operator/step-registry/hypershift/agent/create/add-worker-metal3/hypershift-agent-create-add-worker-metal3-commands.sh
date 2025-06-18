@@ -19,9 +19,9 @@ function gather() {
   oc get BareMetalHost -n ${AGENT_NAMESPACE} -o yaml > "${ARTIFACT_DIR}/extra_baremetalhosts.yaml"
 }
 
-trap gather SIGINT SIGTERM ERR EXIT
+trap gather EXIT
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_NAME" "$AGENT_NAMESPACE" "$EXTRA_BAREMETALHOSTS_FILE" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_NAME" "$AGENT_NAMESPACE" "$EXTRA_BAREMETALHOSTS_FILE" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g' &
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 set -xeo pipefail
@@ -104,3 +104,5 @@ oc scale nodepool ${CLUSTER_NAME} -n $(oc get hostedcluster -A -o=jsonpath="{.it
 echo "wait agent ready"
 oc wait --all=true agent -n ${AGENT_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
 EOF
+
+wait
