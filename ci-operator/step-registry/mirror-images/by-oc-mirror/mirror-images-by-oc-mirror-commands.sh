@@ -125,6 +125,7 @@ cd ${workdir}
 oc image extract "registry.build10.ci.openshift.org/ci-ln-kqi70vk/stable@sha256:5a1da7b688a91b68597d823a9faaed473a968dac273d0f7ba4b4dee1afd40217" --path=/usr/bin/oc-mirror:.
 chmod +x ${workdir}/oc-mirror
 
+oc_mirror_bin=${workdir}/oc-mirror
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
 # set the imagesetconfigure
