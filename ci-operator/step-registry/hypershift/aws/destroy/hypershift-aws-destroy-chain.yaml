@@ -32,10 +32,12 @@ chain:
       HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
       
       HC_COUNT=$HYPERSHIFT_HC_NUMBER
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      BASE_CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       for ((index = 1; index <= HC_COUNT; index++)); do
         if [[ $index -gt 1 ]]; then
-          CLUSTER_NAME=$CLUSTER_NAME$index
+          CLUSTER_NAME="${BASE_CLUSTER_NAME}${index}"
+        else
+          CLUSTER_NAME="${BASE_CLUSTER_NAME}"
         fi
         echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
         bin/hypershift destroy cluster aws \
@@ -52,7 +54,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 90m0s
+    timeout: 180m0s
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
