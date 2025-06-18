@@ -61,6 +61,49 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-azure-ipi
+- as: baremetal-sno-agent-ipv6-f999-logging
+  capabilities:
+  - intranet
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.3-konflux
+      MINIMAL_ISO: "true"
+      OPERATORS: |
+        [
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.3", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.3", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      RESERVE_BOOTSTRAP: "false"
+      TEST_ADDITIONAL: ""
+      TEST_IMPORTANCE: Critical
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+      architecture: amd64
+      ipv4_enabled: "false"
+      ipv6_enabled: "true"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: install-operators
+    - as: sleep5h
+      cli: latest
+      commands: "sleep 20m \n"
+      from: cli
+      resources:
+        requests:
+          cpu: 20m
+          memory: 50Mi
+    - chain: openshift-e2e-test-logging-qe
+    workflow: baremetal-lab-agent-install-network-static
 zz_generated_metadata:
   branch: release-4.17
   org: openshift
