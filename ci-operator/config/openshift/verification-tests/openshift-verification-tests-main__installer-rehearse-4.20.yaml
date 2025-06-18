@@ -46,16 +46,22 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
+      COMPUTE_NODE_TYPE: bx2d-16x64
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-kqi70vk/release:latest
       MIRROR_BIN: oc-mirror
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
       SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-      SLEEP_DURATION: 5h
+      SLEEP_DURATION: 1m
+      SIZE_VARIANT: "large"
+      TEST_SCENARIOS: Workloads
+      TEST_TIMEOUT: "600"      
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
     test:
     - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration    
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
 zz_generated_metadata:
   branch: main

@@ -23,7 +23,7 @@ handle_error() {
     fi
 }
 
-trap 'handle_error; if [[ "$?" == 0 ]]; then echo "waiting..."; sleep 5h; EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+trap 'handle_error; if [[ "$?" != 0 ]]; then echo "waiting..."; sleep 5h; EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 #trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
