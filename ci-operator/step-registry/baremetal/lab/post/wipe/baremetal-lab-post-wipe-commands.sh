@@ -110,24 +110,22 @@ function ilo_reset() {
   local ipxe_via_vmedia="${6}"
   local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
-#  TIMEOUT_SECONDS=120
-#  POLL_INTERVAL=10
-#  iloreset="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} mc reset cold"
-#  echo "$(date): Reseting iLO for host #$host"
-#  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${iloreset}"
-#
-#  echo -e "\nWaiting for 3 mins for #${host} iLO/BMC to reset.."
-#  sleep 120
-#  check_ilo
-  power_button="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} power on"
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${power_button} on"
-  echo "Power cycle #${host} and wait for 3 mins"
+  TIMEOUT_SECONDS=120
+  POLL_INTERVAL=10
+  iloreset="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} mc reset cold"
+  echo "$(date): Reseting iLO for host #$host"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${iloreset}"
+
+  echo -e "\nWaiting for 3 mins for #${host} iLO/BMC to reset.."
   sleep 180
-  echo "Power off #${host}"
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${power_button} off"
-  #timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
-  #echo "Reset #${host} with pxe and wait for 4 mins"
-  #sleep 240
+  check_ilo
+  power_button="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} power off"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${power_button}"
+  echo "Power off #${host} and wait for 5 mins"
+  sleep 300
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+  echo "Reset #${host} with pxe and wait for 4 mins"
+  sleep 240
 }
 
 function reset_host() {
