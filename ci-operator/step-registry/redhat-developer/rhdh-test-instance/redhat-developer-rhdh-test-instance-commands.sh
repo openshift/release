@@ -6,6 +6,10 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+# Install & login to gh cli
+GH_VERSION=2.49.0 && curl -sL https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz | tar xz && export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+gh --version
+
 on_error() {
   echo "❌ An error occurred on line $LINENO. Exiting..."
   if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
@@ -67,9 +71,6 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     git checkout PR"${GIT_PR_NUMBER}"
 fi
 
-# Install & login to gh cli
-GH_VERSION=2.49.0 && curl -sL https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz | tar xz && export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
-gh --version
-echo $(cat /tmp/secrets/GH_BOT_PAT) | gh auth login --with-token
+echo "$(cat /tmp/secrets/GH_BOT_PAT)" | gh auth login --with-token
 
 bash ./deploy.sh
