@@ -16,8 +16,9 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 set -x
 
-uv run pytest \
+uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     --junitxml "${ARTIFACT_DIR}/xunit_results.xml" \
-    --pytest-log-file="${ARTIFACT_DIR}/tests.log" \
+    --html=/data/report.html --self-contained-html \
+    --pytest-log-file="${ARTIFACT_DIR}/tests.log"  \
     -o cache_dir=/tmp \
     --tc=hco_subscription:kubevirt-hyperconverged
