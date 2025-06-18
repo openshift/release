@@ -16,7 +16,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: regulus
+  as: regulus-cpt
   capabilities:
   - intranet
   restrict_network_access: false
@@ -25,10 +25,42 @@ tests:
     env:
       BAREMETAL: "true"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-day2-regulus
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-day2-regulus
 - always_run: false
-  as: regulus-long
+  as: regulus-jetlag
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+    test:
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-day2-regulus
+- always_run: false
+  as: regulus-long-cpt
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CRUCIBLE: "true"
+      JETLAG_BRANCH: main
+      NUM_WORKER_NODES: "2"
+      PRE_RESET_IDRAC: "true"
+      PUBLIC_VLAN: "true"
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-installer-bm-day2-regulus
+- always_run: false
+  as: regulus-long-jetlag
   capabilities:
   - intranet
   restrict_network_access: false
@@ -37,12 +69,14 @@ tests:
     env:
       BAREMETAL: "true"
       CRUCIBLE: "true"
+      JETLAG_BRANCH: main
       NUM_WORKER_NODES: "2"
+      PRE_RESET_IDRAC: "true"
       PUBLIC_VLAN: "true"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-regulus
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-installer-bm-day2-regulus
 zz_generated_metadata:
   branch: main
   org: openshift-eng
