@@ -1,8 +1,33 @@
 #!/bin/bash
+# Install, config and execute Regulus, the dataplane test suite.
+#
+# Background:
+#   For BM we support multiple profiles. Currently there are 2 profiles: metal-perscale-cpt (cloud31)
+#   and metal-perfscale-jetlag (cloud48). More profiles are coming. Multiple profiles ramifications are:
+#       1. The current BM Prow design has cloud31 as the only cloud reachable from Prow pod.
+#       2. Dictated by "1.", jetlag always runs on cloud31 bastion to instantiatep cloud31 or cloud48 cluster.
+#   Notable impacts to the Regulus Step are:
+#      If the profile is cloud31, we ssh from Prow to cloud31's bastion and run Regulus there, a standard case.
+#      If the profile is cloud48, we have to double/nested ssh to get to cloud48's bastion. A more complicate situation.
+#      For this 2-hop scenario, we refer to cloud31's bastion as "bastion" and the second hop bastion as "true" bastion.
+#      On the true bastion, we do not have the private key to ssh to its nodes (ssh core@worker_ip). This key
+#      is on the bastion (where jetlag ran).
+#
+#      In summary, for Regulus some operations are 1-hop ssh, some are 2-hop ssh, and some need jetlag build-time
+#      private key that we need to set up.
+#
 set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+REPO_NAME=${REPO_NAME:-}
+PULL_NUMBER=${PULL_NUMBER:-}
+BASTION="${BASTION:-}"                          # first level which always is cloud31 bastion
+TRUE_BASTION_HOST="${TRUE_BASTION_HOST:-}"      # second level such as cloud48 bastion
+TRUE_BASTION_USER="${TRUE_BASTION_USER:-root}"
+LAB_CLOUD="${LAB_CLOUD:-}"
+LAB="${LAB:-}"
 
 # Enable debug mode with environment variable
 DEBUG_MODE="${DEBUG_MODE:-false}"
@@ -13,50 +38,93 @@ debug_echo() {
 }
 # example: debug_echo "assignment: '${REG_BRANCH}'"
 
-REPO_NAME=${REPO_NAME:-}
-PULL_NUMBER=${PULL_NUMBER:-}
-BASTION="${BASTION:-}"
-LAB_CLOUD="${LAB_CLOUD:-}"
-
-if [ -z "${RUNLOCAL:-}" ]; then
-  if [ -f "${CLUSTER_PROFILE_DIR}/lab_cloud" ]; then
-    LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
-  fi
-  bastion=$(cat /bm/address)
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  jetlag_repo=$(cat "${SHARED_DIR}/jetlag_repo")
-else
-  bastion=$BASTION
-  SSH_ARGS="-i $PRIVATE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  jetlag_repo=$JETLAG_REPO
-fi
-
-
-# Use the jetlag_repo artifact to learn the cloud's bastion hostname.
-echo $LINENO CMD:  ssh ${SSH_ARGS} root@${bastion}
-REMOTE_BASTION_HOST=$(ssh ${SSH_ARGS} root@${bastion} "
-    cd $jetlag_repo;
-    source .ansible/bin/activate; 
-    ansible -i ansible/inventory/$LAB_CLOUD.local bastion --list-hosts  2>/dev/null | tail -n +2 | sed 's/^[[:space:]]*//'; 
-    deactivate
-")
-
-if [ -z "${bastion}" ] ||  [ -z "${REMOTE_BASTION_HOST}" ] ; then
-    echo "Error: Invalid bastion:$bastion  REMOTE_BASTION_HOST: $REMOTE_BASTION_HOST" >&2
-    exit 1
-fi
-
-
-# nested ssh 
-function do_jssh() {
+# 1-level ssh 
+function do_ssh() {
     local user_host="$1"
     shift
-    local user=$(echo "$user_host" | awk -F@ '{print $1}')
-    ssh ${SSH_ARGS} -J ${user_host} ${user}@$REMOTE_BASTION_HOST "$@"
+    ssh ${SSH_ARGS} ${user_host} "$@"
     return $?
 }
 
-# Bail out if Crucible does not exist on the bastion. jetlag in bm-deploy step should have installed it.
+# 2-level, nested/jump ssh
+# Prerequisite:  on bastion, ssh root@true_bastion must work (ssh-copy-id by admin)
+function do_jssh() {
+    local user_host="$1"
+    shift
+    # Use ProxyCommand for nested SSH to control options for both connections
+    ssh ${SSH_ARGS} \
+        -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p ${user_host}" \
+        ${TRUE_BASTION_USER}@${TRUE_BASTION_HOST} "$@"
+    return $?
+}
+
+# 2-level, nested scp
+function do_jscp() {
+    local user_host="$1"
+    shift
+    local src_file="$1"
+    shift
+    local dst_file="$1"
+    local user host
+    user=$(echo "$user_host" | awk -F@ '{print $1}')
+    host=$(echo "$user_host" | awk -F@ '{print $2}')
+    
+    if [ -z "$user" ] || [ -z "$host" ]; then
+        echo "Error: Invalid user/host: $user_host" >&2
+        return 1
+    fi
+    
+    # Use ProxyCommand 
+    scp -q ${SSH_ARGS} \
+        -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p ${user_host}" \
+        "$src_file" "${user}@$TRUE_BASTION_HOST:$dst_file"
+    return $?
+} 
+
+# RUNLOCAL is devel mode that invokes openshift-qe-installer-bm-day2-regulus-commands.sh on local machine
+# instead of going thru Prow/ci-tools.
+if [ -z "${RUNLOCAL:-}" ]; then
+  if [ -f "${CLUSTER_PROFILE_DIR}/lab_cloud" ]; then
+    LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+    LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+  fi
+  bastion=$(cat /bm/address)
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+else
+  bastion=$BASTION
+  SSH_ARGS="-i $PRIVATE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+fi
+
+if [ -n "$LAB" ] && [ -n "$LAB_CLOUD" ]; then
+    jetlag_repo=$(do_ssh root@${bastion} "ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* 2>/dev/null | head -n1")
+    if [ -z "$jetlag_repo" ]; then
+      echo "Error: No jetlag repo found matching pattern: /tmp/jetlag-$LAB-$LAB_CLOUD*" >&2
+      exit 1
+    fi
+else
+    echo "Error: LAB or LAB_CLOUD variables are empty" >&2
+    exit 1
+fi
+
+# Use the jetlag_repo artifact to discover the true bastion identity.
+if [ -z "${TRUE_BASTION_HOST}" ] ; then
+  TRUE_BASTION_HOST=$(do_ssh root@${bastion} "
+    cd $jetlag_repo;
+    source bootstrap.sh
+    ansible -i ansible/inventory/$LAB_CLOUD.local bastion --list-hosts  2>/dev/null | tail -n +2 | sed 's/^[[:space:]]*//'; 
+    deactivate
+    rm -rf .ansible
+  ")
+fi
+# Trim ansible bootstrap.sh garbage. Get the the hostname only.
+TRUE_BASTION_HOST=$(echo "$TRUE_BASTION_HOST" | tail -1)
+
+if [ -z "${bastion}" ] ||  [ -z "${TRUE_BASTION_HOST}" ] ; then
+    echo "Error: Invalid bastion:$bastion TRUE_BASTION_HOST: $TRUE_BASTION_HOST" >&2
+    exit 1
+fi
+
+# Bail out if Crucible does not exist on the true bastion. the bm-deploy step should have installed it.
 if do_jssh root@${bastion} 'command -v crucible >/dev/null'; then
     debug_echo "crucible exists"
 else
@@ -64,11 +132,10 @@ else
     exit 1
 fi
 
-# install regulus on the bastion. This bastion can be the jumphost or a next hop depending on platform profile
+# install regulus on the true bastion. 
 regulus_repo="/root/REGULUS/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
 install-regulus() {
   do_jssh root@${bastion} "
-    echo REMOTE_BASTION_HOST=$REMOTE_BASTION_HOST >> /tmp/regulus.log
     export REG_PR='${REG_PR}' PULL_NUMBER='${PULL_NUMBER}' REPO_NAME='${REPO_NAME}' REG_BRANCH='${REG_BRANCH}'
     regulus_repo='${regulus_repo}'
     set -e
@@ -133,7 +200,7 @@ for v in "${vars[@]}"; do
   if [[ "$v" == "KUBECONFIG" ]]; then
     val=$KUBECONFIG_PATH
   elif [[ "$v" == "REG_OCPHOST" ]]; then
-    val=$REMOTE_BASTION_HOST
+    val=$TRUE_BASTION_HOST
   else
     val="${!v:-}"
   fi
@@ -145,44 +212,34 @@ for v in "${vars[@]}"; do
 
   # Escape any embedded double-quotes
   safe_val=${val//\"/\\\"}
-  printf '%s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
+  printf 'export %s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
 done
-
-# jump scp
-function do_jscp() {
-    local user_host="$1"
-    shift
-    local src_file="$1"
-    shift
-    local dst_file="$1"
-    local user=$(echo "$user_host" | awk -F@ '{print $1}')
-    scp -q ${SSH_ARGS} -J "$user_host" "$src_file"  "$user@$REMOTE_BASTION_HOST:$dst_file"
-    return $?
-}
 
 # ───────────────────────────────────────────────────────────────────────────
 # Launch Regulus (tests are listed in regulus_repo/jobs.config)
 # ───────────────────────────────────────────────────────────────────────────
 run-regulus() {
+  # Pass jetlag's build-time private key and Regulus lab.config the to true bastion
+  do_ssh root@$bastion "scp /root/.ssh/id_rsa root@$TRUE_BASTION_HOST:/tmp/private_key"
   do_jscp "root@${bastion}" "/tmp/lab.config" "${regulus_repo}/lab.config"
+
+  # Kick off Regulus.
   do_jssh "root@${bastion}" "
     set -e
     set -o pipefail
     cd ${regulus_repo}
-    bash /tmp/run_cpt.sh
+    bash ./run_cpt.sh
   "
 }
-# bash ./run_cpt.sh
 run-regulus
 
 #clean up
-ssh ${SSH_ARGS} root@${bastion} "
+do_ssh root@${bastion} "
     set -e
     set -o pipefail
     if [ -f '/tmp/clean-resources.sh' ]; then
         echo bash /tmp/clean-resources.sh
     fi 
 "
-
 
 # EOF
