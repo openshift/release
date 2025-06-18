@@ -81,6 +81,7 @@ spec:
   bmc:
     address: '${driver_info_address}'
     credentialsName: '${host_name}-bmc-secret'
+    disableCertificateVerification: true
 END
 done < <(jq -c '.[]' ${EXTRA_BAREMETALHOSTS_FILE})
 
