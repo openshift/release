@@ -57,7 +57,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
 
         # Fetch brew RPMs for release regression testing
         # Condition to skip it if manage_brew_rpms.sh script latest version is not backported to all release branches
-        if ./test/bin/manage_brew_rpms.sh -h | grep -q '<version_type>'  ; then
+        if ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type'  ; then
             # shellcheck disable=SC1091
             source "${src_path}/test/bin/common_versions.sh"
             out_path="${src_path}/_output/test-images/released-brew-rpms"
