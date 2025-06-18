@@ -69,6 +69,7 @@ fi
 
 # Install & login to gh cli
 GH_VERSION=2.49.0 && curl -sL https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz | tar xz && export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
-echo "$(cat /tmp/secrets/GH_BOT_PAT)" | gh auth login --with-token
+gh --version
+echo $(cat /tmp/secrets/GH_BOT_PAT) | gh auth login --with-token
 
 bash ./deploy.sh
