@@ -118,120 +118,6 @@ presubmits:
     - ^v1alpha1$
     - ^v1alpha1-
     cluster: build03
-    context: ci/prow/ocp4.16-periodic-ci-index-power-monitoring-operator-bundle
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: ocp4.16-periodic
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-ocp4.16-periodic-ci-index-power-monitoring-operator-bundle
-    rerun_command: /test ocp4.16-periodic-ci-index-power-monitoring-operator-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-power-monitoring-operator-bundle
-        - --variant=ocp4.16-periodic
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp4.16-periodic-ci-index-power-monitoring-operator-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^v1alpha1$
-    - ^v1alpha1-
-    cluster: build03
-    context: ci/prow/ocp4.16-periodic-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: ocp4.16-periodic
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-ocp4.16-periodic-images
-    rerun_command: /test ocp4.16-periodic-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=ocp4.16-periodic
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp4.16-periodic-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^v1alpha1$
-    - ^v1alpha1-
-    cluster: build03
     context: ci/prow/ocp4.17-periodic-ci-index-power-monitoring-operator-bundle
     decorate: true
     decoration_config:
@@ -788,6 +674,83 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ocp4.18-periodic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^v1alpha1$
+    - ^v1alpha1-
+    cluster: build04
+    context: ci/prow/ocp4.18-periodic-power-monitoring-operator-e2e-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-observability
+      ci-operator.openshift.io/variant: ocp4.18-periodic
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-ocp4.18-periodic-power-monitoring-operator-e2e-aws
+    rerun_command: /test ocp4.18-periodic-power-monitoring-operator-e2e-aws
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=power-monitoring-operator-e2e-aws
+        - --variant=ocp4.18-periodic
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp4.18-periodic-power-monitoring-operator-e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
