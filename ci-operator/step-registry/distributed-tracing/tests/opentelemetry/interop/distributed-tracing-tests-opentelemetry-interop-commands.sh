@@ -12,18 +12,16 @@ fi
 
 git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
-git checkout rhosdt-3-5
+git checkout rhosdt-3.6
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 
+# Install Prometheus ScrapeConfig CRD
+kubectl create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_scrapeconfigs.yaml
+
 #Set parameters for running the test cases on OpenShift and remove contrib collector images from tests.
 unset NAMESPACE
-#find ./tests/e2e-otel ./tests/e2e-openshift -type f -exec sed -i '/image: ghcr.io\/open-telemetry\/opentelemetry-collector-releases\/opentelemetry-collector-contrib:/d' {} \;
-oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
-#OPAMP_BRIDGE_SERVER="quay.io/rhn_support_ikanse/opamp-bridge-server:v3.3"
-#find . -type f -exec sed -i "s|ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-bridge-server:ve2e|${OPAMP_BRIDGE_SERVER}|g" {} \;
-#find ./tests/e2e-otel/journaldreceiver -type f -exec sed -i '/image: registry.redhat.io\/rhosdt\/opentelemetry-collector-rhel8@sha256:[a-f0-9]\{64\}/d' {} +
 
 # Remove test cases to be skipped from the test run
 IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
@@ -63,6 +61,7 @@ tests/e2e-pdb \
 tests/e2e-opampbridge \
 tests/e2e-otel \
 tests/e2e-multi-instrumentation \
+tests/e2e-targetallocator-cr \
 tests/e2e-targetallocator || any_errors=true
 
 # Set the operator args required for tests execution.
