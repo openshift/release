@@ -11,7 +11,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
   -o 'ServerAliveInterval=90'
-  -o LogLevel=ERROR
+  -o 'LogLevel=ERROR'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 [ -z "${PULL_NUMBER:-}" ] && \
