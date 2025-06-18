@@ -6,6 +6,17 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+on_error() {
+  echo "❌ An error occurred on line $LINENO. Exiting..."
+  if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+    gh pr comment $GIT_PR_NUMBER --repo $GITHUB_ORG_NAME/$GITHUB_REPOSITORY_NAME --body "Nice work!"
+  else
+    gh pr comment $GIT_PR_NUMBER --repo openshift/release --body "Nice work!"
+  fi
+}
+
+trap 'on_error' ERR
+
 export OPENSHIFT_PASSWORD
 export OPENSHIFT_API
 export OPENSHIFT_USERNAME
@@ -33,18 +44,6 @@ if [ $? -ne 0 ]; then
     echo "Timed out waiting for login"
     exit 1
 fi
-
-export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
-K8S_CLUSTER_URL=$(oc whoami --show-server)
-echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
-
-echo "Note: This cluster will be automatically deleted 4 hours after being claimed."
-echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
-
-oc create serviceaccount tester-sa-2 -n default
-oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
-K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
-oc logout
 
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
