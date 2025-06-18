@@ -119,13 +119,13 @@ function ilo_reset() {
   echo -e "\nWaiting for 3 mins for #${host} iLO/BMC to reset.."
   sleep 180
   check_ilo
-  power_button="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} power off"
+  power_button="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} power cycle"
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${power_button}"
-  echo "Power off #${host} and wait for 5 mins"
+  echo "Power cycle #${host} and wait for 5 mins"
   sleep 300
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
-  echo "Reset #${host} with pxe and wait for 4 mins"
-  sleep 240
+#  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+#  echo "Reset #${host} with pxe and wait for 4 mins"
+#  sleep 240
 }
 
 function reset_host() {
@@ -163,7 +163,10 @@ function reset_host() {
   fi
   [ -z "${pdu_uri}" ] && return 0
 
+  echo "Restting PDU of #${host}"
   reset_pdu "${pdu_uri}"
+
+  echo "Checking #${host} is reachable after PDU reset"
   if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
     echo "$bmc_address:$bmc_forwarded_port" >> /tmp/failed
   fi
