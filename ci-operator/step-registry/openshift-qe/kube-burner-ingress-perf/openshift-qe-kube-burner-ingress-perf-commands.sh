@@ -38,14 +38,14 @@ declare -A WORKLOAD_PIDS
 
 # Kick off run with vars set
 if [[ $WORKLOAD == "node-density-heavy" ]]; then
-    EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+    EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --metrics-profile=${METRICS_PROFILE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
 fi
 
 if [[ $WORKLOAD == "cluster-density-v2" ]]; then
     current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
     iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
     export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
-    EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}" ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+    EXTRA_FLAGS+=" --gc-metrics=true --metrics-profile=${METRICS_PROFILE}" ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
 fi
 
 WORKLOAD_PIDS["$WORKLOAD"]=$!
