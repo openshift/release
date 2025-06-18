@@ -30,7 +30,7 @@ oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 ./pod-scenarios/prow_run.sh
 rc=$?
 echo "Done running the test!" 
-
+oc -n openshift-ovn-kubernetes get pods
 cat /tmp/*.log 
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
