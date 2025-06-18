@@ -32,7 +32,7 @@ declare -A hub_to_mce=(
 
 function get_payload_list() {
     declare -A payload_list
-    local versions=("4.14" "4.15" "4.16" "4.17" "4.18")
+    local versions=("4.14" "4.15" "4.16" "4.17" "4.18" "4.19")
 
     for version in "${versions[@]}"; do
         image=$(curl -s "https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/api/v1/releasestream/${version}.0-0.nightly/latest" | jq -r '.pullSpec')
