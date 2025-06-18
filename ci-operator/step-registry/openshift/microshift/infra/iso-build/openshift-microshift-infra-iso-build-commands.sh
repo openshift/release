@@ -60,7 +60,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
         if ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type'  ; then
             # shellcheck disable=SC1091
             source "${src_path}/test/bin/common_versions.sh"
-            out_path="${src_path}/_output/test-images/released-brew-rpms"
+            out_path="${src_path}/_output/test-images/brew-rpms-released"
             bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "zstream"
             bash -x ./test/bin/manage_brew_rpms.sh download "4.${PREVIOUS_MINOR_VERSION}" "${out_path}" "zstream"
             bash -x ./test/bin/manage_brew_rpms.sh download "4.${YMINUS2_MINOR_VERSION}" "${out_path}" "zstream"
