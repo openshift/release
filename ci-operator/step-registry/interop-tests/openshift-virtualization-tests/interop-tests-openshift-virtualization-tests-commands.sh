@@ -18,7 +18,7 @@ set -x
 
 uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     --junitxml "${ARTIFACT_DIR}/xunit_results.xml" \
-    --html=/data/report.html --self-contained-html \
+    --html=${ARTIFACT_DIR}/report.html --self-contained-html \
     --pytest-log-file="${ARTIFACT_DIR}/tests.log"  \
     -o cache_dir=/tmp \
     --tc=hco_subscription:kubevirt-hyperconverged
