@@ -30,19 +30,10 @@ tests:
     from: src
 - as: sonar
   commands: |
-    set -euo pipefail
-    export HOME="/tmp"
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
     export SELF="make -f /opt/build-harness/Makefile.prow"
-    SONAR_GO_TEST_ARGS="$(go list ./... | grep -v /e2e || true)"
-    export SONAR_GO_TEST_ARGS
-    echo "SONAR_GO_TEST_ARGS=$SONAR_GO_TEST_ARGS"
-    ls -l /opt/build-harness/Makefile.prow || true
-    echo "Dumping failing makefile..."
-    cat -n /opt/build-harness-extensions/modules/sonar/Makefile | tail -n +20 | head -n 20
-    if [ -z "$SONAR_GO_TEST_ARGS" ]; then
-      echo "No test packages to analyze. Exiting gracefully."
-      exit 0
-    fi
+    export HOME="/tmp"
+    export XDG_CACHE_HOME="/tmp/.cache"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -51,19 +42,10 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
-    set -euo pipefail
-
-    export HOME="/tmp"
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
     export SELF="make -f /opt/build-harness/Makefile.prow"
-
-    SONAR_GO_TEST_ARGS="$(go list ./... | grep -v /e2e || true)"
-    export SONAR_GO_TEST_ARGS
-
-    if [ -z "$SONAR_GO_TEST_ARGS" ]; then
-      echo "No test packages to analyze. Exiting gracefully."
-      exit 0
-    fi
-
+    export HOME="/tmp"
+    export XDG_CACHE_HOME="/tmp/.cache"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
