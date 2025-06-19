@@ -36,14 +36,15 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 
 oc whoami --show-console
 
-export ACCESS_TOKEN=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-client-secret.txt")
-export ORGANIZATION_ID=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-org-id")
+ACCESS_TOKEN=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-client-secret.txt")
+ORGANIZATION_ID=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-org-id")
+export ACCESS_TOKEN ORGANIZATION_ID
 
 uv run --verbose --cache-dir /tmp/uv-cache pytest  \
   --pytest-log-file="${ARTIFACT_DIR}/tests.log" \
   --data-collector="${COLLECTOR_CONF_FILE}" \
   --junitxml "${ARTIFACT_DIR}/junit_results.xml" \
-  --html=${ARTIFACT_DIR}/report.html --self-contained-html \
+  --html="${ARTIFACT_DIR}/report.html" --self-contained-html \
   --tc-file=tests/global_config.py \
   --tc-format=python \
   --tc=check_http_server_connectivity:false \
