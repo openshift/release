@@ -36,8 +36,8 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 
 oc whoami --show-console
 
-ACCESS_TOKEN=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-client-secret.txt")
-ORGANIZATION_ID=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-org-id")
+export ACCESS_TOKEN=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-client-secret.txt")
+export ORGANIZATION_ID=$(head -1 "${CLUSTER_PROFILE_DIR}/bitwarden-org-id")
 
 uv run --verbose --cache-dir /tmp/uv-cache pytest  \
   --pytest-log-file="${ARTIFACT_DIR}/tests.log" \
