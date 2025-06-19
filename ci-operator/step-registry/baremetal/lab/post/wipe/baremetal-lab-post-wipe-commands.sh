@@ -190,10 +190,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
-  if [ "${ipxe_via_vmedia}" == "true" ]; then
-    echo -e "Host #${host} requires an ilo reset as a workaround to avoid kernel crashes\n"
-    ilo_reset "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}" &
-  fi
+#  if [ "${ipxe_via_vmedia}" == "true" ]; then
+#    echo -e "Host #${host} requires an ilo reset as a workaround to avoid kernel crashes\n"
+#    ilo_reset "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}" &
+#  fi
 done
 wait
 
