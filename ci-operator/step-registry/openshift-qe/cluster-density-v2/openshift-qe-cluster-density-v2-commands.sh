@@ -89,6 +89,7 @@ export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
 
 rm -f ${SHARED_DIR}/index.json
+
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
