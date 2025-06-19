@@ -1,0 +1,147 @@
+base_images:
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.19.0-0
+        upper: 4.20.0-0
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: regression-scale-loaded-projects-ocp-9461
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SCRIPT: perfscale_regression_ci/scripts/scalability/loaded-projects.sh
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: regression-scale-affinity-rule-ocp-18082-ocp-18083
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SCRIPT: perfscale_regression_ci/scripts/scalability/node-affinity-anti-affinity.sh
+      SCRIPT_1: perfscale_regression_ci/scripts/scalability/pod-affinity-anti-affinity.sh
+    test:
+    - chain: openshift-svt-regression-one
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: ingress-scale-ocp-43281-ingress-tunning-ocp-43175
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      IF_MOVE_INGRESS: "false"
+      IF_MOVE_MONITORING: "false"
+      IF_MOVE_REGISTRY: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SCRIPT: perfscale_regression_ci/scripts/scalability/ingress-scale/ingress-scale.sh
+      SCRIPT_1: perfscale_regression_ci/scripts/scalability/ingress-scale/ingress-tunning-options.sh
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: openshift-svt-regression-one
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: networkpolicy-scale-ocp-41535
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCRIPT: perfscale_regression_ci/scripts/network/network_policy_scalability.sh
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: network-mixed-scenario-ocp-72791
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.12xlarge
+      ITERATIONS: "400"
+      MAX_UNAVAILABLE: "18"
+    test:
+    - ref: openshift-svt-network-mixed-scenario
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: storage-csi-in-tree-driver-ocp-63861
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      ITERATIONS: "400"
+    test:
+    - ref: openshift-svt-storage-csi-intree-driver
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: large-secrets-ocp-65206
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SCRIPT: perfscale_regression_ci/scripts/performance/large_secret_list.sh
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: svt
+  variant: regression-aws-4.19-nightly-x86
