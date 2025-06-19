@@ -29,8 +29,6 @@ lab: $LAB
 lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
-ocp_version: $OCP_VERSION
-ocp_build: $OCP_BUILD
 public_vlan: $PUBLIC_VLAN
 sno_use_lab_dhcp: false
 enable_fips: $FIPS
@@ -162,6 +160,7 @@ scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/v
 scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
+scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:/root/.docker/config.json
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
@@ -172,6 +171,7 @@ fi
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
+   export PROW_IMAGE=${RELEASE_IMAGE_LATEST}
    cd ${jetlag_repo}
    source .ansible/bin/activate
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
