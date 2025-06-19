@@ -70,7 +70,9 @@ function reset_pdu() {
   # pub-priv key auth is not supported by the PDUs
   echo "${pdu_pass}" > /tmp/ssh-pass
 
-  timeout -s 9 1m sshpass -f /tmp/ssh-pass ssh "${SSHOPTS[@]}" "${pdu_user}@${pdu_host}" <<EOF || true
+  scp "${SSHOPTS[@]}" /tmp/ssh-pass "root@${AUX_HOST}:/tmp/ssh-pass"
+  timeout -s 9 1m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF || true
+sshpass -f /tmp/ssh-pass ssh -o StrictHostKeyChecking=no ${pdu_user}@${pdu_host}
 olReboot $pdu_socket
 quit
 EOF
