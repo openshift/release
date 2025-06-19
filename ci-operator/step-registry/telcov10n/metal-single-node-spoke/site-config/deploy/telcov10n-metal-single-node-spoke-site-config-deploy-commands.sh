@@ -58,6 +58,36 @@ function generate_network_config {
   #   done
 }
 
+function clear_partition_disk_table {
+
+  echo "************ telcov10n Clear Partition Disk Table ************"
+
+  set -x
+  node_name="$(oc get node -oname)"
+  devices_to_be_wiped=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+    jq -c '
+      .status.deviceClassStatuses[]
+      | select(.name == "vg1").nodeStatus[].devices')
+  set +x
+
+  echo ${devices_to_be_wiped} | jq -r '.[]' | while read -r node_dev; do
+    echo
+    echo "Wiping device $node_dev..."
+    echo
+    oc debug ${node_name} -n default -- chroot /host bash -c "
+     set -x ;
+     lsblk --fs ${node_dev} ;
+     sgdisk --zap-all ${node_dev} ;
+     sleep 3 ;
+     kpartx -d ${node_dev} ;
+     sleep 30 ;
+     lsblk --fs ${node_dev} ;
+     set +x ;
+     echo ;
+     echo '${node_dev} Wiped'"
+  done
+}
+
 function get_storage_class_name {
 
   echo "************ telcov10n Get the Storage Class name to be used ************"
@@ -84,7 +114,11 @@ EOF
     attempts=0
     while sleep 10s ; do
       oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break
-      [ $(( attempts=${attempts} + 1 )) -lt 3 ] || exit 1
+      [ $(( attempts=${attempts} + 1 )) -lt 2 ] || {
+        clear_partition_disk_table ;
+        oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break ;
+        exit 1 ;
+      }
     done
     set +x
     oc -n openshift-storage get lvmcluster/lvmcluster -oyaml
@@ -315,6 +349,7 @@ function generate_ztp_cluster_manifests {
 
     SPOKE_CLUSTER_NAME=${NAMESPACE}
     SPOKE_BASE_DOMAIN=$(cat ${SHARED_DIR}/base_domain)
+    echo -n "${name}.${SPOKE_CLUSTER_NAME}.${SPOKE_BASE_DOMAIN}" >| ${SHARED_DIR}/hostname_with_base_domain
 
     generate_network_config ${baremetal_iface} ${ipi_disabled_ifaces}
 
@@ -470,15 +505,18 @@ function get_openshift_baremetal_install_tool {
   echo "************ telcov10n Extract RHCOS images: Getting openshift-baremetal-install tool ************"
 
   set -x
-  pull_secret=${SHARED_DIR}/pull-secret
-  oc adm release extract -a ${pull_secret} --command=openshift-baremetal-install ${RELEASE_IMAGE_LATEST}
-  attempts=0
-  while sleep 5s ; do
-    ./openshift-baremetal-install version && break
-    [ $(( attempts=${attempts} + 1 )) -lt 2 ] || exit 1
-  done
+  local rel_img
+  if [ -n "${PULL_NUMBER:-}" ] && [ -n "${SET_SPECIFIC_RELEASE_IMAGE}" ]; then
+    rel_img="${SET_SPECIFIC_RELEASE_IMAGE}"
+  else
+    rel_img=${RELEASE_IMAGE_LATEST}
+  fi
 
-  echo -n "$(./openshift-baremetal-install version | head -1 | awk '{print $2}')" > ${SHARED_DIR}/cluster-image-set-ref.txt
+  local pull_secret
+  pull_secret=${SHARED_DIR}/pull-secret
+
+  echo -n "${rel_img}" > ${SHARED_DIR}/release-image-tag.txt
+  echo -n "$(extract_cluster_image_set_reference ${rel_img} ${pull_secret})" > ${SHARED_DIR}/cluster-image-set-ref.txt
   set +x
 }
 

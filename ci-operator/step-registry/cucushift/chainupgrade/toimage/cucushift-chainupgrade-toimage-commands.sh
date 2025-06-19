@@ -49,6 +49,8 @@ function check_failed_operator(){
             failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
             failing_operators="${failing_operator} ${failing_operators}"
+        elif [[ ${failing_status} == "Unknown" ]]; then
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'waiting on \K.*?(?= over)'|tr -d ',') || true
         else
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || \
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting up to 40 minutes on \K.*'|tr -d ',') || \
@@ -306,6 +308,30 @@ EOF
     git pull || true
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
+}
+
+function rhel_pre_unpause(){
+    echo "Running the workaround step before unpausing worker mcp"
+    local testcase="rhel"
+    cat > /tmp/rhel_pre_unpause.yaml <<-'EOF'
+---
+- name: RHEL pre-unpause playbook
+  hosts: workers
+  any_errors_fatal: true
+  gather_facts: false
+  vars:
+    required_packages:
+      - ose-azure-acr-image-credential-provider
+      - ose-gcp-gcr-image-credential-provider
+  tasks:
+  - name: Install required package on the node
+    dnf:
+      name: "{{ required_packages }}"
+      state: latest
+      disable_gpg_check: true
+EOF
+    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/rhel_pre_unpause.yaml -vvv
 }
 
 # Do sdn migration to ovn since sdn is not supported from 4.17 version
@@ -1147,11 +1173,17 @@ for target in "${TARGET_RELEASES[@]}"; do
     upgrade
     check_upgrade_status
 
-    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+    if [[ "${TARGET_MINOR_VERSION}" -lt "19" ]] && [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo "Found rhel worker..."
         run_command "oc get node -owide"
         if [[ $(oc get machineconfigpools worker -ojson | jq -r '.spec.paused') == "true" ]]; then
             echo "worker mcp are paused, it sounds eus upgrade, skip rhel worker upgrade here, should upgrade them after worker mcp unpaused"
+	    #Temporary workaround for 4.14 to 4.16 cpou test with RHEL workers, would be removed until https://github.com/openshift/openshift-ansible/pull/12531 merged
+	    if [[ "${SOURCE_MINOR_VERSION}" == "14" ]]; then
+	        echo "Running workaround for https://issues.redhat.com/browse/OCPBUGS-32057 in 4.14 to 4.16 cpou test"
+		rhel_repo
+	        rhel_pre_unpause
+	    fi
         else
             rhel_repo
             rhel_upgrade

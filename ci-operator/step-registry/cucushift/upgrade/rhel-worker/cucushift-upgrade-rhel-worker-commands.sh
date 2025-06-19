@@ -45,6 +45,8 @@ function check_failed_operator(){
             failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
             failing_operators="${failing_operator} ${failing_operators}"
+        elif [[ ${failing_status} == "Unknown" ]]; then
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'waiting on \K.*?(?= over)'|tr -d ',') || true
         else
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || \
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting up to 40 minutes on \K.*'|tr -d ',') || \
@@ -207,13 +209,13 @@ EOF
 
 # Upgrade RHEL node
 function rhel_upgrade(){
+    local testcase="rhel"
     echo "Upgrading RHEL nodes"
     echo "Validating parsed Ansible inventory"
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     echo -e "\nRunning RHEL worker upgrade"
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv || { export UPGRADE_FAILURE_TYPE="${testcase}"; return 1; }
-
     check_upgrade_status
 }
 

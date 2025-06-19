@@ -36,10 +36,10 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle-release
     source: registry.redhat.io/compliance/openshift-file-integrity-operator-bundle
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-release
     source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
 EOF
 		echo "!!! fail to create the ICSP"
@@ -48,6 +48,27 @@ EOF
 
 	echo "ICSP $ICSP_NAME created successfully"
 	return 0
+}
+
+check_mcp_status() {
+    machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
+    COUNTER=0
+    while [ $COUNTER -lt 1200 ]
+    do
+        sleep 20
+        COUNTER=`expr $COUNTER + 20`
+        echo "waiting ${COUNTER}s"
+        updatedMachineCount=$(oc get mcp worker -o=jsonpath='{.status.updatedMachineCount}')
+        if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
+            echo "MCP updated successfully"
+            break
+        fi
+    done
+    if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
+        run_command "oc get mcp,node"
+        run_command "oc get mcp worker -o yaml"
+        return 1
+    fi
 }
 
 create_catalog_sources() {
@@ -105,15 +126,15 @@ EOF
 # But, for OLM, its global namespace still is "openshift-marketplace"(details: https://bugzilla.redhat.com/show_bug.cgi?id=2076878),
 # so we need to create it manually so that optional operator teams' test cases can be run smoothly.
 check_marketplace() {
-        local -i ret=0
-        run "oc get ns openshift-marketplace" || ret=1
+	local -i ret=0
+	run "oc get ns openshift-marketplace" || ret=1
 
-        [[ $ret -eq 0 ]] && {
-                echo "openshift-marketplace project AlreadyExists, skip creating."
-                return 0
-        }
+	[[ $ret -eq 0 ]] && {
+		echo "openshift-marketplace project AlreadyExists, skip creating."
+		return 0
+	}
 
-        cat <<EOF | oc apply -f -
+	cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -124,7 +145,7 @@ metadata:
     pod-security.kubernetes.io/warn: baseline
   name: openshift-marketplace
 EOF
-        return 0
+	return 0
 }
 
 main() {
@@ -143,6 +164,11 @@ main() {
 		echo "failed to create imagecontentsourcepolicies. resolve the above errors"
 		return 1
 	}
+
+	check_mcp_status || {
+		echo "failed to check mcp status. resolve the above errors"
+	}
+
 	check_marketplace || {
 		echo "failed to check marketplace. resolve the above errors"
 		return 1

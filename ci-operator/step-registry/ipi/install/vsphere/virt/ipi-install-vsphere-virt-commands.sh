@@ -13,6 +13,7 @@ fi
 VIRT_KUBECONFIG=/var/run/vault/vsphere-ibmcloud-config/vsphere-virt-kubeconfig
 CLUSTER_KUBECONFIG=${SHARED_DIR}/kubeconfig
 VM_NETWORK_PATCH=/var/run/vault/vsphere-ibmcloud-config/vm-network-patch.json
+INFRA_PATCH=$(cat /var/run/vault/vsphere-ibmcloud-config/vsphere-virt-infra-patch)
 
 VM_NAME="$(oc get infrastructure cluster -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.status.infrastructureName')-bm"
 VM_NAMESPACE="${NAMESPACE}"
@@ -36,6 +37,8 @@ function approve_csrs() {
   done
 }
 
+# Patch test cluster to have CIDR for non-vSphere node
+oc patch infrastructure cluster --type json -p "${INFRA_PATCH}" --kubeconfig=${CLUSTER_KUBECONFIG}
 
 # Generate YAML for creation VM
 echo "$(date -u --rfc-3339=seconds) - Generating ignition data"
@@ -63,6 +66,12 @@ virtctl start "${VM_NAME}" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
 
 # Monitor cluster for CSRs
 approve_csrs
+
+# Add taint if configured
+if [[ "${TAINT_BM}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Adding vsphere-csi-driver taint to node to prevent pod scheduling"
+  oc adm taint nodes ${VM_NAME} vsphere-csi-driver=reserved:NoSchedule vsphere-csi-driver=reserved:NoExecute --kubeconfig="${CLUSTER_KUBECONFIG}"
+fi
 
 # Remove provider taint
 oc adm taint nodes ${VM_NAME} node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"

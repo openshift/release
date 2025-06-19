@@ -1,23 +1,24 @@
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi9/python-39
+      FROM registry.access.redhat.com/ubi9/python-312
 
-      # Install go toolset
       USER root
 
-      ENV GO_VERSION=1.20
-      RUN curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | \
-      tar -C /usr/local -zxvf - go/bin go/pkg/tool
+      ENV GO_VERSION=1.24.3
       ENV PATH="/usr/local/go/bin:$PATH"
 
-      USER default
+      RUN dnf install -y tar gzip git make && \
+          curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | \
+          tar -C /usr/local -zxvf - go/ && \
+          python -m pip install uv
 
       # Prow expects to be able to check out a repo under /go
-      USER 0:0
-      WORKDIR /go
-      RUN chown 1001:1001 .
+      RUN mkdir -p /go && \
+      chown 1001:1001 /go && \
+      chmod 755 /go
 
+      WORKDIR /go
       USER 1001:1001
 images:
 - dockerfile_path: Containerfile
@@ -49,7 +50,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -79,7 +81,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -109,7 +112,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -139,7 +143,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -169,7 +174,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -199,7 +205,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -229,7 +236,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -258,7 +266,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -286,7 +295,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -315,7 +325,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -343,7 +354,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -371,7 +383,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -399,7 +412,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -427,7 +441,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -454,10 +469,12 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - mount_path: /secrets/slack-hooks
+      - collection: ""
+        mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - mount_path: /secrets/ironic-bot
+      - collection: ""
+        mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -484,10 +501,12 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - mount_path: /secrets/slack-hooks
+      - collection: ""
+        mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - mount_path: /secrets/ironic-bot
+      - collection: ""
+        mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -514,10 +533,12 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - mount_path: /secrets/slack-hooks
+      - collection: ""
+        mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - mount_path: /secrets/ironic-bot
+      - collection: ""
+        mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -544,40 +565,12 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - mount_path: /secrets/slack-hooks
+      - collection: ""
+        mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - mount_path: /secrets/ironic-bot
-        name: metal-platform-bot-credentials
-        namespace: test-credentials
-      from: rebasebot
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: openstack-ironic-lib
-  cron: 40 10 * * Mon,Wed,Fri
-  steps:
-    test:
-    - as: openstack-ironic-lib
-      commands: |
-        rebasebot --source https://github.com/openstack/ironic-lib:master \
-                  --dest openshift/openstack-ironic-lib:main \
-                  --rebase openshift-metal3/openstack-ironic-lib:ironic-bot-master \
-                  --github-app-id 259896 \
-                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
-                  --github-cloner-id 318353 \
-                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
-                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
-                  --git-username ironic-bot \
-                  --git-email metal-platform@redhat.com
-      credentials:
-      - mount_path: /secrets/slack-hooks
-        name: metal-platform-slack-hooks
-        namespace: test-credentials
-      - mount_path: /secrets/ironic-bot
+      - collection: ""
+        mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -605,7 +598,8 @@ tests:
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -633,10 +627,12 @@ tests:
                   --tag-policy=none \
                   --post-rebase-hook git:dest/master:hack/ocp-update-bundle-manifests.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:go-deps.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:git.sh
       credentials:
-      - mount_path: /secrets/metal-net-merge-bot
+      - collection: ""
+        mount_path: /secrets/metal-net-merge-bot
         name: metal-net-merge-bot-private-key
         namespace: test-credentials
-      - mount_path: /secrets/metal-net-cloner-bot
+      - collection: ""
+        mount_path: /secrets/metal-net-cloner-bot
         name: metal-net-cloner-bot-private-key
         namespace: test-credentials
       from: rebasebot
@@ -664,10 +660,12 @@ tests:
                   --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=none
       credentials:
-      - mount_path: /secrets/dt-secrets
+      - collection: ""
+        mount_path: /secrets/dt-secrets
         name: dt-secrets
         namespace: test-credentials
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -695,10 +693,12 @@ tests:
                   --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=none
       credentials:
-      - mount_path: /secrets/dt-secrets
+      - collection: ""
+        mount_path: /secrets/dt-secrets
         name: dt-secrets
         namespace: test-credentials
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -726,10 +726,12 @@ tests:
                   --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=none
       credentials:
-      - mount_path: /secrets/dt-secrets
+      - collection: ""
+        mount_path: /secrets/dt-secrets
         name: dt-secrets
         namespace: test-credentials
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -756,7 +758,8 @@ tests:
                   --git-email openshift-edge-enablement@redhat.com \
                   --tag-policy=none
       credentials:
-      - mount_path: /secrets/lvms/rebase-bot
+      - collection: ""
+        mount_path: /secrets/lvms/rebase-bot
         name: lvms-rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -787,7 +790,8 @@ tests:
                           --bot-emails autoscaling-team-rebase-bot@redhat.com \
                           --tag-policy=strict
       credentials:
-      - mount_path: /secrets/rebasebot
+      - collection: ""
+        mount_path: /secrets/rebasebot
         name: autoscaling-team-rebasebot-credentials
         namespace: test-credentials
       from: rebasebot

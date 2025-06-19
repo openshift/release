@@ -19,6 +19,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -48,13 +52,12 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-user-provisioned-dns
+      COMPUTE_OSIMAGE: projects/redhat-marketplace-dev/global/images/redhat-coreos-opp-419-x86-64-20250513-02
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-dev/global/images/redhat-coreos-opp-419-x86-64-20250513-02
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
@@ -76,16 +79,31 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe-2
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-bpvnbdb/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.19.0-rc.5-x86_64
+      MIRROR_BIN: oc-mirror
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
       SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-      SLEEP_DURATION: 1m
+      SLEEP_DURATION: 5m
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+- as: installer-rehearse-vsphere
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-78j6ckb/release:latest
+      LB_TYPE: UserManaged
+      SLEEP_DURATION: 24h
+      VSPHERE_MULTI_NETWORKS: "true"
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-vsphere-ipi-external-lb-pre-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb-provision
 zz_generated_metadata:
   branch: main
   org: openshift

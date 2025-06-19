@@ -1,6 +1,6 @@
 base_images:
   base-rhel9:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
   cli-operator-sdk:
@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -44,15 +48,12 @@ operator:
   - pullspec: quay.io/jetstack/cert-manager-cainjector:latest
     with: pipeline:cert-manager
 releases:
-  initial:
-    integration:
-      name: "4.17"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.17"
-      namespace: ocp
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -123,20 +124,19 @@ tests:
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
-      FIPS_ENABLED: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
     test:
-    - ref: fips-check-fips-or-die
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
   branch: master
   org: openshift
