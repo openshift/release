@@ -31,18 +31,18 @@ tests:
 - as: sonar
   commands: |
     set -euo pipefail
-
     export HOME="/tmp"
     export SELF="make -f /opt/build-harness/Makefile.prow"
-
     SONAR_GO_TEST_ARGS="$(go list ./... | grep -v /e2e || true)"
     export SONAR_GO_TEST_ARGS
-
+    echo "SONAR_GO_TEST_ARGS=$SONAR_GO_TEST_ARGS"
+    ls -l /opt/build-harness/Makefile.prow || true
+    echo "Dumping failing makefile..."
+    cat -n /opt/build-harness-extensions/modules/sonar/Makefile | tail -n +20 | head -n 20
     if [ -z "$SONAR_GO_TEST_ARGS" ]; then
       echo "No test packages to analyze. Exiting gracefully."
       exit 0
     fi
-
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
