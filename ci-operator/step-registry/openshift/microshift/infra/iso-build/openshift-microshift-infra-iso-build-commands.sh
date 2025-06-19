@@ -61,12 +61,12 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
             # shellcheck disable=SC1091
             source "${src_path}/test/bin/common_versions.sh"
             out_path="${src_path}/_output/test-images/brew-rpms-released"
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "zstream"
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${PREVIOUS_MINOR_VERSION}" "${out_path}" "zstream"
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${YMINUS2_MINOR_VERSION}" "${out_path}" "zstream"
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "nightly"
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "rc"
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "ec"
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${PREVIOUS_MINOR_VERSION}" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${YMINUS2_MINOR_VERSION}" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "nightly" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "rc" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${MINOR_VERSION}" "${out_path}" "ec" || true
         fi
     fi
     popd &>/dev/null
