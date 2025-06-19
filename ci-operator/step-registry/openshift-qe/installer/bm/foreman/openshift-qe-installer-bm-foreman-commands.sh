@@ -33,7 +33,8 @@ envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_N
 # Wait until the newly deployed servers are accessible via ssh
 cat > /tmp/foreman-wait.sh << 'EOF'
 echo 'Running foreman-wait.sh'
-for i in $(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   while ! nc -z $i 22; do
     echo "Trying SSH port on host $i ..."
     sleep 60
