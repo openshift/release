@@ -216,15 +216,18 @@ else
     echo "-------------Check identity in machine/master spec-------------"
     check_machine_managedIdentity "master" "${expected_identity_id_master}" "${cluster_identity_name}"|| check_result=1
 
-    echo "-------------Check identity in controlplanemachineset spec-------------"
-    cpms_identity=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.managedIdentity')
-    echo "checking controlplanemachineset cluster..."
-    if [[ "${cpms_identity}" == "${expected_identity_id_master}" ]] || [[ "${cpms_identity}" == "${cluster_identity_name}" ]]; then
-        echo "INFO: expected identity is configured in cpms spec!"
-    else
-        echo "ERROR: expected identity 4.18- with name ${cluster_identity_name} or 4.19+ with id ${expected_identity_id_master} ${cluster_identity_name} is not configured in cpms spec, unexpected!"
-        echo "identity in cpms spec: ${cpms_identity}"
-        check_result=1
+    #cpms feature is supported starting from 4.13 on Azure platform
+    if (( ${ocp_minor_version} > 12 )); then
+        echo "-------------Check identity in controlplanemachineset spec-------------"
+        cpms_identity=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.managedIdentity')
+        echo "checking controlplanemachineset cluster..."
+        if [[ "${cpms_identity}" == "${expected_identity_id_master}" ]] || [[ "${cpms_identity}" == "${cluster_identity_name}" ]]; then
+            echo "INFO: expected identity is configured in cpms spec!"
+        else
+            echo "ERROR: expected identity 4.18- with name ${cluster_identity_name} or 4.19+ with id ${expected_identity_id_master} ${cluster_identity_name} is not configured in cpms spec, unexpected!"
+            echo "identity in cpms spec: ${cpms_identity}"
+            check_result=1
+        fi
     fi
 fi
 
