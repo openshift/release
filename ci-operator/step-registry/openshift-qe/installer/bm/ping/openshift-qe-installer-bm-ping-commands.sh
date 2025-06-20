@@ -5,7 +5,8 @@ set -o pipefail
 set -x
 
 bastion=$(cat "/secret/address")
-ls -l ${CLUSTER_PROFILE_DIR}/pull_secret
-oc adm release info $RELEASE_IMAGE_LATEST -a ${CLUSTER_PROFILE_DIR}/pull_secret
+ls -l ${CLUSTER_PROFILE_DIR}/pull-secret
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc adm release info $RELEASE_IMAGE_LATEST -a /tmp/pull-secret
 
 ping -c 5 $bastion
