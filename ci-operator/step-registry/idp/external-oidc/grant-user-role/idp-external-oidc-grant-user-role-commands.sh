@@ -58,8 +58,10 @@ EOF
 
 echo "Making sure that the external user has appropriate permissions"
 oc config use-context "$ext_oidc_context"
+# Save external oidc kubeconfig for the later qe test suite using 
+oc config view --flatten --raw > "$SHARED_DIR"/external-oidc-user.kubeconfig
 oc whoami
-if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
+if [ -f "${SHARED_DIR}/nested_kubeconfig" ] && oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
     USER_INFO_JSON=$(oc auth whoami -o jsonpath='{.status.userInfo}')
     # The values in the grep patterns are configured otherwhere and tested as checkpoints here
     if jq -c '.extra' <<< "$USER_INFO_JSON" | grep -qE '"extratest.openshift.com/bar":\[".+"\],"extratest.openshift.com/foo":\[".+"\]' && jq -c '.uid' <<< "$USER_INFO_JSON" | grep -qE 'testuid-.+-uidtest'; then
@@ -71,3 +73,7 @@ if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' | 
     fi
 fi
 oc get co
+
+echo "Switching to the $non_ext_oidc_context context"
+oc config use-context "$non_ext_oidc_context"
+oc whoami
