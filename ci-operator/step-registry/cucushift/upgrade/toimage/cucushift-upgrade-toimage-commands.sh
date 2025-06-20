@@ -246,6 +246,7 @@ function disable_boot_image_update() {
 
     if [ $get_status -ne 0 ]; then
         echo "Error: Failed to get current MachineConfiguration. Check cluster access."
+	export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     fi
 
@@ -261,6 +262,7 @@ function disable_boot_image_update() {
     # Edit the MachineConfiguration to disable boot image updates
     if ! oc patch MachineConfiguration cluster --type=merge --patch '{"spec":{"managedBootImages":{"machineManagers":[]}}}' -n openshift-machine-config-operator; then
         echo "Error: Failed to patch MachineConfiguration."
+	export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     fi
 
@@ -274,6 +276,7 @@ function disable_boot_image_update() {
         return 0
     else
         echo "Error: Failed to update machineManagers. Current value: $new_value"
+	export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     fi
 }
@@ -634,8 +637,19 @@ if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
 fi
 if [[ "${DISABLE_BOOT_IMAGE_UPDATE}" == "true" ]]; then
     #Disable updated boot images feature for jobs with custom boot image specified in certain upgrade paths
-    disable_boot_image_update
+    echo "Checking conditions for disabling boot image updates..."
+
+    # Get platform
+    PLATFORM=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+
+    # Check all conditions
+    if [[ "${TARGET_MINOR_VERSION}" == "19" ]] && [[ "${PLATFORM}" =~ ^(AWS|GCP)$ ]]; then
+        disable_boot_image_update
+    else
+        echo "Skipping boot image update disablement."
+    fi
 fi
+
 upgrade
 check_upgrade_status
 

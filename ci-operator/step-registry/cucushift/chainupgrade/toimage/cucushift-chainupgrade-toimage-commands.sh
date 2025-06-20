@@ -247,6 +247,7 @@ function disable_boot_image_update() {
 
     if [ $get_status -ne 0 ]; then
         echo "Error: Failed to get current MachineConfiguration. Check cluster access."
+	export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     fi
 
@@ -261,6 +262,7 @@ function disable_boot_image_update() {
     # Edit the MachineConfiguration to disable boot image updates
     if ! oc patch MachineConfiguration cluster --type=merge --patch '{"spec":{"managedBootImages":{"machineManagers":[]}}}' -n openshift-machine-config-operator; then
         echo "Error: Failed to patch MachineConfiguration."
+	export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     fi
 
@@ -274,6 +276,7 @@ function disable_boot_image_update() {
         return 0
     else
         echo "Error: Failed to update machineManagers. Current value: $new_value"
+	export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     fi
 }
