@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x
 update_flowcollector() {
   FLOWCOLLECTOR=/tmp/flowcollector.yaml
   cat <<EOF >$FLOWCOLLECTOR
@@ -145,7 +145,7 @@ patch_csv_images(){
 
 if [[ "$CATALOG_SOURCE" == "source" ]]; then
     echo "====> Using upstream catalog bundle with tag: vmain"
-    CATALOG_IMAGE="quay.io/netobserv/network-observability-operator-catalog:v0.0.0-main"
+    CATALOG_IMAGE="quay.io/netobserv/network-observability-operator-catalog:v0.0.0-sha-main"
     CATALOG_NAME="netobserv-main"
     CHANNEL="latest" # for upstream catalog source "latest" is the channel name.
     deploy_catalog
@@ -174,6 +174,7 @@ while :; do
 done
 
 patch_csv_images
+oc wait --timeout=180s --for=condition=ready pod -l app=netobserv-operator -n openshift-netobserv-operator
 
 sleep 10
 update_flowcollector
