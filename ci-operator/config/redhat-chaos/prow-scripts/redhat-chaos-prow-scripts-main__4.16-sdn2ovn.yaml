@@ -4,7 +4,7 @@ base_images:
     namespace: chaos
     tag: cerberus-prow
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   krkn:
@@ -24,7 +24,7 @@ build_root:
 images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
-  to: cerberus-main-prow-415
+  to: cerberus-main-prow-416
 - dockerfile_path: Dockerfile
   from: krkn
   to: prow-scripts
@@ -32,7 +32,7 @@ images:
     FROM prow-scripts.prow
     RUN ls
   from: prow-scripts.prow
-  to: prow-scripts-415-sdn2ovn
+  to: prow-scripts-416-sdn2ovn
 - dockerfile_literal: |-
     FROM ocp-qe-perfscale-ci
     RUN ls
@@ -42,13 +42,13 @@ images:
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -74,7 +74,7 @@ tests:
       MAX_UNAVAILABLE: "1"
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       PROFILE_TYPE: reporting
-      TELEMETRY_GROUP: prow-ocp-4.15
+      TELEMETRY_GROUP: prow-ocp-4.16
       ZONES_COUNT: "3"
     observers:
       enable:
@@ -96,7 +96,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       CHURN: "false"
-      COMPUTE_NODE_REPLICAS: "12"
+      COMPUTE_NODE_REPLICAS: "6"
       CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
       DISRUPTION_COUNT: "2"
       GC: "false"
@@ -104,7 +104,7 @@ tests:
       ITERATION_MULTIPLIER_ENV: "11"
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       PROFILE_TYPE: reporting
-      TELEMETRY_GROUP: prow-ocp-4.15
+      TELEMETRY_GROUP: prow-ocp-4.16
       ZONES_COUNT: "3"
     observers:
       enable:
@@ -115,10 +115,13 @@ tests:
     - chain: openshift-qe-sdn-ovn-migration
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-pod-scenarios
+    - ref: redhat-chaos-pod-network-chaos
+    - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
+    - chain: redhat-chaos-hog-scenarios
     workflow: redhat-chaos-installer-aws-sdn
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
   repo: prow-scripts
-  variant: 4.15-sdn2ovn
+  variant: 4.16-sdn2ovn
