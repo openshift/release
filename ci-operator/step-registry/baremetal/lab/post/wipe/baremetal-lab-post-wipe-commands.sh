@@ -49,7 +49,7 @@ function wait_for_power_down() {
     else
       # We perform the reboot at most twice to overcome some known BMC hardware failures
       # that sometimes keep the hosts frozen before POST.
-      echo "retrying $host_str again to reboot..."
+      echo "$(date): retrying $host_str again to reboot..."
       touch "/tmp/$bmc_host.$bmc_forwarded_port"
       reset_host "$bmc_host" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"
       return $?
@@ -123,13 +123,13 @@ function ilo_reset() {
   echo "$(date): Reseting iLO for host #$host"
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${iloreset}"
 
-  echo -e "\nWaiting for 3 mins for #${host} iLO/BMC to reset.."
-  sleep 240
+  echo -e "\nWaiting for 5 mins for #${host} iLO/BMC to reset.."
+  sleep 360
   check_ilo
-  power_button="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} power cycle"
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${power_button}"
-  echo "Power cycle #${host} and wait for 5 mins"
-  sleep 300
+#  power_button="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} power cycle"
+#  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${power_button}"
+#  echo "$(date): Power cycle #${host} and wait for 5 mins"
+#  sleep 300
 #  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
 #  echo "Reset #${host} with pxe and wait for 4 mins"
 #  sleep 240
@@ -170,7 +170,7 @@ function reset_host() {
   fi
   [ -z "${pdu_uri}" ] && return 0
 
-  echo "Reset #${host} PDU"
+  echo "$(date): Reset #${host} PDU"
   reset_pdu "${pdu_uri}"
 
   echo "Checking #${host} is reachable after PDU reset ..."
