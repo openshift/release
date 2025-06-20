@@ -1,7 +1,7 @@
 base_images:
   ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
+    name: 4.21-priv
+    namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
@@ -11,6 +11,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.20"
+  virtctl:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: virtctl
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/vmware-vsphere-csi-driver-operator
@@ -84,6 +88,31 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-csi
+- always_run: false
+  as: e2e-vsphere-ovn-hybrid-env
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      NETWORK_TYPE: multi-tenant
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-hybrid-env
+- always_run: false
+  as: e2e-vsphere-csi-hybrid-env
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      NETWORK_TYPE: multi-tenant
+      TAINT_BM: "true"
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-csi-hybrid
 - as: e2e-vsphere-ovn-upgrade
   steps:
     cluster_profile: vsphere-elastic
