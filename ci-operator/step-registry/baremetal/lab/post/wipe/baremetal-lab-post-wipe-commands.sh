@@ -72,7 +72,12 @@ function reset_pdu() {
 
   scp "${SSHOPTS[@]}" /tmp/ssh-pass "root@${AUX_HOST}:/tmp/ssh-pass"
   timeout -s 9 1m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF || true
-sshpass -f /tmp/ssh-pass ssh -o StrictHostKeyChecking=no ${pdu_user}@${pdu_host}
+  SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o 'LogLevel=ERROR')
+sshpass -f /tmp/ssh-pass ssh ${SSHOPTS[@]} ${pdu_user}@${pdu_host}
 olReboot $pdu_socket
 quit
 EOF
@@ -119,7 +124,7 @@ function ilo_reset() {
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${iloreset}"
 
   echo -e "\nWaiting for 3 mins for #${host} iLO/BMC to reset.."
-  sleep 180
+  sleep 240
   check_ilo
   power_button="ipmitool -I lanplus -H ${bmc_address} -U ${bmc_user} -P ${bmc_pass} power cycle"
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "${power_button}"
@@ -165,10 +170,10 @@ function reset_host() {
   fi
   [ -z "${pdu_uri}" ] && return 0
 
-  echo "Restting PDU of #${host}"
+  echo "Reset #${host} PDU"
   reset_pdu "${pdu_uri}"
 
-  echo "Checking #${host} is reachable after PDU reset"
+  echo "Checking #${host} is reachable after PDU reset ..."
   if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
     echo "$bmc_address:$bmc_forwarded_port" >> /tmp/failed
   fi
@@ -192,10 +197,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
-#  if [ "${ipxe_via_vmedia}" == "true" ]; then
-#    echo -e "Host #${host} requires an ilo reset as a workaround to avoid kernel crashes\n"
-#    ilo_reset "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}" &
-#  fi
+  if [ "${ipxe_via_vmedia}" == "true" ]; then
+    echo -e "Host #${host} requires an ilo reset as a workaround to avoid kernel crashes\n"
+    ilo_reset "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}" &
+  fi
 done
 wait
 
