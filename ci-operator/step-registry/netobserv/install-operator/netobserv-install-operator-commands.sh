@@ -174,7 +174,12 @@ while :; do
 done
 
 patch_csv_images
-oc wait --timeout=180s --for=condition=ready pod -l app=netobserv-operator -n openshift-netobserv-operator
+timeout=0
+while [ $timeout -lt 180 ]; do
+    oc get pods -n openshift-netobserv-operator -l app=netobserv-operator | (! grep -vE "NAME|Running") && break
+    sleep 30
+    timeout=$((timeout+30))
+done
 
 sleep 10
 update_flowcollector
