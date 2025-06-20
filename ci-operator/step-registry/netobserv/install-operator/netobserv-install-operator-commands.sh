@@ -175,39 +175,10 @@ done
 
 patch_csv_images
 timeout=0
+rc=1
 while [ $timeout -lt 180 ]; do
-    oc get pods -n openshift-netobserv-operator -l app=netobserv-operator | (! grep -vE "NAME|Running") && break
+    oc get pods -n openshift-netobserv-operator -l app=netobserv-operator | (! grep -vE "NAME|Running") && rc=0 && break
     sleep 30
     timeout=$((timeout+30))
 done
-
-sleep 10
-update_flowcollector
-oc apply -f $FLOWCOLLECTOR
-
-sleep 30
-echo "====> Waiting for flowlogs-pipeline daemonset to be created"
-while :; do
-    oc get daemonset flowlogs-pipeline -n ${NAMESPACE} && break
-    sleep 1
-done
-
-echo "====> Waiting for netobserv-ebpf-agent daemonset to be created"
-while :; do
-    oc get daemonset netobserv-ebpf-agent -n ${NAMESPACE}-privileged && break
-    sleep 1
-done
-
-echo "====> Waiting for console-plugin deployment to be created"
-while :; do
-    oc get deployment netobserv-plugin -n ${NAMESPACE} && break
-    sleep 1
-done
-
-echo "====> Waiting for flowcollector to be ready"
-timeout=0
-while [ $timeout -lt 180 ]; do
-    oc get flowcollector/cluster | grep Ready && break
-    sleep 30
-    timeout=$((timeout+30))
-done
+exit $rc
