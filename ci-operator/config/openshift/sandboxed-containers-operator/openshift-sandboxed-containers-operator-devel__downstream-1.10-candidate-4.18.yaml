@@ -1,0 +1,60 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-ipi-kata
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: brew-catalog
+      COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_AZURE_REGION: eastus
+      ENABLEPEERPODS: "false"
+      LOKI_ENABLED: "false"
+      OPERATOR_INDEX_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-fbc-4-19
+      OPERATOR_INDEX_VERSION: on-pr-8463c026e5e25999e85e608e70bd445934ab78a5
+      SLEEP_DURATION: 3h
+      SPOT_INSTANCES: "false"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: C00102
+      TEST_TIMEOUT: "75"
+      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
+      TRUSTEE_INDEX_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-fbc-4-17
+      TRUSTEE_INDEX_VERSION: 655d42ced2086b4dbc95e5042f47d2ab8abdad10
+    post:
+    - ref: cucushift-installer-wait
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - ref: sandboxed-containers-operator-env-cm
+    test:
+    - ref: openshift-extended-test
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: downstream-1.10-candidate-4.18
