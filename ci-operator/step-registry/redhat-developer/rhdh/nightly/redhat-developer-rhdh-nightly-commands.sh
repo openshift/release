@@ -41,7 +41,7 @@ echo "To debug issues or log in to the cluster manually, use the script: .ibm/pi
 
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
-K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
+K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
 oc logout
 
 # Prepare to git checkout

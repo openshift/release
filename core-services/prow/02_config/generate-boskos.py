@@ -430,6 +430,9 @@ CONFIG = {
     'aws-perfscale-quota-slice': {
         'us-west-2': 10,
     },
+    'aws-perfscale-okd-quota-slice': {
+        'us-east-1': 1,
+    },
     'aws-stackrox-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,

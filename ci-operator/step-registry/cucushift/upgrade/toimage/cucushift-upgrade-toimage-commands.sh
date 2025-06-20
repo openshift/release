@@ -238,6 +238,49 @@ function cco_annotation(){
     fi
 }
 
+function disable_boot_image_update() {
+    # Get current machineManagers value
+    local current_value
+    current_value=$(oc get MachineConfiguration cluster -n openshift-machine-config-operator -o jsonpath='{.spec.managedBootImages.machineManagers}' 2>/dev/null)
+    local get_status=$?
+
+    if [ $get_status -ne 0 ]; then
+        echo "Error: Failed to get current MachineConfiguration. Check cluster access."
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+
+    # Check if the value is already empty array
+    if [[ "$current_value" == "[]" ]]; then
+        echo "machineManagers is already configured as empty array. No changes needed."
+        return 0
+    fi
+
+    echo "Current machineManagers value: $current_value"
+    echo "Disabling updated boot images by editing MachineConfiguration..."
+
+    # Edit the MachineConfiguration to disable boot image updates
+    if ! oc patch MachineConfiguration cluster --type=merge --patch '{"spec":{"managedBootImages":{"machineManagers":[]}}}' -n openshift-machine-config-operator; then
+        echo "Error: Failed to patch MachineConfiguration."
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+
+    # Verify the change
+    echo "Verifying the change..."
+    local new_value
+    new_value=$(oc get MachineConfiguration cluster -n openshift-machine-config-operator -o jsonpath='{.spec.managedBootImages.machineManagers}')
+
+    if [[ "$new_value" == "[]" ]]; then
+        echo "Successfully disabled boot image update."
+        return 0
+    else
+        echo "Error: Failed to update machineManagers. Current value: $new_value"
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+}
+
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
@@ -592,6 +635,21 @@ fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc
 fi
+if [[ "${DISABLE_BOOT_IMAGE_UPDATE}" == "true" ]]; then
+    #Disable updated boot images feature for jobs with custom boot image specified in certain upgrade paths
+    echo "Checking conditions for disabling boot image updates..."
+
+    # Get platform
+    PLATFORM=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+
+    # Check all conditions
+    if [[ "${TARGET_MINOR_VERSION}" == "19" ]] && [[ "${PLATFORM}" =~ ^(AWS|GCP)$ ]]; then
+        disable_boot_image_update
+    else
+        echo "Skipping boot image update disablement."
+    fi
+fi
+
 upgrade
 check_upgrade_status
 

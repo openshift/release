@@ -7,8 +7,12 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
-SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-bastion=$(cat "/secret/address")
+
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+export LAB_CLOUD
 
 cat > /tmp/poweroff.sh << 'EOF'
 echo 'Running poweroff.sh'

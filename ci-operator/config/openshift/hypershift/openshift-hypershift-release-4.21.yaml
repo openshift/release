@@ -55,6 +55,11 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
   to: hypershift-tests
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y python3-pip
+  from: src
+  to: custom-verify-src
 promotion:
   to:
   - excluded_images:
@@ -121,7 +126,7 @@ tests:
 - as: verify
   commands: make verify
   container:
-    from: src
+    from: custom-verify-src
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
 - as: unit
   commands: make test

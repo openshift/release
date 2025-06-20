@@ -144,7 +144,11 @@ if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name ${clusterSubnetSNG} -n 'ign_in' --priority 102 --access Allow --source-port-ranges '*' --destination-port-ranges 22623"
 fi
 
-run_command "az network vnet create --name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefixes ${AZURE_VNET_ADDRESS_PREFIXES}"
+vnet_option=""
+if [[ "${AZURE_VNET_ENABLE_ENCRYPTION}" == "true" ]]; then
+    vnet_option="--enable-encryption true --encryption-policy ${AZURE_VNET_ENCRYPTION_POLICY}"
+fi
+run_command "az network vnet create --name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefixes ${AZURE_VNET_ADDRESS_PREFIXES} ${vnet_option}"
 run_command "az network vnet subnet create --name ${controlPlaneSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --network-security-group ${clusterSubnetSNG}"
 run_command "az network vnet subnet create --name ${computeSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_COMPUTE_SUBNET_PREFIX} --network-security-group ${clusterSubnetSNG}"
 

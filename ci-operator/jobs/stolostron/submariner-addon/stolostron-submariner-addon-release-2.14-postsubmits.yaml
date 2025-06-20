@@ -118,3 +118,40 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^release-2\.14$
+    cluster: build09
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-stolostron-submariner-addon-release-2.14-sonarcloud
+    spec:
+      containers:
+      - args:
+        - -f
+        - Makefile.prow
+        - sonar/go/prow
+        command:
+        - make
+        env:
+        - name: ARTIFACT_DIR
+          value: $(ARTIFACTS)
+        - name: SELF
+          value: make -f Makefile.prow
+        image: quay-proxy.ci.openshift.org/openshift/ci:stolostron_builder_go1.24-linux
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
