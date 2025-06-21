@@ -28,30 +28,9 @@ MGMT_RELEASE=stable
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 source $SHARED_DIR/main.env
-echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 
-# Set environment for jobs to run
-INTERNAL=true
-INTERNAL_ONLY=true
-# If the job trigger is "periodic" or "nightly" or the repository owner is "openshift-kni",
-# use the upstream cluster to run the job.
-if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]] || [[ "$REPO_OWNER" == "openshift-kni" ]]; then
-    INTERNAL=false
-    INTERNAL_ONLY=false
-else
-    # Run other jobs on any cluster
-    INTERNAL_ONLY=false
-fi
-# Whether to use the bastion environment
-BASTION_ENV=true
-# Environment - US lab, DS lab or any
-CL_SEARCH="upstreambil"
-
-if $INTERNAL_ONLY && $INTERNAL; then
-    CL_SEARCH="internalbos"
-elif $INTERNAL; then
-    CL_SEARCH="any"
-fi
+# Run on internal RH network only
+CL_SEARCH="internalbos"
 
 echo $CL_SEARCH
 cat << EOF > $SHARED_DIR/bastion_inventory
@@ -63,8 +42,7 @@ EOF
 ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
-# Choose for hypershift hosts for "1b1v" - 1 baremetal host
-ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v"
+ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
@@ -319,10 +297,10 @@ echo "Run the playbook to install the cluster"
 status=0
 
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
-    playbooks/sno_ztp.yml \
+    playbooks/mno_ztp.yml \
     -e bm_workers=$CLUSTER_NAME \
     -e vm_masters=3 \
-    -e vm_workers=1 \
+    -e vm_workers=2 \
     -e vsno_name=$SNO_NAME \
     -e vsno_ip=$SNO_IP \
     -e vsno_add_nm_hosts=false \
@@ -332,6 +310,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e ztp_tag=$T5CI_VERSION \
     -e ztp_release=$T5CI_JOB_ZTP_RELEASE_TYPE \
     -e ztphub_wait_install_timeout=90 \
+    -e ztphub_app_autosync=true \
     -e disconnected_env=true \
     -e disconnected_env_pull_secret=/home/kni/pull-secret.txt \
     -e ztphub_wait_install_timeout=150 $PLAYBOOK_ARGS || status=$?
