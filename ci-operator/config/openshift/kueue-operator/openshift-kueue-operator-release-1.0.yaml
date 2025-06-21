@@ -165,12 +165,12 @@ tests:
         done | sort | tail -n1 | awk '{print $2}')
         echo "export BUNDLE_IMAGE=$BUNDLE_REPO:$LATEST_TAG" >> /tmp/envfile
         echo "export OPERATOR_IMAGE=$OPERATOR_IMAGE" >> /tmp/envfile
+      from: kueue-operator-src
       resources:
         requests:
           cpu: 200m
           memory: 300Mi
     - as: run-sdk
-      from: operator-sdk
       commands: |
         source /tmp/envfile
         oc create namespace openshift-kueue-operator
@@ -178,6 +178,7 @@ tests:
         operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
         CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}')
         oc patch csv -n openshift-kueue-operator $CSV --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$OPERATOR_IMAGE\"}]"
+      from: operator-sdk
       resources:
         requests:
           cpu: 200m
