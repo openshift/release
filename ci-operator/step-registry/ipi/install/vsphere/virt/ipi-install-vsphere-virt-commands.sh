@@ -67,5 +67,11 @@ virtctl start "${VM_NAME}" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
 # Monitor cluster for CSRs
 approve_csrs
 
+# Add taint if configured
+if [[ "${TAINT_BM}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Adding vsphere-csi-driver taint to node to prevent pod scheduling"
+  oc adm taint nodes ${VM_NAME} vsphere-csi-driver=reserved:NoSchedule vsphere-csi-driver=reserved:NoExecute --kubeconfig="${CLUSTER_KUBECONFIG}"
+fi
+
 # Remove provider taint
 oc adm taint nodes ${VM_NAME} node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"

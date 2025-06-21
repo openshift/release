@@ -43,6 +43,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: openstack-installer
+  operator-sdk-mto:
+    name: operator-sdk-mto
+    namespace: origin
+    tag: main
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -1938,26 +1942,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-day2
-- as: baremetal-ha-agent-ipv4-static-disc-day2-f14
+- as: baremetal-sno-agent-ipv4-static-disc-day2-fips
   capabilities:
   - intranet
-  cron: 3 14 13,27 * *
+  cron: 3 15 14,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKERS: "1"
+      AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      E2E_RUN_TAGS: '@disconnected'
+      FIPS_ENABLED: "true"
       RESERVE_BOOTSTRAP: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       architecture: amd64
       ipv4_enabled: "true"
       ipv6_enabled: "false"
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
+      masters: "1"
+      workers: "0"
     workflow: baremetal-lab-agent-install-network-static-disconnected-day2
 - as: baremetal-pxe-sno-agent-ipv4-static-disc-day2-f14
   capabilities:
@@ -2788,6 +2790,7 @@ tests:
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
