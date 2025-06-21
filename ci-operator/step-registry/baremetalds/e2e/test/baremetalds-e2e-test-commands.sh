@@ -44,6 +44,9 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/etcd:3.5.16-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-16-0-ExW1ETJqOZa6gx2F"
   # new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
   "registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ"
+  # image used by SigstoreImageVerification test, we also need to mirror the signature
+  "quay.io/openshift-release-dev/ocp-release:sha256-fbad931c725b2e5b937b295b58345334322bdabb0b67da1c800a53686d7397da.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-fbad931c725b2e5b937b295b58345334322bdabb0b67da1c800a53686d7397da.sig"
+  "quay.io/openshift-release-dev/ocp-release@sha256:fbad931c725b2e5b937b295b58345334322bdabb0b67da1c800a53686d7397da $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-release-dev-ocp-release-sha256-fbad931c725b2e5b937b295b58345334322bdabb0b67da1c800a53686d7397da-Kk7kUWrbjOlq2h9E"
 )
 
 function run-oc-image-mirror() {
