@@ -28,6 +28,12 @@ images:
     RUN dnf install -y skopeo git && dnf clean all
   from: src
   to: kueue-operator-src
+- dockerfile_literal: |
+    FROM operator-sdk
+    USER 0
+    RUN microdnf install -y skopeo git && microdnf clean all
+  from: operator-sdk
+  to: kueue-operator-sdk-tools
 resources:
   '*':
     requests:
@@ -174,7 +180,7 @@ tests:
 
         CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}')
         oc patch csv -n openshift-kueue-operator $CSV --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$OPERATOR_IMAGE\"}]"
-      from: operator-sdk
+      from: kueue-operator-sdk-tools
       resources:
         requests:
           cpu: 200m
