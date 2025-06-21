@@ -7,10 +7,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
-  operator-sdk:
-    name: "4.19"
-    namespace: origin
-    tag: operator-sdk
 build_root:
   from_repository: true
 images:
@@ -25,9 +21,13 @@ images:
   to: kueue-operator
 - dockerfile_literal: |
     FROM src
-    RUN dnf install -y skopeo git buildah && dnf clean all
+    RUN dnf install -y skopeo git && dnf clean all
   from: src
   to: kueue-operator-src
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/operator-sdk:v1.37.0
+    RUN dnf install -y skopeo git && dnf clean all
+  to: operator-sdk
 resources:
   '*':
     requests:
