@@ -263,7 +263,7 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     oc get clusterversion version -o yaml || true
 fi
-
+sleep 7200
 # execute the cases
 function run {
     test_scenarios=""
