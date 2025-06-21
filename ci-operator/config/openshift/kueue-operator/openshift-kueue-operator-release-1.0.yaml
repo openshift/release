@@ -143,6 +143,7 @@ tests:
     - as: image-gather
       cli: latest
       commands: |
+        set -xe
         echo "Current PWD: $(pwd)"
         echo "Listing directory contents:"
         ls -lah
@@ -163,8 +164,11 @@ tests:
           created=$(skopeo inspect docker://$BUNDLE_REPO:$tag 2>/dev/null | jq -r '.Created'); \
           if [ "$created" != "null" ] && [ -n "$created" ]; then echo "$created $tag"; fi; \
         done | sort | tail -n1 | awk '{print $2}')
-        echo "export BUNDLE_IMAGE=$BUNDLE_REPO:$LATEST_TAG" >> /tmp/envfile
-        echo "export OPERATOR_IMAGE=$OPERATOR_IMAGE" >> /tmp/envfile
+        echo "export BUNDLE_IMAGE=$BUNDLE_REPO:$LATEST_TAG" >> "${SHARED_DIR}/env"
+        echo "export OPERATOR_IMAGE=$OPERATOR_IMAGE" >> "${SHARED_DIR}/env"
+      env:
+      - default: /shared
+        name: SHARED_DIR
       from: kueue-operator-src
       resources:
         requests:
@@ -172,12 +176,20 @@ tests:
           memory: 300Mi
     - as: run-sdk
       commands: |
-        source /tmp/envfile
+        source "${SHARED_DIR}/env"
         oc create namespace openshift-kueue-operator
         oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true
         operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
         CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}')
         oc patch csv -n openshift-kueue-operator $CSV --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$OPERATOR_IMAGE\"}]"
+      dependencies:
+      - env: BUNDLE_IMAGE
+        name: image-gather
+      - env: OPERATOR_IMAGE
+        name: image-gather
+      env:
+      - default: /shared
+        name: SHARED_DIR
       from: operator-sdk
       resources:
         requests:
@@ -186,7 +198,6 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |
-        source /tmp/envfile
         make e2e-ci-test
       from: kueue-operator-src
       resources:
