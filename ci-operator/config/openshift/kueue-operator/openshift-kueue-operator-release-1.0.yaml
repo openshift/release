@@ -143,7 +143,8 @@ tests:
     - as: image-gather
       cli: latest
       commands: |
-        set -xe
+        set -x
+        sleep 2
         echo "Current PWD: $(pwd)"
         echo "Listing directory contents:"
         ls -lah
@@ -182,11 +183,6 @@ tests:
         operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
         CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}')
         oc patch csv -n openshift-kueue-operator $CSV --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$OPERATOR_IMAGE\"}]"
-      dependencies:
-      - env: BUNDLE_IMAGE
-        name: image-gather
-      - env: OPERATOR_IMAGE
-        name: image-gather
       env:
       - default: /shared
         name: SHARED_DIR
