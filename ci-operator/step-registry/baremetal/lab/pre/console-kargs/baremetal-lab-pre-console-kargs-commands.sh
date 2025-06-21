@@ -99,6 +99,8 @@ storage:
           id=${baremetal_iface}
           type=ethernet
           interface-name=${baremetal_iface}
+          [ethernet]
+          mtu=1280
           [ipv4]
           method=disabled
           [ipv6]
