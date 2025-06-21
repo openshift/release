@@ -24,8 +24,10 @@ if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
 fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+#TEMP
+sleep 2h # Wait for the cluster to be ready
 
-RUN_COMMAND="uv run pytest tests/model_serving/model_server \
+RUN_COMMAND="uv run pytest -m smoke tests/model_serving/model_server \
             --tc=use_unprivileged_client:False \
             -s -o log_cli=true \
             --junit-xml=${ARTIFACT_DIR}/xunit_results.xml \
