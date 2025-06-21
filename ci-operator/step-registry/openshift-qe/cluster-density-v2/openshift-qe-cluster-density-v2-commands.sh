@@ -49,11 +49,12 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
     fi
 fi
 
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
-pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+REPO_URL="https://github.com/liqcui/e2e-benchmarking";
+#LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+#TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+TAG_OPTION="sdn-ovn-migration-v3";
+git clone $REPO_URL -b $TAG_OPTION --depth 1
+pushd e2e-benchmarking/workloads/sdn-ovn-migration
 export WORKLOAD=cluster-density-v2
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
@@ -88,6 +89,7 @@ export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
 
 rm -f ${SHARED_DIR}/index.json
+
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
