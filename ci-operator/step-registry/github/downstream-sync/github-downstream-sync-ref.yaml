@@ -1,0 +1,37 @@
+ref:
+  as: github-downstream-sync
+  from: dev-scripts
+  commands: github-downstream-sync-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: github-credentials-openshift-bot
+    mount_path: /etc/github
+  timeout: 15m0s
+  grace_period: 1m0s
+  env:
+    - name: DEFAULT_BRANCH
+      default: master
+      documentation: |-
+        The upstream branch to merge from
+    - name: UPSTREAM_REPO
+      default: ""
+      documentation: |-
+        The upstream repo to merge from
+    - name: DOWNSTREAM_REPO
+      default: ""
+      documentation: |-
+        The downstream repo to merge in to
+    - name: MIN_COMMITS
+      default: ""
+      documentation: |-
+        The minumum number of new commits needed in order to create a new sync PR
+    - name: GITHUB_TOKEN
+      default: "/etc/github/oauth"
+      documentation: |-
+        THe name of the file in GITHUB_SECRET containing the GitHub token.
+  documentation: |-
+    Check if a "DownStream Merge [MM-DD-YYYY]" PR is needed, and create one if so.
