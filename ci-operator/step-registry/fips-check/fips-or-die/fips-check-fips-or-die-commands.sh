@@ -143,7 +143,7 @@ fi
 # check if FIPS enabled
 fips_enabled=false
 node_name=`oc get node -l node-role.kubernetes.io/master= -o=jsonpath="{.items[0].metadata.name}"`
-str=`oc debug node/$node_name -- chroot /host fips-mode-setup --check`
+str=`oc -n default debug node/$node_name -- chroot /host fips-mode-setup --check`
 if [[ $str =~ "FIPS mode is enabled" ]]
 then
     fips_enabled=true
