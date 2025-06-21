@@ -30,6 +30,12 @@ function cerberus_cleanup() {
   oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
   output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
   echo "pod rsh $output"
+  
+  if [[ -f final_cerberus_info.json ]];then
+       cat final_cerberus_info.json
+  else
+      echo "No final_cerberus_info.json generated"
+  fi
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 
