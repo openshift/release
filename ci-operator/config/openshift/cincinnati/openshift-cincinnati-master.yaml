@@ -3,6 +3,10 @@ base_images:
     name: rust
     namespace: cincinnati-ci-public
     tag: e2e-test-ubi9
+  openapi-validator:
+    name: openapi-validator
+    namespace: cincinnati-ci-public
+    tag: ci-1.35.2
   ubi:
     name: ubi
     namespace: ocp
@@ -83,6 +87,13 @@ resources:
       memory: 5Gi
 test_binary_build_commands: just build_e2e
 tests:
+- as: verify-openapi
+  commands: |
+    export npm_config_cache=$(mktemp -d)
+    just verify_openapi
+  container:
+    clone: true
+    from: openapi-validator
 - as: cargo-test
   steps:
     pre:
