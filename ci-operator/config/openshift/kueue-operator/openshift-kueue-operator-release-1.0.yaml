@@ -29,10 +29,11 @@ images:
   from: src
   to: kueue-operator-src
 - dockerfile_literal: |
-    FROM operator-sdk
+    FROM pipeline:kueue-operator-src as base
     USER 0
-    RUN microdnf install -y skopeo git && microdnf clean all
-  from: operator-sdk
+    COPY --from=pipeline:operator-sdk /usr/bin/operator-sdk /usr/bin/operator-sdk
+    RUN chmod +x /usr/bin/operator-sdk
+    USER 1001
   to: kueue-operator-sdk-tools
 resources:
   '*':
