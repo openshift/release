@@ -44,6 +44,7 @@ pullSecret: >
   $(cat "${mirror_registry_pull_secret}" | jq -c .)
 additionalTrustBundle: |
 `sed 's/^/  /g' "${additional_trust_bundle}"`
+additionalTrustBundlePolicy: Always
 EOF
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
 
