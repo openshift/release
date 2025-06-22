@@ -156,13 +156,16 @@ ssh ${SSH_ARGS} root@${bastion} "
    source bootstrap.sh
 "
 
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to=/tmp/pull-secret
+oc adm release info $RELEASE_IMAGE_LATEST -a /tmp/pull-secret
+
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
 scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
-scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull-secret root@${bastion}:/root/.docker/config.json
+scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:/root/.docker/config.json
 
-oc adm release info $RELEASE_IMAGE_LATEST -a ${CLUSTER_PROFILE_DIR}/pull_secret
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
