@@ -88,8 +88,3 @@ spec:
   numVfs: ${SRIOV_NUM_VFS}
   resourceName: ${SRIOV_RESOURCE_NAME}
 EOF
-
-if [ ${BAREMETAL} == "true" ]; then
-  # kill the ssh tunnel so the job completes
-  pkill ssh
-fi

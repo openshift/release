@@ -52,8 +52,3 @@ EOF
 
 kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=30m mcp worker
 oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
-
-if [ ${BAREMETAL} == "true" ]; then
-  # kill the ssh tunnel so the job completes
-  pkill ssh
-fi
