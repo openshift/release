@@ -5,7 +5,17 @@ export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
-ls -a /tmp/secrets/ 
+ls /tmp/secrets/ 
+
+# Export secrets, skipping non-secret files
+for file in /tmp/secrets/*; do
+    [[ -f "$file" ]] || continue
+    filename=$(basename "$file")
+    echo "filename : $filename"
+    [[ "$filename" == *"secretsync-vault-source-path"* ]] && continue
+    export "$filename"="$(cat "$file")"
+done
+echo "KEYCLOAK_BASE_URL: $KEYCLOAK_BASE_URL"
 exit 0
 
 # Install & login to gh cli
