@@ -202,6 +202,42 @@ function fixNodeScaling {
   fi
 }
 
+# Check hcp cluster current/desired node's count via rosa cmd one by one. 
+function checkHCPEveryComputeCount {
+  entries=(".autoscaling.min_replicas" ".autoscaling.min_replica" ".replicas" )
+  for MP_NAME in $(rosa list machinepool -c "$CLUSTER_ID" -o json | jq -r '.[].id'); do
+    mp_detail=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json)
+    for entry in "${entries[@]}"; do
+      mp_desired_count=$(echo "$mp_detail"| jq -r ${entry})
+      if [[ ! "$mp_compute_count" != "null" ]];then
+       mp_current_count=$(echo "$mp_detail"| jq -r .status.current_replicas)
+       if (( "$mp_current_count" >= "$mp_desired_count" )); then
+         echo "$(date): ${MP_NAME} worker nodes are ready and match desired $mp_desired_count node count."
+        else
+         echo "$(date): ${MP_NAME} worker nodes are not ready and don't match desired $mp_desired_count node count."
+         listDetails
+         exit 1
+        fi
+      fi
+    done
+  done
+}
+
+# Check classic cluster current/desired machineset count one by one
+function checkEveryMachinesetCount {
+  oc get machinesets -n openshift-machine-api --no-headers -l hive.openshift.io/machine-pool!=infra | awk '{print $1}' | while read mpsetName; do
+    current_count=$(oc get machinesets $mpsetName -n openshift-machine-api -o jsonpath='{.status.availableReplicas}')
+    desired_count=$(oc get machinesets $mpsetName -n openshift-machine-api -o jsonpath='{.status.replicas}')
+    if (( "$current_count" == "$desired_count" )); then
+      echo "$(date): machineset ${mpsetName} is ready and match desired $desired_count node count."
+    else
+      echo "$(date): machineset ${mpsetName} not ready and don't match desired $desired_count node count."
+      listDetails
+      exit 1
+    fi
+  done
+}
+
 # Get cluster
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "CLUSTER_ID is $CLUSTER_ID"
@@ -271,4 +307,13 @@ else
     echo "Exiting test!"
     exit 1
 fi
+
+if [ "$HOSTED_CP" = "false" ]; then
+  echo "checking classic cluster machineset count one by one"
+  checkEveryMachinesetCount
+else
+  echo "checking HCP cluster nodes count one by one"
+  checkHCPEveryComputeCount
+fi
+
 cat "${SHARED_DIR}/cluster-config"
