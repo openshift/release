@@ -161,10 +161,9 @@ oc registry login --to=/tmp/pull-secret
 oc adm release info $RELEASE_IMAGE_LATEST -a /tmp/pull-secret
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
-scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
-scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:/root/.docker/config.json
 
 
 if [[ ${TYPE} == 'sno' ]]; then
