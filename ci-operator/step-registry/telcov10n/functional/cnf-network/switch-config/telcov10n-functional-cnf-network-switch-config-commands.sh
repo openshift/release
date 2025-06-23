@@ -39,6 +39,13 @@ find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
     process_inventory $dir ${ECO_CI_CD_INVENTORY_PATH}/group_vars/"$(basename ${dir})"
 done
 
+echo "Set CLUSTER_NAME env var"
+if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
+    CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
+fi
+export CLUSTER_NAME=${CLUSTER_NAME}
+echo CLUSTER_NAME=${CLUSTER_NAME}
+
 echo "Create host_vars directory"
 mkdir ${ECO_CI_CD_INVENTORY_PATH}/host_vars
 
@@ -46,13 +53,6 @@ find /var/host_variables/${CLUSTER_NAME}/ -mindepth 1 -type d | while read -r di
     echo "Process group inventory file: ${dir}"
     process_inventory $dir ${ECO_CI_CD_INVENTORY_PATH}/host_vars/"$(basename ${dir})"
 done
-
-echo "Set CLUSTER_NAME env var"
-if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
-    CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
-fi
-export CLUSTER_NAME=${CLUSTER_NAME}
-echo CLUSTER_NAME=${CLUSTER_NAME}
 
 echo "Set OCP_NIC env var"
 if [[ -f "${SHARED_DIR}/ocp_nic" ]]; then
