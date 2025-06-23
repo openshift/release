@@ -73,5 +73,5 @@ PR_CHANGESET=$(git diff --name-only main)
 echo "Changeset: $PR_CHANGESET"
 
 echo "Starting Certification Tests"
-bash ./.ibm/pipelines/rhdh_certify.sh
+bash ./.automation/pipelines/rhdh_certify.sh
 
