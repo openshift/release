@@ -8,23 +8,6 @@ cat /etc/os-release
 SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/sriov_num_vfs)
 SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
 
-if [ ${BAREMETAL} == "true" ]; then
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-  bastion="$(cat /bm/address)"
-  # Copy over the kubeconfig
-  if [ ! -f "${SHARED_DIR}/kubeconfig" ]; then
-    ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
-    export KUBECONFIG=/tmp/kubeconfig
-  else
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
-  fi
-  # Setup socks proxy
-  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
-  export https_proxy=socks5://localhost:12345
-  export http_proxy=socks5://localhost:12345
-  oc --kubeconfig="$KUBECONFIG" config set-cluster bm --proxy-url=socks5://localhost:12345
-fi
-
 oc config view
 oc projects
 
