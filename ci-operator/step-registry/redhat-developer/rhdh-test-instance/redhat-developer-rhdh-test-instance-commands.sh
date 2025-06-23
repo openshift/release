@@ -5,18 +5,14 @@ export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
-ls /tmp/secrets/ 
 
 # Export secrets, skipping non-secret files
 for file in /tmp/secrets/*; do
     [[ -f "$file" ]] || continue
     filename=$(basename "$file")
-    echo "filename : $filename"
     [[ "$filename" == *"secretsync-vault-source-path"* ]] && continue
     export "$filename"="$(cat "$file")"
 done
-echo "KEYCLOAK_BASE_URL: $KEYCLOAK_BASE_URL"
-exit 0
 
 # Install & login to gh cli
 GH_VERSION=2.49.0 && curl -sL https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz | tar xz && export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
@@ -97,12 +93,10 @@ fi
 gh pr view "$PR_NUMBER" --repo "$REPO" --json comments |
 jq -r '.comments | reverse | map(select(.body | test("^/test"))) | .[0].body'
 
+source ./install.sh
 
 
-bash ./deploy.sh
-
-
-# Default time is 3h, max is 6h
+# Default time is 3h, max is 4h
 time=${time:-3h}
 max_time=4
 
