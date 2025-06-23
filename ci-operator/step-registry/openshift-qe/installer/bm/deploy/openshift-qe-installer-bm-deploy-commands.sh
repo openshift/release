@@ -10,7 +10,7 @@ set -x
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
-JETLAG_PR=655
+JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
@@ -158,7 +158,6 @@ ssh ${SSH_ARGS} root@${bastion} "
 
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to=/tmp/pull-secret
-oc adm release info $RELEASE_IMAGE_LATEST -a /tmp/pull-secret
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
 scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
