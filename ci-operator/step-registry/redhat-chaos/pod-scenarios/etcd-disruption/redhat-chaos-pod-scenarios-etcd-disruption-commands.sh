@@ -27,9 +27,13 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 
+oc get pods -n openshift-monitoring  --kubeconfig $KRKN_KUBE_CONFIG
+
 ./pod-scenarios/prow_run.sh
 rc=$?
 echo "Done running the test!" 
+
+oc get pods -n openshift-monitoring  --kubeconfig $KRKN_KUBE_CONFIG
 
 cat /tmp/*.log 
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
