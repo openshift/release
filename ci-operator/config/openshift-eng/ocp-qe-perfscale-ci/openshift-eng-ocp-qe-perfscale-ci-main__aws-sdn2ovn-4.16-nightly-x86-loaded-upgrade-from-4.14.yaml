@@ -1,0 +1,74 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  intermediate:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: loaded-upgrade-sdn2ovn-414to416-120nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      GC: "false"
+      IF_CREATE_WORKLOAD_NODE: "true"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE_WORKER: "15"
+      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      PAUSED_MCP_NAME: worker infra
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      TIMEOUT: "150"
+      WORKER_REPLICA_COUNT: "6"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: sdn-conf
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-upgrade-qe-sanity-cpou
+    - ref: openshift-qe-connectivity-check
+    - chain: openshift-qe-sdn-ovn-migration
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: aws-sdn2ovn-4.16-nightly-x86-loaded-upgrade-from-4.14
