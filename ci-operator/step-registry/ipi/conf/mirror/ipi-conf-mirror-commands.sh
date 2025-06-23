@@ -30,8 +30,10 @@ CONFIG_PATCH="${SHARED_DIR}/pull_secret_ca.yaml.patch"
 
 additional_trust_bundle="${SHARED_DIR}/additional_trust_bundle"
 if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+    echo >> "${additional_trust_bundle}"
     cat "${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt" >> "${additional_trust_bundle}"
 else
+    echo >> "${additional_trust_bundle}"
     cat /var/run/vault/mirror-registry/client_ca.crt >> "${additional_trust_bundle}"
 fi
 
