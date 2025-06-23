@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x
 update_flowcollector() {
   FLOWCOLLECTOR=/tmp/flowcollector.yaml
   cat <<EOF >$FLOWCOLLECTOR
@@ -145,7 +145,7 @@ patch_csv_images(){
 
 if [[ "$CATALOG_SOURCE" == "source" ]]; then
     echo "====> Using upstream catalog bundle with tag: vmain"
-    CATALOG_IMAGE="quay.io/netobserv/network-observability-operator-catalog:v0.0.0-main"
+    CATALOG_IMAGE="quay.io/netobserv/network-observability-operator-catalog:v0.0.0-sha-main"
     CATALOG_NAME="netobserv-main"
     CHANNEL="latest" # for upstream catalog source "latest" is the channel name.
     deploy_catalog
@@ -174,34 +174,11 @@ while :; do
 done
 
 patch_csv_images
-
-sleep 10
-update_flowcollector
-oc apply -f $FLOWCOLLECTOR
-
-sleep 30
-echo "====> Waiting for flowlogs-pipeline daemonset to be created"
-while :; do
-    oc get daemonset flowlogs-pipeline -n ${NAMESPACE} && break
-    sleep 1
-done
-
-echo "====> Waiting for netobserv-ebpf-agent daemonset to be created"
-while :; do
-    oc get daemonset netobserv-ebpf-agent -n ${NAMESPACE}-privileged && break
-    sleep 1
-done
-
-echo "====> Waiting for console-plugin deployment to be created"
-while :; do
-    oc get deployment netobserv-plugin -n ${NAMESPACE} && break
-    sleep 1
-done
-
-echo "====> Waiting for flowcollector to be ready"
 timeout=0
+rc=1
 while [ $timeout -lt 180 ]; do
-    oc get flowcollector/cluster | grep Ready && break
+    oc get pods -n openshift-netobserv-operator -l app=netobserv-operator | (! grep -vE "NAME|Running") && rc=0 && break
     sleep 30
     timeout=$((timeout+30))
 done
+exit $rc
