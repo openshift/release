@@ -47,3 +47,7 @@ if [ -n "${ODH_MODEL_CONTROLLER_IMAGE}" ]; then
   echo "odh-model-controller is patched successfully"
 
 fi
+
+# adding sleep for debug 2h
+echo "sleeping for 2h now for debug"
+sleep 2h

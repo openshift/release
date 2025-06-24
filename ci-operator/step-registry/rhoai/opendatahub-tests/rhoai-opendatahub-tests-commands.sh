@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-
 if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
   AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
   AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
