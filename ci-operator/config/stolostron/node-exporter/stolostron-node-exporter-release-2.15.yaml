@@ -1,0 +1,83 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  stolostron_builder_go1.23-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.23-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.23-linux
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    stolostron_builder_go1.23-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
+  to: node-exporter
+promotion:
+  to:
+  - name: "2.15"
+    namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: make -f Makefile.prow test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: node-exporter
+    env:
+      IMAGE_REPO: node-exporter
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-e2e
+  commands: make -f Makefile.prow test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: node-exporter
+    env:
+      IMAGE_REPO: node-exporter
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="node-exporter"
+        make osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.15
+  org: stolostron
+  repo: node-exporter
