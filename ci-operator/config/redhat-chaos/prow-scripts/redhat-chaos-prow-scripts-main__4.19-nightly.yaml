@@ -230,6 +230,62 @@ tests:
     - ref: redhat-chaos-start-krkn
     workflow: redhat-chaos-krkn-hub-node-tests
   timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-master-outage-test-udn-density-pods-layer3
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      ENABLE_LAYER_3: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-udn-density-pods-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: redhat-chaos-start-krkn
+    - ref: redhat-chaos-node-disruptions-master-outage
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-master-outage-test-udn-density-pods-layer2
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      ENABLE_LAYER_3: "false"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-udn-density-pods-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: redhat-chaos-start-krkn
+    - ref: redhat-chaos-node-disruptions-master-outage
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
 - as: krkn-hub-tests-udn-aws-ipsec
   cron: 0 4 * * 1
   steps:
