@@ -13,7 +13,7 @@ else
   export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
 
-RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action uninstall --kubeconfig ${KUBECONFIG} "
+RUN_COMMAND="uv run ocp_addons_operators_cli/cli.py --action uninstall --kubeconfig ${KUBECONFIG} "
 
 OPERATORS_CMD=""
 for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort  --version-sort); do
@@ -31,4 +31,5 @@ fi
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
-${RUN_COMMAND}
+echo $RUN_COMMAND
+eval "$RUN_COMMAND"
