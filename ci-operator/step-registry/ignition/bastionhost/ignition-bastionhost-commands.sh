@@ -250,12 +250,8 @@ cat > "${rsyncd_ignition_patch}" << EOF
 }
 EOF
 
-# patch rsync setting to ignition
-if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
-  echo "ignore the rsyncd_ignition_patch in ibmcloud, ref SPLAT-2243"
-else
-  patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
-fi
+patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
+
 rm -f "${rsyncd_ignition_patch}"
 
 
