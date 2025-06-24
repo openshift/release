@@ -47,7 +47,9 @@ EOF
 sleep 2
 
 ##create a pull secret
-oc -n test-cso create secret docker-registry cso-private --docker-server=quay.io --docker-username="quay-qetest+testcso" --docker-password="G7KF0G57BX4F8G23LOZHJQR9QZAHHEPI3WI4FPFQAJM5UER82M6TNKOMHHKVGRUO"
+ROBOT_USERNAME=$(cat /var/run/quayio-pull-robot/username)
+ROBOT_PASSWORD=$(cat /var/run/quayio-pull-robot/password)
+oc -n test-cso create secret docker-registry cso-private --docker-server=quay.io --docker-username="${ROBOT_USERNAME}" --docker-password="${ROBOT_PASSWORD}"
 sleep 2
 oc -n test-cso secrets link default cso-private --for=pull
 sleep 2
