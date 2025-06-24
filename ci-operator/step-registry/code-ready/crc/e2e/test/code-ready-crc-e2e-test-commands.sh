@@ -78,6 +78,13 @@ curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/crc/bundles/opens
 
 echo "${BUNDLE}" > "${HOME}"/bundle
 
+export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+until gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh --zone "${GOOGLE_COMPUTE_ZONE}" packer@"${INSTANCE_PREFIX}" --command "exit 0" 2>/dev/null; do
+  echo "Waiting for SSH to become available..."
+  sleep 5
+done
+echo "SSH is now available for ${INSTANCE_PREFIX}"
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
