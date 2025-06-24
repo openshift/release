@@ -56,13 +56,14 @@ echo "Generating the template..."
 
 cat > "$SHARED_DIR/haproxy.cfg" <<EOF
 global
-log         127.0.0.1 local2
+log         10.10.137.10:5514 local2
 pidfile     /var/run/haproxy.pid
 daemon
 defaults
 mode                    http
 maxconn                 4000
 log                     global
+option tcplog
 option                  dontlognull
 option http-server-close
 option                  redispatch
@@ -94,15 +95,21 @@ $APISRV
 listen machine-config-server-22623
     bind :::22623
     mode tcp
+    log         10.10.137.10:5514 local2
+    option tcplog
 $MC
 listen ingress-router-80
     bind :::80
     mode tcp
+    log         10.10.137.10:5514 local2
+    option tcplog
     balance source
 $INGRESS80
 listen ingress-router-443
     bind :::443
     mode tcp
+    log         10.10.137.10:5514 local2
+    option tcplog
     balance source
 $INGRESS443
 $SSH
