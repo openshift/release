@@ -155,6 +155,7 @@ function enable_registry_credential () {
 
      tmp_dockerconfig="/tmp/new-dockerconfigjson"
      if [[  $REG_QE_OPT_ENABLED == true ]] ;then
+	 echo " Set cred for query.io/openshift-qe-optional-operators"
          reg_qe_opt_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
          reg_qe_opt_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
 	 reg_qe_opt_auth=$(echo -n "${reg_qe_opt_user}:${reg_qe_opt_password}" | base64 -w 0)
@@ -165,6 +166,7 @@ function enable_registry_credential () {
      fi
 
      if [[  $REG_BREW_ENABLED == true ]] ;then
+	 echo " Set cred for brew.registry.redhat.io"
          reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
          reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
 	 reg_brew_auth=$(echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0)
@@ -175,6 +177,7 @@ function enable_registry_credential () {
      fi
 
      if [[  $REG_STAGE_ENABLED == true ]] ;then
+	 echo " Set cred for registry.stage.redhat.io"
          reg_stage_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
          reg_stage_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
          reg_stage_auth=`echo -n "${reg_stage_user}:${reg_stage_password}" | base64 -w 0`
