@@ -22,6 +22,8 @@ virtctl stop "${VM_NAME}" --force --grace-period=0 --kubeconfig="${VIRT_KUBECONF
 echo "$(date -u --rfc-3339=seconds) - Deleting VM"
 oc delete -f "${SHARED_DIR}/vm.yaml" --kubeconfig="${VIRT_KUBECONFIG}"
 
-# Clean up namespace of Openshift Virt server
-echo "$(date -u --rfc-3339=seconds) - Removing job namespace"
-oc delete ns ${VM_NAMESPACE} --kubeconfig="${VIRT_KUBECONFIG}"
+# Clean up namespace of Openshift Virt server if no addition VMs are present from other test runs
+if [[ "$(oc get vm -n ${VM_NAMESPACE} --kubeconfig="${VIRT_KUBECONFIG}" -o name | wc -l)" -eq 0 ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Removing job namespace"
+  oc delete ns ${VM_NAMESPACE} --kubeconfig="${VIRT_KUBECONFIG}"
+fi
