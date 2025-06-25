@@ -432,5 +432,4 @@ wait_for_nodes_readiness ${EXPECTED_NODES}
 
 echo "Check all cluster operators get stable and ready"
 wait_clusteroperators_continous_success
-
-sleep 7200 
+#sleep 7200
