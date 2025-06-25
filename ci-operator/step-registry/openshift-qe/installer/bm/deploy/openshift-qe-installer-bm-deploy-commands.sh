@@ -44,6 +44,7 @@ setup_bastion_registry: false
 use_bastion_registry: false
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
+payload_url: "${RELEASE_IMAGE_LATEST}"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
@@ -174,7 +175,6 @@ fi
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
-   export PROW_IMAGE=${RELEASE_IMAGE_LATEST}
    cd ${jetlag_repo}
    source .ansible/bin/activate
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
