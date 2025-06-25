@@ -17,7 +17,7 @@ source scripts/netobserv.sh
 deploy_lokistack
 deploy_kafka
 deploy_netobserv
-createFlowCollector "-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS} EBPFSamplingRate='50'"
+createFlowCollector "-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS} EBPFSamplingRate=50"
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
