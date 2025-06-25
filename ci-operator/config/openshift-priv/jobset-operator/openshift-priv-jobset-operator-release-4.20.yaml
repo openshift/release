@@ -41,7 +41,8 @@ tag_specification:
   namespace: ocp-private
 tests:
 - as: verify
-  commands: make verify-gofmt
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+    make verify-gofmt lint
   container:
     from: src
 - as: verify-codegen
@@ -69,7 +70,7 @@ tests:
   steps:
     workflow: openshift-ci-security
 - as: e2e-aws-operator
-  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: aws-2
     test:
@@ -87,7 +88,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-operand
-  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: aws-2
     test:

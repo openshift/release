@@ -1,0 +1,45 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-ipi-kata
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: brew-catalog
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_BUILD_MD5SUM: 1d108ef4451ce8754eeea08cf12aea0a
+      KATA_RPM_BUILD_TASK: "67952818"
+      KATA_RPM_VERSION: 3.17.0-1.rhaos4.18.el9_6
+      OPERATOR_INDEX_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-fbc-4-18
+      OPERATOR_INDEX_VERSION: on-pr-ca1a164e92ae614eaf8e44e2ca8ade672802adf3
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: C00102
+      TEST_TIMEOUT: "75"
+    workflow: sandboxed-containers-operator-e2e-azure
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: downstream-candidate

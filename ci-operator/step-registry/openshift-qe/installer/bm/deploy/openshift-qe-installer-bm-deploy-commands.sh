@@ -20,6 +20,8 @@ export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
+QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
+export QUADS_INSTANCE
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -67,12 +69,13 @@ EOF
 cat > /tmp/prereqs.sh << 'EOF'
 echo "Running prereqs.sh"
 podman pull quay.io/quads/badfish:latest
-USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
+OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
+PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
+  HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
 elif [[ "$TYPE" == "sno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:2][].name")
+  HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:2][].name")
 fi
 echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
@@ -134,11 +137,6 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   done
 fi
 EOF
-if [[ $LAB == "performancelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
-elif [[ $LAB == "scalelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
-fi
 envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion

@@ -108,36 +108,60 @@ images:
     ocp_4.19_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: azure-disk-csi-driver-operator
 - dockerfile_path: Dockerfile.azure-file
   inputs:
     ocp_4.19_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: azure-file-csi-driver-operator
 - dockerfile_path: Dockerfile.openstack-cinder
   inputs:
     ocp_4.19_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: openstack-cinder-csi-driver-operator
 - dockerfile_path: Dockerfile.openstack-manila
   inputs:
     ocp_4.19_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: csi-driver-manila-operator
 - dockerfile_path: Dockerfile.samba
   inputs:
@@ -258,6 +282,30 @@ tests:
       OO_CHANNEL: stable
       TEST_SUITE: openshift/csi
     workflow: openshift-e2e-aws-csi-efs
+- as: aws-efs-cross-account-operator-e2e
+  optional: true
+  run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs-cross-account
+- as: aws-efs-sts-cross-account-operator-e2e
+  optional: true
+  run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs-sts-cross-account
 - as: aws-efs-operator-e2e-extended
   optional: true
   run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
