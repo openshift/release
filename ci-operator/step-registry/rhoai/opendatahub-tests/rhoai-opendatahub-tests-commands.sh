@@ -100,7 +100,8 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 #TEMP
-sleep 2h # Wait for the cluster to be ready
+# sleep 2h
+
 
 RUN_COMMAND="uv run pytest -m smoke tests/model_serving/model_server \
             --tc=use_unprivileged_client:False \
