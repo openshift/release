@@ -3,7 +3,7 @@ ref:
   from_image:
     namespace: ocp
     name: "4.17"
-    tag: upi-installer
+    tag: stream8
   commands: rhoai-patch-component-deployment-odh-model-controller-commands.sh
   resources:
     requests:
@@ -13,5 +13,15 @@ ref:
   - name: odh-model-controller
     env: ODH_MODEL_CONTROLLER_IMAGE
   documentation: >-
-    This step patches RHOAI odh-model-controller deployments.
-    # TODO: add kserve
+    This step deploys and patches RHOAI odh-model-controller deployments.
+    
+    First, it clones the odh-model-controller repository from the same branch 
+    that was used to build the image, runs 'kustomize build config/default > install.yaml', 
+    and applies the manifests to the cluster using 'oc apply -f install.yaml'.
+    
+    Then, if ODH_MODEL_CONTROLLER_IMAGE is provided, it patches the existing 
+    deployment to use the newly built image by scaling down the RHOAI operator 
+    and updating the deployment image.
+    
+    The branch is determined automatically from Prow environment variables 
+    (PULL_BASE_REF or PULL_PULL_REF), falling back to 'main' if not available.
