@@ -27,6 +27,8 @@ PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/ove}"
 mkdir -p "${INSTALL_DIR}"
 
+dnf install --nodocs -y skopeo xorriso podman
+
 git clone https://github.com/openshift/agent-installer-utils.git $INSTALL_DIR
 
 cd $INSTALL_DIR/tools/iso_builder/hack
