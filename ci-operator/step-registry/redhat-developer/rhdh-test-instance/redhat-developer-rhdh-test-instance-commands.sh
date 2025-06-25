@@ -61,7 +61,13 @@ gh_comment() {
 
 on_error() {
     echo "❌ An error occurred on line $LINENO. Exiting..."
-    gh_comment "❌ An error occurred on line $LINENO. Exiting..."
+    
+    [[ "$JOB_NAME" != rehearse-* ]] && URL_REPO="redhat-developer_rhdh-test-instance" || URL_REPO="openshift_release"
+    
+    gh_comment "❌ An error occurred during the deployment. Please check the logs for more details.
+
+[View logs](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${URL_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy/redhat-developer-rhdh-test-instance/build-log.txt)"
+    
 }
 
 trap 'on_error' ERR
@@ -94,29 +100,24 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-htpasswd -c -B -b users.htpasswd "$(cat /tmp/secrets/USERNAME)" "$(cat /tmp/secrets/PASSWORD)"
+htpasswd -c -B -b users.htpasswd "$(cat /tmp/secrets/CLUSTER_ADMIN_USERNAME)" "$(cat /tmp/secrets/CLUSTER_ADMIN_PASSWORD)"
 oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n openshift-config
 oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"name":"htpasswd_provider","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}'
 oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
-oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/USERNAME)"
+oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/CLUSTER_ADMIN_USERNAME)"
 
 # Extract and parse the comment
-comment_body=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments |
+comment_body=$(gh pr view "$GIT_PR_NUMBER" --repo "$REPO" --json comments |
 jq -r '.comments | reverse | map(select(.body | test("^(/pj-rehearse|/test)"))) | .[0].body')
-
 echo "Found comment: $comment_body"
 
-# Parse arguments from the comment
-# Duration is optional and defaults to 3h
 if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
-    # Split the comment into parts
     read -r -a comment_parts <<< "$comment_body"
     
-    # Check if we have the minimum required parts (at least 4: /pj-rehearse or /test, job_name, and 2 install.sh args)
     if [ ${#comment_parts[@]} -ge 4 ]; then
         # Extract install.sh arguments (skip /pj-rehearse or /test and job_name)
-        install_arg1="${comment_parts[2]}"  # helm
-        install_arg2="${comment_parts[3]}"  # 1.7-98-CI
+        install_type="${comment_parts[2]}"
+        rhdh_version="${comment_parts[3]}"
         
         # Check if duration is provided (5th argument), otherwise default to 3h
         if [ ${#comment_parts[@]} -ge 5 ]; then
@@ -125,20 +126,19 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
             time="3h"
         fi
         
-        echo "Parsed arguments: $install_arg1 $install_arg2"
+        echo "Parsed arguments: $install_type $rhdh_version"
         echo "Time duration: $time"
         
-        source ./install.sh "$install_arg1" "$install_arg2"
+        source ./install.sh "$install_type" "$rhdh_version"
     else
-        echo "Warning: Comment format incorrect. Expected: /pj-rehearse job_name_xyz helm 1.7-98-CI [3h] OR /test job_name_xyz helm 1.7-98-CI [3h]"
-        echo "Using default arguments"
-        time="3h"
-        source ./install.sh helm 1.7-98-CI
+        echo "Error: Comment format incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h"
+        echo "Example: /test deploy helm 1.7-98-CI 3h"
+        echo "Received comment: $comment_body"
+        exit 1
     fi
 else
-    echo "No matching comment found. Using default arguments"
-    time="3h"
-    source ./install.sh helm 1.7-98-CI
+    echo "Error: No matching comment found."
+    exit 1
 fi
 
 # Default time is 3h, max is 4h
@@ -160,8 +160,18 @@ else
     echo "Sleeping for 3h (${sleep_seconds} seconds)"
 fi
 
-gh_comment "RHDH BASE URL : $RHDH_BASE_URL
-OpenShift Console URL : $(oc whoami --show-console)
-Cluster available for next $hours hours
+comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
+
+🌐 **RHDH URL:** $RHDH_BASE_URL
+
+🖥️ **OpenShift Console:** [Open Console]($(oc whoami --show-console))
+
+🔑 **Cluster Credentials:** Available in [vault](https://vault.ci.openshift.org/ui/vault/secrets/kv/kv/list/selfservice/rhdh-test-instance) under \`ocp-cluster-creds\` with keys:
+   • Username: \`CLUSTER_ADMIN_USERNAME\`
+   • Password: \`CLUSTER_ADMIN_PASSWORD\`
+
+⏰ **Cluster Availability:** Next $hours hours
 "
+echo "$comment"
+gh_comment "$comment"
 sleep $sleep_seconds
