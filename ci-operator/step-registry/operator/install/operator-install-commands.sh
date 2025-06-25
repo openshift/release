@@ -56,4 +56,5 @@ if [ "${COLLECT_MUST_GATHER}" = "true" ]; then
   RUN_COMMAND+=" --must-gather-output-dir=${ARTIFACT_DIR} "
 fi
 
-${RUN_COMMAND}
+echo $RUN_COMMAND
+eval "$RUN_COMMAND"

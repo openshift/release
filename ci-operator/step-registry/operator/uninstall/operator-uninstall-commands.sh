@@ -31,4 +31,5 @@ fi
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
-${RUN_COMMAND}
+echo $RUN_COMMAND
+eval "$RUN_COMMAND"
