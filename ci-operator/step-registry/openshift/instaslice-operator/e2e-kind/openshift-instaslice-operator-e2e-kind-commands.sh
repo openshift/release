@@ -81,6 +81,7 @@ gcloud compute ssh "$VM_NAME" --zone="$GOOGLE_COMPUTE_ZONE" --command='
   sudo apt install gcc make git ginkgo skopeo -y
 
   # NVIDIA Driver Ubuntu installation
+  export DEBIAN_FRONTEND=noninteractive
   sudo apt install linux-headers-$(uname -r) -y
   export distro=ubuntu2404 arch=x86_64 arch_ext=amd64
   wget https://developer.download.nvidia.com/compute/cuda/repos/$distro/$arch/cuda-keyring_1.1-1_all.deb
