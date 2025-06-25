@@ -127,7 +127,11 @@ images:
     FROM this-is-ignored-and-not-used
     RUN set -x && \
         curl -skL https://repository-basic.engineering.redhat.com/nexus/repository/dno-raw/droute-client/latest/droute-linux-amd64 -o /usr/local/bin/droute && \
-        chmod +x /usr/local/bin/droute
+        chmod +x /usr/local/bin/droute && \
+        pushd /etc/pki/ca-trust/source/anchors && \
+        curl -skL -O https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem && \
+        update-ca-trust extract && \
+        popd
   from: ci_tests-private-base
   to: datarouter
 - dockerfile_literal: |
