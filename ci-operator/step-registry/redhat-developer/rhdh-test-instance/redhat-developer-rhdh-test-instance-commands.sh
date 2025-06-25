@@ -37,7 +37,15 @@ for file in /tmp/secrets/*; do
 done
 
 # Install & login to gh cli
-GH_VERSION=2.49.0 && curl -sL https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz | tar xz && export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+GH_VERSION=2.49.0
+echo "Installing GitHub CLI version ${GH_VERSION}..."
+curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" | tar xz -C /tmp
+if [ ! -f "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" ]; then
+    echo "Failed to install GitHub CLI"
+    exit 1
+fi
+export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+echo "GitHub CLI installed successfully. Version: $(gh --version)"
 echo "$(cat /tmp/secrets/GH_BOT_PAT)" | gh auth login --with-token
 
 if [[ "$JOB_NAME" != rehearse-* ]]; then
