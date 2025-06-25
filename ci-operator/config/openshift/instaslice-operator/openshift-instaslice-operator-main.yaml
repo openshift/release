@@ -74,13 +74,9 @@ tests:
   optional: true
   steps:
     cluster_profile: gcp
-    dependencies:
-      INSTASLICE_CONTROLLER_IMG: instaslice-controller
-      INSTASLICE_DAEMONSET_IMG: instaslice-daemonset
     env:
       CONTROL_PLANE_NODE_TYPE: a2-highgpu-1g
       CONTROL_PLANE_ZONES: '[us-central1-f]'
-      OO_INSTALL_NAMESPACE: instaslice-system
     pre:
     - chain: ipi-conf-gcp
     - ref: single-node-conf-gcp
@@ -89,7 +85,26 @@ tests:
     - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - ref: openshift-instaslice-operator-e2e-sno
+    - ref: wait
+    workflow: ipi-gcp-single-node
+- as: e2e-sno-gpu-fips
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: a2-highgpu-1g
+      CONTROL_PLANE_ZONES: '[us-central1-f]'
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: single-node-conf-gcp
+    - ref: ipi-conf-gcp-zones
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
+    test:
+    - ref: wait
+    workflow: ipi-gcp-single-node
 - as: e2e-kind-gpu
   optional: true
   steps:
