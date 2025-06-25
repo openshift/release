@@ -29,7 +29,7 @@ mkdir -p "${INSTALL_DIR}"
 
 git clone https://github.com/openshift/agent-installer-utils.git $INSTALL_DIR
 
-cd $INSTALL_DIR/agent-installer-utils/tools/iso_builder/hack
+cd $INSTALL_DIR/tools/iso_builder/hack
 
 
 ./build-ove-image.sh --release-image-url "${OPENSHIFT_INSTALL_RELEASE_IMAGE}" \
