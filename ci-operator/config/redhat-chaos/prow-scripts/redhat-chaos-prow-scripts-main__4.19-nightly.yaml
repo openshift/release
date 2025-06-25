@@ -650,6 +650,56 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
   timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-ibm-cloud-node-tests-compact
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      CHURN: "true"
+      COMPUTE_NODE_TYPE: bx2-4x16
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: compact
+      WAIT_DURATION: "600"
+      WORKERS: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - ref: ibmcloud-provision-blockstorage
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- always_run: false
+  as: krkn-hub-ibm-cloud-node-tests-large
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      CHURN: "true"
+      COMPUTE_NODE_TYPE: bx2-4x16
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      WAIT_DURATION: "600"
+      WORKERS: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - ref: ibmcloud-provision-blockstorage
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
