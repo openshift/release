@@ -1,0 +1,92 @@
+base_images:
+  ansible:
+    name: "4.19"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.19"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: candidate
+      version: "4.19"
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.19"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-disc-priv-f28
+  cron: 11 0 2 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-24663
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+zz_generated_metadata:
+  branch: prow-job-OCPQE-30011
+  org: openshift
+  repo: openshift-tests-private
