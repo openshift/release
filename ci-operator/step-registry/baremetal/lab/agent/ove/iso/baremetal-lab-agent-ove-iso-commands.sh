@@ -24,10 +24,12 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
+INSTALL_DIR="${INSTALL_DIR:-/tmp/ove}"
+mkdir -p "${INSTALL_DIR}"
 
-git clone https://github.com/openshift/agent-installer-utils.git
+git clone https://github.com/openshift/agent-installer-utils.git $INSTALL_DIR
 
-cd agent-installer-utils/tools/iso_builder/hack
+cd $INSTALL_DIR/agent-installer-utils/tools/iso_builder/hack
 
 
 ./build-ove-image.sh --release-image-url "${OPENSHIFT_INSTALL_RELEASE_IMAGE}" \
