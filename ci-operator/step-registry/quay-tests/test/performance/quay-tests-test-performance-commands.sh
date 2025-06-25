@@ -14,6 +14,7 @@ ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
 echo "QUAY_ROUTE: $QUAY_ROUTE $QUAY_OAUTH_TOKEN"
+echo "sys env: ${PUSH_PULL_NUMBERS} ${CONCURRENCY} ${TEST_PHASES}"
 
 #Create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
@@ -34,7 +35,8 @@ oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_names
 # 2, Deploy Quay performance test job
 
 QUAY_ROUTE=${QUAY_ROUTE#https://} #remove "https://"
-cat <<EOF | oc apply -f -
+# cat <<EOF | oc apply -f -
+cat <<EOF > /tmp/testjob.yaml
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -146,6 +148,9 @@ spec:
 
 EOF
 
+cat /tmp/testjob.yaml
+oc apply -f /tmp/testjob.yaml
+
 echo "the Perf Job needs about 2~3 hours to complete"
 echo "check the OCP Quay Perf Job, if it complete, go to AWS OpenSearch to generate index pattern and get Quay Perf metrics"
 
@@ -178,6 +183,7 @@ date
 
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "job end $end_time and status $JOB_STATUS"
+sleep 3h
 
 # 4, Send the performance test data to ELK
 # original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
