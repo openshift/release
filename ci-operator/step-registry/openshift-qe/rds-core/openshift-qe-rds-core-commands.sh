@@ -25,4 +25,4 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 
 UUID=$(uuidgen)
 
-WORKLOAD=rds-core EXTRA_FLAGS="--uuid=${UUID} --gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
+WORKLOAD=rds-core EXTRA_FLAGS="--uuid=${UUID} --gc=${GC} --iterations=${ITERATIONS} --churn=${CHURN} --perf-profile=cpt-pao --alerting=true --check-health=true --profile-type=${PROFILE_TYPE}" ./run.sh
