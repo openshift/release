@@ -187,7 +187,7 @@ function wait_clusteroperators_continous_success() {
             continous_successful_check=0
         fi
 	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
-	console_route=`oc -n openshift-console get route -ojsonpath={.items[].status.ingress[].host}`
+	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
 	curl -k -Is https://${console_route}/ | head -n 1;
         sleep 60
         (( try += 1 ))
@@ -277,7 +277,7 @@ function wait_mcp_continous_success() {
         fi
         echo "wait and retry..."
 	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
-	console_route=`oc -n openshift-console get route -ojsonpath={.items[].status.ingress[].host}`
+	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
         curl -k -Is https://${console_route}/ | head -n 1;
         sleep ${interval}
         (( try += 1 ))
