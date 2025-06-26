@@ -142,12 +142,12 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
 
 ### 📋 Expected Format:
 \`\`\`
-/test deploy (helm or operator) (1.7-98-CI or next or 1.7) [duration]
+/test deploy [helm or operator] [Helm chart or Operator version] [duration]
 \`\`\`
 
 ### ✨ Examples:
 - \`/test deploy helm 1.7 3h\`
-- \`/test deploy operator next 2h\`
+- \`/test deploy operator 1.6 2h\`
 - \`/test deploy helm 1.7-98-CI\` (defaults to 3h)
 
 Please correct the command format and try again! 🚀"
