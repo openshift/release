@@ -131,15 +131,16 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
         
         source ./install.sh "$install_type" "$rhdh_version"
     else
-        echo "Error: Comment format incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h"
-        echo "Example: /test deploy helm 1.7-98-CI 3h"
+        echo "❌ Error: Unable to trigger deployment command format is incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h"
+        echo "Example: /test deploy helm 1.7 3h"
         echo "Received comment: $comment_body"
-        gh_comment "❌ Error: Comment format incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h"
+        gh_comment "❌ Error: Unable to trigger deployment command format is incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h
+        Example: /test deploy helm 1.7 3h"
         exit 1
     fi
 else
-    echo "Error: No matching comment found."
-    gh_comment "❌ No matching comment found. Please check the comment format."
+    echo "❌ Error: Unable to trigger deployment. No matching comment found. Please check the comment format."
+    gh_comment "❌ Error: Unable to trigger deployment. No matching comment found. Please check the comment format."
     exit 1
 fi
 
