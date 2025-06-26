@@ -64,9 +64,11 @@ on_error() {
     
     [[ "$JOB_NAME" != rehearse-* ]] && URL_REPO="redhat-developer_rhdh-test-instance" || URL_REPO="openshift_release"
     
-    gh_comment "❌ An error occurred during the deployment. Please check the logs for more details.
+    gh_comment "## 💥 Deployment Failed
 
-[View logs](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${URL_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy/redhat-developer-rhdh-test-instance/build-log.txt)"
+🚨 **RHDH deployment encountered an error**
+
+📊 [**View Build Logs**](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${URL_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy/redhat-developer-rhdh-test-instance/build-log.txt) for details"
     
 }
 
@@ -102,7 +104,7 @@ fi
 
 htpasswd -c -B -b users.htpasswd "$(cat /tmp/secrets/CLUSTER_ADMIN_USERNAME)" "$(cat /tmp/secrets/CLUSTER_ADMIN_PASSWORD)"
 oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n openshift-config
-oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"name":"htpasswd_provider","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}'
+oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"name":"cluster_admin","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}'
 oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
 oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/CLUSTER_ADMIN_USERNAME)"
 
@@ -134,8 +136,21 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
         echo "❌ Error: Unable to trigger deployment command format is incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h"
         echo "Example: /test deploy helm 1.7 3h"
         echo "Received comment: $comment_body"
-        gh_comment "❌ Error: Unable to trigger deployment command format is incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h
-        Example: /test deploy helm 1.7 3h"
+        gh_comment "## ❌ Deployment Command Error
+
+🚨 **Unable to trigger deployment** - Command format is incorrect.
+
+### 📋 Expected Format:
+\`\`\`
+/test deploy (helm or operator) (1.7-98-CI or next or 1.7) [duration]
+\`\`\`
+
+### ✨ Examples:
+- \`/test deploy helm 1.7 3h\`
+- \`/test deploy operator next 2h\`
+- \`/test deploy helm 1.7-98-CI\` (defaults to 3h)
+
+Please correct the command format and try again! 🚀"
         exit 1
     fi
 else
