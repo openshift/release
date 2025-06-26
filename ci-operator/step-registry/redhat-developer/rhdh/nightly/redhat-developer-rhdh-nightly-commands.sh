@@ -143,26 +143,33 @@ else
     done
 fi
 
-# if [[ "$JOB_NAME" == *sealight* ]]; then
-#     # Create a directory for cosign
-#     mkdir -p /tmp/cosign-client
-#     curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 && chmod +x /tmp/cosign-client/cosign
-#     export PATH=/tmp/cosign-client:$PATH
+if [[ "$JOB_NAME" == *sealight* ]]; then
+    # Create a directory for cosign
+    mkdir -p /tmp/cosign-client
+    curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 && chmod +x /tmp/cosign-client/cosign
+    export PATH=/tmp/cosign-client:$PATH
 
-#     COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
-#     cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
-#     SL_CONTAINER_IMAGE="$(jq -r '
-#             .payload
-#             | @base64d
-#             | fromjson
-#             | .predicate.buildConfig.tasks[]
-#             | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
-#             | .invocation.parameters.IMAGE
-#           ' cosign_metadata.json)"
+    COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
+    cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
+    SL_BSID="$(jq -r \
+            '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
+            select(.invocation.environment.labels."konflux-ci/sealights" == "true")
+            | .results[] | select(.name == "sealights-bsid") | .value' \
+            cosign_metadata.json)"
+    echo "SL_BSID: $SL_BSID"
+    SL_CONTAINER_IMAGE="$(jq -r '
+            .payload
+            | @base64d
+            | fromjson
+            | .predicate.buildConfig.tasks[]
+            | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
+            | .invocation.parameters.IMAGE
+          ' cosign_metadata.json)"
+    echo "SL_CONTAINER_IMAGE: $SL_CONTAINER_IMAGE"
 
-#     QUAY_REPO=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f1 | sed 's|quay.io/||')
-#     TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2)
-# fi
+    QUAY_REPO=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f1 | sed 's|quay.io/||' | head -n1)
+    TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2 | head -n1)
+fi
 
 echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
