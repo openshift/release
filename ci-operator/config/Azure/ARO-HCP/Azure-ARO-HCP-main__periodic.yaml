@@ -1,0 +1,46 @@
+base_images:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+binary_build_commands: GO_COMPLIANCE_INFO=0 make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN cat /etc/dnf/dnf.conf || true
+    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
+    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
+    RUN dnf install -y azure-cli
+  from: src
+  to: src-plus-az
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+tests:
+- as: create-aro-hcp-in-integration
+  cron: '@daily'
+  steps:
+    env:
+      CLUSTER_NAME: periodic-integration-cluster
+      CUSTOMER_RG_NAME: periodic-integration-customer-rg
+      LOCATION: uksouth
+      SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+    test:
+    - chain: aro-hcp-provision-create-functional-cluster
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: periodic
