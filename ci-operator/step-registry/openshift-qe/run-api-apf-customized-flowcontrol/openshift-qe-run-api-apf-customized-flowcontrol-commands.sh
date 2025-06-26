@@ -15,7 +15,7 @@ set -o pipefail
 
 REPLICAS=${REPLICAS:=3}
 namespace="test"
-apf_api_version="flowcontrol.apiserver.k8s.io/v1beta3"
+apf_api_version="flowcontrol.apiserver.k8s.io/v1"
 error_count=0
 log_count=0
 
