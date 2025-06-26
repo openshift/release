@@ -9,10 +9,10 @@ oc config view
 oc projects
 python --version
 
+ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
 ES_PASSWORD=$(cat "/secret/password")
-export ES_PASSWORD
 ES_USERNAME=$(cat "/secret/username")
-export ES_USERNAME
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 # If running from the one folder, will reset SCRIPT and PARAMETERS variables
 export SCRIPT=${SCRIPT_1:-$SCRIPT}
