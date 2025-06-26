@@ -151,12 +151,12 @@ if [[ "$JOB_NAME" == *sealight* ]]; then
 
     COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
     cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
-    SL_BSID="$(jq -r \
+    export SL_BUILD_SESSION_ID="$(jq -r \
             '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
             select(.invocation.environment.labels."konflux-ci/sealights" == "true")
             | .results[] | select(.name == "sealights-bsid") | .value' \
             cosign_metadata.json)"
-    echo "SL_BSID: $SL_BSID"
+    echo "SL_BSID: $SL_BUILD_SESSION_ID"
     SL_CONTAINER_IMAGE="$(jq -r '
             .payload
             | @base64d
