@@ -114,7 +114,7 @@ echo "Found comment: $comment_body"
 if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
     read -r -a comment_parts <<< "$comment_body"
     
-    if [ ${#comment_parts[@]} -ge 4 ]; then
+    if [ ${#comment_parts[@]} -ge 4 ] && [[ "${comment_parts[2]}" == "helm" || "${comment_parts[2]}" == "operator" ]]; then
         # Extract install.sh arguments (skip /pj-rehearse or /test and job_name)
         install_type="${comment_parts[2]}"
         rhdh_version="${comment_parts[3]}"
