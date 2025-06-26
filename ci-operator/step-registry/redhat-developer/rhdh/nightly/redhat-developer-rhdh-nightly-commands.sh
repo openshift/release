@@ -163,9 +163,11 @@ if [[ "$JOB_NAME" == *sealight* ]]; then
             .payload
             | @base64d
             | fromjson
-            | .predicate.buildConfig.tasks[]
-            | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
-            | .invocation.parameters.IMAGE
+            | first(
+              .predicate.buildConfig.tasks[]
+              | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
+              | .invocation.parameters.IMAGE
+              )
           ' cosign_metadata.json)"
     echo "SL_CONTAINER_IMAGE: $SL_CONTAINER_IMAGE"
 
