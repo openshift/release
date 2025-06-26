@@ -43,7 +43,7 @@ echo "Latest Git commits:"
 git log --oneline -5
 echo "Git status:"
 git status
-export OPERATOR_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}"
+export OPERATOR_IMAGE="quay.io/rh-pbhojara/testrepo/kueue-operator:latest"
 echo "export OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> "${SHARED_DIR}/env"
 
 REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-1-0"
