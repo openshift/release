@@ -143,6 +143,8 @@ else
     done
 fi
 
+export SL_BUILD_SESSION_ID
+
 if [[ "$JOB_NAME" == *sealight* ]]; then
     # Create a directory for cosign
     mkdir -p /tmp/cosign-client
@@ -151,7 +153,7 @@ if [[ "$JOB_NAME" == *sealight* ]]; then
 
     COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
     cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
-    export SL_BUILD_SESSION_ID="$(jq -r \
+    SL_BUILD_SESSION_ID="$(jq -r \
             '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
             select(.invocation.environment.labels."konflux-ci/sealights" == "true")
             | .results[] | select(.name == "sealights-bsid") | .value' \
