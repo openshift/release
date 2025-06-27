@@ -49,6 +49,8 @@ function check_failed_operator(){
             failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
             failing_operators="${failing_operator} ${failing_operators}"
+        elif [[ ${failing_status} == "Unknown" ]]; then
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'waiting on \K.*?(?= over)'|tr -d ',') || true
         else
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || \
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting up to 40 minutes on \K.*'|tr -d ',') || \
@@ -236,6 +238,49 @@ function cco_annotation(){
     fi
 }
 
+function disable_boot_image_update() {
+    # Get current machineManagers value
+    local current_value
+    current_value=$(oc get MachineConfiguration cluster -n openshift-machine-config-operator -o jsonpath='{.spec.managedBootImages.machineManagers}' 2>/dev/null)
+    local get_status=$?
+
+    if [ $get_status -ne 0 ]; then
+        echo "Error: Failed to get current MachineConfiguration. Check cluster access."
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+
+    # Check if the value is already empty array
+    if [[ "$current_value" == "[]" ]]; then
+        echo "machineManagers is already configured as empty array. No changes needed."
+        return 0
+    fi
+
+    echo "Current machineManagers value: $current_value"
+    echo "Disabling updated boot images by editing MachineConfiguration..."
+
+    # Edit the MachineConfiguration to disable boot image updates
+    if ! oc patch MachineConfiguration cluster --type=merge --patch '{"spec":{"managedBootImages":{"machineManagers":[]}}}' -n openshift-machine-config-operator; then
+        echo "Error: Failed to patch MachineConfiguration."
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+
+    # Verify the change
+    echo "Verifying the change..."
+    local new_value
+    new_value=$(oc get MachineConfiguration cluster -n openshift-machine-config-operator -o jsonpath='{.spec.managedBootImages.machineManagers}')
+
+    if [[ "$new_value" == "[]" ]]; then
+        echo "Successfully disabled boot image update."
+        return 0
+    else
+        echo "Error: Failed to update machineManagers. Current value: $new_value"
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+}
+
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
@@ -386,8 +431,8 @@ function upgrade() {
             echo "Current cluster is on ${cluster_src_ver}"
         fi
         echo "Negative Testing: upgrade to an unsigned image without --force option"
-        admin_ack
-        cco_annotation
+        admin_ack "${SOURCE_VERSION}" "${TARGET_VERSION}"
+        cco_annotation "${SOURCE_VERSION}" "${TARGET_VERSION}"
         run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade"
         error_check_invalid_image
         clear_upgrade
@@ -440,17 +485,6 @@ function check_upgrade_status() {
     echo -e "Upgrade checking start at $(date "+%F %T")\n"
     start_time=$(date "+%s")
 
-    # https://issues.redhat.com//browse/OTA-861
-    # When upgrade is processing, Upgradeable will be set to false
-    sleep 60 # while waiting for condition to populate
-    local case_id="OCP-25473"
-    if [[ "$TARGET_MINOR_VERSION" -gt 18 ]] && [[ "$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].status}')" != "False" ]]; then
-        echo "Error: ${case_id} As OTA-861 designed, Upgradeable should be set to False when an upgrade is in progress, but actually not"
-        export UPGRADE_FAILURE_TYPE="${case_id}"
-        export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
-        return 1
-    fi
-
     # print once to log (including full messages)
     oc adm upgrade || true
     # log oc adm upgrade (excluding garbage messages)
@@ -478,6 +512,17 @@ function check_upgrade_status() {
             end_time=$(date "+%s")
             echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
             return 0
+        fi
+        if [[ ${progress} == "True" ]] && \
+            [[ "$TARGET_MINOR_VERSION" -gt 18 ]] && \
+            [[ "$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].status}')" != "False" ]]; then
+            # https://issues.redhat.com//browse/OTA-861
+            # When upgrade is processing, Upgradeable will be set to false
+            local case_id="OCP-25473"
+            echo "Error: ${case_id} As OTA-861 designed, Upgradeable should be set to False when an upgrade is in progress, but actually not"
+            export UPGRADE_FAILURE_TYPE="${case_id}"
+            export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
+            return 1
         fi
         if [ "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" ] &&  check_ota_case_enabled "OCP-73352"; then
             # "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" is used to make sure run check_upgrade_recommend_when_upgrade_inprogress once
@@ -590,6 +635,21 @@ fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc
 fi
+if [[ "${DISABLE_BOOT_IMAGE_UPDATE}" == "true" ]]; then
+    #Disable updated boot images feature for jobs with custom boot image specified in certain upgrade paths
+    echo "Checking conditions for disabling boot image updates..."
+
+    # Get platform
+    PLATFORM=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+
+    # Check all conditions
+    if [[ "${TARGET_MINOR_VERSION}" == "19" ]] && [[ "${PLATFORM}" =~ ^(AWS|GCP)$ ]]; then
+        disable_boot_image_update
+    else
+        echo "Skipping boot image update disablement."
+    fi
+fi
+
 upgrade
 check_upgrade_status
 

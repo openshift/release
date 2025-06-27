@@ -16,9 +16,12 @@ PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
 BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
+QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
+export QUADS_INSTANCE
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -66,12 +69,13 @@ EOF
 cat > /tmp/prereqs.sh << 'EOF'
 echo "Running prereqs.sh"
 podman pull quay.io/quads/badfish:latest
-USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
+OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
+PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
+  HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
 elif [[ "$TYPE" == "sno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:2][].name")
+  HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:2][].name")
 fi
 echo "Hosts to be prepared: $HOSTS"
 # IDRAC reset
@@ -92,7 +96,7 @@ if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
     echo "Modifying PXE loader of server $i ..."
-    hammer --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
+    hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
   done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
@@ -133,12 +137,7 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   done
 fi
 EOF
-if [[ $LAB == "performancelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
-elif [[ $LAB == "scalelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
-fi
-envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)

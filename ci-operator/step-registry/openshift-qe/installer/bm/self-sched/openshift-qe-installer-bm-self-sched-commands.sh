@@ -7,15 +7,8 @@ set -x
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
-quads_pwd=$(cat "/secret/quads_pwd")
-
-if [[ $LAB == "performancelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com"
-elif [[ $LAB == "scalelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com"
-elif [[ $LAB == "scalelab-stage" ]]; then
-  export QUADS_INSTANCE="https://quads2-stage.rdu2.scalelab.redhat.com"
-fi
+quads_pwd=$(cat "${CLUSTER_PROFILE_DIR}/quads_pwd")
+QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 
 # Login to get token
 set +x
