@@ -160,21 +160,22 @@ fi
 
 # Default time is 3h, max is 4h
 max_time=4
+default_time=3
 
 # Parse time and convert to seconds
-if [[ $time =~ ^([0-9]+)h$ ]]; then
+if [[ $time =~ ^([0-9]+(\.[0-9]+)?)h$ ]]; then
     hours=${BASH_REMATCH[1]}
     # Enforce maximum hours
-    if [ $hours -gt $max_time ]; then
+    if (( $(echo "$hours > $max_time" | bc -l) )); then
         echo "Warning: Time $time exceeds maximum of $max_time h, using $max_time h instead"
         hours=$max_time
     fi
-    sleep_seconds=$((hours * 3600))
+    sleep_seconds=$(echo "$hours * 3600" | bc | cut -d. -f1)
     echo "Sleeping for ${hours}h (${sleep_seconds} seconds)"
 else
-    echo "Warning: Invalid time format '$time', using default 4h"
-    sleep_seconds=$((3 * 3600))
-    echo "Sleeping for 3h (${sleep_seconds} seconds)"
+    echo "Warning: Invalid time format '$time', using default $default_time h"
+    sleep_seconds=$((default_time * 3600))
+    echo "Sleeping for $default_time h (${sleep_seconds} seconds)"
 fi
 
 comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
