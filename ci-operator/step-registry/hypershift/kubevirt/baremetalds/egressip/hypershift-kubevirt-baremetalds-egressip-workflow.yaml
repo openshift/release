@@ -1,0 +1,56 @@
+workflow:
+  as: hypershift-kubevirt-baremetalds-egressip
+  documentation: |-
+    The HyperShift KubeVirt egressIP workflow executes egressIP-specific tests against a new ephemeral
+    HyperShift cluster on baremetal infrastructure. This workflow focuses specifically on testing
+    egressIP functionality in the hypershift+kubevirt environment.
+
+    The workflow:
+    1. Sets up a baremetal environment with required operators (LVM, MetalLB, ODF)
+    2. Installs HyperShift and KubeVirt
+    3. Creates a hosted cluster with KubeVirt provider
+    4. Runs egressIP conformance tests
+    5. Cleans up resources
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+    Learn more about egressIP here: https://docs.openshift.com/container-platform/latest/networking/ovn_kubernetes_network_provider/configuring-egress-ip-ovn.html
+  steps:
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: hypershift-kubevirt-destroy
+    - chain: baremetalds-ipi-post
+    test:
+    - ref: hypershift-kubevirt-egressip-test
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    env:
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-15
+      ETCD_STORAGE_CLASS: lvms-vg1
+      TEST_ARGS: '--run [sig-network][Feature:EgressIP]'
+      TEST_SUITE: 'openshift/conformance/serial'
+      PACKET_OS: rocky_9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G 
