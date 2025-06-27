@@ -169,13 +169,11 @@ if [[ $time =~ ^([0-9]+(\.[0-9]+)?)h$ ]]; then
     if (( $(awk "BEGIN {print ($hours > $max_time)}") )); then
         echo "Warning: Time $time exceeds maximum of $max_time h, using ${max_time}h instead"
         time="${max_time}h"
-        hours=$max_time
     fi
     echo "Sleeping for $time"
 else
     echo "Warning: Invalid time format '$time', using default ${default_time}h"
     time="${default_time}h"
-    hours=$default_time
     echo "Sleeping for $time"
 fi
 
