@@ -89,3 +89,20 @@ echo "Deploying RHDH"
 
 export RHDH_NAMESPACE=rhdh-test-main
 bash apply.sh --keycloak
+cd .. || exit 1
+
+export PLAYWRIGHT_URL RHDH_USER RHDH_PASSWORD
+PLAYWRIGHT_URL="https://rhdh-${RHDH_NAMESPACE}.$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}')"
+RHDH_USER=$(cat /usr/local/lightspeed-plugin/rhdh-user)
+RHDH_PASSWORD=$(cat /usr/local/lightspeed-plugin/rhdh-password)
+
+# TODO make configurable with fork and refs
+git clone https://github.com/jrichter1/rhdh-plugins
+cd rhdh-plugins/workspaces/lightspeed || exit 1
+git checkout lightspeed-e2e
+
+yarn
+yarn playwright install chrome
+yarn playwright test
+
+cp -a e2e-test-report/* ${ARTIFACT_DIR}
