@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
   ocp_builder_rhel-9-base-openshift-4.19:
     name: builder
     namespace: ocp
@@ -28,6 +32,18 @@ images:
     RUN dnf install -y skopeo git && dnf clean all
   from: src
   to: kueue-operator-src
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
 resources:
   '*':
     requests:
@@ -73,24 +89,29 @@ tests:
     version: "4.17"
   steps:
     test:
+    - ref: kueue-operator-image-env-setup
+    - as: run-sdk
+      commands: |
+        source "${SHARED_DIR}/env"
+        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+      env:
+      - default: /shared
+        name: SHARED_DIR
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - ref: kueue-operator-image-patch
     - as: e2e-kueue
       cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
+      commands: |
+        source "${SHARED_DIR}/env"
         make e2e-ci-test
+      env:
+      - default: /shared
+        name: SHARED_DIR
       from: kueue-operator-src
       resources:
         requests:
@@ -106,24 +127,29 @@ tests:
     version: "4.17"
   steps:
     test:
+    - ref: kueue-operator-image-env-setup
+    - as: run-sdk
+      commands: |
+        source "${SHARED_DIR}/env"
+        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+      env:
+      - default: /shared
+        name: SHARED_DIR
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - ref: kueue-operator-image-patch
     - as: e2e-kueue
       cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
+      commands: |
+        source "${SHARED_DIR}/env"
         make e2e-upstream-test
+      env:
+      - default: /shared
+        name: SHARED_DIR
       from: kueue-operator-src
       resources:
         requests:
@@ -140,79 +166,7 @@ tests:
   optional: true
   steps:
     test:
-    - as: image-gather
-      cli: latest
-      commands: |
-        set -xe
-
-        echo "Applying ImageDigestMirrorSet and ImageTagMirrorSet..."
-
-        oc apply -f - <<EOF
-        apiVersion: config.openshift.io/v1
-        kind: ImageDigestMirrorSet
-        metadata:
-          name: kueue-digest-mirrorset
-        spec:
-          imageDigestMirrors:
-            - mirrors:
-                - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
-              source: registry.redhat.io/kueue-tech-preview/kueue-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
-              source: registry.redhat.io/kueue-tech-preview/kueue-rhel9
-        EOF
-
-        oc apply -f - <<EOF
-        apiVersion: config.openshift.io/v1
-        kind: ImageTagMirrorSet
-        metadata:
-          name: kueue-mirrorset
-        spec:
-          imageTagMirrors:
-            - mirrors:
-                - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
-              source: registry.redhat.io/kueue-tech-preview/kueue-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
-              source: registry.redhat.io/kueue-tech-preview/kueue-rhel9
-        EOF
-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
-        echo "export OPERATOR_IMAGE=$OPERATOR_IMAGE" >> "${SHARED_DIR}/env"
-
-
-        REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-1-0"
-        BUNDLE_IMAGE=$(skopeo list-tags docker://$REPO | jq -r '.Tags[]' | grep -E '^[a-f0-9]{40}$' | while read -r tag; do
-          created=$(skopeo inspect docker://$REPO:$tag 2>/dev/null | jq -r '.Created')
-          if [ "$created" != "null" ] && [ -n "$created" ]; then echo "$created $tag"; fi
-        done | sort | tail -n1 | awk -v repo="$REPO" '{print repo ":" $2}')
-
-        echo "Resolved BUNDLE_IMAGE: $BUNDLE_IMAGE"
-        echo "export BUNDLE_IMAGE=$BUNDLE_IMAGE" >> "${SHARED_DIR}/env"
-
-        oc create namespace openshift-kueue-operator
-        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
+    - ref: kueue-operator-image-env-setup
     - as: run-sdk
       commands: |
         source "${SHARED_DIR}/env"
@@ -226,14 +180,11 @@ tests:
         requests:
           cpu: 200m
           memory: 300Mi
+    - ref: kueue-operator-image-patch
     - as: e2e-kueue
       cli: latest
       commands: |
         source "${SHARED_DIR}/env"
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}')
-        oc patch csv -n openshift-kueue-operator $CSV --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$OPERATOR_IMAGE\"}]"
         make e2e-ci-test
       env:
       - default: /shared
@@ -254,24 +205,29 @@ tests:
   optional: true
   steps:
     test:
+    - ref: kueue-operator-image-env-setup
+    - as: run-sdk
+      commands: |
+        source "${SHARED_DIR}/env"
+        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+      env:
+      - default: /shared
+        name: SHARED_DIR
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - ref: kueue-operator-image-patch
     - as: e2e-kueue
       cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
+      commands: |
+        source "${SHARED_DIR}/env"
         make e2e-upstream-test
+      env:
+      - default: /shared
+        name: SHARED_DIR
       from: kueue-operator-src
       resources:
         requests:
@@ -288,24 +244,29 @@ tests:
   optional: true
   steps:
     test:
+    - ref: kueue-operator-image-env-setup
+    - as: run-sdk
+      commands: |
+        source "${SHARED_DIR}/env"
+        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+      env:
+      - default: /shared
+        name: SHARED_DIR
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - ref: kueue-operator-image-patch
     - as: e2e-kueue
       cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
+      commands: |
+        source "${SHARED_DIR}/env"
         make e2e-ci-test
+      env:
+      - default: /shared
+        name: SHARED_DIR
       from: kueue-operator-src
       resources:
         requests:
@@ -322,24 +283,29 @@ tests:
   optional: true
   steps:
     test:
+    - ref: kueue-operator-image-env-setup
+    - as: run-sdk
+      commands: |
+        source "${SHARED_DIR}/env"
+        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+      env:
+      - default: /shared
+        name: SHARED_DIR
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - ref: kueue-operator-image-patch
     - as: e2e-kueue
       cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
+      commands: |
+        source "${SHARED_DIR}/env"
         make e2e-upstream-test
+      env:
+      - default: /shared
+        name: SHARED_DIR
       from: kueue-operator-src
       resources:
         requests:
