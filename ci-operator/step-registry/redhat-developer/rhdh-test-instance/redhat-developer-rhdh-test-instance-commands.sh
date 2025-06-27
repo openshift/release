@@ -10,8 +10,7 @@ cd /tmp || exit
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME RELEASE_BRANCH_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
-# GITHUB_ORG_NAME="redhat-developer"
-GITHUB_ORG_NAME="subhashkhileri"
+GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh-test-instance"
 
 # Get the base branch name based on job.
@@ -163,20 +162,21 @@ fi
 max_time=4
 default_time=3
 
-# Parse time and convert to seconds
+# Parse and validate time format
 if [[ $time =~ ^([0-9]+(\.[0-9]+)?)h$ ]]; then
     hours=${BASH_REMATCH[1]}
     # Enforce maximum hours
-    if (( $(echo "$hours > $max_time" | bc -l) )); then
-        echo "Warning: Time $time exceeds maximum of $max_time h, using $max_time h instead"
+    if (( $(awk "BEGIN {print ($hours > $max_time)}") )); then
+        echo "Warning: Time $time exceeds maximum of $max_time h, using ${max_time}h instead"
+        time="${max_time}h"
         hours=$max_time
     fi
-    sleep_seconds=$(echo "$hours * 3600" | bc | cut -d. -f1)
-    echo "Sleeping for ${hours}h (${sleep_seconds} seconds)"
+    echo "Sleeping for $time"
 else
-    echo "Warning: Invalid time format '$time', using default $default_time h"
-    sleep_seconds=$((default_time * 3600))
-    echo "Sleeping for $default_time h (${sleep_seconds} seconds)"
+    echo "Warning: Invalid time format '$time', using default ${default_time}h"
+    time="${default_time}h"
+    hours=$default_time
+    echo "Sleeping for $time"
 fi
 
 comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
@@ -193,4 +193,4 @@ comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
 "
 echo "$comment"
 gh_comment "$comment"
-sleep $sleep_seconds
+sleep $time
