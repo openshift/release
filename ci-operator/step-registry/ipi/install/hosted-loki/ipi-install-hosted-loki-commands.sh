@@ -35,7 +35,7 @@ then
 fi
 
 export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
-export PROMTAIL_VERSION="v2.9.8"
+export PROMTAIL_VERSION="v3.4.3"
 # openshift-trt taken from the tenants list in the LokiStack CR on DPCR:
 export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
 
