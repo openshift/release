@@ -44,6 +44,17 @@ releases:
       include_built_images: true
       name: "4.19"
       namespace: ocp
+  # arm64-latest:
+  #   candidate:
+  #     architecture: arm64
+  #     product: ocp
+  #     stream: nightly
+  #     version: "4.19"
+  latest-nightly:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -151,7 +162,7 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-- as: insights-operator-e2e-tests-periodic
+- as: periodic-ci-openshift-insights-operator-release-4.19-e2e-test
   cron: 0 0 * * *
   steps:
     cluster_profile: gcp-3
@@ -189,6 +200,7 @@ tests:
         name: insights-ocm-token
         namespace: test-credentials
       env:
+      - RELEASE_IMAGE_LATEST: "latest-nightly"
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
       - default: /secret/aws/aws-bucket/aws-bucket
