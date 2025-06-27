@@ -10,7 +10,8 @@ cd /tmp || exit
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME RELEASE_BRANCH_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
-GITHUB_ORG_NAME="redhat-developer"
+# GITHUB_ORG_NAME="redhat-developer"
+GITHUB_ORG_NAME="subhashkhileri"
 GITHUB_REPOSITORY_NAME="rhdh-test-instance"
 
 # Get the base branch name based on job.
