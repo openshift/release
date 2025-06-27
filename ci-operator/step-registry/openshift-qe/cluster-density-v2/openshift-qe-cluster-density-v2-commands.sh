@@ -91,7 +91,7 @@ export ADDITIONAL_PARAMS
 rm -f ${SHARED_DIR}/index.json
 export BURST=40
 export QPS=30
-export MAX_INGRESS_CONTROLLER=185
+#export MAX_INGRESS_CONTROLLER=185
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
