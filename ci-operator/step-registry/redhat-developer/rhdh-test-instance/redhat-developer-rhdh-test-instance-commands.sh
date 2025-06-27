@@ -10,8 +10,7 @@ cd /tmp || exit
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME RELEASE_BRANCH_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
-# GITHUB_ORG_NAME="redhat-developer"
-GITHUB_ORG_NAME="subhashkhileri"
+GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh-test-instance"
 
 # Get the base branch name based on job.
@@ -68,7 +67,7 @@ on_error() {
 
 🚨 **RHDH deployment encountered an error**
 
-📊 [**View Build Logs**](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${URL_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy/redhat-developer-rhdh-test-instance/build-log.txt) for details"
+📊 [**View Logs**](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${URL_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy/redhat-developer-rhdh-test-instance/build-log.txt) for details"
     
 }
 
