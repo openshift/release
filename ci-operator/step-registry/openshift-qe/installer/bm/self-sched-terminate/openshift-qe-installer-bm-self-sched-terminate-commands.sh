@@ -2,6 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
