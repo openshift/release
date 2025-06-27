@@ -6,7 +6,7 @@ set -o pipefail
 # Fix UID issue (from Telco QE Team)
 ~/fix_uid.sh
 
-quads_pwd=$(cat "/secret/quads_pwd")
+quads_pwd=$(cat "${CLUSTER_PROFILE_DIR}/quads_pwd")
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 
 # Login to get token
