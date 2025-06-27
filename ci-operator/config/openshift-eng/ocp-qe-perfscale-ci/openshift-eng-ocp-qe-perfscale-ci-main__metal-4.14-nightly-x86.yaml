@@ -1,19 +1,21 @@
-base_images:
-  cli:
-    name: "4.15"
-    namespace: ocp
-    tag: cli
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-metal-414
+promotion:
+  to:
+  - namespace: ci
     tag: latest
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -30,7 +32,6 @@ tests:
     env:
       CRUCIBLE: "false"
       NUM_WORKER_NODES: "6"
-      OCP_VERSION: latest-4.15
       PUBLIC_VLAN: "true"
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -45,7 +46,6 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       CRUCIBLE: "false"
-      OCP_VERSION: latest-4.15
       PUBLIC_VLAN: "true"
       TYPE: sno
     test:
@@ -62,8 +62,8 @@ tests:
     env:
       BAREMETAL: "true"
       CRUCIBLE: "false"
+      KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
-      OCP_VERSION: latest-4.15
       PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
@@ -84,7 +84,6 @@ tests:
       CRUCIBLE: "false"
       INFRA: "true"
       NUM_WORKER_NODES: "6"
-      OCP_VERSION: latest-4.15
       PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
@@ -104,8 +103,8 @@ tests:
     env:
       BAREMETAL: "true"
       CRUCIBLE: "false"
+      KUBE_BURNER_VERSION: 1.2.9
       NUM_WORKER_NODES: "6"
-      OCP_VERSION: latest-4.15
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
@@ -125,7 +124,6 @@ tests:
       KUBE_BURNER_VERSION: 1.2.9
       LIMIT_COUNT: "1"
       NUM_WORKER_NODES: "6"
-      OCP_VERSION: latest-4.15
       WORKLOAD: web-burner-cluster-density
     test:
     - chain: openshift-qe-installer-bm-ping
@@ -137,4 +135,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: metal-4.15-latest-x86
+  variant: metal-4.14-nightly-x86
