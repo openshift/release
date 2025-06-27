@@ -162,20 +162,19 @@ fi
 max_time=4
 default_time=3
 
-# Parse time and convert to seconds
+# Parse and validate time format
 if [[ $time =~ ^([0-9]+(\.[0-9]+)?)h$ ]]; then
     hours=${BASH_REMATCH[1]}
     # Enforce maximum hours
-    if (( $(echo "$hours > $max_time" | bc -l) )); then
-        echo "Warning: Time $time exceeds maximum of $max_time h, using $max_time h instead"
-        hours=$max_time
+    if (( $(awk "BEGIN {print ($hours > $max_time)}") )); then
+        echo "Warning: Time $time exceeds maximum of $max_time h, using ${max_time}h instead"
+        time="${max_time}h"
     fi
-    sleep_seconds=$(echo "$hours * 3600" | bc | cut -d. -f1)
-    echo "Sleeping for ${hours}h (${sleep_seconds} seconds)"
+    echo "Sleeping for $time"
 else
-    echo "Warning: Invalid time format '$time', using default $default_time h"
-    sleep_seconds=$((default_time * 3600))
-    echo "Sleeping for $default_time h (${sleep_seconds} seconds)"
+    echo "Warning: Invalid time format '$time', using default ${default_time}h"
+    time="${default_time}h"
+    echo "Sleeping for $time"
 fi
 
 comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
@@ -192,4 +191,4 @@ comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
 "
 echo "$comment"
 gh_comment "$comment"
-sleep $sleep_seconds
+sleep $time
