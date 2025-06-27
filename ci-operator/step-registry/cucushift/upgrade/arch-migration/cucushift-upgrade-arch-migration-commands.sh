@@ -1,10 +1,10 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
+#set -o errexit
+#set -o pipefail
 
-trap 'FRC=$?; createArchMigrationJunit; debug' EXIT TERM
+#trap 'FRC=$?; createArchMigrationJunit; debug' EXIT TERM
 
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
