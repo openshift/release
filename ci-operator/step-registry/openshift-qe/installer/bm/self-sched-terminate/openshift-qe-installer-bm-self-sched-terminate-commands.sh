@@ -18,6 +18,7 @@ TOKEN=$(curl -sSk -X POST -u "metal-perfscale-cpt@redhat.com:$quads_pwd" -H "Con
 echo
 echo "Terminate assignment ..."
 ASSIGNMENT_ID=$(cat "${SHARED_DIR}/assignment_id")
+echo "The assignment_id is: $ASSIGNMENT_ID"
 
 TERMINATION_OUTPUT=$(curl -k -X POST -H "Authorization: Bearer $TOKEN" $QUADS_INSTANCE/api/v3/assignments/terminate/$ASSIGNMENT_ID)
 echo $TERMINATION_OUTPUT
