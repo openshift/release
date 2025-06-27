@@ -27,6 +27,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  operator-sdk-mto:
+    name: operator-sdk-mto
+    namespace: origin
+    tag: main
   tests-private:
     name: tests-private
     namespace: ci
@@ -1375,8 +1379,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
-- as: azure-ipi-sharednetwork-ovn-ipv4-subnet-amd-f28-destructive
-  cron: 39 17 27 * *
+- as: azure-ipi-vnet-ovn-ipv4-subnet-amd-f28-destructive
+  cron: 1 14 25 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1384,8 +1388,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork-ovn-ipv4-subnet
-- as: azure-ipi-sharednetwork-ovn-ipv4-subnet-mini-perm-arm-f14
-  cron: 5 10 7,23 * *
+- as: azure-ipi-vnet-ovn-ipv4-subnet-mini-perm-arm-f14
+  cron: 23 14 16,30 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1813,6 +1817,23 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-external-lb
+- as: baremetal-ipi-ovn-ipv4-disconnected-arm-f14
+  capabilities:
+  - intranet
+  cron: 54 14 6,20 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@disconnected'
+      RESERVE_BOOTSTRAP: "false"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-disconnected
 - as: baremetal-upi-ovn-ipv4-arm-mixarch-f14-day2-64k-pagesize
   capabilities:
   - intranet
@@ -2365,8 +2386,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-upi-private-xpn-ingress-glb
-- as: ibmcloud-ovn-multi-ppc64le-f7
-  cron: 42 4 1,7,14,21 * *
+- as: ibmcloud-ovn-multi-ppc64le-f28
+  cron: 52 23 25 * *
   steps:
     cluster_profile: ibmcloud-multi-ppc64le
     env:
@@ -2389,7 +2410,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      COMPUTE_NODE_TYPE: Standard_D8ps_v5
       FEATURE_GATES: '["ShortCertRotation=true"]'
       FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
@@ -2437,6 +2458,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-cert-rotation
     workflow: baremetal-lab-ipi
+- as: metal-ipi-ovn-tna-disasterrecovery-destructive-f14
+  cron: 0 9 14,28 * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      MODULE_FILTERS: OLM:~Catalog
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: baremetalds-two-node-arbiter
+- as: metal-ipi-ovn-tna-disasterrecovery-sanity-f14
+  cron: 0 9 1,15 * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_SCENARIOS_DISASTERRECOVERY: Apiserver|backup|restore|quorum|etcd|CEO|77921|42183|67718|50205|51109|53767|59377|68658|77922
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: baremetalds-two-node-arbiter
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

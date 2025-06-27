@@ -39,6 +39,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: openstack-installer
+  operator-sdk-mto:
+    name: operator-sdk-mto
+    namespace: origin
+    tag: main
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -229,6 +233,14 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-efa-pg
+- as: aws-ipi-external-oidc-entraid-tp-f14
+  cron: 37 5 12,26 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: idp-external-oidc-entraid-aws
 - as: aws-ipi-f9-longduration-hive-remaining
   cron: 21 16 5,14,26 * *
   steps:
@@ -551,7 +563,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-cco-manual-security-token-service
-- as: aws-ipi-ovn-stress-f30
+- as: aws-ipi-ovn-stress-f28
   cron: 8 22 25 * *
   steps:
     cluster_profile: aws-qe
@@ -704,9 +716,9 @@ tests:
       DYNAMIC_DNS_ENABLED: "true"
       HYPERSHIFT_DYNAMIC_DNS: hypershift-qe-dns.qe.devcluster.openshift.com
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      HYPERSHIFT_HC_ZONES: us-east-1a
       HYPERSHIFT_NODE_COUNT: "1"
       NODEPOOL_CAPACITY_RESERVATION: OnDemand
+      NODEPOOL_CAPACITY_RESERVATION_ZONE: us-east-1a
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -1465,7 +1477,8 @@ tests:
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DC4ads_v5
+      COMPUTE_CUSTOM_AZURE_AZ: '[''2'']'
+      COMPUTE_NODE_TYPE: Standard_EC4es_v6
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v5
       ENABLE_CONFIDENTIAL_COMPUTE: "true"
       ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
@@ -1480,7 +1493,8 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_DC4ads_v5
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4es_v6
+      CP_CUSTOM_AZURE_AZ: '[''2'']'
       ENABLE_CONFIDENTIAL_DEFAULT_MACHINE: "true"
       ENABLE_ENCRYPTIONATHOST_DEFAULT_MACHINE: "false"
     test:
@@ -1538,6 +1552,14 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
+- as: azure-ipi-external-oidc-entraid-tp-f14
+  cron: 6 23 9,25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: idp-external-oidc-entraid-azure
 - as: azure-ipi-f9-longduration-part3-3
   cron: 48 18 7,16,25 * *
   steps:
@@ -3070,7 +3092,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: ibmcloud-ipi-private-f14-disasterrecovery
-  cron: 10 21 1,15 * *
+  cron: 0 3 6,20 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -3172,7 +3194,6 @@ tests:
   steps:
     cluster_profile: nutanix-qe-flow
     env:
-      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-e2e-test-qe
@@ -3183,7 +3204,6 @@ tests:
   steps:
     cluster_profile: nutanix-qe-flow
     env:
-      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -4337,8 +4357,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-cert-rotation
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: ibmcloud-short-cert-rotation-f9
-  cron: 36 23 3,15,24 * *
+- as: ibmcloud-short-cert-rotation-f28
+  cron: 36 23 28 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
