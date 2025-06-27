@@ -13,6 +13,7 @@ ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
+echo "QUAY_ROUTE: $QUAY_ROUTE"
 
 #Create organization "perftest" and namespace "quay-perf" for Quay performance test
 export quay_perf_organization="perftest"
@@ -179,7 +180,6 @@ date
 
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "job end $end_time and status $JOB_STATUS"
-sleep 3h
 
 # 4, Send the performance test data to ELK
 # original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
