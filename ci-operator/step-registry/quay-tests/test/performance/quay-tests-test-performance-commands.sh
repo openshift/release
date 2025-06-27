@@ -31,7 +31,7 @@ curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
 
-sleep 30s
+sleep 120s
 
 # 2, Deploy Quay performance test job
 
