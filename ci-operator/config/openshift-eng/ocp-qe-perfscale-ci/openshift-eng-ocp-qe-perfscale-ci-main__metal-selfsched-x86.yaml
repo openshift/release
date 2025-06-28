@@ -10,22 +10,41 @@ releases:
       stream: nightly
       version: "4.17"
 resources:
-  '*':
+  "*":
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: self-sched
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perfscale-selfsched
-    post:
-    - ref: openshift-qe-installer-bm-self-sched-terminate
-    test:
-    - ref: openshift-qe-installer-bm-self-sched
+  - always_run: false
+    as: self-sched
+    capabilities:
+      - intranet
+    restrict_network_access: false
+    steps:
+      cluster_profile: metal-perfscale-selfsched
+      post:
+        - ref: openshift-qe-installer-bm-self-sched-terminate
+      test:
+        - chain: openshift-qe-installer-bm-self-sched
+  - always_run: false
+    as: self-sched-jetlag
+    capabilities:
+      - intranet
+    restrict_network_access: false
+    steps:
+      cluster_profile: metal-perfscale-selfsched
+      env:
+        CRUCIBLE: "false"
+        PUBLIC_VLAN: "true"
+        TYPE: sno
+      post:
+        - chain: openshift-qe-installer-bm-self-sched-terminate
+      test:
+        - ref: openshift-qe-installer-bm-ping
+        - ref: openshift-qe-installer-bm-self-sched
+        - ref: openshift-qe-installer-bm-deploy
+        - chain: openshift-qe-cluster-health
+        - ref: openshift-qe-installer-bm-self-sched
 zz_generated_metadata:
   branch: main
   org: openshift-eng
