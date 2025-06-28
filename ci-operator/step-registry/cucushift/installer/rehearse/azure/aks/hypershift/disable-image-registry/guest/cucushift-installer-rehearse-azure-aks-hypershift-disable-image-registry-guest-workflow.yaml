@@ -1,0 +1,42 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-aks-hypershift-disable-image-registry-guest
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-azure-aks-provision
+    - ref: hypershift-azure-aks-attach-kv
+    - ref: azure-provision-vnet-hypershift
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-role-assignment-hypershift
+    - ref: hypershift-install
+    - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+    - ref: cucushift-installer-rehearse-azure-aks-hypershift-disable-image-registry-remove-image-registry
+    - chain: hypershift-azure-create
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-azure-destroy
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    env:
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      HYPERSHIFT_AZURE_LOCATION: "eastus2"
+      CLOUD_PROVIDER: "Azure"
+      AKS: "true"
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "service.hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_MANAGED_SERVICE: "ARO-HCP"
+      AKS_CLUSTER_AUTOSCALER_MIN_NODES: "3"
+      AKS_CLUSTER_AUTOSCALER_MAX_NODES: "6"
+      ENABLE_CLUSTER_AUTOSCALER: "true"
+      AUTH_THROUGH_CERTS: "true"
+      HYPERSHIFT_CUSTOM_NSG: "true"
+      HYPERSHIFT_CUSTOM_RESOURCE_GROUP: "true"
+      HYPERSHIFT_CUSTOM_SUBNET: "true"
+      HYPERSHIFT_CUSTOM_VNET: "true"
+      AKS_ADDONS: "azure-keyvault-secrets-provider"
+      EXTRA_ARGS: "--disable-cluster-capabilities ImageRegistry"
+  documentation: |-
+    Create/destroy an aks management cluster and a public hosted cluster with "--disable-cluster-capabilities ImageRegistry" when create 
+    Hypershift azure cluster. A managed identities file without ImageRegistry configuration will be passed to create hypershift cluster by default.
+    
