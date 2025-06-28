@@ -49,7 +49,7 @@ function run_cmd_with_retries()
     echo "Trying ${max} times max to run '${cmd}'"
 
     res=$(eval "${cmd}") || ret=$?
-    while [[ ${ret} -ne 0 || -z "${res}" ]] && [ ${try} -lt ${max} ]; do
+    while [[ ${ret} -ne 0 || -z "${res}" || "${res}" == "[]" ]] && [ ${try} -lt ${max} ]; do
         echo "'${cmd}' did not return success or return empty, waiting 60 sec....."
         sleep 60
         try=$(( try + 1 ))
@@ -146,8 +146,9 @@ EOF
 
     # ensure that role assignment creation is successful
     echo "Ensure that role ${role_name} assigned successfully"
-    cmd="az role assignment list --role '${role_name}'"
+    cmd="az role assignment list --role '${role_name}' --assignee '${sp_id}' --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}"
     run_cmd_with_retries "${cmd}"
+    eval ${cmd}
 
     if [[ "${role_name}" == "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
         az role assignment list --assignee ${sp_app_id} --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
