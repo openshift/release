@@ -65,6 +65,13 @@ function get_baseline(){
     python nope.py baseline --fetch "$WORKLOAD"
     BASELINE_UUID=$(jq '.BASELINE_UUID' < /tmp/data/baseline.json)
     BASELINE_UUID=${BASELINE_UUID//\"/}
+    if [[ $WORKLOAD == "node-density-heavy" ]]; then
+        BASELINE_UUID="cd916310-7610-4e7f-8310-2e87309c2a3c"
+    fi
+    if [[ $WORKLOAD == "cluster-density-v2" ]]; then
+        BASELINE_UUID="dd743150-78ca-48a2-a553-d8b48fd31566"
+    fi
+    
     export BASELINE_UUID
 }
 
