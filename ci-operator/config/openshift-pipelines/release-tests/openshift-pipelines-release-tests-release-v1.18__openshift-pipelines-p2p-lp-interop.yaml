@@ -1,0 +1,98 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  ocp-addons-operators-cli:
+    name: ocp-addons-operators-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: openshift-pipelines-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: openshift-pipelines-serverless-p2p-419-iib-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+              [
+                {"step": "openshift-pipelines-install", "failure_type": "all", "classification": "Operator Installation Failure", "jira_additional_labels": ["!default","p2p-tests"]},
+                {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Product to Product Test Failure", "jira_project": "SRVKP", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default"], "jira_epic": "!default"}
+              ],
+          "success_rules": [{"jira_epic": "INTEROP-7595", "jira_additional_labels": ["!default"]}]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-p2p","self-managed-p2p","pipelines-serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
+      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      INSTALL_FROM_IIB: "true"
+      OPERATOR1_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
+      OPERATOR2_CONFIG: name=serverless-operator;namespace=openshift-serverless;channel=stable
+      PIPELINES_TEST_SPECS: specs/clustertasks/clustertask-multiarch.spec
+      S3_BUCKET_OPERATORS_LATEST_IIB_PATH: ci-iib-jobs-trigger/operators-latest-iib.json
+    test:
+    - ref: operator-install
+    - ref: openshift-pipelines-deploy-tekton
+    - ref: openshift-pipelines-tests
+    - ref: p2p-additional-labels
+    workflow: firewatch-ipi-aws
+- as: openshift-pipelines-serverless-p2p-419-rc-aws
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+              [
+                {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Product to Product Test Failure", "jira_project": "SRVKP", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default"], "jira_epic": "!default"}
+              ],
+          "success_rules": [{"jira_epic": "INTEROP-7595", "jira_additional_labels": ["!default"]}]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-p2p","self-managed-p2p","pipelines-serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
+      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATOR1_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
+      OPERATOR2_CONFIG: name=serverless-operator;namespace=openshift-serverless;channel=stable
+      PIPELINES_TEST_SPECS: specs/clustertasks/clustertask-multiarch.spec
+    test:
+    - ref: operator-install
+    - ref: openshift-pipelines-deploy-tekton
+    - ref: openshift-pipelines-tests
+    - ref: p2p-additional-labels
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: release-v1.18
+  org: openshift-pipelines
+  repo: release-tests
+  variant: openshift-pipelines-p2p-lp-interop
