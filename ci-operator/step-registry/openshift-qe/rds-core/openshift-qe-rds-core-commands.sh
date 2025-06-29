@@ -21,6 +21,8 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
+kube-burner-ocp version
+
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 WORKLOAD=rds-core PPROF=false EXTRA_FLAGS="--iterations=${ITERATIONS} --churn=${CHURN} --perf-profile=cpt-pao --alerting=true --check-health=true --profile-type=${PROFILE_TYPE}" ./run.sh
