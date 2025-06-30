@@ -396,12 +396,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
     cluster: build04
-    context: ci/prow/regression-clusterinfra-cucushift-rehearse-gcp-ipi
+    context: ci/prow/regression-clusterinfra-gcp-ipi-ccm
     decorate: true
     decoration_config:
       timeout: 7h0m0s
@@ -410,10 +410,11 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cloud-provider-gcp-release-4.19-regression-clusterinfra-cucushift-rehearse-gcp-ipi
+    name: pull-ci-openshift-cloud-provider-gcp-release-4.19-regression-clusterinfra-gcp-ipi-ccm
     optional: true
     path_alias: k8s.io/cloud-provider-gcp
-    rerun_command: /test regression-clusterinfra-cucushift-rehearse-gcp-ipi
+    rerun_command: /test regression-clusterinfra-gcp-ipi-ccm
+    run_if_changed: ^(go\.mod|go\.sum)$
     spec:
       containers:
       - args:
@@ -422,7 +423,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=regression-clusterinfra-cucushift-rehearse-gcp-ipi
+        - --target=regression-clusterinfra-gcp-ipi-ccm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -470,7 +471,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )regression-clusterinfra-cucushift-rehearse-gcp-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )regression-clusterinfra-gcp-ipi-ccm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
