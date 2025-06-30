@@ -310,7 +310,8 @@ function load_env {
   export HUB_CLUSTER_VERSION
 
   set -x
-  if [ -n "${PULL_NUMBER:-}" ] && [ -n "${SET_SPECIFIC_RELEASE_IMAGE}" ]; then
+  # if [ -n "${PULL_NUMBER:-}" ] && [ -n "${SET_SPECIFIC_RELEASE_IMAGE}" ]; then
+  if [ -n "${SET_SPECIFIC_RELEASE_IMAGE}" ]; then
     rel_img="${SET_SPECIFIC_RELEASE_IMAGE}"
   else
     rel_img=${RELEASE_IMAGE_LATEST}
