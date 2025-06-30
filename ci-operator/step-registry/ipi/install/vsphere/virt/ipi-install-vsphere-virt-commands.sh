@@ -13,6 +13,7 @@ fi
 VIRT_KUBECONFIG=/var/run/vault/vsphere-ibmcloud-config/vsphere-virt-kubeconfig
 CLUSTER_KUBECONFIG=${SHARED_DIR}/kubeconfig
 VM_NETWORK_PATCH=/var/run/vault/vsphere-ibmcloud-config/vm-network-patch.json
+INFRA_PATCH=$(cat /var/run/vault/vsphere-ibmcloud-config/vsphere-virt-infra-patch)
 
 VM_NAME="$(oc get infrastructure cluster -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.status.infrastructureName')-bm"
 VM_NAMESPACE="${NAMESPACE}"
@@ -36,6 +37,8 @@ function approve_csrs() {
   done
 }
 
+# Patch test cluster to have CIDR for non-vSphere node
+oc patch infrastructure cluster --type json -p "${INFRA_PATCH}" --kubeconfig=${CLUSTER_KUBECONFIG}
 
 # Generate YAML for creation VM
 echo "$(date -u --rfc-3339=seconds) - Generating ignition data"
@@ -48,9 +51,14 @@ IGNITION_DATA=$(oc get secret worker-user-data -n openshift-machine-api -o json 
 echo "$(date -u --rfc-3339=seconds) - Generating virtual machine yaml"
 virtctl create vm --name ${VM_NAME} --instancetype ci-baremetal --volume-import type:registry,url:docker://${VIRT_IMAGE},size:60Gi,pullmethod:node --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual -n ${VM_NAMESPACE} > "${SHARED_DIR}/vm.yaml"
 
+# Create namespace if it does not exist (it will exist if multiple jobs run in same namespace)
+if [[ "$(oc get ns ${VM_NAMESPACE} --ignore-not-found --kubeconfig="${VIRT_KUBECONFIG}")" == "" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Creating job namespace"
+  oc create ns ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
+fi
+
 # Create VM (VM will not be running)
 echo "$(date -u --rfc-3339=seconds) - Creating virtual machine"
-oc create ns ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
 oc create -f "${SHARED_DIR}/vm.yaml" --kubeconfig=${VIRT_KUBECONFIG}
 
 # Update VM to have CI network
@@ -63,6 +71,12 @@ virtctl start "${VM_NAME}" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
 
 # Monitor cluster for CSRs
 approve_csrs
+
+# Add taint if configured
+if [[ "${TAINT_BM}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Adding vsphere-csi-driver taint to node to prevent pod scheduling"
+  oc adm taint nodes ${VM_NAME} vsphere-csi-driver=reserved:NoSchedule vsphere-csi-driver=reserved:NoExecute --kubeconfig="${CLUSTER_KUBECONFIG}"
+fi
 
 # Remove provider taint
 oc adm taint nodes ${VM_NAME} node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"

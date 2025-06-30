@@ -250,8 +250,8 @@ cat > "${rsyncd_ignition_patch}" << EOF
 }
 EOF
 
-# patch rsync setting to ignition
 patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
+
 rm -f "${rsyncd_ignition_patch}"
 
 
