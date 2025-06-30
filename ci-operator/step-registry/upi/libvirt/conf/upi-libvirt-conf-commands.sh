@@ -31,7 +31,7 @@ compute:
   replicas: 0
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14
+  - cidr: 10.8.0.0/14
     hostPrefix: 23
   networkType: OVNKubernetes
   serviceNetwork:

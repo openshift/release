@@ -193,6 +193,10 @@ openshift_install="$!"
 
 init_bootstrap ${dir}
 
+echo "OPENSHIFT INSTALL: ${openshift_install}"
+echo "sleelping 20m"
+sleep 20m
+
 wait "${openshift_install}"
 
 # shellcheck source=/dev/null
