@@ -54,13 +54,11 @@ fi
 EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
-
 ./run.sh
 rc=$?
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${ARTIFACT_DIR}/index_data.json
-
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
