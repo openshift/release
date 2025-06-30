@@ -12,7 +12,7 @@ images:
     FROM replaced-by-from
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y helm
+    RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | sh
   from: bin
   inputs:
     cli:
@@ -30,6 +30,11 @@ releases:
       include_built_images: true
       name: "4.20"
       namespace: ocp
+  multilatest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -49,12 +54,32 @@ tests:
         make openshift-toolchain
         # log in to the cluster in order for the script to log in to the internal registry
         oc login -u kubeadmin "$(oc whoami --show-server)" < "${KUBEADMIN_PASSWORD_FILE}"
-        ./hack/openshift-kwok-e2e.sh
+        CLEANUP=false ./hack/openshift-kwok-e2e.sh
       from: bin-oc-kubectl-helm
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-kwok-hcp
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multilatest
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make openshift-toolchain
+        # log in to the cluster in order for the script to log in to the internal registry
+        oc login -u kubeadmin "$(oc whoami --show-server)" < "${KUBEADMIN_PASSWORD_FILE}"
+        CLEANUP=false ./hack/openshift-kwok-e2e.sh
+      from: bin-oc-kubectl-helm
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: openshift-main
   org: maxcao13
