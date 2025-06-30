@@ -98,14 +98,23 @@ storage:
           [connection]
           id=${baremetal_iface}
           type=ethernet
+          autoconnect-priority=-100
+          autoconnect-retries=1
           interface-name=${baremetal_iface}
+          multi-connect=1
+          wait-device-timeout=60000
+
           [ipv4]
           method=disabled
+
           [ipv6]
+          dhcp-timeout=90
           method=auto
           dhcp-duid=ll
-          dhcp-iaid=1
           may-fail=false
+
+          [user]
+          org.freedesktop.NetworkManager.origin=nm-initrd-generator
 EOF
 done
 
