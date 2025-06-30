@@ -34,6 +34,7 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 wmco_image_src="registry.apps.build02.vmc.ci.openshift.org/${NAMESPACE}/pipeline"
 wmco_image_dst="${MIRROR_REGISTRY_HOST}/pipeline"
 
+retries=0
 echo mirroring $wmco_image_src=$wmco_image_dst
 until oc image mirror "${wmco_image_src}" "${wmco_image_dst}" --insecure=true -a "${new_pull_secret}" --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
 do
