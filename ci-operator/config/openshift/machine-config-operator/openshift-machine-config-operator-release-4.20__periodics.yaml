@@ -71,6 +71,11 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: machine-config-operator
 releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
   latest:
     candidate:
       product: ocp
@@ -205,6 +210,30 @@ tests:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: baremetalds-e2e-ovn-dualstack
   timeout: 6h0m0s
+- as: e2e-aws-ovn-ocl
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: mco-conf-day2-enable-ocl
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-aws-ovn-ocl-upgrade
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: mco-conf-day2-enable-ocl
+    - chain: openshift-e2e-test-qe
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
