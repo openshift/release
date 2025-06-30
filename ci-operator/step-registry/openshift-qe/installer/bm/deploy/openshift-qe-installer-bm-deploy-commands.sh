@@ -157,7 +157,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    source bootstrap.sh
 "
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+cp ${CLUSTER_PROFILE_DIR}/pull_secret /tmp/pull-secret
 oc registry login --to=/tmp/pull-secret
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
