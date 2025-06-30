@@ -1,4 +1,6 @@
 #!/bin/bash
+# shellcheck disable=SC2153
+# ARTIFACT_DIR is provided by the CI environment (Prow/OpenShift CI)
 
 set -o nounset
 set -o errexit
