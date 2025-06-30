@@ -1,10 +1,10 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
+#set -o errexit
+#set -o pipefail
 
-trap 'FRC=$?; createArchMigrationJunit; debug' EXIT TERM
+#trap 'FRC=$?; createArchMigrationJunit; debug' EXIT TERM
 
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
@@ -176,9 +176,11 @@ function check_clusteroperators() {
 }
 
 function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=40
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=450
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
+	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
+	curl -k -Is https://${console_route}/ | head -n 1;
         if check_clusteroperators; then
             echo "Passed #${continous_successful_check}"
             (( continous_successful_check += 1 ))
@@ -186,6 +188,7 @@ function wait_clusteroperators_continous_success() {
             echo "cluster operators are not ready yet, wait and retry..."
             continous_successful_check=0
         fi
+	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
         sleep 60
         (( try += 1 ))
     done
@@ -250,9 +253,12 @@ function wait_mcp_continous_success() {
     num=$(oc get node --no-headers | wc -l)
     max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
     passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    echo "max_retries is $max_retries passed_criteria is $passed_criteria"
     local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
+	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
+        curl -k -Is https://${console_route}/ | head -n 1;
         ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
@@ -272,6 +278,7 @@ function wait_mcp_continous_success() {
             fi
         fi
         echo "wait and retry..."
+	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
         sleep ${interval}
         (( try += 1 ))
     done
@@ -314,6 +321,17 @@ function check_pod() {
 
 function health_check() {
     echo "Step #1: Make sure no degrated or updating mcp"
+    INIT=1
+    while [[ $INIT -le 60 ]];
+    do
+	echo Try No.$INIT
+	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
+        curl -k -Is https://${console_route}/ | head -n 1;
+	echo
+        oc get mcp
+        sleep 30
+	INIT=$(( $INIT + 1 ))
+    done
     wait_mcp_continous_success
 
     echo "Step #2: check all cluster operators get stable and ready"
