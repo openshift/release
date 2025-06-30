@@ -3,6 +3,7 @@ set -euo pipefail -x
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
+/usr/bin/hypershift install --hypershift-image quay.io/rh-ee-neyadav/hypershift-power@sha256:23a574a919d90fc5aab02e585c4e272f444b2c3f98c5092065f5db4866bed824
 
 echo Generating pull secret to current build farm
 oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
@@ -161,7 +162,6 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --power-edge-router true \
       --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
       --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
