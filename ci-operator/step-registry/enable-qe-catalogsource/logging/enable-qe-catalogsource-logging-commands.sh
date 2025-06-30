@@ -159,8 +159,9 @@ function enable_registry_credential () {
          reg_qe_opt_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
 	 reg_qe_opt_auth=$(echo -n "${reg_qe_opt_user}:${reg_qe_opt_password}" | base64 -w 0)
 	 if [[ $reg_qe_opt_auth != "" ]]; then
+             echo " Set cred for quay.io/openshift-qe-optional-operators"
              jq --argjson var '{"quay.io/openshift-qe-optional-operators":{"auth":"'${reg_qe_opt_auth}'","email":""}}' '.auths |= . + $var' /tmp/.dockerconfigjson > ${tmp_dockerconfig}
-             mv ${tmp_dockerconfig} /tmp/.dockerconfigjson
+             cp ${tmp_dockerconfig} /tmp/.dockerconfigjson
 	 fi
      fi
 
@@ -169,8 +170,9 @@ function enable_registry_credential () {
          reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
 	 reg_brew_auth=$(echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0)
 	 if [[ $reg_brew_auth != "" ]]; then
+             echo " Set cred for brew.registry.redhat.io"
              jq --argjson var '{"brew.registry.redhat.io":{"auth":"'${reg_brew_auth}'","email":""}}' '.auths |= . + $var' /tmp/.dockerconfigjson > ${tmp_dockerconfig}
-             mv ${tmp_dockerconfig} /tmp/.dockerconfigjson
+             cp ${tmp_dockerconfig} /tmp/.dockerconfigjson
 	 fi
      fi
 
@@ -179,8 +181,9 @@ function enable_registry_credential () {
          reg_stage_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
          reg_stage_auth=`echo -n "${reg_stage_user}:${reg_stage_password}" | base64 -w 0`
 	 if [[ $reg_stage_auth != "" ]]; then
+             echo " Set cred for registry.stage.redhat.io"
              jq --argjson var '{"registry.stage.redhat.io":{"auth":"'${reg_stage_auth}'","email":""}}' '.auths |= . + $var' /tmp/.dockerconfigjson > ${tmp_dockerconfig}
-             mv ${tmp_dockerconfig} /tmp/.dockerconfigjson
+             cp ${tmp_dockerconfig} /tmp/.dockerconfigjson
 	 fi
      fi
 
@@ -197,7 +200,8 @@ function enable_registry_credential () {
 	 ret=$?
 	 echo "${result}"
          if [[ $ret -eq 0 && ! $result =~ "pull-secret was not changed" ]]; then
-                 CLUSTER_UPDATED=true
+             echo "oc set data secret/pull-secret successed"
+             CLUSTER_UPDATED=true
          else
              echo "oc set data secret/pull-secret failed!"
 	     exit 1
@@ -284,7 +288,7 @@ EOF
 
     cat <<EOF>/tmp/mirror_set_stage_clo.yaml
   - mirrors:
-    - registry.stage.redhat.io/rh-osbs/openshift-logging-cluster-logging-operator-bundle
+    - registry.stage.redhat.io/openshift-logging/cluster-logging-operator-bundle
     source: registry.redhat.io/openshift-logging/cluster-logging-operator-bundle
   - mirrors:
     - registry.stage.redhat.io/openshift-logging/cluster-logging-rhel9-operator
@@ -305,7 +309,7 @@ EOF
 
     cat <<EOF>/tmp/mirror_set_stage_lo.yaml
   - mirrors:
-    - registry.stage.redhat.io/rh-osbs/openshift-logging-loki-operator-bundle
+    - registry.stage.redhat.io/openshift-logging/loki-operator-bundle
     source: registry.redhat.io/openshift-logging/loki-operator-bundle
   - mirrors:
     - registry.stage.redhat.io/openshift-logging/loki-rhel9-operator
