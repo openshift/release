@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+binary_build_commands: make openshift-toolchain
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM replaced-by-from
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | sh
+  from: bin
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: bin-oc-kubectl-helm
+releases:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-kwok
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make openshift-toolchain
+        # log in to the cluster in order for the script to log in to the internal registry
+        oc login -u kubeadmin "$(oc whoami --show-server)" < "${KUBEADMIN_PASSWORD_FILE}"
+        ./hack/openshift-kwok-e2e.sh
+      from: bin-oc-kubectl-helm
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: openshift-main
+  org: maxcao13
+  repo: karpenter
