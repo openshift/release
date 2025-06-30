@@ -17,10 +17,18 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-upgrade-ci
+- dockerfile_path: hack/Dockerfile.test.src.ci
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-test-ci
 promotion:
   to:
   - additional_images:
-      cnv-ci-src: src
+      cnv-ci-src: src-test-ci
       cnv-ci-src-upgrade: src-upgrade-ci
     name: "4.20"
     namespace: cnv
@@ -70,7 +78,9 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      from: src
+      - default: candidate
+        name: CNV_SUBSCRIPTION_CHANNEL
+      from: src-test-ci
       resources:
         requests:
           cpu: 100m
