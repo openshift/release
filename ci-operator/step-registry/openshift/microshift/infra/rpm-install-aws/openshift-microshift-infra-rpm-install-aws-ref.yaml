@@ -1,6 +1,7 @@
 ref:
   as: openshift-microshift-infra-rpm-install-aws
   from: root
+  cli: latest
   grace_period: 10m
   commands: openshift-microshift-infra-rpm-install-aws-commands.sh
   resources:
@@ -19,9 +20,17 @@ ref:
     documentation: >-
       Get MicroShift code from git instead of the image. This is because this step may be used in jobs where
       pipeline:src image may not belong to MicroShift repo.
+  dependencies:
+  - name: "release:nightly-amd64"
+    env: "OPENSHIFT_RELEASE_IMAGE"
+  - name: "release:nightly-arm64"
+    env: "OPENSHIFT_RELEASE_IMAGE_ARM"
   credentials:
   - namespace: test-credentials
     name: microshift-rhsm-creds
     mount_path: /var/run/rhsm/
+  - name: pr-creds
+    namespace: test-credentials
+    mount_path: /secrets/pr-creds
   documentation: >-
     This step installs the microshift rpm and microshift infra in instance created by upi-install-gcp-nested.
