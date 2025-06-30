@@ -1,0 +1,37 @@
+chain:
+  as: storage-conf-csi-optional-aws-efs-cross-account
+  steps:
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-aws-efs
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: aws-provision-vpc-shared
+    # before configure the cross account iam policy needs the operator credentialsrequests created,
+    # which depends on operator installed and clustercsidriver created
+    - ref: storage-create-csi-aws-efs-cross-account
+    - ref: storage-conf-storageclass-set-default-storageclass
+  env:
+  - name: REQUIRED_DEFAULT_STORAGECLASS
+    default: "efs-sc"
+  - name: CLUSTERCSIDRIVER
+    default: efs.csi.aws.com
+  - name: ENABLE_CROSS_ACCOUNT
+    default: "yes"
+  - name: ENABLE_SHARED_VPC
+    default: "yes"
+  - name: OO_PACKAGE
+    default: aws-efs-csi-driver-operator
+  - name: OO_CHANNEL
+    default: stable
+  - name: OO_INSTALL_NAMESPACE
+    default : openshift-cluster-csi-drivers
+  - name: OO_TARGET_NAMESPACES
+    default: '!all'
+  - name: TRUECONDITIONS
+    default: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: manifest-aws-efs.yaml
+  - name: VPC_CIDR
+    default: 172.20.0.0/16
+  documentation: |-
+    The storage-conf-csi-optional-aws-efs-cross-account step subscribes the aws-efs-csi-driver-operator, creates efs volume in different account, creates efs csidriver
+    custom resource to install the aws-efs-csi-driver and sets the default storageclass to efs csi storageclass `efs-sc`.
