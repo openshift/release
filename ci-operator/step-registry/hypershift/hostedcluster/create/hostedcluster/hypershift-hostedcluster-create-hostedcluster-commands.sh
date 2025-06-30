@@ -194,6 +194,7 @@ done
 
 # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
 echo "Waiting for cluster to become available"
+sleep 2h
 oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
   echo "Cluster did not become available"
   oc get hostedcluster --namespace=clusters -o yaml ${CLUSTER_NAME}
