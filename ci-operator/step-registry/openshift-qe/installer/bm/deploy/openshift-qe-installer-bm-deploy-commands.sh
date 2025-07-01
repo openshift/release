@@ -160,6 +160,8 @@ ssh ${SSH_ARGS} root@${bastion} "
    git branch
    source bootstrap.sh
 "
+# Save jetlag_repo for next Step(s) that may need this info
+echo $jetlag_repo > ${SHARED_DIR}/jetlag_repo
 
 cp ${CLUSTER_PROFILE_DIR}/pull_secret /tmp/pull-secret
 oc registry login --to=/tmp/pull-secret
