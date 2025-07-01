@@ -1,0 +1,36 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- dockerfile_path: images/openshift-ci/Dockerfile
+  to: libvirt-installer
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  crc:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: e2e-snc
+  steps:
+    cluster_profile: gcp
+    workflow: code-ready-snc-e2e
+- as: e2e-microshift
+  cluster: build01
+  steps:
+    cluster_profile: gcp
+    workflow: code-ready-snc-microshift
+zz_generated_metadata:
+  branch: release-4.20
+  org: crc-org
+  repo: snc
