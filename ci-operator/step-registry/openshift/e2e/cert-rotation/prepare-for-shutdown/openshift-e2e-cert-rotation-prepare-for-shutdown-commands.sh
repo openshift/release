@@ -84,6 +84,7 @@ if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
     until (( approved_csrs >= required_csrs )); do
       ((attempt++))
       echo -n ""
+      echo -n ""
       echo "$(date +%X) attempt #${attempt}"
       mapfile -t all_csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers)
       echo "found ${#all_csrs[@]} CSRs"
@@ -93,7 +94,7 @@ if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
         echo "approving ${csrs[@]}"
         oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
-      sleep 10
+      sleep 60
       echo "" >&3
     done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
   done
