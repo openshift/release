@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# test only
 set -o nounset
 set -o errexit
 set -o pipefail
