@@ -200,6 +200,8 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --service-cidr 172.32.0.0/16 \
     --cluster-cidr 10.136.0.0/14 ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 
+  sed -i '/service: APIServer/{n; n; s/LoadBalancer/NodePort/}' "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
   # shellcheck disable=SC2086
