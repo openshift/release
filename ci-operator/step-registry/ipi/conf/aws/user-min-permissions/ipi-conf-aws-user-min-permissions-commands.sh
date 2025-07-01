@@ -365,6 +365,15 @@ EOF
 		rm -rf "${dir}"
 	fi
 
+    # For BYO Encrypt AMI (Encrypted by custom KMS key)
+    if [ ${ENCRYPTED_AMI} == "yes" ]; then
+        if [ -f "${SHARED_DIR}/aws_kms_key_id" ] || [ -f "${SHARED_DIR}/aws_kms_key_id_control_plane" ]; then
+            echo "AMI was encrypted by custom KMS key, adding kms:ReEncrypt* to permission list."
+            echo "kms:ReEncrypt*" >> "${PERMISION_LIST}"
+        fi
+    fi
+    
+
 	create_jsoner_py
 	
 	# generate policy file and save it to shared dir so later steps have access to it.

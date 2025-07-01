@@ -60,7 +60,7 @@ echo "AMI used by cluster: controlPlane: [${control_plane_ami}], compute: [${com
 
 ret=0
 
-ic_platform_ami=$(yq-go r "${CONFIG}" 'platform.aws.amiID')
+ic_platform_ami=$(yq-go r "${CONFIG}" 'platform.aws.defaultMachinePlatform.amiID')
 ic_control_plane_ami=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.amiID')
 ic_compute_ami=$(yq-go r "${CONFIG}" 'compute[0].platform.aws.amiID')
 echo "AMI in install-config: platform: [${ic_platform_ami}], controlPlane: [${ic_control_plane_ami}], compute: [${ic_compute_ami}]"
@@ -79,7 +79,7 @@ expected_control_plane_ami=""
 expected_compute_ami=""
 
 if ! is_empty "$ic_platform_ami"; then
-    echo "platform.aws.amiID was found: ${ic_platform_ami}"
+    echo "platform.aws.defaultMachinePlatform.amiID was found: ${ic_platform_ami}"
     expected_control_plane_ami="${ic_platform_ami}"
     expected_compute_ami="${ic_platform_ami}"
 fi
