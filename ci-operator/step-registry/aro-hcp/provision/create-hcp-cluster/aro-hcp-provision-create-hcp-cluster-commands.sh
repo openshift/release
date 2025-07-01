@@ -48,7 +48,7 @@ az deployment group create \
   --name 'aro-hcp'\
   --subscription "${SUBSCRIPTION}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
-  --template-file bicep/cluster.bicep \
+  --template-file demo/bicep/cluster.bicep \
   --parameters \
     networkSecurityGroupId="${NSG_ID}" \
     subnetId="${SUBNET_ID}" \
@@ -59,7 +59,7 @@ az deployment group create \
   --name 'node-pool' \
   --subscription "${SUBSCRIPTION}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
-  --template-file bicep/nodepool.bicep \
+  --template-file demo/bicep/nodepool.bicep \
   --parameters \
     clusterName="${CLUSTER_NAME}" \
     nodePoolName="${NP_NAME}"

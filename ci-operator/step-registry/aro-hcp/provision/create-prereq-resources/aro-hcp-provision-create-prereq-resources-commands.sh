@@ -40,7 +40,7 @@ az deployment group create \
   --name 'infra' \
   --subscription "${SUBSCRIPTION}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
-  --template-file bicep/customer-infra.bicep \
+  --template-file demo/bicep/customer-infra.bicep \
   --parameters \
     customerNsgName="${CUSTOMER_NSG}" \
     customerVnetName="${CUSTOMER_VNET_NAME}" \
