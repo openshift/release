@@ -176,6 +176,7 @@ function check_clusteroperators() {
 }
 
 function wait_clusteroperators_continous_success() {
+    console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
     local try=0 continous_successful_check=0 passed_criteria=3 max_retries=450
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
@@ -187,7 +188,6 @@ function wait_clusteroperators_continous_success() {
             continous_successful_check=0
         fi
 	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
-	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
 	echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
         sleep 60
         (( try += 1 ))
@@ -250,6 +250,7 @@ function check_mcp() {
 
 function wait_mcp_continous_success() {
     local try=0 continous_successful_check=0 passed_criteria max_retries ret=0 interval=30
+    console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
     num=$(oc get node --no-headers | wc -l)
     max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
     passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
@@ -276,7 +277,6 @@ function wait_mcp_continous_success() {
             fi
         fi
         echo "wait and retry..."
-	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
         echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
 	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
         sleep ${interval}
@@ -322,10 +322,10 @@ function check_pod() {
 function health_check() {
     echo "Step #1: Make sure no degrated or updating mcp"
     INIT=1
+    console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
     while [[ $INIT -le 30 ]];
     do
 	echo Try No.$INIT
-	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
         echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
 	echo
         oc get mcp
