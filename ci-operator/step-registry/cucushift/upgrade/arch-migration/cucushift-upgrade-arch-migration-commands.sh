@@ -187,7 +187,7 @@ function wait_clusteroperators_continous_success() {
             echo "cluster operators are not ready yet, wait and retry..."
             continous_successful_check=0
         fi
-	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
+	echo -e "\n`date`\n---------------------------------------\n`oc get mcp | grep -A4 NAME`\n"
 	echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
         sleep 60
         (( try += 1 ))
@@ -278,7 +278,7 @@ function wait_mcp_continous_success() {
         fi
         echo "wait and retry..."
         echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
-	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
+	echo -e "\n`date`\n---------------------------------------\n`oc get mcp | grep -A5 NAME`\n"
         sleep ${interval}
         (( try += 1 ))
     done
@@ -328,7 +328,7 @@ function health_check() {
 	echo Try No.$INIT
         echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
 	echo
-        oc get mcp
+        oc get mcp |grep -A4 NAME
         sleep 30
 	INIT=$(( $INIT + 1 ))
     done
