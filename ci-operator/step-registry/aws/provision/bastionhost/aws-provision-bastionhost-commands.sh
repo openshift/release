@@ -30,7 +30,7 @@ fi
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 # 1. get vpc id and public subnet
-if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; then
+if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]] && [[ ! -f "${SHARED_DIR}/vpc_info.json" ]]; then
   if [[ ! -f ${SHARED_DIR}/metadata.json ]]; then
     echo "no vpc_id or public_subnet_ids found in ${SHARED_DIR} - and no metadata.json found, exiting"
     exit 1
@@ -52,15 +52,24 @@ if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; 
   ### Previous versions or Byo-VPC may not have it created - 
   ### CloudFormation has logic to ignore it if its set to "None"
   ControlPlaneSecurityGroup=$(aws --region ${REGION} ec2 describe-security-groups --filters "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=${infra_id}-controlplane" --query 'SecurityGroups[0].GroupId' --output text)
+elif [[ -f "${SHARED_DIR}/vpc_info.json" ]]; then
+  VpcId=$(jq -r '.vpc_id' "${SHARED_DIR}/vpc_info.json")
+  PublicSubnet=$(jq -r '.subnets[0].ids[0].public' "${SHARED_DIR}/vpc_info.json")
+  ControlPlaneSecurityGroup="None"
 else
   VpcId=$(cat "${SHARED_DIR}/vpc_id")
-  PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
+  PublicSubnet=$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')
   ControlPlaneSecurityGroup="None"
 fi
 
 echo "VpcId: $VpcId"
 echo "PublicSubnet: $PublicSubnet"
 echo "ControlPlaneSecurityGroup: $ControlPlaneSecurityGroup"
+EnableIpv6="no"
+if [[ "${IPSTACK}" == "dualstack" ]]; then
+    echo "IPSTACK: $IPSTACK"
+    EnableIpv6="yes"
+fi
 
 stack_name="${CLUSTER_NAME}-bas"
 s3_bucket_name="${CLUSTER_NAME}-s3"
@@ -144,6 +153,12 @@ Parameters:
   ControlPlaneSecurityGroup:
     Description: Control plane security group
     Type: String
+  EnableIpv6:
+    Default: "no"
+    AllowedValues:
+    - "yes"
+    - "no"
+    Type: String
   BastionHostInstanceType:
     Default: t2.medium
     Type: String
@@ -172,6 +187,7 @@ Metadata:
 Conditions:
   UseIgnition: !Not [ !Equals ["NA", !Ref BastionIgnitionLocation] ]
   HasControlPlaneSecurityGroupSet: !Not [ !Equals ["None", !Ref ControlPlaneSecurityGroup] ]
+  AssignIpv6: !Equals ["yes", !Ref EnableIpv6]
 
 Resources:
   BastionIamRole:
@@ -207,7 +223,7 @@ Resources:
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Bastion Host Security Group
+      GroupDescription: Bastion Host Security Group for ipv4
       SecurityGroupIngress:
       - IpProtocol: icmp
         FromPort: 0
@@ -223,10 +239,6 @@ Resources:
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 3128
-        ToPort: 3128
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 3129
         ToPort: 3129
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
@@ -246,6 +258,29 @@ Resources:
         ToPort: 8080
         CidrIp: 0.0.0.0/0
       VpcId: !Ref VpcId
+  BastionSecurityGroupIpv6:
+    Condition: AssignIpv6
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion Host Security Group for ipv6
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 3128
+        ToPort: 3129
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 5000
+        ToPort: 5000
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 6001
+        ToPort: 6002
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIpv6: ::/0
+      VpcId: !Ref VpcId
   BastionInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -255,8 +290,10 @@ Resources:
       NetworkInterfaces:
       - AssociatePublicIpAddress: "True"
         DeviceIndex: "0"
+        Ipv6AddressCount: !If [ "AssignIpv6", 1, !Ref "AWS::NoValue"]
         GroupSet:
           - !GetAtt BastionSecurityGroup.GroupId
+          - !If [ "AssignIpv6", !GetAtt BastionSecurityGroupIpv6.GroupId, !Ref "AWS::NoValue"]
           - !If [ "HasControlPlaneSecurityGroupSet", !Ref "ControlPlaneSecurityGroup", !Ref "AWS::NoValue"]
         SubnetId: !Ref "PublicSubnet"
       Tags:
@@ -313,6 +350,7 @@ aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=PublicSubnet,ParameterValue="${PublicSubnet}" \
         ParameterKey=ControlPlaneSecurityGroup,ParameterValue="${ControlPlaneSecurityGroup}" \
+        ParameterKey=EnableIpv6,ParameterValue="${EnableIpv6}" \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
         ParameterKey=BastionIgnitionLocation,ParameterValue="${ign_location}"  &
 
@@ -330,6 +368,13 @@ echo "Instance ${INSTANCE_ID}"
 # to allow log collection during gather:
 # append to proxy bastion host ID to "${SHARED_DIR}/aws-instance-ids.txt"
 echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-ids.txt"
+
+if [[ "${EnableIpv6}" == "yes" ]]; then
+    BASTION_HOST_IPv6="$(aws --region "${REGION}" ec2 describe-instances --instance-ids ${INSTANCE_ID} \
+--query "Reservations[*].Instances[].Ipv6Address" --output text)"
+    echo "Bastion IPv6: ${BASTION_HOST_IPv6}"
+    echo "${BASTION_HOST_IPv6}" > "${SHARED_DIR}/bastion_ipv6_address"
+fi
 
 BASTION_HOST_PUBLIC_DNS="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
   --query 'Stacks[].Outputs[?OutputKey == `PublicDnsName`].OutputValue' --output text)"

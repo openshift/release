@@ -30,12 +30,12 @@ function show_test_execution_time() {
 function set_cluster_access() {
     if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
-	echo "KUBECONFIG: ${KUBECONFIG}"
+        echo "KUBECONFIG: ${KUBECONFIG}"
     fi
     cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
     if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
-	echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
+        echo "proxy: ${SHARED_DIR}/proxy-conf.sh"
     fi
 }
 function preparation_for_test() {
@@ -122,17 +122,17 @@ function filter_test_by_network() {
     networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
     case "${networktype,,}" in
         openshiftsdn)
-	    networktag='@network-openshiftsdn'
-	    ;;
+            networktag='@network-openshiftsdn'
+            ;;
         ovnkubernetes)
-	    networktag='@network-ovnkubernetes'
-	    ;;
+            networktag='@network-ovnkubernetes'
+            ;;
         other)
-	    networktag=''
-	    ;;
+            networktag=''
+            ;;
         *)
-	    echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
-	    ;;
+            echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
+            ;;
     esac
     if [[ -n $networktag ]] ; then
         export E2E_RUN_TAGS="${networktag} and ${E2E_RUN_TAGS}"
@@ -357,28 +357,33 @@ function test_execution() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
+    xmlfiles=''
     if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
         echo "Artifact dir '${ARTIFACT_DIR}' not exist"
         exit 0
     else
         echo "Artifact dir '${ARTIFACT_DIR}' exist"
         ls -lR "${ARTIFACT_DIR}"
-        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
-        if [[ "$files" -eq 0 ]] ; then
+        xmlfiles="$(find "${ARTIFACT_DIR}" -name '*.xml')"
+        if [[ "$(wc -w <<< $xmlfiles)" -eq 0 ]] ; then
             echo "There are no JUnit files"
             exit 0
         fi
     fi
+
+    combinedxml="${ARTIFACT_DIR}/cucushift-e2e-combined.xml"
+    jrm "$combinedxml" $xmlfiles || exit 0
+
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
-    while read row ; do
-	for ctype in "${!results[@]}" ; do
-            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+    if [ -f "$combinedxml" ] ; then
+        testsuites="$(grep 'testsuites.*tests=' "$combinedxml")"
+        for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $testsuites)"
             if [[ -n $count ]] ; then
                 let results[$ctype]+=count || true
             fi
         done
-    done < /tmp/zzz-tmp.log
+    fi
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
