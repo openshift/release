@@ -36,9 +36,10 @@ fi
 echo $LINENO CMD:  ssh ${SSH_ARGS} root@${bastion}
 REMOTE_BASTION_HOST=$(ssh ${SSH_ARGS} root@${bastion} "
     cd $jetlag_repo;
-    source .ansible/bin/activate; 
+    source bootstrap.sh
     ansible -i ansible/inventory/$LAB_CLOUD.local bastion --list-hosts  2>/dev/null | tail -n +2 | sed 's/^[[:space:]]*//'; 
     deactivate
+    rm -rf .ansible
 ")
 
 if [ -z "${bastion}" ] ||  [ -z "${REMOTE_BASTION_HOST}" ] ; then
