@@ -1,8 +1,28 @@
 base_images:
+  ocp_4.20_etcd:
+    name: "4.20"
+    namespace: ocp
+    tag: etcd
+  ocp_4.20_hyperkube:
+    name: "4.20"
+    namespace: ocp
+    tag: hyperkube
+  ocp_4.20_installer-etcd-artifacts:
+    name: "4.20"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.20_installer-kube-apiserver-artifacts:
+    name: "4.20"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
   ocp_builder_rhel-9-golang-1.23-openshift-4.20:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
   origin_scos-4.20_base-stream9:
     name: scos-4.20
     namespace: origin
@@ -61,18 +81,25 @@ images:
   dockerfile_path: images/baremetal/Dockerfile.ci
   from: origin_scos-4.20_base-stream9
   inputs:
+    ocp_4.20_etcd:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:etcd
+    ocp_4.20_hyperkube:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:hyperkube
     ocp_builder_rhel-9-golang-1.23-openshift-4.20:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     origin_scos-4.20_etcd:
       as:
       - etcd
-      - registry.ci.openshift.org/ocp/4.19:etcd
     origin_scos-4.20_hyperkube:
       as:
       - kas
-      - registry.ci.openshift.org/ocp/4.19:hyperkube
   to: baremetal-installer
 - build_args:
   - name: TAGS
@@ -80,18 +107,25 @@ images:
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: origin_scos-4.20_base-stream9
   inputs:
+    ocp_4.20_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:installer-etcd-artifacts
+    ocp_4.20_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:installer-kube-apiserver-artifacts
     ocp_builder_rhel-9-golang-1.23-openshift-4.20:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     origin_scos-4.20_installer-etcd-artifacts:
       as:
       - etcd-artifacts
-      - registry.ci.openshift.org/ocp/4.19:installer-etcd-artifacts
     origin_scos-4.20_installer-kube-apiserver-artifacts:
       as:
       - kas-artifacts
-      - registry.ci.openshift.org/ocp/4.19:installer-kube-apiserver-artifacts
   to: installer-artifacts
 - build_args:
   - name: TAGS
@@ -99,18 +133,25 @@ images:
   dockerfile_path: images/installer/Dockerfile.ci
   from: origin_scos-4.20_base-stream9
   inputs:
+    ocp_4.20_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:installer-etcd-artifacts
+    ocp_4.20_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:installer-kube-apiserver-artifacts
     ocp_builder_rhel-9-golang-1.23-openshift-4.20:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     origin_scos-4.20_installer-etcd-artifacts:
       as:
       - etcd-artifacts
-      - registry.ci.openshift.org/ocp/4.19:installer-etcd-artifacts
     origin_scos-4.20_installer-kube-apiserver-artifacts:
       as:
       - kas-artifacts
-      - registry.ci.openshift.org/ocp/4.19:installer-kube-apiserver-artifacts
   to: installer
 promotion:
   to:
