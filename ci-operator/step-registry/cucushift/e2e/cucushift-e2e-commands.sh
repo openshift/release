@@ -385,6 +385,30 @@ function summarize_test_results() {
         done
     fi
 
+    bakfile="${combinedxml%.xml}.bak"
+    lines=0; startline=0; endline=0
+    team='unknown'
+    while IFS= read -r line; do
+        let lines+=1
+        if [[ "$line" =~ '<testcase' ]] ; then
+            startline=$lines
+            team="$(sed -E 's/.*name=.*OCP-[0-9]+:([a-zA-Z_-]+).*/\1/' <<< "$line")"
+            name="$(sed -E 's/.*classname="([^"]+).*/\1/' <<< "$line")"
+            sed -i "${lines}s/classname=\"$name\"/classname=\"$team\"/" "$combinedxml"
+        elif [[ "$line" =~ '</testcase>' ]] ; then
+            endline=$lines
+            sed -n "$startline,${endline}p" "$combinedxml" >> "${bakfile}.${team}.xml"
+        fi
+    done < $combinedxml
+
+    teamfiles="$(find "${ARTIFACT_DIR}" -name "$(basename "${bakfile}").*")"
+    for teamfile in $teamfiles ; do
+        tests="$(grep '<testcase' "$teamfile" | wc -l)"
+        sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$teamfile"
+        sed -i "1 a \  <testsuite failures=\"0\" errors=\"0\" skipped=\"0\" tests=\"$tests\" name=\"${teamfile##*.}\">" "$teamfile"
+        sed -i '$ a \  </testsuite>' "$teamfile"
+    done
+
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
 cucushift-e2e:
