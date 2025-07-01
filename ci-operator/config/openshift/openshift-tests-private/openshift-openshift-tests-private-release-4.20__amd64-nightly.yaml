@@ -1277,13 +1277,13 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      NAME_PREFIX: rosa-hcp-auth
+      NAME_PREFIX: ocpe2e
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_PROFILE: ocpe2e-rosa-hcp-external-auth
       VERSION: "4.20"
     test:
-    - chain: openshift-e2e-test-hypershift-qe
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: rosa-lifecycle-external-auth-advanced
 - as: aws-rosa-hcp-pl-stage-f7
   cron: 20 22 6,13,22,29 * *
@@ -2911,6 +2911,23 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: osd-ccs-gcp-xpn-private
+- as: gcp-ocm-wif-sv-f7
+  capabilities:
+  - intranet
+  cron: 33 13 3,10,17,24 * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@osd_ccs'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+      TEST_PROFILE: osd-gcp-wif-sv
+      VERSION: "4.20"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: ocm-api-lifecycle
 - as: gcp-upi-f7-ui
   cron: 46 21 4,11,18,25 * *
   steps:
