@@ -67,6 +67,8 @@ AKS_CREATE_COMMAND=(
     "${CERT_ROTATION_ARGS:-}"
     "${MI_ARGS:-}"
     --location "$AZURE_LOCATION"
+    --network-plugin azure
+    --network-policy azure
 )
 
 if [[ -n "$AKS_ADDONS" ]]; then
