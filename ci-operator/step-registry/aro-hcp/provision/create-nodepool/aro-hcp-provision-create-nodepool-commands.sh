@@ -35,7 +35,7 @@ az deployment group create \
   --name 'node-pool' \
   --subscription "${SUBSCRIPTION}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
-  --template-file bicep/nodepool.bicep \
+  --template-file demo/bicep/nodepool.bicep \
   --parameters \
     clusterName="${CLUSTER_NAME}" \
     nodePoolName="${NP_NAME}"
