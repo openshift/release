@@ -179,8 +179,6 @@ function wait_clusteroperators_continous_success() {
     local try=0 continous_successful_check=0 passed_criteria=3 max_retries=450
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
-	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
-	echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
         if check_clusteroperators; then
             echo "Passed #${continous_successful_check}"
             (( continous_successful_check += 1 ))
@@ -189,6 +187,8 @@ function wait_clusteroperators_continous_success() {
             continous_successful_check=0
         fi
 	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
+	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
+	echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
         sleep 60
         (( try += 1 ))
     done
@@ -257,8 +257,6 @@ function wait_mcp_continous_success() {
     local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
-	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
-        echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
         ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
@@ -278,6 +276,8 @@ function wait_mcp_continous_success() {
             fi
         fi
         echo "wait and retry..."
+	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
+        echo "`date`-`curl -k -Is https://${console_route}/ | head -n 1;`"
 	echo -e "\n`date`\n---------------------------------------\n`oc get mcp`\n"
         sleep ${interval}
         (( try += 1 ))
@@ -322,7 +322,7 @@ function check_pod() {
 function health_check() {
     echo "Step #1: Make sure no degrated or updating mcp"
     INIT=1
-    while [[ $INIT -le 60 ]];
+    while [[ $INIT -le 30 ]];
     do
 	echo Try No.$INIT
 	console_route=`oc -n openshift-console get route -ojsonpath="{.items[].status.ingress[].host}"`
