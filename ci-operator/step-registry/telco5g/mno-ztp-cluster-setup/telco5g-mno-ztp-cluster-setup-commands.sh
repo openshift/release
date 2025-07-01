@@ -21,6 +21,9 @@ chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 
+BM_WORKERS=${BM_WORKERS:-1}
+VIRT_WORKERS=${VIRT_WORKERS:-2}
+
 # Use latest stable version for mgmt cluster
 MGMT_VERSION=4.18
 MGMT_RELEASE=stable
@@ -43,6 +46,11 @@ ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
+
+# if BM_WORKERS more than 1, add it to cluster request
+if [ "$BM_WORKERS" -gt 1 ]; then
+    ADDITIONAL_ARG="${ADDITIONAL_ARG} --number 2"
+fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
@@ -71,9 +79,14 @@ EOF
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
-IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV ADD_BM_HOST <<< "$(cat ${SHARED_DIR}/cluster_name)"
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 SNO_NAME=sno-${CLUSTER_NAME}
+# if ADD_BM_HOST is not empty, include it in release
+RELEASE_ADD=""
+if [[ -n "$ADD_BM_HOST" ]]; then
+    RELEASE_ADD="--release-cluster $ADD_BM_HOST"
+fi
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -83,7 +96,7 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME $RELEASE_ADD
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
@@ -142,6 +155,20 @@ cat << EOF > $SHARED_DIR/delete-sno.yml
 
 EOF
 
+if [[ -n "$ADD_BM_HOST" ]]; then
+    cat << EOF >> $SHARED_DIR/delete-sno.yml
+
+    - name: Remove existing SNO for $ADD_BM_HOST
+      include_role:
+        name: virtual_sno
+        tasks_from: deletion.yml
+      vars:
+        vsno_name: sno-${ADD_BM_HOST}
+        vsno_domain_name: $SNO_DOMAIN
+
+EOF
+fi
+
 cat << EOF > $SHARED_DIR/delete-mno-hosts.yml
 ---
 - name: Delete existing MNO hosts
@@ -160,6 +187,20 @@ cat << EOF > $SHARED_DIR/delete-mno-hosts.yml
 
 EOF
 
+if [[ -n "$ADD_BM_HOST" ]]; then
+    cat << EOF >> $SHARED_DIR/delete-mno-hosts.yml
+
+    - name: Detect all possible virtual machines for ${ADD_BM_HOST}
+      shell: kcli list vm | grep "${ADD_BM_HOST}-.*er-." | cut -d"|" -f2
+      register: vms
+
+    - name: Delete virtual machines if exists
+      command: kcli delete vm {{ item }} --yes
+      when: vms.stdout != ""
+      loop: "{{ vms.stdout_lines }}"
+
+EOF
+fi
 
 cat << EOF > $SHARED_DIR/destroy-cluster.yml
 ---
@@ -170,6 +211,10 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
 
   - name: Remove last run for ${CLUSTER_NAME}_ci
     shell: kcli delete plan --yes ${CLUSTER_NAME}_ci
+    ignore_errors: yes
+
+  - name: Remove last run for ${ADD_BM_HOST:-empty}_ci
+    shell: kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
     ignore_errors: yes
 
 EOF
@@ -292,15 +337,21 @@ cat << EOF > ~/fetch-kubeconfig.yml
 
 EOF
 
+if [[ -n "$ADD_BM_HOST" ]]; then
+    BM_CLUSTERS="${CLUSTER_NAME},${ADD_BM_HOST}"
+else
+    BM_CLUSTERS=${CLUSTER_NAME}
+fi
+
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
 
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     playbooks/mno_ztp.yml \
-    -e bm_workers=$CLUSTER_NAME \
+    -e bm_workers=$BM_CLUSTERS \
     -e vm_masters=3 \
-    -e vm_workers=2 \
+    -e vm_workers=$VIRT_WORKERS \
     -e vsno_name=$SNO_NAME \
     -e vsno_ip=$SNO_IP \
     -e vsno_add_nm_hosts=false \
