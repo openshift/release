@@ -149,6 +149,16 @@ run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "mkdir 
 # Prepare credentials
 # Update here to support intallation in bastion on different platforms
 case "${CLUSTER_TYPE}" in
+aws|aws-arm64|aws-usgov)
+    if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
+        echo "Setting AWS credential with minimal permision for installer"
+        export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+    else
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+    fi
+    run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AWS_SHARED_CREDENTIALS_FILE}" "${REMOTE_SECRETS_DIR}/.awscred"
+    echo "export AWS_SHARED_CREDENTIALS_FILE='${REMOTE_SECRETS_DIR}/.awscred'" >> "${REMOTE_ENV_FILE}"
+    ;;
 azure4|azuremag|azure-arm64)
     if [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
         echo "Setting AZURE credential using managed identity for installer"
