@@ -370,19 +370,20 @@ function summarize_test_results() {
             exit 0
         fi
     fi
+
+    combinedxml="${ARTIFACT_DIR}/cucushift-e2e-combined.xml"
+    jrm "$combinedxml" $xmlfiles || exit 0
+
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
-    while read row ; do
-	for ctype in "${!results[@]}" ; do
-            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+    if [ -f "$combinedxml" ] ; then
+        testsuites="$(grep 'testsuites.*tests=' "$combinedxml")"
+        for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $testsuites)"
             if [[ -n $count ]] ; then
                 let results[$ctype]+=count || true
             fi
         done
-    done < /tmp/zzz-tmp.log
-
-    combinedxml="${ARTIFACT_DIR}/cucushift-e2e-combined.xml"
-    jrm "$combinedxml" $xmlfiles || exit 0
+    fi
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
