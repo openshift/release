@@ -17,28 +17,68 @@ REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 BASTION="${BASTION:-}"
 LAB_CLOUD="${LAB_CLOUD:-}"
-LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 
 if [ -z "${RUNLOCAL:-}" ]; then
-  bastion=$(cat  /bm/address)
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+  if [ -f "${CLUSTER_PROFILE_DIR}/lab_cloud" ]; then
+    LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+  fi
+  bastion=$(cat /bm/address)
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  jetlag_repo=$(cat "${SHARED_DIR}/jetlag_repo")
 else
   bastion=$BASTION
-  SSH_ARGS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+  SSH_ARGS="-i $PRIVATE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  jetlag_repo=$JETLAG_REPO
 fi
 
+
+# Use the jetlag_repo artifact to learn the cloud's bastion hostname.
+echo $LINENO CMD:  ssh ${SSH_ARGS} root@${bastion}
+REMOTE_BASTION_HOST=$(ssh ${SSH_ARGS} root@${bastion} "
+    cd $jetlag_repo;
+    source .ansible/bin/activate; 
+    ansible -i ansible/inventory/$LAB_CLOUD.local bastion --list-hosts  2>/dev/null | tail -n +2 | sed 's/^[[:space:]]*//'; 
+    deactivate
+")
+
+if [ -z "${bastion}" ] ||  [ -z "${REMOTE_BASTION_HOST}" ] ; then
+    echo "Error: Invalid bastion:$bastion  REMOTE_BASTION_HOST: $REMOTE_BASTION_HOST" >&2
+    exit 1
+fi
+
+
+# nested ssh 
+function do_jssh() {
+    local user_host="$1"
+    shift
+    local user=$(echo "$user_host" | awk -F@ '{print $1}')
+    ssh ${SSH_ARGS} -J ${user_host} ${user}@$REMOTE_BASTION_HOST "$@"
+    return $?
+}
+
+# Bail out if Crucible does not exist on the bastion. jetlag in bm-deploy step should have installed it.
+if do_jssh root@${bastion} 'command -v crucible >/dev/null'; then
+    debug_echo "crucible exists"
+else
+    echo "crucible not found" >&2
+    exit 1
+fi
+
+# install regulus on the bastion. This bastion can be the jumphost or a next hop depending on platform profile
 regulus_repo="/root/REGULUS/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
 install-regulus() {
-  ssh ${SSH_ARGS} root@${bastion} "
-    REG_PR='${REG_PR}' PULL_NUMBER='${PULL_NUMBER}' REPO_NAME='${REPO_NAME}' REG_BRANCH='${REG_BRANCH}'
+  do_jssh root@${bastion} "
+    echo REMOTE_BASTION_HOST=$REMOTE_BASTION_HOST >> /tmp/regulus.log
+    export REG_PR='${REG_PR}' PULL_NUMBER='${PULL_NUMBER}' REPO_NAME='${REPO_NAME}' REG_BRANCH='${REG_BRANCH}'
+    regulus_repo='${regulus_repo}'
     set -e
     set -o pipefail
-    if [ -d ${regulus_repo} ] ; then
-        rm -fr ${regulus_repo}
+    if [ -d \${regulus_repo} ] ; then
+        rm -fr \${regulus_repo}
     fi
     dnf install -y bc
-    git clone https://github.com/redhat-performance/regulus.git --depth=1 --branch=\${REG_BRANCH:-main} ${regulus_repo}
-    cd ${regulus_repo}
+    git clone https://github.com/redhat-performance/regulus.git --depth=1 --branch=\"\${REG_BRANCH:-main}\" ${regulus_repo}
+    cd \${regulus_repo}
     if [[ -n \"\${REG_PR}\" ]]; then
         git pull origin pull/\${REG_PR}/head:\${REG_PR} --rebase
         git switch \${REG_PR}
@@ -49,14 +89,6 @@ install-regulus() {
     git branch
   "
 }
-
-# Bail out if Crucible does not exist
-if ssh ${SSH_ARGS} root@${bastion} 'command -v crucible >/dev/null'; then
-    debug_echo "crucible exists"
-else
-    echo "crucible not found"
-    exit 1
-fi
 
 # Install fresh Regulus always
 install-regulus 
@@ -101,7 +133,7 @@ for v in "${vars[@]}"; do
   if [[ "$v" == "KUBECONFIG" ]]; then
     val=$KUBECONFIG_PATH
   elif [[ "$v" == "REG_OCPHOST" ]]; then
-    val=$bastion
+    val=$REMOTE_BASTION_HOST
   else
     val="${!v:-}"
   fi
@@ -116,20 +148,41 @@ for v in "${vars[@]}"; do
   printf '%s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
 done
 
+# jump scp
+function do_jscp() {
+    local user_host="$1"
+    shift
+    local src_file="$1"
+    shift
+    local dst_file="$1"
+    local user=$(echo "$user_host" | awk -F@ '{print $1}')
+    scp -q ${SSH_ARGS} -J "$user_host" "$src_file"  "$user@$REMOTE_BASTION_HOST:$dst_file"
+    return $?
+}
+
 # ───────────────────────────────────────────────────────────────────────────
 # Launch Regulus (tests are listed in regulus_repo/jobs.config)
 # ───────────────────────────────────────────────────────────────────────────
 run-regulus() {
-  echo scp -q ${SSH_ARGS} /tmp/lab.config  root@${bastion}:${regulus_repo}/ 
-  scp -q ${SSH_ARGS} /tmp/lab.config  root@${bastion}:${regulus_repo}/ 
-  ssh ${SSH_ARGS} root@${bastion} "
+  do_jscp "root@${bastion}" "/tmp/lab.config" "${regulus_repo}/lab.config"
+  do_jssh "root@${bastion}" "
     set -e
     set -o pipefail
     cd ${regulus_repo}
-    bash ./run_cpt.sh
+    bash /tmp/run_cpt.sh
   "
 }
-
+# bash ./run_cpt.sh
 run-regulus
+
+#clean up
+ssh ${SSH_ARGS} root@${bastion} "
+    set -e
+    set -o pipefail
+    if [ -f '/tmp/clean-resources.sh' ]; then
+        echo bash /tmp/clean-resources.sh
+    fi 
+"
+
 
 # EOF
