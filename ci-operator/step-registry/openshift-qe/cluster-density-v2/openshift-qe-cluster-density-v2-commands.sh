@@ -3,6 +3,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 cat /etc/os-release
 oc config view
 oc projects
