@@ -74,6 +74,13 @@ function old_do_jssh() {
     ssh ${SSH_ARGS} -J ${user_host} ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} "$@"
     return $?
 }
+function do_ssh() {
+    local user_host="$1"
+    shift
+    local user=$(echo "$user_host" | awk -F@ '{print $1}')
+    ssh ${SSH_ARGS} ${user_host} "$@"
+    return $?
+}
 
 function do_jssh() {
     local user_host="$1"
@@ -81,12 +88,15 @@ function do_jssh() {
     local user=$(echo "$user_host" | awk -F@ '{print $1}')
 
    # Log the command to /tmp/log
-    echo "do_jssh executing: $ssh_cmd" >> /tmp/log
-    echo "user_host=$user_host" >> /tmp/log
-    echo "REMOTE_BASTION_USER=$REMOTE_BASTION_USER" >> /tmp/log
-    echo " REMOTE_BASTION_HOST=$REMOTE_BASTION_HOST" >> /tmp/log
-    echo "command arguments: $*" >> /tmp/log
-    echo "---" >> /tmp/log
+   local ssh_cmd="ssh -i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand=\"ssh -i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ${user_host}\" ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} $*"
+   do_ssh $user_host  /bin/bash << EOF
+echo "executing: $ssh_cmd" >> /tmp/log
+echo "user_host=$user_host" >> /tmp/log
+echo "REMOTE_BASTION_USER=$REMOTE_BASTION_USER" >> /tmp/log
+echo " REMOTE_BASTION_HOST=$REMOTE_BASTION_HOST" >> /tmp/log
+echo "command arguments: $*" >> /tmp/log
+echo "---" >> /tmp/log
+EOF
 
     
     # Use ProxyCommand for nested SSH to control options for both connections
@@ -95,8 +105,10 @@ function do_jssh() {
         ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} "$@"
 
     local exit_code=$?
-    echo "do_jssh exit code: $exit_code" >> /tmp/log
-    echo "===================" >> /tmp/log
+   do_ssh $user_host  /bin/bash << EOF
+echo "do_jssh exit code: $exit_code" >> /tmp/log
+echo "===================" >> /tmp/log
+EOF
     
     return $exit_code
     #return $?
