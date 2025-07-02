@@ -19,14 +19,17 @@ BASTION="${BASTION:-}"
 REMOTE_BASTION_HOST="${REMOTE_BASTION_HOST:-}"
 REMOTE_BASTION_USER="${REMOTE_BASTION_USER:-root}"
 LAB_CLOUD="${LAB_CLOUD:-}"
+LAB="${LAB:-}"
 
 if [ -z "${RUNLOCAL:-}" ]; then
   if [ -f "${CLUSTER_PROFILE_DIR}/lab_cloud" ]; then
     LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+    LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
   fi
   bastion=$(cat /bm/address)
   SSH_ARGS="-i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  jetlag_repo=$(cat "${SHARED_DIR}/jetlag_repo")
+  #jetlag_repo=$(cat "${SHARED_DIR}/jetlag_repo")
+  jetlag_repo=$(ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* | head -n1)
 else
   bastion=$BASTION
   SSH_ARGS="-i $PRIVATE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -55,11 +58,23 @@ fi
 
 
 # nested ssh 
-function do_jssh() {
+function old_do_jssh() {
     local user_host="$1"
     shift
     local user=$(echo "$user_host" | awk -F@ '{print $1}')
     ssh ${SSH_ARGS} -J ${user_host} ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} "$@"
+    return $?
+}
+
+function do_jssh() {
+    local user_host="$1"
+    shift
+    local user=$(echo "$user_host" | awk -F@ '{print $1}')
+    
+    # Use ProxyCommand for nested SSH to control options for both connections
+    ssh ${SSH_ARGS} \
+        -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p ${user_host}" \
+        ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} "$@"
     return $?
 }
 
