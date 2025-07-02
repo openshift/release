@@ -15,18 +15,6 @@ function cd_cleanup() {
   if [[ -n $(jobs -l | grep "$cd_pid" | grep "Running") ]]; then
     kill -15 ${cd_pid}
   fi
-  if [[ -n $(jobs -l | grep "$cd_pid" | grep "Terminated") ]]; then
-    ls -t -d /tmp/*/
-    folder_name=$(ls -t -d /tmp/*/ | head -1)
-    jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${ARTIFACT_DIR}/index_data.json
-
-    if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
-        metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
-        cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
-    fi
-    rc=$(cat $folder_name/index_data.json | jq .jobStatus | tr -d '"' |sed "s/success/0/g" | sed "s/failure/1/g")
-    echo "{'cluster_density': $rc}" >> ${ARTIFACT_DIR}/observer_status.json
-  fi
   exit 0
   
 }
