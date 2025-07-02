@@ -175,6 +175,8 @@ if [[ $JOB_NAME != rehearse-* ]]; then
     fi
 fi
 
+# Override with prebuild index
+OO_INDEX="quay.io/pewang/csi-operator:samba-index"
 echo "[$(date --utc +%FT%T.%3NZ)] == Parameters:"
 echo "[$(date --utc +%FT%T.%3NZ)] OO_INDEX:             $OO_INDEX"
 echo "[$(date --utc +%FT%T.%3NZ)] OO_PACKAGE:           $OO_PACKAGE"
