@@ -29,7 +29,17 @@ if [ -z "${RUNLOCAL:-}" ]; then
   bastion=$(cat /bm/address)
   SSH_ARGS="-i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
   #jetlag_repo=$(cat "${SHARED_DIR}/jetlag_repo")
-  jetlag_repo=$(ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* | head -n1)
+
+  if [ -n "$LAB" ] && [ -n "$LAB_CLOUD" ]; then
+    jetlag_repo=$(ssh ${SSH_ARGS} root@${bastion} "ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* 2>/dev/null | head -n1"
+    if [ -z "$jetlag_repo" ]; then
+      echo "Error: No jetlag repo found matching pattern: /tmp/jetlag-$LAB-$LAB_CLOUD*" >&2
+      exit 1
+    fi
+  else
+    echo "Error: LAB or LAB_CLOUD variables are empty" >&2
+    exit 1
+  fi
 else
   bastion=$BASTION
   SSH_ARGS="-i $PRIVATE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -38,7 +48,6 @@ fi
 
 
 # Use the jetlag_repo artifact to learn the cloud's bastion hostname.
-echo $LINENO CMD:  ssh ${SSH_ARGS} root@${bastion}
 if [ -z "${REMOTE_BASTION_HOST}" ] ; then
   REMOTE_BASTION_HOST=$(ssh ${SSH_ARGS} root@${bastion} "
     cd $jetlag_repo;
