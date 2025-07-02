@@ -177,7 +177,7 @@ if [[ -z "${quayperf_pod_name}" ]]; then
   exit 1
 fi
 
-sleep 120 #wait pod start
+sleep 120 #wait for pod start
 
 # Fetch UUID,JOB_START etc required data to dashboard
 TEST_UUID=$(oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" | grep 'test_uuid' | sed -n 's/^.*test_uuid=\s*\(\S*\).*$/\1/p')
