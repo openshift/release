@@ -16,6 +16,8 @@ debug_echo() {
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 BASTION="${BASTION:-}"
+REMOTE_BASTION_HOST="${REMOTE_BASTION_HOST:-}"
+REMOTE_BASTION_USER="${REMOTE_BASTION_USER:-root}"
 LAB_CLOUD="${LAB_CLOUD:-}"
 
 if [ -z "${RUNLOCAL:-}" ]; then
@@ -34,13 +36,17 @@ fi
 
 # Use the jetlag_repo artifact to learn the cloud's bastion hostname.
 echo $LINENO CMD:  ssh ${SSH_ARGS} root@${bastion}
-REMOTE_BASTION_HOST=$(ssh ${SSH_ARGS} root@${bastion} "
+if [ -z "${REMOTE_BASTION_HOST}" ] ; then
+  REMOTE_BASTION_HOST=$(ssh ${SSH_ARGS} root@${bastion} "
     cd $jetlag_repo;
     source bootstrap.sh
     ansible -i ansible/inventory/$LAB_CLOUD.local bastion --list-hosts  2>/dev/null | tail -n +2 | sed 's/^[[:space:]]*//'; 
     deactivate
     rm -rf .ansible
-")
+  ")
+fi
+# ansible during bootstrap.sh spills out garbage. Get the last line which is the hostname.
+REMOTE_BASTION_HOST=$(echo "$REMOTE_BASTION_HOST" | tail -1)
 
 if [ -z "${bastion}" ] ||  [ -z "${REMOTE_BASTION_HOST}" ] ; then
     echo "Error: Invalid bastion:$bastion  REMOTE_BASTION_HOST: $REMOTE_BASTION_HOST" >&2
@@ -53,9 +59,10 @@ function do_jssh() {
     local user_host="$1"
     shift
     local user=$(echo "$user_host" | awk -F@ '{print $1}')
-    ssh ${SSH_ARGS} -J ${user_host} ${user}@$REMOTE_BASTION_HOST "$@"
+    ssh ${SSH_ARGS} -J ${user_host} ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} "$@"
     return $?
 }
+
 
 # Bail out if Crucible does not exist on the bastion. jetlag in bm-deploy step should have installed it.
 if do_jssh root@${bastion} 'command -v crucible >/dev/null'; then
@@ -146,7 +153,7 @@ for v in "${vars[@]}"; do
 
   # Escape any embedded double-quotes
   safe_val=${val//\"/\\\"}
-  printf '%s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
+  printf 'export %s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
 done
 
 # jump scp
