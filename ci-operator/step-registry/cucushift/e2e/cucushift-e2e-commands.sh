@@ -394,7 +394,11 @@ function summarize_test_results() {
             startline=$lines
             team="$(sed -E 's/.*name=.*OCP-[0-9]+:([a-zA-Z_-]+).*/\1/' <<< "$line")"
             name="$(sed -E 's/.*classname="([^"]+).*/\1/' <<< "$line")"
-            sed -i "${lines}s/classname=\"$name\"/classname=\"$team\"/" "$combinedxml"
+            if ! [[ "$name" =~ / ]] ; then
+                sed -i "${lines}s/classname=\"$name\"/classname=\"$team\"/" "$combinedxml"
+            else
+                sed -i "${lines}s#classname=\"$name\"#classname=\"$team\"#" "$combinedxml"
+            fi
         elif [[ "$line" =~ '</testcase>' ]] ; then
             endline=$lines
             sed -n "$startline,${endline}p" "$combinedxml" >> "${bakfile}.${team}.xml"
