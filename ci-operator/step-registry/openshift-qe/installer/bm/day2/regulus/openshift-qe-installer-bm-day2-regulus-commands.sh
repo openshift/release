@@ -46,6 +46,17 @@ else
   jetlag_repo=$JETLAG_REPO
 fi
 
+}
+function do_ssh() {
+    local user_host="$1"
+    shift
+    local user=$(echo "$user_host" | awk -F@ '{print $1}')
+    ssh ${SSH_ARGS} ${user_host} "$@"
+    return $?
+}
+
+# clear debug log file
+do_ssh root@$bastion "echo \"NEW RUN" > /tmp/log"
 
 # Use the jetlag_repo artifact to learn the cloud's bastion hostname.
 if [ -z "${REMOTE_BASTION_HOST}" ] ; then
@@ -73,14 +84,6 @@ function old_do_jssh() {
     local user=$(echo "$user_host" | awk -F@ '{print $1}')
     ssh ${SSH_ARGS} -J ${user_host} ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} "$@"
     return $?
-}
-function do_ssh() {
-    local user_host="$1"
-    shift
-    local user=$(echo "$user_host" | awk -F@ '{print $1}')
-    ssh ${SSH_ARGS} ${user_host} "$@"
-    return $?
-}
 
 function do_jssh() {
     local user_host="$1"
