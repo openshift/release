@@ -109,9 +109,10 @@ echo "Retrieve test results..."
 
 oc cp jws-test-image/jws-test-pod:/opt/artifacts/jws-6.x/ "${ARTIFACT_DIR}/jws_artifacts/jws-6/"
 
-for file in "${ARTIFACT_DIR}/jws_artifacts/jws-6/target/surefire-reports/"*.xml; do
-  cp "$file" "${ARTIFACT_DIR}/junit_jws_6_$(basename $file .xml).xml"
-done
+sleep 30m
+#for file in "${ARTIFACT_DIR}/jws_artifacts/jws-6/target/surefire-reports/"*.xml; do
+#  cp "$file" "${ARTIFACT_DIR}/junit_jws_6_$(basename $file .xml).xml"
+#done
 
 result=`cat ${ARTIFACT_DIR}/junit_*.xml | sed 's/"//g'`
 if [[ "$result" =~ "errors=0" ]] && [[ "$result" =~ "failures=0" ]]; then
