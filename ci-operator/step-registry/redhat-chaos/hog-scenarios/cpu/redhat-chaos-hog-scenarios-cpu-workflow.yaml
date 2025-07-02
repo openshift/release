@@ -1,28 +1,23 @@
 workflow:
-  as: redhat-chaos-network-chaos
+  as: redhat-chaos-hog-scenarios-cpu
   steps:
     test:
-      - ref: redhat-chaos-network-chaos
+      - ref: redhat-chaos-hog-scenarios-cpu
     env:
-      DURATION: "600"
-      NODE_NAME: ""
-      LABEL_SELECTOR: "node-role.kubernetes.io/master"
-      INSTANCE_COUNT: "1"
-      INTERFACES: ""
-      EXECUTION: "serial"
-      EGRESS: "{latency: 15ms}"
-      NETWORK_PARAMS: ""
-      WAIT_DURATION: "300"
-      RETRY_WAIT: "60"
-      KUBE_CHECK: "True"
+      TOTAL_CHAOS_DURATION: "600"
+      NODE_CPU_PERCENTAGE: "90"
+      TARGET_NAMESPACE: "default"
+      NODE_SELECTORS: "node-role.kubernetes.io/worker="
       ENABLE_ALERTS: "True"
       ALERTS_PATH: "/home/krkn/kraken/config/alerts_openshift.yaml"       
       CHECK_CRITICAL_ALERTS: "True"
+      WAIT_DURATION: "100"      
       TELEMETRY_ENABLED: "True"
+      KUBE_CHECK: "true"
       TELEMETRY_API_URL: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
       TELEMETRY_USERNAME: "redhat-chaos"
       TELEMETRY_GROUP: "prow"
-      TELEMETRY_RUN_TAG: "network-chaos"
+      TELEMETRY_RUN_TAG: "prow-hog-cpu"
       TELEMETRY_PROMETHEUS_BACKUP: "True"
       TELEMETRY_FULL_PROMETHEUS_BACKUP: "True"
       TELEMTRY_BACKUP_THREADS: "5"
@@ -32,5 +27,5 @@ workflow:
       TELEMETRY_LOGS_BACKUP: "True"
       TELEMTRY_CLI_PATH: "/usr/local/bin/oc"
       TELEMETRY_EVENTS_BACKUP: "True"
-  documentation: |-
-    This workflow runs the krkn-hub config workload in the deployed cluster and introduces network latency, packet loss, bandwidth restriction in the egress traffic of a Node's interface using the tc and Netem.
+  documentation: >-
+    This step runs the krkn-hub config workload in the deployed cluster to hog CPU and validate SLOs to identify components that do not have proper memory limits set to avoid performance throttling or having an impact on stability/availability.
