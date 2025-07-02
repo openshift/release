@@ -25,12 +25,36 @@ while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
 done
 echo "starting master node disruption scenario"
 
+# List of nodes
+nodes=$(oc get nodes -o jsonpath='{.items[*].metadata.name}')
+
+# Check if nodes were found
+if [[ -z "$nodes" ]]; then
+  echo "No nodes found in the cluster."
+  exit 1
+fi
+
+# Select the first node
+node_name=$(echo $nodes | awk '{print $1}')
+
+# Get the region label for the selected node
+node_region=$(oc get node "$node_name" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/region}')
+
+# Check if the region label was found
+if [[ -z "$node_region" ]]; then
+  echo "Region label not found for node $node_name."
+  exit 1
+fi
+
+# Assign region
+REGION=$node_region
+
 platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
 if [ "$platform" = "AWS" ]; then
     mkdir -p $HOME/.aws
     cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
     export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-    aws_region=${REGION:-$LEASED_RESOURCE}
+    aws_region=$REGION
     export AWS_DEFAULT_REGION=$aws_region
 elif [ "$platform" = "GCP" ]; then
     export CLOUD_TYPE="gcp"
@@ -54,7 +78,7 @@ elif [ "$platform" = "IBMCloud" ]; then
     export IBMCLOUD_CLI
     IBMCLOUD_HOME=/output
     export IBMCLOUD_HOME
-    region="${LEASED_RESOURCE}"
+    region="${REGION}"
     CLOUD_TYPE="ibmcloud"
     export CLOUD_TYPE
     export region
