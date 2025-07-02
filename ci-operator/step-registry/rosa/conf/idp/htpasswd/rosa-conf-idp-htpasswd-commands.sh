@@ -41,9 +41,7 @@ read_profile_file() {
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
-echo $SSO_CLIENT_ID > $SHARED_DIR/debug_client_id
-echo $SSO_CLIENT_SECRET > $SHARED_DIR/debug_cli_sec
-echo $ROSA_TOKEN > $SHARED_DIR/debug_token
+echo "need to wait here"
 sleep 6h
 
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
