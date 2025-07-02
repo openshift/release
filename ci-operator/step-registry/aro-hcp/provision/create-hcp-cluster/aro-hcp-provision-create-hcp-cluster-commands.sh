@@ -24,7 +24,7 @@ fi
 
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(az account show --query id --output tsv)
 export TENANT_ID; TENANT_ID=$(az account show --query tenantId --output tsv)
-MANAGED_RESOURCE_GROUP="$CLUSTER_NAME-rg-03"
+MANAGED_RESOURCE_GROUP="$CLUSTER_NAME-rg-managed"
 
 export SUBSCRIPTION_RESOURCE_ID; SUBSCRIPTION_RESOURCE_ID="/subscriptions/${SUBSCRIPTION_ID}"
 export RESOURCE_GROUP_RESOURCE_ID; RESOURCE_GROUP_RESOURCE_ID="${SUBSCRIPTION_RESOURCE_ID}/resourceGroups/${CUSTOMER_RG_NAME}"
@@ -48,7 +48,7 @@ az deployment group create \
   --name 'aro-hcp'\
   --subscription "${SUBSCRIPTION}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
-  --template-file bicep/cluster.bicep \
+  --template-file demo/bicep/cluster.bicep \
   --parameters \
     networkSecurityGroupId="${NSG_ID}" \
     subnetId="${SUBNET_ID}" \
@@ -59,7 +59,7 @@ az deployment group create \
   --name 'node-pool' \
   --subscription "${SUBSCRIPTION}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
-  --template-file bicep/nodepool.bicep \
+  --template-file demo/bicep/nodepool.bicep \
   --parameters \
     clusterName="${CLUSTER_NAME}" \
     nodePoolName="${NP_NAME}"
