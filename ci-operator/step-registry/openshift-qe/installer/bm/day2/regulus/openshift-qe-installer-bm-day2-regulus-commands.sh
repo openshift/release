@@ -31,7 +31,7 @@ if [ -z "${RUNLOCAL:-}" ]; then
   #jetlag_repo=$(cat "${SHARED_DIR}/jetlag_repo")
 
   if [ -n "$LAB" ] && [ -n "$LAB_CLOUD" ]; then
-    jetlag_repo=$(ssh ${SSH_ARGS} root@${bastion} "ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* 2>/dev/null | head -n1"
+    jetlag_repo=$(ssh ${SSH_ARGS} root@${bastion} "ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* 2>/dev/null | head -n1")
     if [ -z "$jetlag_repo" ]; then
       echo "Error: No jetlag repo found matching pattern: /tmp/jetlag-$LAB-$LAB_CLOUD*" >&2
       exit 1
