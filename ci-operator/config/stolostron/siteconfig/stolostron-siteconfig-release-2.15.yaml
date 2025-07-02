@@ -23,7 +23,8 @@ images:
   to: siteconfig-operator
 promotion:
   to:
-  - name: "2.15"
+  - disabled: true
+    name: "2.15"
     namespace: stolostron
 resources:
   '*':
@@ -58,13 +59,34 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: siteconfig-operator
     env:
-      DESTINATION_BRANCH: release-2.15
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: siteconfig-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_VERSION="5"
+        export OSCI_COMPONENT_NAME="siteconfig-operator"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.15
   org: stolostron
   repo: siteconfig
