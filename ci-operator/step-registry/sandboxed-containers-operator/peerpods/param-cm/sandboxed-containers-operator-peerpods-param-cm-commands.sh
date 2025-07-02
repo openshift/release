@@ -12,6 +12,68 @@ cd /tmp || exit 1
 # can reference it.
 PP_CONFIGM_PATH="${SHARED_DIR:-$(pwd)}/peerpods-param-cm.yaml"
 
+handle_aws() {
+    local AWS_REGION
+    local AWS_SG_IDS
+    local AWS_SUBNET_ID
+    local AWS_VPC_ID
+    local INSTANCE_ID
+
+    oc -n kube-system get secret aws-creds -o json > aws-creds.json
+
+    AWS_ACCESS_KEY_ID="$(jq -r .data.aws_access_key_id aws-creds.json | base64 -d)"
+    export AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY="$(jq -r .data.aws_secret_access_key aws-creds.json | base64 -d)"
+    export AWS_SECRET_ACCESS_KEY
+
+    cat<<-EOF > ./auth.json
+    {
+      "aws": {
+        "aws_access_key_id": "${AWS_ACCESS_KEY_ID}",
+        "aws_secret_access_key": "${AWS_SECRET_ACCESS_KEY}"
+      }
+    }
+EOF
+
+    oc create secret generic peerpods-param-secret --from-file=./auth.json -n default
+
+    INSTANCE_ID=$(oc get nodes -l 'node-role.kubernetes.io/worker' -o jsonpath='{.items[0].spec.providerID}' | sed 's#[^ ]*/##g')
+    AWS_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.aws.region}')
+    AWS_SUBNET_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SubnetId' --region "${AWS_REGION}" --output text)
+    AWS_VPC_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].VpcId' --region "${AWS_REGION}" --output text)
+    AWS_SG_IDS=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SecurityGroups[*].GroupId' --region "${AWS_REGION}" --output text | tr ' \t' ',')
+
+    # Opening ports
+    for AWS_SG_ID in ${AWS_SG_IDS/,/ }; do
+        aws ec2 authorize-security-group-ingress \
+            --group-id "${AWS_SG_ID}" --protocol tcp --port 15150 \
+            --source-group "${AWS_SG_ID}" --region "${AWS_REGION}" \
+            --no-paginate
+        aws ec2 authorize-security-group-ingress \
+            --group-id "${AWS_SG_ID}" --protocol tcp --port 9000 \
+            --source-group "${AWS_SG_ID}" --region "${AWS_REGION}" \
+            --no-paginate
+    done
+
+    cat <<-EOF > "${PP_CONFIGM_PATH}"
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: peerpods-param-cm
+      namespace: default
+    data:
+      CLOUD_PROVIDER: "aws"
+      AWS_REGION: "${AWS_REGION}"
+      AWS_SUBNET_ID: "${AWS_SUBNET_ID}"
+      AWS_VPC_ID: "${AWS_VPC_ID}"
+      AWS_SG_IDS: "${AWS_SG_IDS}"
+      VXLAN_PORT: "9000"
+      PODVM_INSTANCE_TYPE: "t3.medium"
+      PODVM_INSTANCE_TYPES: "t3.small,t3.medium,t3.large,t3.xlarge,g4dn.2xlarge,g5.2xlarge,p3.2xlarge"
+      PROXY_TIMEOUT: "30m"
+EOF
+}
+
 handle_azure() {
     local AZURE_RESOURCE_GROUP
     local AZURE_AUTH_LOCATION
@@ -157,7 +219,16 @@ EOF
     oc create secret generic peerpods-param-secret --from-file="${AZURE_AUTH_LOCATION}" -n default
 }
 
-echo "Creating peerpods-param-cm for azure"
-handle_azure
+provider="$(oc get infrastructure -n cluster -o json | jq '.items[].status.platformStatus.type'  | awk '{print tolower($0)}' | tr -d '"')"
+echo "Creating peerpods-param-cm for ${provider}"
+case $provider in
+    aws)
+        handle_aws ;;
+    azure)
+        handle_azure ;;
+    *)
+        echo "ERROR: handler not implemented for that provider"
+        exit 1 ;;
+esac
 
 oc create -f "${PP_CONFIGM_PATH}"
