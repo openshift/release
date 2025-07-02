@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 set -o pipefail
-
+exit 0
 echo "Create group_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
 
