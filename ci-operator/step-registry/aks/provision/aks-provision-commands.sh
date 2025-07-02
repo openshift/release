@@ -69,6 +69,7 @@ AKS_CREATE_COMMAND=(
     --location "$AZURE_LOCATION"
     --network-plugin azure
     --network-policy azure
+    --max-pods 250
 )
 
 if [[ -n "$AKS_ADDONS" ]]; then
