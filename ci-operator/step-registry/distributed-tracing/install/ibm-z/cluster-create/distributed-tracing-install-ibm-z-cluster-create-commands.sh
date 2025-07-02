@@ -6,28 +6,40 @@ set -o pipefail
 cd /tmp
 pwd
 
-KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
-PRIVATE_KEY_FILE="/root/.ssh/id_rsa"
-SSH_KEY_PATH=$PRIVATE_KEY_FILE
+# Define required values these we can export in the env
+CLUSTER_VERSION=4.18.1
+CLUSTER_NAME=ocp-demo-ci-script
+PULL_SECRET_FILE='/root/ocp-pull-secrte.json'
 
-SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
+
+
+# install kubectl
+#curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+#chmod +x kubectl
+
+# Kubeconfig file
+KUBECONFIG_FILE="/tmp/kubeconfig"
 
 IP_JUMPHOST=128.168.131.205
 CLUSTER_VARS_PATH="/root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning/cluster-vars"
 
+# Define SSH command just like Power script
 SSH_CMD=$(cat <<EOF
-export OCP_CLUSTER_VERSION="${OCP_CLUSTER_VERSION}";
-export CLUSTER_NAME="${CLUSTER_NAME}";
-export PULL_SECRET_FILE="${PULL_SECRET_FILE}";
-export IC_API_KEY="${IC_API_KEY}";
-echo "OCP_CLUSTER_VERSION=\$OCP_CLUSTER_VERSION" > $CLUSTER_VARS_PATH;
-echo "CLUSTER_NAME=\$CLUSTER_NAME" >> $CLUSTER_VARS_PATH;
-echo "PULL_SECRET_FILE=\$PULL_SECRET_FILE" >> $CLUSTER_VARS_PATH;
-echo "IC_API_KEY=\$IC_API_KEY" >> $CLUSTER_VARS_PATH;
-/root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning/create-cluster.sh
+set -e
+
+# Append values directly to cluster-vars
+{
+  echo "CLUSTER_VERSION='${CLUSTER_VERSION}'"
+  echo "CLUSTER_NAME='${CLUSTER_NAME}'"
+  echo "PULL_SECRET_FILE='${PULL_SECRET_FILE}'"
+} >> "$CLUSTER_VARS_PATH"
+
+cd /root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning
+./create-cluster.sh
 EOF
 )
 
-ssh $SSH_ARGS root@$IP_JUMPHOST "$SSH_CMD" > "$KUBECONFIG_FILE"
+# Run the SSH command
+ssh root@$IP_JUMPHOST "$SSH_CMD" > "$KUBECONFIG_FILE"
 
-KUBECONFIG="$KUBECONFIG_FILE" ./oc get nodes
+KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes
