@@ -46,7 +46,6 @@ else
   jetlag_repo=$JETLAG_REPO
 fi
 
-}
 function do_ssh() {
     local user_host="$1"
     shift
@@ -56,7 +55,7 @@ function do_ssh() {
 }
 
 # clear debug log file
-do_ssh root@$bastion "echo \"NEW RUN" > /tmp/log"
+do_ssh root@$bastion "echo \"NEW RUN jetlag_repo=$jetlag_repo\" > /tmp/log"
 
 # Use the jetlag_repo artifact to learn the cloud's bastion hostname.
 if [ -z "${REMOTE_BASTION_HOST}" ] ; then
@@ -78,13 +77,6 @@ fi
 
 
 # nested ssh 
-function old_do_jssh() {
-    local user_host="$1"
-    shift
-    local user=$(echo "$user_host" | awk -F@ '{print $1}')
-    ssh ${SSH_ARGS} -J ${user_host} ${REMOTE_BASTION_USER}@${REMOTE_BASTION_HOST} "$@"
-    return $?
-
 function do_jssh() {
     local user_host="$1"
     shift
@@ -130,7 +122,6 @@ fi
 regulus_repo="/root/REGULUS/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
 install-regulus() {
   do_jssh root@${bastion} "
-    echo REMOTE_BASTION_HOST=$REMOTE_BASTION_HOST >> /tmp/regulus.log
     export REG_PR='${REG_PR}' PULL_NUMBER='${PULL_NUMBER}' REPO_NAME='${REPO_NAME}' REG_BRANCH='${REG_BRANCH}'
     regulus_repo='${regulus_repo}'
     set -e
