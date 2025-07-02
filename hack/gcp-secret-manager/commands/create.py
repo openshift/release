@@ -225,7 +225,7 @@ def prompt_for_annotation(msg: str) -> str:
         click.echo("Input cannot be empty. Please enter a value or 'N/A'.")
 
 
-def check_annotations_size(annotations: Dict) -> bool:
+def check_annotations_size(annotations: Dict):
     size = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
         for key, value in annotations.items()
