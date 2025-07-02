@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "************ openshift cert rotation shutdown test command ************"
+echo "************ openshift cert rotation mirror images command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
@@ -233,11 +233,19 @@ cp -rvf ~/pull-secret /run/secrets/ci.openshift.io/cluster-profile
 # Mirror test images
 DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
 export KUBECONFIG=/root/.kube/config
-openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
-oc image mirror -f /tmp/mirror --registry-config ~/pull-secret
-echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
-oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.redhat.io/rhel8/httpd-24:latest ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-12-registry-k8s-io-e2e-test-images-httpd-2-4-38-4-lYFH2l3oSS5xEICa
 
+set +e
+for retry in {1..5}
+do
+    echo "[$(date)] Retrying test image mirror #${retry}"
+    openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror && \
+    echo && \
+    oc image mirror -f /tmp/mirror --registry-config ~/pull-secret && \
+    break
+    sleep 15
+done
+set -e
+echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
 
 # Build registries.conf
 tail -n 12 /tmp/oc-mirror.output | tee /tmp/icsp.yaml
@@ -277,13 +285,14 @@ MIRRORED_RELEASE_IMAGE=$(grep -oP "Update image:\s*\K.+" /tmp/oc-mirror.output)
 MIRRORED_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" -o template --template='{{.digest}}' )
 MUST_GATHER_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=must-gather | cut -f 2 -d '@' )
 MIRRORED_MUST_GATHER_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${MUST_GATHER_DIGEST}"
-HYPERKUBE_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=hyperkube | cut -f 2 -d '@' )
-MIRRORED_HYPERKUBE_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${HYPERKUBE_DIGEST}"
+MIRRORED_HYPERKUBE_IMAGE="$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=hyperkube )"
+MIRRORED_MCO_IMAGE="$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=machine-config-operator )"
 
 echo "export RELEASE_IMAGE_LATEST=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}" >> ~/config.sh
-echo "export HYPERKUBE_IMAGE=${MIRRORED_HYPERKUBE_IMAGE}" >> ~/config.sh
+echo "export MIRRORED_HYPERKUBE_IMAGE=${MIRRORED_HYPERKUBE_IMAGE}" >> ~/config.sh
+echo "export MIRRORED_MCO_IMAGE=${MIRRORED_MCO_IMAGE}" >> ~/config.sh
 #TODO: Fix assisted-test-infra to pass CA bundle in skipper
 echo "export OPENSHIFT_VERSION=4.14" >> ~/config.sh
 
