@@ -69,6 +69,7 @@ EnableIpv6="no"
 if [[ "${IPSTACK}" == "dualstack" ]]; then
     echo "IPSTACK: $IPSTACK"
     EnableIpv6="yes"
+    VpcIpv6Cidr=$(jq -r '.vpc_ipv6_cidr //"2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128"' "${SHARED_DIR}/vpc_info.json")
 fi
 
 stack_name="${CLUSTER_NAME}-bas"
@@ -132,6 +133,11 @@ Parameters:
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
     Default: 10.0.0.0/16
     Description: CIDR block for VPC.
+    Type: String
+  VpcIpv6Cidr:
+    ConstraintDescription: IPv6 CIDR block parameter
+    Default: 2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128
+    Description: IPv6 CIDR block for VPC.
     Type: String
   VpcId:
     Description: The VPC-scoped resources will belong to this VPC.
@@ -226,8 +232,8 @@ Resources:
       GroupDescription: Bastion Host Security Group for ipv4
       SecurityGroupIngress:
       - IpProtocol: icmp
-        FromPort: 0
-        ToPort: 0
+        FromPort: -1
+        ToPort: -1
         CidrIp: !Ref VpcCidr
       - IpProtocol: tcp
         FromPort: 22
@@ -264,6 +270,14 @@ Resources:
     Properties:
       GroupDescription: Bastion Host Security Group for ipv6
       SecurityGroupIngress:
+      - IpProtocol: icmpv6
+        FromPort: -1
+        ToPort: -1
+        CidrIpv6: !Ref VpcIpv6Cidr
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 3128
         ToPort: 3129
@@ -346,6 +360,7 @@ aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
         ParameterKey=VpcId,ParameterValue="${VpcId}"  \
+        ParameterKey=VpcIpv6Cidr,ParameterValue="${VpcIpv6Cidr-2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128}"  \
         ParameterKey=BastionHostInstanceType,ParameterValue="${BastionHostInstanceType}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=PublicSubnet,ParameterValue="${PublicSubnet}" \
