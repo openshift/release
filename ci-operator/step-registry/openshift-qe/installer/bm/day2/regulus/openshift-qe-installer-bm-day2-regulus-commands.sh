@@ -25,7 +25,6 @@ TRUE_BASTION_HOST="${TRUE_BASTION_HOST:-}"      # second level such as cloud48 b
 TRUE_BASTION_USER="${TRUE_BASTION_USER:-root}"
 LAB_CLOUD="${LAB_CLOUD:-}"
 LAB="${LAB:-}"
-REG_LOG=/tmp/regulus.log                        # file is created on first level bastion
 
 # Enable debug mode with environment variable
 DEBUG_MODE="${DEBUG_MODE:-false}"
@@ -40,7 +39,6 @@ debug_echo() {
 function do_ssh() {
     local user_host="$1"
     shift
-    local user=$(echo "$user_host" | awk -F@ '{print $1}')
     ssh ${SSH_ARGS} ${user_host} "$@"
     return $?
 }
@@ -50,35 +48,11 @@ function do_ssh() {
 function do_jssh() {
     local user_host="$1"
     shift
-    local user=$(echo "$user_host" | awk -F@ '{print $1}')
-
-    if [[ "${DEBUG_MODE}" == "true" ]]; then 
-       local ssh_cmd="ssh -i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand=\"ssh -i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ${user_host}\" ${TRUE_BASTION_USER}@${TRUE_BASTION_HOST} $*"
-      # use the below style to make quoting the least troublesome.
-      do_ssh $user_host  /bin/bash << EOF
-echo "executing: $ssh_cmd" >> $REG_LOG
-echo "user_host=$user_host" >> $REG_LOG
-echo "TRUE_BASTION_USER=$TRUE_BASTION_USER" >> $REG_LOG
-echo " TRUE_BASTION_HOST=$TRUE_BASTION_HOST" >> $REG_LOG
-echo "command arguments: $*" >> $REG_LOG
-echo "---" >> $REG_LOG
-EOF
-    fi # debug
-
     # Use ProxyCommand for nested SSH to control options for both connections
     ssh ${SSH_ARGS} \
         -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p ${user_host}" \
         ${TRUE_BASTION_USER}@${TRUE_BASTION_HOST} "$@"
-
-    local exit_code=$?
-
-    if [[ "${DEBUG_MODE}" == "true" ]]; then 
-       do_ssh $user_host  /bin/bash << EOF
-echo "do_jssh exit code: $exit_code" >> $REG_LOG
-echo "===================" >> $REG_LOG
-EOF
-    fi # end debug
-    return $exit_code
+    return $?
 }
 
 # 2-level, nested scp
@@ -113,34 +87,20 @@ if [ -z "${RUNLOCAL:-}" ]; then
   fi
   bastion=$(cat /bm/address)
   SSH_ARGS="-i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  #jetlag_repo=$(cat "${SHARED_DIR}/jetlag_repo")
-
-  if [ -n "$LAB" ] && [ -n "$LAB_CLOUD" ]; then
-    jetlag_repo=$(ssh ${SSH_ARGS} root@${bastion} "ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* 2>/dev/null | head -n1")
-    if [ -z "$jetlag_repo" ]; then
-      echo "Error: No jetlag repo found matching pattern: /tmp/jetlag-$LAB-$LAB_CLOUD*" >&2
-      exit 1
-    fi
-  else
-    echo "Error: LAB or LAB_CLOUD variables are empty" >&2
-    exit 1
-  fi
 else
   bastion=$BASTION
   SSH_ARGS="-i $PRIVATE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 fi
 
 if [ -n "$LAB" ] && [ -n "$LAB_CLOUD" ]; then
-        jetlag_repo=$(do_ssh root@${bastion} "ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* 2>/dev/null | head -n1")
-        if [ -z "$jetlag_repo" ]; then
+    jetlag_repo=$(do_ssh root@${bastion} "ls -dt /tmp/jetlag-$LAB-$LAB_CLOUD* 2>/dev/null | head -n1")
+    if [ -z "$jetlag_repo" ]; then
       echo "Error: No jetlag repo found matching pattern: /tmp/jetlag-$LAB-$LAB_CLOUD*" >&2
       exit 1
     fi
-fi
-
-# start a new debug log file
-if [[ "${DEBUG_MODE}" == "true" ]]; then
-   do_ssh root@$bastion "echo \"NEW RUN jetlag_repo=$jetlag_repo\" > $REG_LOG"
+else
+    echo "Error: LAB or LAB_CLOUD variables are empty" >&2
+    exit 1
 fi
 
 # Use the jetlag_repo artifact to learn the true bastion identity.
@@ -252,17 +212,17 @@ for v in "${vars[@]}"; do
   printf 'export %s="%s"\n' "$v" "$safe_val" >> /tmp/lab.config
 done
 
-
 # ───────────────────────────────────────────────────────────────────────────
 # Launch Regulus (tests are listed in regulus_repo/jobs.config)
 # ───────────────────────────────────────────────────────────────────────────
 run-regulus() {
+  # for "ssh core@worker_ip" from the true bastion, it needs the key of the host that jetlag ran from.
   do_jscp "root@${bastion}" "/tmp/lab.config" "${regulus_repo}/lab.config"
   do_jssh "root@${bastion}" "
     set -e
     set -o pipefail
     cd ${regulus_repo}
-    bash run_cpt.sh
+    bash ./run_cpt.sh
   "
 }
 run-regulus
@@ -275,6 +235,5 @@ do_ssh root@${bastion} "
         echo bash /tmp/clean-resources.sh
     fi 
 "
-
 
 # EOF
