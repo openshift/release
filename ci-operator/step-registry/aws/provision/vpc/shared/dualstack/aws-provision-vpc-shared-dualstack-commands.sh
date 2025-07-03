@@ -74,6 +74,13 @@ Parameters:
     - "no"
     Description: "Create a dhcpOptionSet with a custom DNS name"
     Type: String
+  Ipv6OnlyPrivateSubnets:
+    Default: "no"
+    AllowedValues:
+    - "yes"
+    - "no"
+    Description: "Create ipv6-only subnets in the dualstack vpc"
+    Type: String
   AllowedAvailabilityZoneList:
     ConstraintDescription: "Select AZs from this list, e.g. 'us-east-2c,us-east-2a'"
     Type: CommaDelimitedList
@@ -103,7 +110,11 @@ Conditions:
   DoAz3: !Equals [3, !Ref AvailabilityZoneCount]
   DoAz2: !Or [!Equals [2, !Ref AvailabilityZoneCount], Condition: DoAz3]
   DoDhcp: !Equals ["yes", !Ref DhcpOptionSet]
-  AzRestriction: !Not [ !Equals [!Join ['', !Ref AllowedAvailabilityZoneList], ''] ]
+  DoIpv6OnlyPrivateSubnets: !Equals ["yes", !Ref Ipv6OnlyPrivateSubnets]
+  DoIpv4NatAZ3: !And [!Not [Condition: DoIpv6OnlyPrivateSubnets], Condition: DoAz3]
+  DoIpv4NatAZ2: !And [!Not [Condition: DoIpv6OnlyPrivateSubnets], Condition: DoAz2]
+  DoIpv4NatAZ1: !Not [Condition: DoIpv6OnlyPrivateSubnets]
+  AzRestriction: !Not [!Equals [!Join ['', !Ref AllowedAvailabilityZoneList], '']]
 
 Resources:
   VPC:
@@ -216,7 +227,9 @@ Resources:
     Type: "AWS::EC2::Subnet"
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
+      CidrBlock: !If [ DoIpv6OnlyPrivateSubnets, !Ref "AWS::NoValue", !Select [3, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]] ]
+      EnableDns64: !If [ DoIpv6OnlyPrivateSubnets, true, false ]
+      Ipv6Native: !If [ DoIpv6OnlyPrivateSubnets, true, false ]
       Ipv6CidrBlock: !Select [ 3, !Cidr [ !Select [ 0, !GetAtt VPC.Ipv6CidrBlocks], 8, !Ref SubnetBitsIpv6 ]]
       AssignIpv6AddressOnCreation: true
       AvailabilityZone:
@@ -238,6 +251,7 @@ Resources:
     DependsOn:
     - GatewayToInternet
     Type: "AWS::EC2::NatGateway"
+    Condition: DoIpv4NatAZ1
     Properties:
       AllocationId:
         "Fn::GetAtt":
@@ -246,10 +260,12 @@ Resources:
       SubnetId: !Ref PublicSubnet
   EIP:
     Type: "AWS::EC2::EIP"
+    Condition: DoIpv4NatAZ1
     Properties:
       Domain: vpc
   Route:
     Type: "AWS::EC2::Route"
+    Condition: DoIpv4NatAZ1
     Properties:
       RouteTableId:
         Ref: PrivateRouteTable
@@ -272,7 +288,9 @@ Resources:
     Condition: DoAz2
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
+      CidrBlock: !If [ DoIpv6OnlyPrivateSubnets, !Ref "AWS::NoValue", !Select [4, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]] ]
+      EnableDns64: !If [ DoIpv6OnlyPrivateSubnets, true, false ]
+      Ipv6Native: !If [ DoIpv6OnlyPrivateSubnets, true, false ]
       Ipv6CidrBlock: !Select [ 4, !Cidr [ !Select [ 0, !GetAtt VPC.Ipv6CidrBlocks], 8, !Ref SubnetBitsIpv6 ]]
       AssignIpv6AddressOnCreation: true
       AvailabilityZone:
@@ -296,7 +314,7 @@ Resources:
     DependsOn:
     - GatewayToInternet
     Type: "AWS::EC2::NatGateway"
-    Condition: DoAz2
+    Condition: DoIpv4NatAZ2
     Properties:
       AllocationId:
         "Fn::GetAtt":
@@ -305,12 +323,12 @@ Resources:
       SubnetId: !Ref PublicSubnet2
   EIP2:
     Type: "AWS::EC2::EIP"
-    Condition: DoAz2
+    Condition: DoIpv4NatAZ2
     Properties:
       Domain: vpc
   Route2:
     Type: "AWS::EC2::Route"
-    Condition: DoAz2
+    Condition: DoIpv4NatAZ2
     Properties:
       RouteTableId:
         Ref: PrivateRouteTable2
@@ -334,7 +352,9 @@ Resources:
     Condition: DoAz3
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]]
+      CidrBlock: !If [ DoIpv6OnlyPrivateSubnets, !Ref "AWS::NoValue", !Select [5, !Cidr [!Ref VpcCidr, 8, !Ref SubnetBits]] ]
+      EnableDns64: !If [ DoIpv6OnlyPrivateSubnets, true, false ]
+      Ipv6Native: !If [ DoIpv6OnlyPrivateSubnets, true, false ]
       Ipv6CidrBlock: !Select [ 5, !Cidr [ !Select [ 0, !GetAtt VPC.Ipv6CidrBlocks], 8, !Ref SubnetBitsIpv6 ]]
       AssignIpv6AddressOnCreation: true
       AvailabilityZone:
@@ -358,7 +378,7 @@ Resources:
     DependsOn:
     - GatewayToInternet
     Type: "AWS::EC2::NatGateway"
-    Condition: DoAz3
+    Condition: DoIpv4NatAZ3
     Properties:
       AllocationId:
         "Fn::GetAtt":
@@ -367,12 +387,12 @@ Resources:
       SubnetId: !Ref PublicSubnet3
   EIP3:
     Type: "AWS::EC2::EIP"
-    Condition: DoAz3
+    Condition: DoIpv4NatAZ3
     Properties:
       Domain: vpc
   Route3:
     Type: "AWS::EC2::Route"
-    Condition: DoAz3
+    Condition: DoIpv4NatAZ3
     Properties:
       RouteTableId:
         Ref: PrivateRouteTable3
@@ -576,6 +596,8 @@ if [[ ${ZONES_LIST} != "" ]]; then
   aws_add_param_to_json "AllowedAvailabilityZoneList" "${ZONES_LIST}" "$vpc_params"
 fi
 
+aws_add_param_to_json "Ipv6OnlyPrivateSubnets" "${VPC_IPv6_ONLY_PRIVATE_SUBNETS:-no}" "$vpc_params"
+
 aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME}" \
   --template-body "$(cat /tmp/01_vpc.yaml)" \
@@ -641,6 +663,11 @@ echo '{}' > ${vpc_info_json}
 
 # vpc_id
 cat <<< "$(jq --arg v $VpcId '.vpc_id = $v' ${vpc_info_json})" > ${vpc_info_json}
+
+VpcIpv4CidrBlock=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="Ipv4CidrBlock") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
+VpcIpv6CidrBlock=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="Ipv6CidrBlock") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
+cat <<< "$(jq --arg v $VpcIpv4CidrBlock '.vpc_ipv4_cidr = $v' ${vpc_info_json})" > ${vpc_info_json}
+cat <<< "$(jq --arg v $VpcIpv6CidrBlock '.vpc_ipv6_cidr = $v' ${vpc_info_json})" > ${vpc_info_json}
 
 subnets_by_az_1=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="SubnetsByAz1") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
 subnets_by_az_2=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="SubnetsByAz2") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")

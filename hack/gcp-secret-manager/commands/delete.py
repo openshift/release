@@ -2,12 +2,13 @@
 # pylint: disable=E0401, C0413
 
 import click
-from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
     ensure_authentication,
     get_secret_name,
+    get_secrets_from_index,
+    update_index_secret,
     validate_collection,
     validate_secret_name,
 )
@@ -34,19 +35,24 @@ def delete(collection: str, secret: str):
     """Delete a secret from the specified collection."""
 
     ensure_authentication()
+    client = secretmanager.SecretManagerServiceClient()
 
+    index_secrets = get_secrets_from_index(client, collection)
+
+    # Remove from index if present (if missing from index, don't fail)
+    if secret in index_secrets:
+        index_secrets.remove(secret)
+        update_index_secret(client, collection, index_secrets)
+
+    # Remove from GSM if present (don't fail if missing)
     try:
-        client = secretmanager.SecretManagerServiceClient()
-        name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
-        client.delete_secret(name=name)
-        click.echo(f"Secret '{secret}' deleted")
-    except NotFound:
-        raise click.UsageError(
-            f"Secret '{secret}' not found in collection '{collection}' (project: {PROJECT_ID})."
-        )
-    except PermissionDenied:
-        raise click.UsageError(
-            f"Access denied: You do not have permission to delete secret '{secret}'."
+        click.echo(f"Deleting secret '{secret}'...")
+        client.delete_secret(
+            name=client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
         )
     except Exception as e:
-        raise click.UsageError(f"Error deleting secret '{secret}': {e}")
+        raise click.ClickException(
+            f"Failed to delete secret '{secret}': {e}. Please retry the delete operation."
+        )
+
+    click.echo(f"Secret '{secret}' successfully deleted.")
