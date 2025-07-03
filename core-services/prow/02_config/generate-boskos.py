@@ -523,6 +523,8 @@ CONFIG = {
     },
     'observability-aws-quota-slice': {
         'default': 50,
+        'us-east-1': 25,
+        'us-east-2': 25,
     },
     'aro-redhat-tenant-quota-slice': {
         'default': 1,
