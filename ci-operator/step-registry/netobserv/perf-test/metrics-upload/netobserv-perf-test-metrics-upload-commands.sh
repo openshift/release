@@ -94,7 +94,13 @@ function generate_sheet(){
     export GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
     install_requirements requirements.txt
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    SHEET_NAME=""
     # JOB_NAME, JOB_NAME_SAFE, PULL_NUMBER vars are set by prow.
+
+    # Set custom sheet name prefix if SHEET_NAME_PREFIX is defined
+    if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_SHEET_PREFIX:-} ]]; then
+        SHEET_NAME+="${MULTISTAGE_PARAM_OVERRIDE_SHEET_PREFIX}-"
+    fi
 
     # check if JOB_PREFIX is a rehearsal of periodic job.
     if [[ $JOB_NAME =~ ^"rehearse" ]]; then
@@ -106,16 +112,16 @@ function generate_sheet(){
             JOB_PREFIX=${JOB_NAME%-pull*}
         fi
         
-        SHEET_NAME="$JOB_NAME_SAFE-$JOB_PREFIX-$timestamp"
+        SHEET_NAME+="$JOB_NAME_SAFE-$JOB_PREFIX-$timestamp"
     fi
 
     # check if the job starts from PR of component test
     if [[ $JOB_NAME =~ ^"pull" ]]; then
-        SHEET_NAME="$JOB_NAME_SAFE-pull-$PULL_NUMBER-$timestamp"
+        SHEET_NAME+="$JOB_NAME_SAFE-pull-$PULL_NUMBER-$timestamp"
     fi
 
     if [[ $JOB_NAME =~ ^"periodic" ]]; then
-        SHEET_NAME="periodic-$JOB_NAME_SAFE-$timestamp"
+        SHEET_NAME+="periodic-$JOB_NAME_SAFE-$timestamp"
     fi
     
     if [[ -n $ops && $ops == "comparison" ]]; then
