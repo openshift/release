@@ -407,9 +407,11 @@ function summarize_test_results() {
 
     teamfiles="$(find "${ARTIFACT_DIR}" -name "$(basename "${bakfile}").*")"
     for teamfile in $teamfiles ; do
-        tests="$(grep '<testcase' "$teamfile" | wc -l)"
+        failures="$(grep 'type="failed"' "$teamfile" | wc -l)" || true
+        skipped="$(grep 'skipped/' "$teamfile" | wc -l)" || true
+        tests="$(grep '<testcase' "$teamfile" | wc -l)" || true
         sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$teamfile"
-        sed -i "1 a \  <testsuite failures=\"0\" errors=\"0\" skipped=\"0\" tests=\"$tests\" name=\"${teamfile##*.}\">" "$teamfile"
+        sed -i "1 a \  <testsuite failures=\"$failures\" errors=\"0\" skipped=\"$skipped\" tests=\"$tests\" name=\"${teamfile##*.}\">" "$teamfile"
         sed -i '$ a \  </testsuite>' "$teamfile"
     done
 
