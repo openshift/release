@@ -77,7 +77,7 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
     index_secrets = get_secrets_from_index(client, collection)
     if secret in index_secrets:
         raise click.ClickException(
-            f"Secret '{secret}' already exists in collection '{collection}'."
+            f"Secret '{secret}' already exists within the collection index."
         )
     try:
         client.get_secret(name=client.secret_path(PROJECT_ID, secret_name))
