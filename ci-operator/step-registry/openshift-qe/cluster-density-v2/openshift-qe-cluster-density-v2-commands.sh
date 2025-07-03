@@ -20,6 +20,10 @@ fi
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 echo "proxy is: ${proxy}"
 http_proxy=${proxy} https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
+export http_proxy
+export https_proxy
+export HTTP_PROXY
+export HTTPS_PROXY
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
