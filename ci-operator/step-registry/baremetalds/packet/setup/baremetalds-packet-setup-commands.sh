@@ -80,7 +80,7 @@ cat > packet-config.yaml <<-EOF
         fi
 
         IP=\$(cat "\${SHARED_DIR}/server-ip")
-        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/equinix-ssh-key")
 
         # Checkout packet server
         for x in \$(seq 10) ; do

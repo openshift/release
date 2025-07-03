@@ -37,7 +37,6 @@ if [[ -f "${AWSCRED}" ]]; then
   export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
 else
   echo "Did not find compatible cloud provider cluster_profile"
-  exit 1
 fi
 
 if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
@@ -48,7 +47,6 @@ elif [[ -n "${ROSA_TOKEN}" ]]; then
   rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
   echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
-  exit 1
 fi
 
 EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER}" 
