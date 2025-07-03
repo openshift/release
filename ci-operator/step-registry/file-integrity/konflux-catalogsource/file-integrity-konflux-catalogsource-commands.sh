@@ -36,10 +36,10 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle-release
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle-$TEST_TYPE
     source: registry.redhat.io/compliance/openshift-file-integrity-operator-bundle
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-release
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-$TEST_TYPE
     source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
 EOF
 		echo "!!! fail to create the ICSP"
@@ -155,11 +155,6 @@ main() {
 	run "oc whoami"
 	run "oc version -o yaml"
 
-	if [ -z "${INDEX_IMAGE}" ]; then
-		echo "'INDEX_IMAGE' is empty. Skipping catalog source creation..."
-		exit 0
-	fi
-
 	create_icsp_connected || {
 		echo "failed to create imagecontentsourcepolicies. resolve the above errors"
 		return 1
@@ -173,6 +168,12 @@ main() {
 		echo "failed to check marketplace. resolve the above errors"
 		return 1
 	}
+
+	if [[ -z "${INDEX_IMAGE}" ]]; then
+		echo "'INDEX_IMAGE' is empty. Skipping catalog source creation..."
+		exit 0
+	fi
+
 	create_catalog_sources || {
 		echo "failed to create catalogsource. resolve the above errors"
 		return 1
