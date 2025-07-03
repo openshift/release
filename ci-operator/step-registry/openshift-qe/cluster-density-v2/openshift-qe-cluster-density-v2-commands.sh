@@ -3,6 +3,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+    cat "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+sleep 3600
+
 cat /etc/os-release
 oc config view
 oc projects
@@ -11,19 +19,6 @@ python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
-
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-    cat "${SHARED_DIR}/proxy-conf.sh"
-fi
-
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
-echo "proxy is: ${proxy}"
-http_proxy=${proxy} https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
-export http_proxy
-export https_proxy
-export HTTP_PROXY
-export HTTPS_PROXY
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
