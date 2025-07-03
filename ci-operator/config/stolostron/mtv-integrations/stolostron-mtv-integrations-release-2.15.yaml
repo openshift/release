@@ -15,6 +15,11 @@ images:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: mtv-integrations
+promotion:
+  to:
+  - disabled: true
+    name: "2.15"
+    namespace: stolostron
 resources:
   '*':
     requests:
@@ -73,13 +78,33 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: mtv-integrations
     env:
-      DESTINATION_BRANCH: release-2.15
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: mtv-integrations
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="mtv-integrations"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.15
   org: stolostron
   repo: mtv-integrations
