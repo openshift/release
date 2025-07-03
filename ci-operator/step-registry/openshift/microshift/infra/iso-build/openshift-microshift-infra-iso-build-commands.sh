@@ -17,8 +17,14 @@ download_microshift_scripts
 "\${DNF_RETRY}" "install" "pcp-zeroconf jq"
 ci_copy_secrets "${CACHE_REGION}"
 
-sudo systemctl start pmcd
-sudo systemctl start pmlogger
+if ! sudo systemctl start pmcd; then
+    sudo journalctl -u pmcd
+    exit 1
+fi
+if ! sudo systemctl start pmlogger; then
+    sudo journalctl -u pmlogger
+    exit 1
+fi
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
@@ -51,9 +57,19 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     # brew to be included in the source repository archive
     pushd "${src_path}" &>/dev/null
     if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
-        ocpversion="4.$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
+        y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
-        bash -x ./test/bin/manage_brew_rpms.sh download "${ocpversion}" "${out_path}"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}"
+
+        # Fetch brew RPMs for release regression testing
+        # Condition to skip it if manage_brew_rpms.sh script latest version is not backported to all release branches
+        if ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type'  ; then
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "rc" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "ec" || true
+        fi
     fi
     popd &>/dev/null
 fi

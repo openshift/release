@@ -48,7 +48,7 @@ CONFIG = {
         'us-east-2': 2,
     },
     'aws-sd-qe-quota-slice': {
-        'us-west-2': 3,
+        'us-west-2': 10,
     },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
@@ -523,6 +523,8 @@ CONFIG = {
     },
     'observability-aws-quota-slice': {
         'default': 50,
+        'us-east-1': 25,
+        'us-east-2': 25,
     },
     'aro-redhat-tenant-quota-slice': {
         'default': 1,
