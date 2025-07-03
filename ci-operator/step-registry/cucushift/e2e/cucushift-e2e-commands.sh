@@ -410,8 +410,9 @@ function summarize_test_results() {
         failures="$(grep 'type="failed"' "$teamfile" | wc -l)" || true
         skipped="$(grep 'skipped/' "$teamfile" | wc -l)" || true
         tests="$(grep '<testcase' "$teamfile" | wc -l)" || true
+        name="$(sed -E 's;.*.bak.([^.]+).xml;\1;' <<< "$teamfile")_cucushift"
         sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$teamfile"
-        sed -i "1 a \  <testsuite failures=\"$failures\" errors=\"0\" skipped=\"$skipped\" tests=\"$tests\" name=\"${teamfile##*.}\">" "$teamfile"
+        sed -i "1 a \  <testsuite failures=\"$failures\" errors=\"0\" skipped=\"$skipped\" tests=\"$tests\" name=\"$name\">" "$teamfile"
         sed -i '$ a \  </testsuite>' "$teamfile"
     done
 
