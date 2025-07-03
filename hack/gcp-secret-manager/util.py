@@ -12,6 +12,7 @@ from google.api_core.exceptions import PermissionDenied
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import secretmanager
+from google.cloud.secretmanager import SecretPayload
 
 # Test Platform's project in GCP Secret Manager
 PROJECT_ID = "openshift-ci-secrets"
@@ -223,7 +224,7 @@ def get_secrets_from_index(
     try:
         secret_list = yaml.safe_load(response.payload.data.decode("UTF-8"))
     except yaml.YAMLError as e:
-        click.echo("Failed to parse the index secret:", e)
+        click.echo(f"Failed to parse the index secret: {e}")
 
     return secret_list
 
@@ -248,7 +249,7 @@ def update_index_secret(
     payload = yaml.safe_dump(sorted(secret_names))
     try:
         client.add_secret_version(
-            parent=name, payload={"data": payload.encode("utf-8")}
+            parent=name, payload=SecretPayload(data=payload.encode("utf-8"))
         )
     except Exception as e:
         raise click.ClickException(
