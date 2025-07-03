@@ -41,7 +41,7 @@ def list_secrets(output: str, collection: str, group: str):
     If no collection is provided, lists all secret collections.
     """
     if collection != "" and group != "":
-        raise click.UsageError(
+        raise click.ClickException(
             "--collection and --group cannot both be set at the same time"
         )
 
@@ -63,8 +63,8 @@ def list_all_collections(collections_dict: Dict, output: str):
     else:
         for group_name, collections in collections_dict.items():
             click.echo(f"{group_name}:")
-            for c in collections:
-                click.echo(f"- {c}")
+            for collection in collections:
+                click.echo(f"- {collection}")
 
 
 def list_collections_for_group(
@@ -77,8 +77,8 @@ def list_collections_for_group(
     if output == "json":
         click.echo(json.dumps(collections_dict[group], indent=2))
     else:
-        for c in collections_dict[group]:
-            click.echo(f"{c}")
+        for collection in collections_dict[group]:
+            click.echo(f"{collection}")
 
 
 def list_secrets_for_collection(collection: str, output: str):

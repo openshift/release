@@ -100,7 +100,7 @@ def validate_secret_source(from_file: str, from_literal: str):
     if from_literal == "" and from_file == "":
         raise click.BadOptionUsage(
             option_name=from_file,
-            message="You must provide secret data either as string input or a path to file",
+            message="You must provide secret data either as string input or a path to file. See `update --help` for more information.",
         )
 
 
@@ -122,8 +122,17 @@ def create_payload(from_file: str, from_literal: str) -> bytes:
         return from_literal.encode("UTF-8")
 
     try:
-        with open(from_file, "rb") as f:
+        # Resolve the path and check if it's readable
+        resolved_path = os.path.realpath(from_file)
+        if not os.path.isfile(resolved_path):
+            raise click.UsageError(
+                f"File '{from_file}' does not exist or is not a regular file."
+            )
+
+        with open(resolved_path, "rb") as f:
             return f.read()
+    except (OSError, IOError) as e:
+        raise click.UsageError(f"Failed to read file '{from_file}': {e}")
     except Exception as e:
         raise click.UsageError(f"Failed to read file '{from_file}': {e}")
 
@@ -137,8 +146,11 @@ def get_group_collections() -> Dict[str, List[str]]:
         each value is a list of secret collections associated with that group.
     """
     try:
-        config_data = requests.get(CONFIG_PATH, timeout=5)
-        data = yaml.safe_load(config_data.text)
+        response = requests.get(CONFIG_PATH, timeout=5)
+        response.raise_for_status()
+        data = yaml.safe_load(response.text)
+    except yaml.YAMLError as e:
+        raise click.ClickException(f"Failed to parse configuration: {e}")
     except requests.exceptions.RequestException:
         click.echo(
             "Failed to fetch configuration from GitHub. Falling back to local config in the release repository..."
@@ -168,14 +180,13 @@ def get_collections() -> Set[str]:
     Returns:
         Set[str]: A set containing all secret collections.
     """
-    colls_dict = get_group_collections()
-    colls_set = set()
+    collections_dict = get_group_collections()
+    collections_set = set()
 
-    for _, collections in colls_dict.items():
-        for c in collections:
-            colls_set.add(c)
+    for _, collections in collections_dict.items():
+        collections_set.update(collections)  # More efficient than loop
 
-    return colls_set
+    return collections_set
 
 
 def check_if_collection_exists(collection: str) -> bool:
@@ -190,8 +201,8 @@ def check_if_collection_exists(collection: str) -> bool:
         bool: True if collection is one of the defined collections
         in the configuration file, False otherwise.
     """
-    s = get_collections()
-    return collection in s
+    collections_set = get_collections()
+    return collection in collections_set
 
 
 def get_secrets_from_index(
@@ -213,7 +224,7 @@ def get_secrets_from_index(
     try:
         response = client.access_secret_version(request={"name": index_secret})
     except PermissionDenied:
-        raise click.UsageError(
+        raise click.ClickException(
             f"Access denied: You do not have permission to list secrets in collection '{collection}'."
         )
     except Exception as e:
@@ -221,10 +232,11 @@ def get_secrets_from_index(
             f"Failed to list secrets for collection '{collection}': {e}"
         )
 
+    secret_list = []
     try:
         secret_list = yaml.safe_load(response.payload.data.decode("UTF-8"))
     except yaml.YAMLError as e:
-        click.echo(f"Failed to parse the index secret: {e}")
+        raise click.ClickException(f"Failed to parse the index secret: {e}")
 
     return secret_list
 
@@ -252,8 +264,4 @@ def update_index_secret(
             parent=name, payload=SecretPayload(data=payload.encode("utf-8"))
         )
     except Exception as e:
-        raise click.ClickException(
-            f"Error while updating index: '{e}'. "
-            "This could point to an inconsistent state. "
-            "Please contact Test Platform to clean up manually."
-        )
+        raise click.ClickException(f"Error while updating index: '{e}'.")

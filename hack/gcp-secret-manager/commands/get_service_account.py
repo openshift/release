@@ -36,11 +36,11 @@ def get_service_account(collection: str):
         response = client.access_secret_version(request={"name": name})
     except NotFound:
         raise click.ClickException(
-            f"{UPDATER_SA_SECRET_NAME} credentials not found in project '{PROJECT_ID}'"
+            f"Service account credentials not found for collection '{collection}'"
         )
     except Exception as e:
         raise click.ClickException(
-            f"Failed to access '{UPDATER_SA_SECRET_NAME}' credentials: {e}"
+            f"Failed to access service account credentials for collection '{collection}': {e}"
         ) from e
 
     payload = response.payload.data.decode("UTF-8")
