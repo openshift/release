@@ -217,6 +217,7 @@ done
 # ───────────────────────────────────────────────────────────────────────────
 run-regulus() {
   # for "ssh core@worker_ip" from the true bastion, it needs the key of the host that jetlag ran from.
+  do_ssh root@$bastion "scp /root/.ssh/id_rsa root@$TRUE_BASTION_HOST:/tmp/private_key"
   do_jscp "root@${bastion}" "/tmp/lab.config" "${regulus_repo}/lab.config"
   do_jssh "root@${bastion}" "
     set -e
