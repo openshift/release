@@ -2,11 +2,12 @@
 # pylint: disable=E0401, C0413
 
 import re
-from typing import Dict, List
+from typing import Dict
 
 import click
 from google.api_core.exceptions import NotFound
 from google.cloud import secretmanager
+from google.cloud.secretmanager import SecretPayload
 from util import (
     PROJECT_ID,
     check_if_collection_exists,
@@ -108,62 +109,15 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
         )
         client.add_secret_version(
             parent=gcp_secret.name,
-            payload={"data": create_payload(from_file, from_literal)},
+            payload=SecretPayload(data=create_payload(from_file, from_literal)),
         )
         update_index_secret(client, collection, index_secrets + [secret])
         click.echo(f"Secret '{secret}' created")
     except Exception as e:
-        # Clean up if anything failed
-        try:
-            if "gcp-secret" in locals():
-                client.delete_secret(name=gcp_secret.name)
-        except Exception as cleanup_error:
-            raise click.ClickException(
-                f"Failed to create secret '{secret}': {e}. "
-                f"Also failed to clean up: {cleanup_error}. "
-                "Please contact Test platform to clean up manually."
-            ) from e
-
-        raise click.ClickException(f"Failed to create secret '{secret}': {e}") from e
-
-
-def check_and_handle_existing_secret(
-    collection: str, secret: str, client: secretmanager.SecretManagerServiceClient
-) -> List[str]:
-    """
-    Ensures secret state is consistent between GSM and the index secret.
-
-    - If secret exists in GSM and index → raise error.
-    - If secret exists in GSM but not in index → delete it.
-    - If secret is in index but not GSM → remove it from index.
-    - If secret is in neither → do nothing.
-
-    Returns:
-        List[str]: Updated list of secrets from the index.
-    """
-
-    full_secret_path = client.secret_path(
-        PROJECT_ID, get_secret_name(collection, secret)
-    )
-    index_secrets = get_secrets_from_index(client, collection)
-
-    try:
-        client.get_secret(request={"name": full_secret_path})
-        if secret in index_secrets:
-            raise click.ClickException(
-                f"Secret '{secret}' already exists in collection '{collection}'."
-            )
-
-        # Exists in GSM but not in index, indicating an inconsistent state;
-        # delete the old secret and allow recreate.
-        client.delete_secret(request={"name": full_secret_path})
-    except NotFound:
-        if secret in index_secrets:
-            # Exists in index but not in GSM: index is stale — fix it.
-            index_secrets.remove(secret)
-            update_index_secret(client, collection, index_secrets)
-
-    return index_secrets
+        raise click.ClickException(
+            f"Failed to create secret '{secret}': {e}. "
+            f"If the secret is in an inconsistent state, run 'delete -c {collection} -s {secret}', then try again."
+        ) from e
 
 
 def prompt_for_labels() -> Dict[str, str]:

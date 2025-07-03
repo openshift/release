@@ -2,7 +2,6 @@
 # pylint: disable=E0401, C0413
 
 import click
-from google.api_core.exceptions import NotFound
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
@@ -39,21 +38,21 @@ def delete(collection: str, secret: str):
     client = secretmanager.SecretManagerServiceClient()
 
     index_secrets = get_secrets_from_index(client, collection)
-    if secret not in index_secrets:
-        raise click.ClickException(
-            f"Secret '{secret}' not found in collection '{collection}'."
-        )
+
+    # Remove from index if present (if missing from index, don't fail)
+    if secret in index_secrets:
+        index_secrets.remove(secret)
+        update_index_secret(client, collection, index_secrets)
+
+    # Remove from GSM if present (don't fail if missing)
     try:
+        click.echo(f"Deleting secret '{secret}'...")
         client.delete_secret(
             name=client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
         )
-        index_secrets.remove(secret)
-        update_index_secret(client, collection, index_secrets)
-        click.echo(f"Secret '{secret}' deleted from collection '{collection}'.")
-    except NotFound:
-        # Secret doesn't exist in GCP but is in index;
-        # remove from index to fix inconsistent state.
-        index_secrets.remove(secret)
-        update_index_secret(client, collection, index_secrets)
     except Exception as e:
-        raise click.ClickException(f"Failed to delete secret '{secret}': {e}")
+        raise click.ClickException(
+            f"Failed to delete secret '{secret}': {e}. Please retry the delete operation."
+        )
+
+    click.echo(f"Secret '{secret}' successfully deleted.")
