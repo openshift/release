@@ -6,7 +6,7 @@ set -x
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
-    cat "${SHARED_DIR}/proxy-conf.sh"
+    echo $HTTP_PROXY $HTTPS_PROXY
 fi
 
 sleep 3600
