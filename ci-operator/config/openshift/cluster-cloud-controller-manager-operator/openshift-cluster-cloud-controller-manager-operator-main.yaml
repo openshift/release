@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.20"
     namespace: ocp
@@ -10,7 +14,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.20"
 binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
 build_root:
   from_repository: true
@@ -147,19 +151,18 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: regression-vsphere-ipi-ccmo
+- as: regression-clusterinfra-vsphere-ipi-ccm
   optional: true
-  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: vsphere-elastic
     env:
-      TEST_FILTERS: CCM
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "1200"
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: e2e-nutanix-ovn
   cluster: build01
   optional: true
