@@ -10,7 +10,7 @@ debug() {
   oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
 }
 
-support_n-2() {
+support_np_skew() {
   curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
   local extra_flags=""
   if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
@@ -85,9 +85,13 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   source "${SHARED_DIR}/packet-conf.sh"
   # disconnected requires the additional trust bundle containing the local registry certificate
   scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
-  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes "
+  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt "
   EXTRA_ARGS+=" --olm-disable-default-sources "
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+fi
+
+if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
+  EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
@@ -103,7 +107,7 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
-  --release-image ${RELEASE_IMAGE} $(support_n-2)"
+  --release-image ${RELEASE_IMAGE} $(support_np_skew)"
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"

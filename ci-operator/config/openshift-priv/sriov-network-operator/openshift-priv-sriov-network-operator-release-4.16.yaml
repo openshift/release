@@ -196,7 +196,8 @@ tests:
     workflow: openshift-ci-security
 - always_run: false
   as: e2e-telco5g-sriov
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -211,6 +212,7 @@ tests:
       T5CI_VERSION: "4.16"
     test:
     - ref: ipi-install-rbac
+    - ref: opct-pre-wait-ready
     - ref: optional-operators-subscribe
     - as: start-sriov-operator
       cli: latest
@@ -252,6 +254,67 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: telco5g-sriov
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-telco5g-sriov-sno
+  capabilities:
+  - intranet
+  optional: true
+  restrict_network_access: false
+  steps:
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+      T5CI_JOB_TYPE: sno-ztp-cnftests
+      T5CI_VERSION: "4.16"
+    test:
+    - ref: ipi-install-rbac
+    - ref: optional-operators-subscribe
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+          disableDrain: true
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e-validation
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-conformance
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-conformance
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: telco5g-sno-ztp-cnf
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16

@@ -36,7 +36,17 @@ scp \
 
 ssh "${INSTANCE_PREFIX}" "/tmp/prepare.sh"
 
-ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"
+setup_ok=true
+if ! ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"; then
+    setup_ok=false
+fi
+# Always try to get the artifacts, even if the setup failed
+scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/artifacts/*" "${ARTIFACT_DIR}" || true
+
+if ! "${setup_ok}"; then
+    exit 1
+fi
+
 boot_id=$(ssh "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id')
 ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/2-reboot.sh" || true
 
@@ -44,18 +54,19 @@ ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/2-rebo
 boot_timeout=$(( 20 * 60  ))
 start_time=$(date +%s)
 while true ; do
-    if ssh -oConnectTimeout=10 -oBatchMode=yes -oStrictHostKeyChecking=accept-new "${INSTANCE_PREFIX}" "true" &>/dev/null; then
-        new_boot_id=$(ssh "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id')
-        if [[ "${boot_id}" != "${new_boot_id}" ]]; then
-            time_to_up=$(( $(date +%s) - start_time ))
-            echo "Host is up after $(( time_to_up / 60 ))m $(( time_to_up % 60 ))s."
-            break
-        fi
+    new_boot_id=$(ssh -oConnectTimeout=10 -oBatchMode=yes -oStrictHostKeyChecking=accept-new "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id' 2>/dev/null || true)
+
+    if [[ -n "${new_boot_id}" && "${boot_id}" != "${new_boot_id}" ]]; then
+        time_to_up=$(( $(date +%s) - start_time ))
+        echo "Host is up after $(( time_to_up / 60 ))m $(( time_to_up % 60 ))s."
+        break
     fi
+
     if [ $(( $(date +%s) - start_time )) -gt "${boot_timeout}" ]; then
         echo "ERROR: Waited too long for the host to boot."
         exit 1
     fi
+
     sleep 30
 done
 

@@ -273,7 +273,7 @@ function create_settled_icsp () {
     #we registry level proxy as below.In rosa cluster, registry level proxy may be rejected. 
     #as this ICSP/IDMS is used for QE Test images quay.io/openshifttest too. We don't use oc-mirror generated ICSP or IDMS
     if [[ $icsp_num -gt 0 || $kube_minor -lt 26 ]] ; then
-        cat <<EOF | oc create -f -
+        cat <<EOF | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:

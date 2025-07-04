@@ -24,5 +24,5 @@ export CLUSTER_NAME=${CLUSTER_NAME}
 echo CLUSTER_NAME=${CLUSTER_NAME}
 
 cd /eco-ci-cd/
-ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml \
+ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig" version=${VERSION} operators='${OPERATORS}'"

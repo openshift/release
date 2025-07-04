@@ -259,6 +259,10 @@ cat > run_test_playbook.yaml <<-"EOF"
 
         # Use the largest disk available for assisted
         DATA_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
+        if [[ -z "$DATA_DISK" ]]; then
+          exit 0
+        fi
+
         mkfs.xfs -f "${DATA_DISK}"
         mount "${DATA_DISK}" {{ REPO_DIR }}
       when: '"large" in CLUSTERTYPE'

@@ -21,9 +21,6 @@ if [[ -n "${BASE_DOMAIN}" ]]; then
 fi
 
 GCP_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
-if [[ -n "${BASE_DOMAIN_ZONE_PROJECT}" ]]; then
-  GCP_PROJECT="${BASE_DOMAIN_ZONE_PROJECT}"
-fi
 
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})

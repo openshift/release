@@ -27,10 +27,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: ocp-version-placeholder
-    namespace: ocp
-    tag: tests
 build_root:
   from_repository: true
 images:
@@ -59,6 +55,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: hotfix
+    test:
+    - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
     export GOCACHE=/tmp/gocache
@@ -189,6 +194,7 @@ tests:
         TEST=./src/tests/test_upgrade_agent.py
         TEST_FUNC=test_upgrade_agent
         OPENSHIFT_VERSION=ocp-version-placeholder
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-oci-assisted

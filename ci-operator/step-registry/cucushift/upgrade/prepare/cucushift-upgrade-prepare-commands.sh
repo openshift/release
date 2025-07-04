@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
 function set_cluster_access() {
     if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -311,13 +317,14 @@ else
 fi
 
 # check if the cluster is ready
+set_cluster_access
 oc version --client
-oc wait nodes --all --for=condition=Ready=true --timeout=25m
+
+run_command "oc wait nodes --all --for=condition=Ready=true --timeout=25m"
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
-    oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=15m
+    run_command "oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=15m"
 fi
 
-set_cluster_access
 preparation_for_test
 filter_tests
 test_execution

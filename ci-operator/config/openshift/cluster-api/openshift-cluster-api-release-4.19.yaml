@@ -1,8 +1,12 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.19"
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -22,7 +26,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: latest
+    tag: "4.19"
 binary_build_commands: make manager-core
 build_root:
   from_repository: true
@@ -39,8 +43,7 @@ images:
   to: cluster-capi-controllers
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -148,6 +151,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
+  shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
@@ -157,18 +161,17 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
-- as: regression-clusterinfra-aws-ipi-techpreview
+- as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
   steps:
     cluster_profile: aws
     env:
+      E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_FILTERS: NonPreRelease
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
       TEST_SCENARIOS: Cluster_Infrastructure CAPI
-      TEST_TIMEOUT: "35"
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 7h30m0s
 - as: verify-commits
@@ -177,6 +180,12 @@ tests:
   container:
     from: commitchecker
   optional: true
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

@@ -26,7 +26,8 @@ images:
   to: console-operator
 promotion:
   to:
-  - name: "4.20"
+  - disabled: true
+    name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -54,7 +55,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -75,7 +76,7 @@ tests:
   timeout: 5h30m0s
 - as: e2e-aws-console
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -89,13 +90,19 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
 - as: e2e-hypershift-conformance
   optional: true
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

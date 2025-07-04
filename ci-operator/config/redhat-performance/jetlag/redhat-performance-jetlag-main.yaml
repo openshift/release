@@ -5,10 +5,9 @@ build_root:
     tag: latest
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.17"
+    release:
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -18,44 +17,18 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: deploy-5nodes
+  as: deploy-mno
   capabilities:
   - intranet
   restrict_network_access: false
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
-      BASTION_CP_INTERFACE: ens7f1
-      CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
       NUM_WORKER_NODES: "2"
-      OCP_VERSION: latest-4.18
-      PUBLIC_VLAN: "true"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-cluster-health
-- always_run: false
-  as: deploy-5nodes-dev
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perfscale-jetlag
-    env:
-      BASTION_CP_INTERFACE: ens7f1
-      CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
-      NUM_WORKER_NODES: "2"
-      OCP_BUILD: dev
-      OCP_VERSION: latest
-      PUBLIC_VLAN: "true"
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
 - always_run: false
   as: deploy-sno
   capabilities:
@@ -64,37 +37,12 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
-      BASTION_CP_INTERFACE: ens7f1
-      CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
-      OCP_VERSION: latest-4.18
-      PUBLIC_VLAN: "true"
       TYPE: sno
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-poweroff
-    - chain: openshift-qe-installer-bm-deploy
-- always_run: false
-  as: deploy-sno-dev
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perfscale-jetlag
-    env:
-      BASTION_CP_INTERFACE: ens7f1
-      CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
-      OCP_BUILD: dev
-      OCP_VERSION: latest
-      PUBLIC_VLAN: "true"
-      TYPE: sno
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-poweroff
-    - chain: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
 - always_run: false
   as: deploy-compact
   capabilities:
@@ -103,39 +51,12 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
-      BASTION_CP_INTERFACE: ens7f1
-      CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
       NUM_WORKER_NODES: "0"
-      OCP_VERSION: latest-4.18
-      PUBLIC_VLAN: "true"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-poweroff
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-cluster-health
-- always_run: false
-  as: deploy-compact-dev
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perfscale-jetlag
-    env:
-      BASTION_CP_INTERFACE: ens7f1
-      CRUCIBLE: "false"
-      LAB_CLOUD: cloud19
-      LAB_INTERFACE: eno3
-      NUM_WORKER_NODES: "0"
-      OCP_BUILD: dev
-      OCP_VERSION: latest
-      PUBLIC_VLAN: "true"
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-poweroff
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
 zz_generated_metadata:
   branch: main
   org: redhat-performance

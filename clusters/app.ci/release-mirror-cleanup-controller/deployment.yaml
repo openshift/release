@@ -1,0 +1,55 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# release_mirror_cleanup_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-mirror-cleanup-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  name: release-mirror-cleanup-controller
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: release-mirror-cleanup-controller
+  template:
+    metadata:
+      labels:
+        app: release-mirror-cleanup-controller
+    spec:
+      containers:
+      - command:
+        - /usr/bin/release-mirror-cleanup-controller
+        - start
+        - -v=4
+        - --credentials-namespace=ci-release
+        - --namespaces=ocp
+        - --namespaces=ocp-s390x
+        - --namespaces=ocp-ppc64le
+        - --namespaces=ocp-arm64
+        - --namespaces=ocp-multi
+        - --namespaces=ocp-multi-2
+        - --namespaces=ocp-priv
+        - --namespaces=ocp-s390x-priv
+        - --namespaces=ocp-ppc64le-priv
+        - --namespaces=ocp-arm64-priv
+        - --namespaces=ocp-multi-priv
+        - --namespaces=ocp-multi-2-priv
+        image: release-mirror-cleanup-controller:latest
+        name: controller
+        resources:
+          limits:
+            cpu: 500m
+            memory: 4Gi
+          requests:
+            cpu: 250m
+            memory: 2Gi
+      serviceAccountName: release-mirror-cleanup-controller

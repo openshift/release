@@ -21,17 +21,37 @@ function update_openshift_config_pull_secret {
 
   echo "Adding PreGA pull secret to pull the container image index from the Hub cluster..."
 
-  optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
-  optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
-  qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+  # optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+  # optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+  # qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
 
-  openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
-  openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
-  openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+  # openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+  # openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+  # openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
 
-  reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
-  reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
-  brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+  # reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+  # reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+  # brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+
+#   cat <<EOF >| /tmp/pre-ga.json
+# {
+#   "auths": {
+#     "quay.io/prega": {
+#       "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
+#       "email": "prega@redhat.com"
+#     },
+#     "brew.registry.redhat.io": {
+#       "auth": "${brew_registry_auth}"
+#     },
+#     "quay.io/openshift-qe-optional-operators": {
+#       "auth": "${qe_registry_auth}"
+#     },
+#     "quay.io/openshifttest": {
+#       "auth": "${openshifttest_registry_auth}"
+#     }
+#   }
+# }
+# EOF
 
   cat <<EOF >| /tmp/pre-ga.json
 {
@@ -39,17 +59,6 @@ function update_openshift_config_pull_secret {
     "quay.io/prega": {
       "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
       "email": "prega@redhat.com"
-    },
-    "brew.registry.redhat.io": {
-      "auth": "${brew_registry_auth}",
-      "email": "jiazha@redhat.com"
-    },
-    "quay.io/openshift-qe-optional-operators": {
-      "auth": "${qe_registry_auth}",
-      "email": "jiazha@redhat.com"
-    },
-    "quay.io/openshifttest": {
-      "auth": "${openshifttest_registry_auth}"
     }
   }
 }
@@ -91,11 +100,22 @@ prega_operator_index_tags_url="${2}"
 tag_version="${4}"
 
 function findout_manifest_digest {
-  curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
+  res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
     [ .tags[] ]
     | sort_by(.start_ts)
-    | last.manifest_digest'
+    | last.manifest_digest')
+
+  if [ "${res}" == "null" ]; then
+    res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" | jq -r '
+      [ .tags[]
+      | select(has("end_ts") | not)]
+      | sort_by(.start_ts)
+      | .[-2].manifest_digest')
+  fi
+
+  echo "${res}"
 }
+
 function get_related_catalogs_and_icsp_manifests {
 
   query_tag="${tag_version%.*}-"
@@ -153,6 +173,7 @@ EOF
   echo
   echo "----------------------------------------------------------------------------------------------"
   set -x
+  rm -frv "${ARTIFACT_DIR}/pre-ga-info"
   mv -v ${catalog_info_dir} "${ARTIFACT_DIR}/pre-ga-info"
   prega_info_dir="$(ls -1d ${ARTIFACT_DIR}/pre-ga-info/*)"
   ls -lhrtR ${prega_info_dir}

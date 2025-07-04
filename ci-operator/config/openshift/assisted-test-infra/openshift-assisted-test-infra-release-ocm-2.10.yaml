@@ -23,10 +23,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: "4.15"
-    namespace: ocp
-    tag: tests
   upi-installer:
     name: "4.15"
     namespace: ocp
@@ -68,7 +64,7 @@ tests:
     make lint
   container:
     from: assisted-test-infra-internal
-- as: e2e-metal-assisted-ha-kube-api-4-15-periodic
+- as: e2e-metal-assisted-ha-kube-api-ipv4-4-15-periodic
   cluster: build05
   cron: 30 05 * * 3
   steps:
@@ -79,11 +75,12 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
         ENABLE_KUBE_API=true
         IPv4=true
+        IPv6=false
         OPENSHIFT_VERSION=4.15
         SERVICE_BASE_REF=release-ocm-2.10
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ha-kube-api-4-15
+- as: e2e-metal-assisted-ha-kube-api-ipv4-4-15
   cluster: build05
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
@@ -94,6 +91,7 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
         ENABLE_KUBE_API=true
         IPv4=true
+        IPv6=false
         OPENSHIFT_VERSION=4.15
         SERVICE_BASE_REF=release-ocm-2.10
     workflow: assisted-ofcir-baremetal
@@ -130,24 +128,21 @@ tests:
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-kube-api-net-suite-4-15
+- as: e2e-metal-assisted-ha-kube-api-ipv6-4-15-periodic
   cluster: build05
-  optional: true
+  cron: 30 05 * * 3
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.10
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_MASTERS=1
-        ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
-        WORKER_DISK=40000000000
+        ENABLE_KUBE_API=true
+        IPv4=false
+        IPv6=true
         OPENSHIFT_VERSION=4.15
+        SERVICE_BASE_REF=release-ocm-2.10
+      CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-ha-kube-api-ipv6-4-15
@@ -158,10 +153,9 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.10
-        KUBE_API=true
         ENABLE_KUBE_API=true
+        IPv4=false
         IPv6=true
-        ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.15
@@ -174,10 +168,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.10
-        KUBE_API=true
         ENABLE_KUBE_API=true
         NUM_WORKERS=0
         IPv4=true
+        IPv6=false
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"

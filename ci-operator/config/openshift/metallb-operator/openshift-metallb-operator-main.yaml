@@ -4,19 +4,19 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   kube-rbac-proxy:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: kube-rbac-proxy
   metallb:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: metallb
   metallb-frr:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: metallb-frr
   ocp_4.19_base-rhel9:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
@@ -47,29 +47,29 @@ operator:
     dockerfile_path: bundleci.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/openshift/origin-metallb:4.18
+  - pullspec: quay.io/openshift/origin-metallb:4.20
     with: pipeline:metallb
-  - pullspec: quay.io/openshift/origin-metallb-operator:4.18
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.20
     with: pipeline:metallb-operator
-  - pullspec: quay.io/openshift/origin-metallb-frr:4.18
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.20
     with: pipeline:metallb-frr
-  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.18
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.20
     with: pipeline:kube-rbac-proxy
 promotion:
   to:
-  - name: metallb-4.18
+  - name: metallb-4.20
     namespace: origin
-  - name: "4.19"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -86,7 +86,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.19"
   steps:
     test:
     - as: install
@@ -134,6 +134,12 @@ tests:
       PROJECT_NAME: metallb-operator
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

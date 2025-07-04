@@ -23,8 +23,7 @@ images:
   to: search-collector
 promotion:
   to:
-  - disabled: true
-    name: "2.14"
+  - name: "2.14"
     namespace: stolostron
 resources:
   '*':
@@ -93,7 +92,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -106,6 +106,7 @@ tests:
   commands: |
     export SELF="make -f Makefile.prow"
     export DEPLOYED_IN_HUB=true
+    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -116,6 +117,7 @@ tests:
   commands: |
     export SELF="make -f Makefile.prow"
     export DEPLOYED_IN_HUB=true
+    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
     make -f Makefile.prow sonar/go/prow
   container:
     from: src

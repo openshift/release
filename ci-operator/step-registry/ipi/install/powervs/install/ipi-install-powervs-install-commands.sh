@@ -256,19 +256,27 @@ function install_required_tools() {
       exit 1
     fi
   done
+
+  mkdir -p /tmp/bin
+  PATH=${PATH}:/tmp/bin
+  export PATH
+
   echo "Installing yq-v4"
   # Install yq manually if its not found in installer image
   cmd_yq="$(which yq-v4 2>/dev/null || true)"
-  mkdir -p /tmp/bin
   if [ ! -x "${cmd_yq}" ]; then
     curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
       -o /tmp/bin/yq-v4 && chmod +x /tmp/bin/yq-v4
   fi
-  PATH=${PATH}:/tmp/bin
-  export PATH
+
+  echo "Installing PowerVS-DHCP-report"
+  DHCP_TAR="PowerVS-DHCP-report-v1.3-linux-amd64.tar.gz"
+  curl --location --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR}
+  (cd /tmp/; tar xzvf ${DHCP_TAR}; mv PowerVS-DHCP-report /tmp/bin/)
 
   hash jq || exit 1
   hash yq-v4 || exit 1
+  hash PowerVS-DHCP-report || exit 1
 }
 
 function init_ibmcloud() {
@@ -332,7 +340,8 @@ function init_ibmcloud() {
   #  ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn'
   # does not always return a match!  This also is likely to fail:
   #  ibmcloud pi workspace list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
-  SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
+  #SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
+  SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[] | select(.type|contains("resource-instance")) | .crn')"
   if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
     echo "Error: SERVICE_INSTANCE_CRN is empty!"
     exit 1
@@ -537,30 +546,16 @@ function dump_resources() {
 )
 
   echo "8<--------8<--------8<--------8<-------- DHCP networks 8<--------8<--------8<--------8<--------"
-
-  BEARER_TOKEN=$(curl --silent -X POST "https://iam.cloud.ibm.com/identity/token" -H "content-type: application/x-www-form-urlencoded" -H "accept: application/json" -d "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${IBMCLOUD_API_KEY}" | jq -r .access_token)
-  export BEARER_TOKEN
-  [ -z "${BEARER_TOKEN}" ] && exit 1
-  [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-  echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | "\(.id) - \(.network.name)"'
-  if [ $? -gt 0 ]
-  then
-    echo "DHCP_NETWORKS_RESULT=${DHCP_NETWORKS_RESULT}"
-  fi
-
-  echo "8<--------8<--------8<--------8<-------- DHCP network information 8<--------8<--------8<--------8<--------"
-
-  while read DHCP_UUID
-  do
-    DHCP_UUID_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${DHCP_UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-    echo "${DHCP_UUID_RESULT}" | jq -r '.'
-    if [ $? -gt 0 ]
+  (
+    if [ -n "$(jq -r '.powervs.serviceInstanceGUID' "${dir}/metadata.json")" ]
     then
-      echo "DHCP_UUID_RESULT=${DHCP_UUID_RESULT}"
+      echo "Running PowerVS-DHCP-report (serviceInstanceGUID) (check artifact directory for output)"
+      PowerVS-DHCP-report -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -shouldDebug false -serviceInstanceGUID "$(jq -r '.powervs.serviceInstanceGUID' "${dir}/metadata.json")" > "${ARTIFACT_DIR}/PowerVS-DHCP-report.txt"
+    else
+      echo "Running PowerVS-DHCP-report (infraID) (check artifact directory for output)"
+      PowerVS-DHCP-report -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -shouldDebug false -infraID "${INFRA_ID}" > "${ARTIFACT_DIR}/PowerVS-DHCP-report.txt"
     fi
-
-  done < <( echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id' )
+  )
 
 (
   echo "8<--------8<--------8<--------8<-------- DNS records 8<--------8<--------8<--------8<--------"
@@ -589,7 +584,6 @@ function dump_resources() {
 )
 
   echo "8<--------8<--------8<--------8<-------- oc get clusterversion 8<--------8<--------8<--------8<--------"
-
   (
     DEBUG=true
 
