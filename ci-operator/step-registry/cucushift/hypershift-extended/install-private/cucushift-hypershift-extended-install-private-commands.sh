@@ -14,6 +14,8 @@ if [[ $HO_MULTI == "true" ]]; then
   HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
+# Override the HO image for debugging
+OPERATOR_IMAGE="quay.io/jimma/hypershift-operator:revert"
 # Build up the hypershift install command
 COMMAND=(
     "${HCP_CLI}" install
