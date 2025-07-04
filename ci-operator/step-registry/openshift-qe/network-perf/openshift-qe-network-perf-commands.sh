@@ -4,6 +4,10 @@ set -o nounset
 set -o pipefail
 set -x
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 cat /etc/os-release
 
 # For disconnected or otherwise unreachable environments, we want to
