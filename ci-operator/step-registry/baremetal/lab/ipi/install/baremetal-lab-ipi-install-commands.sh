@@ -64,6 +64,8 @@ INSTALL_DIR="/tmp/installer"
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=registry.build06.ci.openshift.org/ci-ln-ft2vp6t/release:latest
+export MULTI_RELEASE_IMAGE=registry.build06.ci.openshift.org/ci-ln-ft2vp6t/release:latest
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 
@@ -118,6 +120,11 @@ echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not add additional workers if we need to run them as day2 (e.g., to test cluster-api)
+    echo "{INFO} Additional worker ${name} will be added as day2 operation"
+    continue
+  fi
   ADAPTED_YAML="
   name: ${name}
   role: ${name%%-[0-9]*}
@@ -198,6 +205,11 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "
 ### Create manifests
 echo "[INFO] Creating manifests..."
 oinst create manifests
+
+# Enable BMO to watch all namespaces if CAPI is enabled
+if [[ "$ENABLE_CAPI" == "true" ]]; then
+    sed -i 's/watchAllNamespaces: false/watchAllNamespaces: true/' "${INSTALL_DIR}/openshift/99_baremetal-provisioning-config.yaml"
+fi
 
 ### Inject customized manifests
 echo -e "\n[INFO] The following manifests will be included at installation time:"
