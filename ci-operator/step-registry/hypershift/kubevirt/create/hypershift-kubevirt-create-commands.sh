@@ -216,7 +216,9 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
+    --cluster-cidr 10.136.0.0/14 --render --render-sensitive > /tmp/hc.yaml"
+
+  wait 3600
 fi
 
 
