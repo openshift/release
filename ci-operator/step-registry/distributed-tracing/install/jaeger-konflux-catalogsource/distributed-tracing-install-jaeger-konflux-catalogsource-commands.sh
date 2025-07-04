@@ -7,7 +7,15 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 
 declare ICSP_NAME=${JAEGER_ICSP_NAME}
 declare CATALOG_SOURCE=${JAEGER_CATALOG_SOURCE}
-declare DT_INDEX_IMAGE=${JAEGER_INDEX_IMAGE}
+declare DT_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_JAEGER_INDEX_IMAGE}
+
+# Check if DT_INDEX_IMAGE is not empty
+if [[ -z "$DT_INDEX_IMAGE" ]]; then
+    echo "Error: DT_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "DT_INDEX_IMAGE is set to: $DT_INDEX_IMAGE"
+fi
 
 set_proxy() {
 	[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
