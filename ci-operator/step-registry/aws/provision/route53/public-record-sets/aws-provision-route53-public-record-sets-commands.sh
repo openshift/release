@@ -23,7 +23,7 @@ dns_reserve_and_defer_cleanup() {
       \"ResourceRecords\": [{\"Value\": \"$record\"}]
     }
   }"
-  jq --argjson jc "$json_create" '.Changes += [$jc]' "${SHARED_DIR}"/dns-create.json > "${SHARED_DIR}"/tmp-create.json && mv "${SHARED_DIR}"/tmp-create.json "${SHARED_DIR}"/dns-create.json
+  jq --argjson jc "$json_create" '.Changes += [$jc]' "${SHARED_DIR}"/dns-create.json > "${SHARED_DIR}"/tmp-create.json && mv "${SHARED_DIR}"/tmp-create.json "${SHARED_DIR}"/dns-create.json && cp "${SHARED_DIR}"/dns-create.json "${ARTIFACT_DIR}/"
 
   json_delete="{
     \"Action\": \"DELETE\",
@@ -34,7 +34,7 @@ dns_reserve_and_defer_cleanup() {
       \"ResourceRecords\": [{\"Value\": \"$record\"}]
     }
   }"
-  jq --argjson jd "$json_delete" '.Changes += [$jd]' "${SHARED_DIR}"/dns-delete.json > "${SHARED_DIR}"/tmp-delete.json && mv "${SHARED_DIR}"/tmp-delete.json "${SHARED_DIR}"/dns-delete.json
+  jq --argjson jd "$json_delete" '.Changes += [$jd]' "${SHARED_DIR}"/dns-delete.json > "${SHARED_DIR}"/tmp-delete.json && mv "${SHARED_DIR}"/tmp-delete.json "${SHARED_DIR}"/dns-delete.json && cp "${SHARED_DIR}"/dns-delete.json "${ARTIFACT_DIR}/"
 }
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/route53.only.awscred"
@@ -82,10 +82,12 @@ while read -r line; do
   fi
 done < "${SHARED_DIR}/public-custom-dns"
 
-id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
+echo "$(date -u --rfc-3339=seconds) - Running Command: aws route53 change-resource-record-sets --hosted-zone-id \"$hosted_zone_id\" --change-batch file:///${SHARED_DIR}/dns-create.json --query '\"ChangeInfo\".\"Id\"' --output text"
+id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///${SHARED_DIR}/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 
 echo "$(date -u --rfc-3339=seconds) - INFO: Waiting for DNS records to sync..."
 
+echo "$(date -u --rfc-3339=seconds) - Running Command: aws route53 wait resource-record-sets-changed --id \"$id\""
 aws route53 wait resource-record-sets-changed --id "$id"
 
 echo "$(date -u --rfc-3339=seconds) - INFO: DNS records created."
