@@ -34,6 +34,16 @@ ci_clone_src
 cp /go/src/github.com/openshift/microshift/origin/skip.txt "${SHARED_DIR}/conformance-skip.txt"
 cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"
 
+curl -o /go/src/github.com/openshift/microshift/origin/skip-optional-components.txt https://raw.githubusercontent.com/pacevedom/microshift/98f5ab252e0d47d77345c93ab356b3d2b34ea262/origin/skip-optional-components.txt
+
+if "${OPTIONAL_RPMS}"; then
+  if [ -f /go/src/github.com/openshift/microshift/origin/skip-optional-components.txt ]; then
+    cat /go/src/github.com/openshift/microshift/origin/skip-optional-components.txt >> "${SHARED_DIR}/conformance-skip.txt"
+  else
+    echo "Optional components skip file not found, skipping."
+  fi
+fi
+
 # Disable workload partitioning for annotated pods to avoid throttling.
 ssh "${INSTANCE_PREFIX}" "sudo sed -i 's/resources/#&/g' /etc/crio/crio.conf.d/11-microshift-ovn.conf"
 ssh "${INSTANCE_PREFIX}" "sudo systemctl daemon-reload"
