@@ -10,6 +10,9 @@ chain:
         - name: HYPERSHIFT_AWS_REGION
           default: "us-east-1"
           documentation: "The AWS region of the cluster."
+        - name: HYPERSHIFT_HC_NUMBER
+          default: "1"
+          documentation: "If set to greater than one, it would destroy multiple hosted clusters"
       commands: |-
         set -exuo pipefail
 
@@ -28,26 +31,34 @@ chain:
           cd -
         fi
 
-        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-        
+        HC_COUNT=$HYPERSHIFT_HC_NUMBER
+        BASE_CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        CLUSTER_NAME="${BASE_CLUSTER_NAME}"
+
         CRED_COMMAND=""
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
           CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
         else
           CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
         fi
-      
-        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-        /tmp/${HYPERSHIFT_NAME} destroy cluster aws ${CRED_COMMAND} \
-          --name ${CLUSTER_NAME} \
-          --region ${HYPERSHIFT_AWS_REGION} \
-          --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
-          --namespace local-cluster \
-          --cluster-grace-period 40m
-        echo "$(date) Finished deleting cluster"
-        
-        oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
-        echo "$(date) Finished destroying hypershift managed cluster"
+
+        for ((index = 1; index <= HC_COUNT; index++)); do
+          if [[ $index -gt 1 ]]; then
+            CLUSTER_NAME="${BASE_CLUSTER_NAME}${index}"
+          fi
+  
+          echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+          /tmp/${HYPERSHIFT_NAME} destroy cluster aws ${CRED_COMMAND} \
+            --name ${CLUSTER_NAME} \
+            --region ${HYPERSHIFT_AWS_REGION} \
+            --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+            --namespace local-cluster \
+            --cluster-grace-period 40m
+          echo "$(date) Finished deleting cluster"
+          
+          oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
+          echo "$(date) Finished destroying hypershift managed cluster"
+        done
       from_image:
         namespace: ocp
         name: "4.12"
@@ -57,4 +68,4 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 30m0s
+      timeout: 180m0s
