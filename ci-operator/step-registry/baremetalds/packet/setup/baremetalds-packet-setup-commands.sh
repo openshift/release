@@ -38,6 +38,15 @@ EOF
 
 trap 'exit_with_failure' ERR
 
+# Using ssh key for provisioning arm64 host in equinix for metal-qe project
+# To be removed when arm64 can be provisioned in ofcir
+if [[ "${PACKET_PLAN}" == "c3.large.arm64" && -f "${CLUSTER_PROFILE_DIR}"/equinix-ssh-key ]] ; then
+  export SSH_KEY="equinix-ssh-key"
+  echo -e "\n--arm64 cluster, using ${SSH_KEY}--\n"
+else
+  export SSH_KEY="packet-ssh-key"
+fi
+
 cd
 cat > packet-config.yaml <<-EOF
 - name: Create Config for host
@@ -80,7 +89,7 @@ cat > packet-config.yaml <<-EOF
         fi
 
         IP=\$(cat "\${SHARED_DIR}/server-ip")
-        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/\${SSH_KEY}")
 
         # Checkout packet server
         for x in \$(seq 10) ; do
