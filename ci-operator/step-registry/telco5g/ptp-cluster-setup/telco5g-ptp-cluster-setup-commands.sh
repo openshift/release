@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# test only
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -299,7 +299,7 @@ log_chronyd_status() {
 
 #Set status and run playbooks
 status=0
-
+SKIP_OCP_INSTALL="true"
 if [[ "$SKIP_OCP_INSTALL" != "true" ]]; then
   ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi
