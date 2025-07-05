@@ -1,8 +1,17 @@
 #!/bin/bash
-
 set -o nounset
 set -o errexit
 set -o pipefail
+
+export PATH=/tmp/:$PATH
+which extended-platform-tests
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
 
 function warn_0_case_executed {
     local count
@@ -347,11 +356,13 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     create_must-gather_dir_for_case
     ret_value=0
     set -x
+
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
