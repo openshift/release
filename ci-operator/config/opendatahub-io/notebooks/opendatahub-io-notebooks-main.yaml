@@ -58,6 +58,33 @@ images:
 - context_dir: .
   dockerfile_path: runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile.rocm
   to: rocm-runtime-tensorflow-ubi9-python-3.11
+- context_dir: .
+  dockerfile_path: jupyter/minimal/ubi9-python-3.12/Dockerfile.cpu
+  to: jupyter-minimal-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/datascience/ubi9-python-3.12/Dockerfile.cpu
+  to: jupyter-datascience-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/minimal/ubi9-python-3.12/Dockerfile.cuda
+  to: cuda-jupyter-minimal-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/tensorflow/ubi9-python-3.12/Dockerfile.cuda
+  to: cuda-jupyter-tensorflow-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/pytorch/ubi9-python-3.12/Dockerfile.cuda
+  to: cuda-jupyter-pytorch-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/trustyai/ubi9-python-3.12/Dockerfile.cpu
+  to: jupyter-trustyai-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/minimal/ubi9-python-3.12/Dockerfile.rocm
+  to: rocm-jupyter-minimal-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/rocm/tensorflow/ubi9-python-3.12/Dockerfile.rocm
+  to: rocm-jupyter-tensorflow-ubi9-python-3.12
+- context_dir: .
+  dockerfile_path: jupyter/rocm/pytorch/ubi9-python-3.12/Dockerfile.rocm
+  to: rocm-jupyter-pytorch-ubi9-python-3.12
 promotion:
   to:
   - namespace: opendatahub-io
@@ -756,6 +783,164 @@ tests:
       dependencies:
       - env: RUNTIME_ROCM_TENSORFLOW_IMAGE
         name: rocm-runtime-tensorflow-ubi9-python-3.11
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: notebooks-py312-ubi9-e2e-tests
+  run_if_changed: (jupyter\/minimal\/ubi9-python-3.12\/*)|(jupyter\/datascience\/ubi9-python-3.12\/*)|(jupyter\/pytorch\/ubi9-python-3.12\/*)|(jupyter\/tensorflow\/ubi9-python-3.12\/*)|(jupyter\/trustyai\/ubi9-python-3.12\/*)
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.2-multi
+    test:
+    - as: jupyter-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-minimal-ubi9-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
+        make deploy9-jupyter-minimal-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-minimal-ubi9-python-3.12
+        make undeploy9-jupyter-minimal-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_MINIMAL_IMAGE
+        name: jupyter-minimal-ubi9-python-3.12
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-ds-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-datascience-ubi9-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
+        make deploy9-jupyter-datascience-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-datascience-ubi9-python-3.12
+        make undeploy9-jupyter-datascience-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_DATA_SCIENCE_IMAGE
+        name: jupyter-datascience-ubi9-python-3.12
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-pt-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-pytorch-ubi9-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_PYTORCH_IMAGE}"
+        make deploy9-jupyter-pytorch-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-pytorch-ubi9-python-3.12
+        make undeploy9-jupyter-pytorch-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_PYTORCH_IMAGE
+        name: cuda-jupyter-pytorch-ubi9-python-3.12
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-minimal-ubi9-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
+        make deploy9-cuda-jupyter-minimal-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-minimal-ubi9-python-3.12
+        make undeploy9-cuda-jupyter-minimal-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_MINIMAL_IMAGE
+        name: cuda-jupyter-minimal-ubi9-python-3.12
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-tf-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-tensorflow-ubi9-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TENSORFLOW_IMAGE}"
+        make deploy9-cuda-jupyter-tensorflow-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-tensorflow-ubi9-python-3.12
+        make undeploy9-cuda-jupyter-tensorflow-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_TENSORFLOW_IMAGE
+        name: cuda-jupyter-tensorflow-ubi9-python-3.12
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-tai-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-trustyai-ubi9-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TRUSTYAI_IMAGE}"
+        make deploy9-jupyter-trustyai-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-trustyai-ubi9-python-3.12
+        make undeploy9-jupyter-trustyai-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_TRUSTYAI_IMAGE
+        name: jupyter-trustyai-ubi9-python-3.12
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: rocm-notebooks-py312-e2e-tests
+  run_if_changed: (rocm\/ubi9-python-3.12\/*)|(jupyter\/rocm\/pytorch\/ubi9-python-3.12\/*)|(jupyter\/rocm\/tensorflow\/ubi9-python-3.12\/*)
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.2-multi
+    test:
+    - as: rocm-jupyter-tf-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project rocm-jupyter-tensorflow-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_rocm__TENSORFLOW_IMAGE}"
+        make deploy9-jupyter-rocm-tensorflow-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-rocm-tensorflow-ubi9-python-3.12
+        make undeploy9-jupyter-rocm-tensorflow-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_rocm__TENSORFLOW_IMAGE
+        name: rocm-jupyter-tensorflow-ubi9-python-3.12
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: rocm-jupyter-pt-ubi9-python-3-12-test-e2e
+      cli: latest
+      commands: |
+        oc new-project rocm-jupyter-pytorch-python-3-12
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_rocm__PYTORCH_IMAGE}"
+        make deploy9-jupyter-rocm-pytorch-ubi9-python-3.12 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-rocm-pytorch-ubi9-python-3.12
+        make undeploy9-jupyter-rocm-pytorch-ubi9-python-3.12
+      dependencies:
+      - env: JUPYTER_rocm__PYTORCH_IMAGE
+        name: rocm-jupyter-pytorch-ubi9-python-3.12
       from: src
       resources:
         requests:
