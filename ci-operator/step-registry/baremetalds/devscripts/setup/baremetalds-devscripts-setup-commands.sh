@@ -6,6 +6,15 @@ set -o pipefail
 
 echo "************ baremetalds devscripts setup command ************"
 
+# Using ssh key for provisioning arm64 host in equinix for metal-qe project
+# To be removed when arm64 can be provisioned in ofcir
+if [[ "${PACKET_PLAN}" == "c3.large.arm64" && -f "${CLUSTER_PROFILE_DIR}"/equinix-ssh-key ]] ; then
+  export SSH_KEY="equinix-ssh-key"
+  echo -e "\n--arm64 cluster, using ${SSH_KEY}--\n"
+else
+  export SSH_KEY="packet-ssh-key"
+fi
+
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
