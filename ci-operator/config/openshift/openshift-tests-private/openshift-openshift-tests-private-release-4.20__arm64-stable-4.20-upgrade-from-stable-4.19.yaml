@@ -62,6 +62,42 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: aws-ipi-localzone-byo-subnet-role-sts-kms-mini-perm-f60
+  cron: 2 16 12,26 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      ASSIGN_ROLES_TO_SUBNETS: "yes"
+      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EDGE_ZONES_LIST: us-east-1-mia-1a
+      SUBNET_ROLES: |-
+        [
+          [
+            {
+              "private": "ClusterNode ControlPlaneInternalLB",
+              "public": "IngressControllerLB ControlPlaneExternalLB BootstrapNode"
+            }
+          ],
+          [
+            {
+              "private": "ClusterNode ControlPlaneInternalLB",
+              "public": "IngressControllerLB ControlPlaneExternalLB"
+            }
+          ],
+          [
+            {
+              "private": "ClusterNode ControlPlaneInternalLB",
+              "public": "IngressControllerLB ControlPlaneExternalLB"
+            }
+          ]
+        ]
+      UPGRADE_CCO_MANUAL_MODE: oidc
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-cco-manual-security-token-service-byo-kms
 - as: aws-ipi-disc-priv-sts-ep-f28
   cron: 40 2 28 * *
   steps:
