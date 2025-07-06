@@ -38,11 +38,18 @@ chain:
         trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
         
         debug() {
-          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
-          oc get pod -n local-cluster-${CLUSTER_NAME}
-          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
-          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster
+          oc get pod -n local-cluster-${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster_cp_pods
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml > $ARTIFACT_DIR/hostedcluster.yaml
+          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml > $ARTIFACT_DIR/hostedcluster_cp_pods.yaml
+          oc get managedcluster > $ARTIFACT_DIR/managedcluster
+          oc get managedcluster -oyaml > $ARTIFACT_DIR/managedcluster.yaml
           oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
+          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+          oc get clusterversion/version > $ARTIFACT_DIR/guestcluster_clusterversion
+          oc get clusterversion/version -oyaml > $ARTIFACT_DIR/guestcluster_clusterversion.yaml
+          oc get clusteroperator > $ARTIFACT_DIR/guestcluster_clusteroperator
+          oc get clusteroperator -oyaml > $ARTIFACT_DIR/guestcluster_clusteroperator.yaml
         }
 
         support_np_skew() {
@@ -161,21 +168,27 @@ chain:
         /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
         echo "Waiting for clusteroperators to be ready"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        until \
-        oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
-        echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-        oc get clusterversion 2>/dev/null || true
-        sleep 10s
-        done
+        
+        timeout 20m bash -c '
+          until \
+            oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
+            echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+            oc get clusterversion 2>/dev/null || true
+            sleep 10s
+          done
+        '
         echo "Waiting for ManagedCluster to be ready"
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        until \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
-        echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
-        sleep 10s
-        done
+        
+        timeout 20m bash -c '
+          until \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
+            echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
+            sleep 10s
+          done
+        '        
         echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
       from_image:
         namespace: ocp
@@ -186,7 +199,7 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 30m0s
+      timeout: 60m0s
       credentials:
         - mount_path: /etc/ci-pull-credentials
           name: ci-pull-credentials
