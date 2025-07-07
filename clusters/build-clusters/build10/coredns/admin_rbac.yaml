@@ -1,44 +1,44 @@
-kind: List
 apiVersion: v1
-items:
-- kind: Namespace
-  apiVersion: v1
-  metadata:
-    name: coredns
+kind: Namespace
+metadata:
+  name: coredns
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: port-forwarder
+  namespace: coredns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: port-forward
+  namespace: coredns
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods/portforward
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: port-forward-to-port-forwarder
+  namespace: coredns
+subjects:
 - kind: ServiceAccount
-  apiVersion: v1
-  metadata:
-    name: port-forwarder
-    namespace: coredns
-- kind: Role
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: port-forward
-    namespace: coredns
-  rules:
-    - apiGroups:
-        - ""
-      resources:
-        - pods/portforward
-      verbs:
-        - create
-    - apiGroups:
-        - ""
-      resources:
-        - pods
-      verbs:
-        - get
-        - list
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: port-forward-to-port-forwarder
-    namespace: coredns
-  subjects:
-  - kind: ServiceAccount
-    name: port-forwarder
-    namespace: coredns
-  roleRef:
-    kind: Role
-    apiGroup: rbac.authorization.k8s.io
-    name: port-forward
+  name: port-forwarder
+  namespace: coredns
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: port-forward
