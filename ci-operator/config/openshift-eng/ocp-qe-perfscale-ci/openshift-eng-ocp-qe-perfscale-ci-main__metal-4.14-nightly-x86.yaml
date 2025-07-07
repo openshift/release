@@ -29,11 +29,7 @@ tests:
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
-    env:
-      NUM_WORKER_NODES: "6"
-    test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: deploy-sno
@@ -44,9 +40,7 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       TYPE: sno
-    test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
@@ -58,12 +52,10 @@ tests:
     env:
       BAREMETAL: "true"
       KUBE_BURNER_VERSION: 1.2.9
-      NUM_WORKER_NODES: "6"
       RUN_CERBERUS: "false"
     test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
     - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
@@ -76,14 +68,12 @@ tests:
       BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
-      NUM_WORKER_NODES: "6"
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
@@ -95,14 +85,12 @@ tests:
     env:
       BAREMETAL: "true"
       KUBE_BURNER_VERSION: 1.2.9
-      NUM_WORKER_NODES: "6"
       PUBLIC_VLAN: "false"
     test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-installer-bm-day2-label
     - ref: openshift-qe-installer-bm-day2-sriov
     - ref: openshift-qe-web-burner
+    workflow: openshift-qe-installer-bm-deploy
 - always_run: false
   as: web-burner-cluster-density-6nodes
   capabilities:
@@ -114,15 +102,13 @@ tests:
       BAREMETAL: "true"
       KUBE_BURNER_VERSION: 1.2.9
       LIMIT_COUNT: "1"
-      NUM_WORKER_NODES: "6"
       PUBLIC_VLAN: "false"
       WORKLOAD: web-burner-cluster-density
     test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-installer-bm-day2-label
     - ref: openshift-qe-installer-bm-day2-sriov
     - ref: openshift-qe-web-burner
+    workflow: openshift-qe-installer-bm-deploy
 zz_generated_metadata:
   branch: main
   org: openshift-eng
