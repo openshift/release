@@ -74,9 +74,6 @@ if "${SRC_FROM_GIT}"; then
 fi
 ci_clone_src
 
-# temporary for testing.
-RELEASE_IMAGE_INITIAL="registry.ci.openshift.org/ocp/release:4.20.0-0.nightly-2025-07-04-033329"
-
 # Track whether rebase succeeded
 REBASE_SUCCEEDED=false
 
@@ -104,9 +101,6 @@ if [[ -n "${RELEASE_IMAGE_INITIAL:-}" ]]; then
     DRY_RUN=y \
     ./scripts/auto-rebase/rebase_job_entrypoint.sh || { echo "rebase failed" > "${SHARED_DIR}"/rebase_failure; exit 0; }
   REBASE_SUCCEEDED=true
-  #TODO temporary. Simulate a failure.
-  echo "rebase failed" > "${SHARED_DIR}"/rebase_failure
-  exit 0
 fi
 
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
