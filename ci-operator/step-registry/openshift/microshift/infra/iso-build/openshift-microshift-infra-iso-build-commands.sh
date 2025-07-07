@@ -14,7 +14,7 @@ source /tmp/ci-functions.sh
 ci_subscription_register
 
 download_microshift_scripts
-"\${DNF_RETRY}" "install" "pcp-zeroconf jq"
+"\${DNF_RETRY}" "install" "pcp-zeroconf jq sos"
 ci_copy_secrets "${CACHE_REGION}"
 
 sudo systemctl start pmcd
