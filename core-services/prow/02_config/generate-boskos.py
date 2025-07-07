@@ -551,13 +551,10 @@ CONFIG = {
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-# Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
-for i in range(3):
+# Excluding Mihawk0 from lease pool due to S2S migration
+for i in range(1, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
-# Reserve one for internal debugging use
-del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-0-3']
-
 for i in range(4):
     CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-{}'.format(i)] = 1
 
