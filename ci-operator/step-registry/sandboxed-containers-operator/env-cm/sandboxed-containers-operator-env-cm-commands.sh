@@ -10,8 +10,7 @@ configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
 
 create_catsrc() {
   local catsrc_name="$1"
-  local catsrc_version="$2"
-  local catsrc_image="$3"
+  local catsrc_image="$2"
   local catsrc_path="${SHARED_DIR:-$(pwd)}/catsrc_${catsrc_name}.yaml"
 
   echo "Create a custom catalogsource named ${catsrc_name} for internal builds"
@@ -24,7 +23,7 @@ create_catsrc() {
     namespace: openshift-marketplace
   spec:
     displayName: QE
-    image: "${catsrc_image}:${catsrc_version}"
+    image: "${catsrc_image}"
     publisher: QE
     sourceType: grpc
 EOF
@@ -139,8 +138,8 @@ EOF
 
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   mirror_konflux
-  create_catsrc "${CATALOG_SOURCE_NAME}" "${OPERATOR_INDEX_VERSION}" "${OPERATOR_INDEX_IMAGE}"
-  create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_INDEX_VERSION}" "${TRUSTEE_INDEX_IMAGE}"
+  create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
+  create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
 fi
 
 cat <<EOF | tee "${configmap_path}"
@@ -151,7 +150,7 @@ metadata:
   namespace: default
 data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
-  operatorVer: "${OPERATOR_INDEX_VERSION}"
+  operatorVer: "${EXPECTED_OPERATOR_VERSION}"
   channel: "${OPERATOR_UPDATE_CHANNEL}"
   redirectNeeded: "true"
   exists: "true"
