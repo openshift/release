@@ -20,6 +20,10 @@ export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
+if [[ "$NUM_WORKER_NODES" == "" ]]; then
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  export NUM_WORKER_NODES
+fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 
@@ -29,8 +33,6 @@ lab: $LAB
 lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
-ocp_version: $OCP_VERSION
-ocp_build: $OCP_BUILD
 public_vlan: $PUBLIC_VLAN
 sno_use_lab_dhcp: false
 enable_fips: $FIPS
@@ -46,6 +48,7 @@ setup_bastion_registry: false
 use_bastion_registry: false
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
+payload_url: "${RELEASE_IMAGE_LATEST}"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
@@ -158,10 +161,14 @@ ssh ${SSH_ARGS} root@${bastion} "
    source bootstrap.sh
 "
 
+cp ${CLUSTER_PROFILE_DIR}/pull_secret /tmp/pull-secret
+oc registry login --to=/tmp/pull-secret
+
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
-scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
+
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'

@@ -11,23 +11,9 @@ images:
     RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
     RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
     RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli
+    RUN dnf install -y azure-cli libicu
   from: src
   to: src-plus-az
-promotion:
-  to:
-  - name: "4.20"
-    namespace: ocp
-releases:
-  initial:
-    integration:
-      name: "4.20"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.20"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -37,13 +23,17 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make test-compile
 tests:
-- as: create-aro-hcp-in-integration
+- always_run: false
+  as: create-aro-hcp-in-integration
+  run_if_changed: ^(demo)
   steps:
     env:
-      CLUSTER_NAME: periodic-integration-cluster
-      CUSTOMER_RG_NAME: periodic-integration-customer-rg
+      CLUSTER_NAME: premerge-integration-cluster
+      CUSTOMER_RG_NAME: premerge-integration-customer-rg
       LOCATION: uksouth
       SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+    post:
+    - chain: aro-hcp-provision-teardown-cluster
     test:
     - chain: aro-hcp-provision-create-functional-cluster
 zz_generated_metadata:
