@@ -521,8 +521,7 @@ CONFIG = {
     'aws-ip-pools-us-east-1': {
         'default': 256,
     },
-    'observability-aws-quota-slice': {
-        'default': 50,
+    'aws-observability-quota-slice': {
         'us-east-1': 25,
         'us-east-2': 25,
     },
