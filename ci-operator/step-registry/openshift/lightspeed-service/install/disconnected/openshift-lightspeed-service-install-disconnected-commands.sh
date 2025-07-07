@@ -65,6 +65,12 @@ EOF
 
 # Mirror operator and test images to the Mirror registry. Create Catalog sources and Image Content Source Policy.
 function mirror_catalog_icsp() {
+    run_command 'oc patch operatorhub cluster -p '\''{"spec": {"disableAllDefaultSources": true}}'\'' --type=merge'
+    run_command 'oc patch clustercatalog openshift-certified-operators -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
+    run_command 'oc patch clustercatalog openshift-redhat-operators -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
+    run_command 'oc patch clustercatalog openshift-redhat-marketplace -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
+    run_command 'oc patch clustercatalog openshift-community-operators -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
+    run_command 'oc get clustercatalog'
     registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
 
     optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
