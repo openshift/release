@@ -31,6 +31,30 @@ EOF
   oc apply -f "${catsrc_path}"
 }
 
+# The default catalog image doesn't have a "latest" tag associated with, so
+# we search in quay.io for the latest built tag.
+latest_catsrc_image_tag() {
+    local page=1
+    while true; do
+        local resp
+        resp=$(curl -sf "https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/?limit=100&page=$page")
+
+        if ! jq -e '.tags | length > 0' <<< "$resp" >/dev/null; then
+            break
+        fi
+
+        latest_tag=$(echo "$resp" | \
+          jq -r '.tags[]? | select(.name | test("^osc-test-fbc-on-push-.*-build-image-index$")) | "\(.start_ts) \(.name)"' | \
+          sort -nr | head -n1 | awk '{print $2}')
+        if [ -n "${latest_tag}" ]; then
+            echo "${latest_tag}"
+            break
+        fi
+
+        ((page++))
+    done
+}
+
 mirror_konflux() {
   local mirror_path="${SHARED_DIR:-$(pwd)}/mirror_konflux.yaml"
 
@@ -138,6 +162,13 @@ EOF
 
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   mirror_konflux
+
+  default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
+  if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
+    catsrc_image_tag=$(latest_catsrc_image_tag)
+    CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
+  fi
+
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
   create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
 fi
