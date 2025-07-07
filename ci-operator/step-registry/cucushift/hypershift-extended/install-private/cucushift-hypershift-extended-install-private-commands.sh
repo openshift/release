@@ -13,11 +13,6 @@ if [[ $HO_MULTI == "true" ]]; then
   chmod +x /tmp/hs-cli/hypershift
   HCP_CLI="/tmp/hs-cli/hypershift"
 fi
-mkdir /tmp/hcp-cli
-OPERATOR_IMAGE="quay.io/rh-ee-xiuwang/hypershift-operator:pr-6370"
-oc image extract $OPERATOR_IMAGE --path /usr/bin/hypershift:/tmp/hcp-cli
-chmod +x /tmp/hcp-cli/hypershift
-HCP_CLI="/tmp/hcp-cli/hypershift"
 
 # Build up the hypershift install command
 COMMAND=(

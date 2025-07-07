@@ -26,3 +26,21 @@ yq-v4 'select(.kind == "HostedCluster") *= load("/tmp/patch.yaml")' "${SHARED_DI
 
 echo "Applying patched artifacts"
 oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render_proxy.yaml
+
+echo "Waiting for the HC to be ready"
+cluster_name="$(oc get hc -A -o jsonpath='{.items[0].metadata.name}')"
+if [[ -z "$cluster_name" ]]; then
+    echo "Unable to find the hosted cluster's name"
+    exit 1
+fi
+
+timeout=2700
+interval=15
+SECONDS=0
+until [[ "$(oc get -n clusters hostedcluster/"${cluster_name}" -o jsonpath='{.status.version.history[?(@.state!="")].state}')" == Completed ]]; do
+    sleep $interval
+    if (( SECONDS >= timeout )); then
+        echo "Timed out waiting for the hosted cluster to become ready after $timeout seconds"
+        exit 1
+    fi
+done
