@@ -66,7 +66,7 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-RETRIES=30
+RETRIES=60
 CSV=
 for i in $(seq "${RETRIES}") max; do
   [[ "${i}" == "max" ]] && break
