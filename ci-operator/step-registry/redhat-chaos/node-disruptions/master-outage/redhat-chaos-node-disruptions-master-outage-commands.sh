@@ -64,7 +64,14 @@ elif [ "$platform" = "IBMCloud" ]; then
     export IBMC_URL
     IBMC_APIKEY=$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-api-key)
     export IBMC_APIKEY
-    NODE_NAME=$(oc get nodes -l $LABEL_SELECTOR --no-headers | head -1 | awk '{printf $1}' )
+    
+    # IBM Cloud CLI login for verification
+    echo "Performing IBM Cloud CLI login for verification..."
+    "${IBMCLOUD_CLI}" config --check-version=false
+    echo "Try to login..."
+    "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" --skip-ssl-validation
+    
+    NODE_NAME=$(oc get nodes -l node-role.kubernetes.io/worker= --no-headers | head -1 | awk '{printf $1}' )
     export NODE_NAME
     export TIMEOUT=320
 elif [ "$platform" = "VSphere" ]; then
