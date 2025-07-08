@@ -22,10 +22,8 @@ set -o pipefail
 set -x
 
 REPO_NAME=${REPO_NAME:-}
-PULL_NUMBER=${PULL_NUMBER:-}
 BASTION="${BASTION:-}"                          # first level which always is cloud31 bastion
 TRUE_BASTION_HOST="${TRUE_BASTION_HOST:-}"      # second level such as cloud48 bastion
-TRUE_BASTION_USER="${TRUE_BASTION_USER:-root}"
 LAB_CLOUD="${LAB_CLOUD:-}"
 LAB="${LAB:-}"
 
@@ -54,7 +52,7 @@ function do_jssh() {
     # Use ProxyCommand for nested SSH to control options for both connections
     ssh ${SSH_ARGS} \
         -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p ${user_host}" \
-        ${TRUE_BASTION_USER}@${TRUE_BASTION_HOST} "$@"
+        root@${TRUE_BASTION_HOST} "$@"
     return $?
 }
 
@@ -139,7 +137,7 @@ fi
 regulus_repo="/root/REGULUS/regulus-${LAB_CLOUD}-$(date "+%Y-%m-%d-%H-%M-%S")"
 install-regulus() {
   do_jssh root@${bastion} "
-    export REG_PR='${REG_PR}' PULL_NUMBER='${PULL_NUMBER}' REPO_NAME='${REPO_NAME}' REG_BRANCH='${REG_BRANCH}'
+    export REG_PR='${REG_PR}' REPO_NAME='${REPO_NAME}' REG_BRANCH='${REG_BRANCH}'
     regulus_repo='${regulus_repo}'
     set -e
     set -o pipefail
@@ -152,9 +150,6 @@ install-regulus() {
     if [[ -n \"\${REG_PR}\" ]]; then
         git pull origin pull/\${REG_PR}/head:\${REG_PR} --rebase
         git switch \${REG_PR}
-    elif [[ -n \"\${PULL_NUMBER}\" ]] && [[ \"\${REPO_NAME}\" == \"regulus\" ]]; then
-        git pull origin pull/\${PULL_NUMBER}/head:\${PULL_NUMBER} --rebase
-        git switch \${PULL_NUMBER}
     fi
     git branch
   "
