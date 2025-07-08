@@ -41,8 +41,16 @@ spec:
         name: microsoft-entra-id
         oidcClients:
         - clientID: ${CONSOLE_CLIENT_ID}
+
+EOF
+if [[ "$EXT_OIDC_CLIENT_SECRET" == "true" ]]; then
+    echo "Appending the clientSecret"
+    cat <<EOF >> /tmp/patch.yaml
           clientSecret:
             name: ${CONSOLE_CLIENT_SECRET_NAME}
+EOF
+fi
+cat <<EOF > /tmp/patch.yaml
           componentName: console
           componentNamespace: openshift-console
 EOF
