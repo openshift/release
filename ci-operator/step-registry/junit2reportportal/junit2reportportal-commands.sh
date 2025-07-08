@@ -9,7 +9,7 @@ touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
 LOGS_PATH="logs"
-if [[ -n "$PULL_NUMBER" ]]
+if [[ -n "${PULL_NUMBER:-''}" ]]
 then
   LOGS_PATH="pr-logs/pull/openshift_release/${PULL_NUMBER}"
 fi
