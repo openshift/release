@@ -41,7 +41,6 @@ spec:
         name: microsoft-entra-id
         oidcClients:
         - clientID: ${CONSOLE_CLIENT_ID}
-
 EOF
 if [[ "$EXT_OIDC_CLIENT_SECRET" == "true" ]]; then
     echo "Appending the clientSecret"
@@ -50,7 +49,7 @@ if [[ "$EXT_OIDC_CLIENT_SECRET" == "true" ]]; then
             name: ${CONSOLE_CLIENT_SECRET_NAME}
 EOF
 fi
-cat <<EOF > /tmp/patch.yaml
+cat <<EOF >> /tmp/patch.yaml
           componentName: console
           componentNamespace: openshift-console
 EOF
@@ -70,23 +69,26 @@ cat <<EOF >> /tmp/patch.yaml
       type: OIDC
 EOF
 
-echo "Sleeping for 4 hours..."
-sleep 4h
+if [[ "$HYPERSHIFT_CREATE_CLUSTER_RENDER" == "true" ]]; then
+   echo "Patching rendered artifacts"
+   yq-v4 'select(.kind == "HostedCluster") *= load("/tmp/patch.yaml")' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml \
+      > "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
+
+   echo "Applying patched artifacts"
+   oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
+   HOSTED_CLUSTER_RELEASE=$(yq-v4 'select(.kind == "HostedCluster") | .spec.release.image' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
+   HOSTED_CLUSTER_NAME=$(yq-v4 'select(.kind == "HostedCluster") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
+   yq-v4 "select(.metadata.name == \"$HOSTED_CLUSTER_NAME-pull-secret\") | .data.\".dockerconfigjson\"" "${SHARED_DIR}"/hypershift_create_cluster_render.yaml | base64 -d > /tmp/hosted_cluster_pull_secret
+   HOSTED_CLUSTER_VERSION=$(oc image info -a /tmp/hosted_cluster_pull_secret $HOSTED_CLUSTER_RELEASE | grep -o 'io.openshift.release=.*' | grep -Eo '=4\.[0-9]+' | grep -Eo '[^=]+')
+   echo "The hosted cluster minor version is: $HOSTED_CLUSTER_VERSION"
+   rm -f /tmp/hosted_cluster_pull_secret
+else
+   CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+   oc patch hostedcluster $CLUSTER_NAME -n clusters --patch-file /tmp/patch.yaml --type=merge
+   HOSTED_CLUSTER_VERSION=$(oc get hc $CLUSTER_NAME -n clusters -o jsonpath='{.status.version.desired.version}' |  grep -oE '^[0-9]+\.[0-9]+')
+fi
 
 
-echo "Patching rendered artifacts"
-yq-v4 'select(.kind == "HostedCluster") *= load("/tmp/patch.yaml")' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml \
-    > "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
-
-echo "Applying patched artifacts"
-oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
-
-HOSTED_CLUSTER_RELEASE=$(yq-v4 'select(.kind == "HostedCluster") | .spec.release.image' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
-HOSTED_CLUSTER_NAME=$(yq-v4 'select(.kind == "HostedCluster") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
-yq-v4 "select(.metadata.name == \"$HOSTED_CLUSTER_NAME-pull-secret\") | .data.\".dockerconfigjson\"" "${SHARED_DIR}"/hypershift_create_cluster_render.yaml | base64 -d > /tmp/hosted_cluster_pull_secret
-HOSTED_CLUSTER_VERSION=$(oc image info -a /tmp/hosted_cluster_pull_secret $HOSTED_CLUSTER_RELEASE | grep -o 'io.openshift.release=.*' | grep -Eo '=4\.[0-9]+' | grep -Eo '[^=]+')
-echo "The hosted cluster minor version is: $HOSTED_CLUSTER_VERSION"
-rm -f /tmp/hosted_cluster_pull_secret
 
 echo "Checking External OIDC uid and extra settings ..."
 echo "First, checking ExternalOIDCWithUIDAndExtraClaimMappings featuregate ..."
