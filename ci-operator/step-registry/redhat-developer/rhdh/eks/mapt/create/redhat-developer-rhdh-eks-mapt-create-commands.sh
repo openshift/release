@@ -24,4 +24,5 @@ mapt aws eks create \
   --arch x86_64 \
   --spot \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
-  --load-balancer-controller
+  --load-balancer-controller \
+  --tags app-code=rhdh-003,service-phase=dev,cost-center=726
