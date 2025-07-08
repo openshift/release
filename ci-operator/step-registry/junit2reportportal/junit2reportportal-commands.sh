@@ -7,9 +7,15 @@ touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
 LOGS_PATH="logs"
-if (env | grep -q PULL_NUMBER) && [[ -n "${PULL_NUMBER:-''}" ]]
+if [[ "$(jq -r '.type' <<< ${JOB_SPEC:-''})" = "presubmit" ]]
 then
-  LOGS_PATH="pr-logs/pull/openshift_release/${PULL_NUMBER}"
+  pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
+  if [[ -z "$pr_number" ]]
+  then
+    echo "Expected pull number not found, exit 1"
+    exit 1
+  fi
+  LOGS_PATH="pr-logs/pull/openshift_release/${pr_number}"
 fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
