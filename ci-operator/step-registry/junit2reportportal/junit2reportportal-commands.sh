@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
 set -o pipefail
 
 # the exit code of this step is not expected to be caught from the overall test suite in ReportPortal. Excluding it
@@ -9,7 +8,7 @@ touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
 LOGS_PATH="logs"
-if [[ -n "${PULL_NUMBER:-''}" ]]
+if (env | grep -q PULL_NUMBER) && [[ -n "${PULL_NUMBER:-''}" ]]
 then
   LOGS_PATH="pr-logs/pull/openshift_release/${PULL_NUMBER}"
 fi
