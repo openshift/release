@@ -53,7 +53,8 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 rm -f ${SHARED_DIR}/index.json
 
 WORKLOAD=full-run.yaml ./run.sh
-
+echo "pause to run cross arch test locall"
+sleep 3600
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 mv $folder_name/index_data.json ${SHARED_DIR}/index_data-pod.json
 
