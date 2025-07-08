@@ -61,7 +61,7 @@ case "${BOOT_MODE}" in
     else
       # Assuming HTTP or HTTPS
       if [ -z "${OVE_ISO_FILE}" ]; then
-        iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove.x86_64.iso"
+        iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/bmanzari/agent-ove.x86_64.iso"
       else
         iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${OVE_ISO_FILE}"
       fi
