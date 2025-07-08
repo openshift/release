@@ -218,7 +218,7 @@ else
     --service-cidr 172.32.0.0/16 \
     --cluster-cidr 10.136.0.0/14 --render --render-sensitive > /tmp/hc.yaml"
 
-  wait 3600
+  sleep 3600
 fi
 
 
