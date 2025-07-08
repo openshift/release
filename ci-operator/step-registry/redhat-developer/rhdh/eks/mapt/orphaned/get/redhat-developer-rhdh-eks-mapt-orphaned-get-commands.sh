@@ -13,12 +13,13 @@ aws configure set aws_access_key_id "${AWS_ACCESS_KEY_ID}"
 aws configure set aws_secret_access_key "${AWS_SECRET_ACCESS_KEY}"
 aws configure set default.region "${AWS_DEFAULT_REGION}"
 
-# List all objects in the S3 bucket and save to file
-echo "Listing objects from S3 bucket ${AWS_S3_BUCKET}..."
+# List all top-level prefixes in the S3 bucket and save to file
+echo "Listing top-level prefixes from S3 bucket ${AWS_S3_BUCKET}..."
 aws s3api list-objects-v2 \
   --bucket "${AWS_S3_BUCKET}" \
+  --delimiter "/" \
   --output json | \
-  jq -r '.Contents[]?.Key | split("/")[0] | select(length > 0)' | \
+  jq -r '.CommonPrefixes[]?.Prefix | rtrimstr("/")' | \
   sort -u > "${SHARED_DIR}/s3_top_level_folders.txt"
 
 if [ -f "${SHARED_DIR}/s3_top_level_folders.txt" ]; then
