@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -o nounset
 set -o pipefail
 
 # the exit code of this step is not expected to be caught from the overall test suite in ReportPortal. Excluding it
