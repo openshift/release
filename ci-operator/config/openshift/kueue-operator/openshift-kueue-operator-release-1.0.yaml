@@ -1,0 +1,184 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-9-base-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.19
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: kueue-operator
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  to: kueue-operator-src
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: test-generate
+  commands: make generate manifests regen-crd
+  container:
+    from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: src
+- as: fips-image-scan-kueue-operator
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: kueue-operator
+    test:
+    - ref: fips-check-image-scan
+- as: security
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    workflow: openshift-ci-security
+- as: test-e2e-4-17
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    post:
+    - as: kueue-must-gather
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: kueue-cleanup
+      cli: latest
+      commands: |
+        make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    test:
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-4-18
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  minimum_interval: 96h
+  optional: true
+  presubmit: true
+  steps:
+    post:
+    - as: kueue-must-gather
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: kueue-cleanup
+      cli: latest
+      commands: |
+        make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    test:
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-4-19
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.19"
+  minimum_interval: 96h
+  optional: true
+  presubmit: true
+  steps:
+    post:
+    - as: kueue-must-gather
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: kueue-cleanup
+      cli: latest
+      commands: |
+        make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    test:
+    - chain: kueue-operator-test-e2e
+zz_generated_metadata:
+  branch: release-1.0
+  org: openshift
+  repo: kueue-operator

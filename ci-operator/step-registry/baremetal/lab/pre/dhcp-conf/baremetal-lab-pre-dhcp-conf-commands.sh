@@ -55,7 +55,8 @@ id:$DUID:$mac,$name,[$ipv6],infinite"
 done
 
 DHCP_CONF="${DHCP_CONF}
-$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$(<"${SHARED_DIR}/ipi_bootstrap_ip_address"),set:$CLUSTER_NAME,infinite"
+$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$(<"${SHARED_DIR}/ipi_bootstrap_ip_address"),set:$CLUSTER_NAME,infinite
+id:$DUID:$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$CLUSTER_NAME,[$(<"${SHARED_DIR}/ipi_bootstrap_ipv6_address")],infinite"
 
 echo "Setting the DHCP/PXE config in the auxiliary host..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \

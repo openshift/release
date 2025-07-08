@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.22-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.22-linux
   stolostron_builder_go1.23-linux:
     name: builder
     namespace: stolostron
@@ -15,7 +11,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: operators/multiclusterobservability/Dockerfile
   from: base
@@ -64,16 +60,6 @@ promotion:
   - disabled: true
     name: "2.14"
     namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.16"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.18"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -138,9 +124,9 @@ tests:
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-418
+      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-419
       CLUSTERPOOL_LIFETIME: 1h
-      CLUSTERPOOL_MANAGED_FILTER: sno-418
+      CLUSTERPOOL_MANAGED_FILTER: sno-419
       COMPONENT_NAME: multicluster-observability-operator
       DEPLOY_HUB_ADDITIONAL_YAML: |
         LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl
@@ -211,7 +197,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -236,7 +223,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -262,7 +250,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -288,7 +277,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -314,7 +304,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -340,7 +331,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -349,26 +341,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: sonarcloud
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  optional: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonarcloud-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: release-2.14
   org: stolostron

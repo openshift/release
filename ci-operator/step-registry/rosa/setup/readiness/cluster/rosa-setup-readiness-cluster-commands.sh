@@ -7,6 +7,8 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-60}
+CLUSTER_TIMEOUT_M="${CLUSTER_TIMEOUT}m"
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
@@ -14,9 +16,13 @@ log(){
 
 source ./tests/prow_ci.sh
 
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
 # functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
 #configure aws
-aws_region=${REGION:-$LEASED_RESOURCE}
+aws_region=${REGION:-us-east-2}
 configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
 configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 
@@ -80,7 +86,7 @@ cluster_info_json=$(mktemp)
 record_cluster "timers" "status" "claim"
 
 rosatest --ginkgo.v --ginkgo.no-color \
-  --ginkgo.timeout "60m" \
+  --ginkgo.timeout $CLUSTER_TIMEOUT_M \
   --ginkgo.label-filter "day1-readiness" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 
 # Output

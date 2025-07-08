@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.4.8
+    tag: stackrox-ui-test-0.4.9
 releases:
   latest:
     candidate:
@@ -35,27 +35,43 @@ tests:
       COMPUTE_NODE_REPLICAS: "24"
       ES_SECRETS_PATH: /secret_stackrox
       EXTRA_FLAGS: --churn-duration=20m --timeout=5h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      PODS_PER_NODE: "240"
+      ROX_SCANNER_V4_ENABLED: "false"
       USER_TAGS: |
         TicketId 382
+        RoxProject PerfScale
       ZONES_COUNT: "3"
     test:
-    - chain: openshift-qe-control-plane
+    - chain: stackrox-perfscale
     workflow: stackrox-install-helm
   timeout: 5h0m0s
+- as: 24nodes-scale-scannerv4-test
+  cron: 0 6 * * Mon
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "24"
+      ES_SECRETS_PATH: /secret_stackrox
+      EXTRA_FLAGS: --churn-duration=20m --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      PODS_PER_NODE: "240"
+      ROX_SCANNER_V4_ENABLED: "true"
+      SCANNER_V4_MATCHER_READINESS: vulnerability
+      SCANNER_V4_MATCHER_READINESS_MAX_WAIT: "3600"
+      USER_TAGS: |
+        TicketId 382
+        RoxProject PerfScale
+      ZONES_COUNT: "3"
+    test:
+    - chain: stackrox-perfscale
+    workflow: stackrox-install-helm
+  timeout: 8h0m0s
 - as: qa-e2e-tests
   postsubmit: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/candidate-4.18
-      TEST_SUITE: ocp-qa-e2e-tests
-    workflow: stackrox-automation-flavors-ocp-4-e2e
-  timeout: 5h0m0s
-- as: qa-ebpf-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
       OCP_VERSION: ocp/candidate-4.18
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e

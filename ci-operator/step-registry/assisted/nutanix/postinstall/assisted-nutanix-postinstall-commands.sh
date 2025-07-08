@@ -161,20 +161,38 @@ done
 
 
 # Get the package manifest for the Nutanix CSI Operator from the specific catalog
-packagemanifests_nutanix=$(oc get packagemanifests -o json | jq -r --arg catalog "$catalog" '.items[] | select(.metadata.name=="nutanixcsioperator" and .status.catalogSourceDisplayName==$catalog)')
+start_time=$(date +%s)
+while true; do
+  current_time=$(date +%s)
+  elapsed_time=$((current_time - start_time))
 
-# Extract required variables
-starting_csv=$(echo "$packagemanifests_nutanix" | jq -r '.status.channels[].currentCSV')
-source=$(echo "$packagemanifests_nutanix" | jq -r '.status.catalogSource')
-source_namespace=$(echo "$packagemanifests_nutanix" | jq -r '.status.catalogSourceNamespace')
-default_channel=$(echo "$packagemanifests_nutanix" | jq -r '.status.defaultChannel')
+  packagemanifests_nutanix=$(oc get packagemanifests -o json | jq -r --arg catalog "$catalog" '.items[] | select(.metadata.name=="nutanixcsioperator" and .status.catalogSourceDisplayName==$catalog)')
+  starting_csv=$(echo "$packagemanifests_nutanix" | jq -r '.status.channels[].currentCSV')
+  source=$(echo "$packagemanifests_nutanix" | jq -r '.status.catalogSource')
+  source_namespace=$(echo "$packagemanifests_nutanix" | jq -r '.status.catalogSourceNamespace')
+  default_channel=$(echo "$packagemanifests_nutanix" | jq -r '.status.defaultChannel')
 
-# Debugging output
-echo "Catalog: $catalog"
-echo "Starting CSV: $starting_csv"
-echo "Source: $source"
-echo "Source Namespace: $source_namespace"
-echo "Default Channel: $default_channel"
+  # Check if all variables have values (not null or empty)
+  if [[ -n "$source" && -n "$source_namespace" && -n "$default_channel" ]]; then
+    echo "Source: $source"
+    echo "Source Namespace: $source_namespace"
+    echo "Default Channel: $default_channel"
+    echo "Starting CSV: $starting_csv"
+    break
+  fi
+
+
+  if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
+    echo "Source: $source"
+    echo "Source Namespace: $source_namespace"
+    echo "Default Channel: $default_channel"
+    echo "Starting CSV: $starting_csv"
+    echo "Timeout reached (${resource_timeout_seconds}s) while waiting for required values."
+    exit 1
+  fi
+  echo "Waiting for source, source_namespace, and default_channel to be populated..."
+  sleep 5
+done
 
 
 cat <<EOF | oc apply -f -

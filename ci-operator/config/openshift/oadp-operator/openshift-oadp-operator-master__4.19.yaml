@@ -30,13 +30,13 @@ resources:
 tests:
 - always_run: false
   as: e2e-test-aws
-  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -45,7 +45,8 @@ tests:
       cli: latest
       commands: make test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator
@@ -61,7 +62,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -70,7 +71,8 @@ tests:
       cli: latest
       commands: make test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator
@@ -81,13 +83,13 @@ tests:
     workflow: optional-operators-ci-aws
 - always_run: false
   as: e2e-test-kubevirt-aws
-  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
     cluster_profile: aws
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -96,7 +98,8 @@ tests:
       cli: latest
       commands: make TEST_VIRT=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator
@@ -112,7 +115,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -121,7 +124,61 @@ tests:
       cli: latest
       commands: make TEST_VIRT=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-test-hcp-aws
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: make TEST_HCP=true test-e2e
+      credentials:
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- as: e2e-test-hcp-aws-periodic
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: make TEST_HCP=true test-e2e
+      credentials:
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator

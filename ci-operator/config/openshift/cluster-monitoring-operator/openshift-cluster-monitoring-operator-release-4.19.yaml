@@ -29,8 +29,7 @@ images:
   to: cluster-monitoring-operator-src
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -94,13 +93,13 @@ tests:
     from: src
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TELEMETRY_ENABLED: "true"
@@ -108,13 +107,13 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws-single-node
 - as: e2e-agnostic-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       TELEMETRY_ENABLED: "true"
     test:
@@ -128,7 +127,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-upgrade-aws
@@ -136,6 +135,12 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

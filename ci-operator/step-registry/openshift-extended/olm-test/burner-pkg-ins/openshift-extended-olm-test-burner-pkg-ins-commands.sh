@@ -181,7 +181,7 @@ function analysis_container_cpu_metrics {
     set +x
     for file in ${CCPU_DIR}/mt_ccpu_abs_*.json; do
         echo "analysis ${file}"
-        local ma_options=" --zscore_threshold ${ZSCORE_THRESHOLD} --window_size ${WINDOW_SIZE} --watermark ${WATERMARK}"
+        local ma_options=" --zscore_threshold ${ZSCORE_THRESHOLD} --window_threshold ${WINDOW_THRESHOLD} --window_size ${WINDOW_SIZE} --watermark ${WATERMARK}"
         python3 ma.py check-ccpu -i ${file} -o ${CCPU_DIR_RESULT} ${ma_options}
     done
     set -x
@@ -359,8 +359,8 @@ export GC CHURN CHURN_CYCLES CHURN_DELAY CHURN_DURATION CHURN_PERCENT CHURN_DELE
 export PKG_NAME CHANNEL_NAME CATALOGSOURCE_NAME CATALOGSOURCE_NAMESPACE
 export BURNER_TIMEOUT MAX_WAIT_TIMEOUT JOB_ITERATION_DELAY JOB_PAUSE
 export KUBE_BURNER_VERSION LOG_LEVEL GC_METRICS CHECK_HEALTH BURST QPS
-export ENABLE_LOCAL_INDEX METRICS_ENDPOINT ZSCORE_THRESHOLD WINDOW_SIZE WATERMARK
-export CPU_USAGE_RESULT=0 CASEID CASETITLE
+export ENABLE_LOCAL_INDEX METRICS_ENDPOINT ZSCORE_THRESHOLD WINDOW_THRESHOLD WINDOW_SIZE WATERMARK
+export CPU_USAGE_RESULT=0 CASEID="${CID}" CASETITLE="${CTITLE}"
 
 BURNER_START=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 export BURNER_START

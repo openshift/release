@@ -4,6 +4,33 @@ set -e
 set -u
 set -o pipefail
 
+# Set catalog image names that start with brew in ImageSetConfiguration as vars
+declare JAEGER_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_JAEGER_INDEX_IMAGE}
+declare OTEL_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE}
+declare TEMPO_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE}
+
+# Check if catalog image variables are not empty
+if [[ -z "$JAEGER_INDEX_IMAGE" ]]; then
+    echo "Error: JAEGER_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "JAEGER_INDEX_IMAGE is set to: $JAEGER_INDEX_IMAGE"
+fi
+
+if [[ -z "$OTEL_INDEX_IMAGE" ]]; then
+    echo "Error: OTEL_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "OTEL_INDEX_IMAGE is set to: $OTEL_INDEX_IMAGE"
+fi
+
+if [[ -z "$TEMPO_INDEX_IMAGE" ]]; then
+    echo "Error: TEMPO_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "TEMPO_INDEX_IMAGE is set to: $TEMPO_INDEX_IMAGE"
+fi
+
 # Set XDG_RUNTIME_DIR/containers to be used by oc mirror
 export HOME=/tmp/home
 export XDG_RUNTIME_DIR="${HOME}/run"
@@ -94,7 +121,7 @@ function mirror_catalog_icsp() {
     MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
     echo $MIRROR_REGISTRY_HOST
     if [[ $ret -eq 0 ]]; then 
-        jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
+        jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
       export REG_CREDS=${XDG_RUNTIME_DIR}/containers/auth.json
     else
         echo "!!! fail to extract the auth of the cluster"
@@ -113,19 +140,19 @@ storageConfig:
     path: /tmp/images
 mirror:
   operators:
-  - catalog: brew.registry.redhat.io/rh-osbs/iib:928197
+  - catalog: ${TEMPO_INDEX_IMAGE}
     targetCatalog: rh-osbs/tempo
     packages:
     - name: tempo-product
       channels:
       - name: stable
-  - catalog: brew.registry.redhat.io/rh-osbs/iib:927219
+  - catalog: ${OTEL_INDEX_IMAGE}
     targetCatalog: rh-osbs/otel
     packages:
     - name: opentelemetry-product
       channels:
       - name: stable
-  - catalog: brew.registry.redhat.io/rh-osbs/iib:933808
+  - catalog: ${JAEGER_INDEX_IMAGE}
     targetCatalog: rh-osbs/jaeger
     packages:
     - name: jaeger-product

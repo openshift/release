@@ -33,8 +33,7 @@ images:
   to: oc-mirror
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -60,7 +59,10 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test-unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make test-unit
   container:
     from: src
 - as: e2e
@@ -78,6 +80,12 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

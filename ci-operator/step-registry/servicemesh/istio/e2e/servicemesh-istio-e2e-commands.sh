@@ -7,7 +7,7 @@ set -o pipefail
 
 function check_pod_status() {
     INTERVAL=60
-    CNT=10
+    CNT=15
     while [ $((CNT)) -gt 0 ]; do
         READY=false
         while read -r i

@@ -47,6 +47,7 @@ allowVolumeExpansion: true
 parameters:
   connect-mode: DIRECT_PEERING
   network: $NETWORK_NAME
+  reserved-ipv4-cidr: 10.192.0.0/16 # GCE will pick NFS server addresses from this range, should not collide with the defaul OCP networking config
   labels: kubernetes-io-cluster-$CLUSTER_NAME=owned
 EOF
 

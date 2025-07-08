@@ -82,33 +82,6 @@ tests:
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
   timeout: 7h0m0s
 - always_run: false
-  as: data-path-9nodes
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D8ps_v5
-      ADDITIONAL_WORKERS: "3"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "3"
-      COMPUTE_NODE_TYPE: Standard_D8s_v5
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
-      CUSTOM_AZURE_REGION: eastus
-      OCP_ARCH: amd64
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
-      SET_ENV_BY_PLATFORM: custom
-      TOLERANCE: "99"
-      WORKER_REPLICA_COUNT: "9"
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: workers-scale
-    - ref: openshift-qe-perfscale-azu-data-path-nsg
-    - chain: openshift-qe-data-path-tests
-    workflow: openshift-qe-installer-azure
-  timeout: 8h0m0s
-- always_run: false
   as: control-plane-24nodes
   steps:
     allow_skip_on_success: true
@@ -148,8 +121,35 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-azure
   timeout: 5h0m0s
-- always_run: false
-  as: node-density-heavy-multi-24nodes
+- as: data-path-multi-9nodes
+  cron: 0 4 8,22 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D8ps_v5
+      ADDITIONAL_WORKERS: "3"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D8s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
+      CUSTOM_AZURE_REGION: eastus
+      OCP_ARCH: amd64
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
+      SET_ENV_BY_PLATFORM: custom
+      TOLERANCE: "99"
+      WORKER_REPLICA_COUNT: "9"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: workers-scale
+    - ref: openshift-qe-perfscale-azu-data-path-nsg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-azure
+  timeout: 8h0m0s
+- as: node-density-heavy-multi-24nodes
+  cron: 0 0 12,26 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -173,8 +173,8 @@ tests:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-azure
   timeout: 8h0m0s
-- always_run: false
-  as: control-plane-multi-120nodes
+- as: control-plane-multi-120nodes
+  cron: 0 10 4,18 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-perfscale

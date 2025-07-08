@@ -45,13 +45,14 @@ function check_failed_operator(){
             failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
             failing_operators="${failing_operator} ${failing_operators}"
+        elif [[ ${failing_status} == "Unknown" ]]; then
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'waiting on \K.*?(?= over)'|tr -d ',') || true
         else
-            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || true
-            if [[ -z "${failing_operators}" ]]; then
-                failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting on \K.*'|tr -d ',') || true
-            fi
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || \
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting up to 40 minutes on \K.*'|tr -d ',') || \
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting on \K.*'|tr -d ',') || true
         fi
-        if [[ -n "${failing_operators}" ]]; then
+        if [[ -n "${failing_operators}" && "${failing_operators}" =~ [^[:space:]] ]]; then
             echo "Upgrade stuck, set UPGRADE_FAILURE_TYPE to ${failing_operators}"
             export UPGRADE_FAILURE_TYPE="${failing_operators}"
         fi
@@ -60,23 +61,32 @@ function check_failed_operator(){
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\n# Generating the Junit for upgrade"
+    local upg_report="${ARTIFACT_DIR}/junit_upgrade.xml"
+    local cases_in_upgrade
     if (( FRC == 0 )); then
-      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="cluster upgrade" tests="1" failures="0">
-  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}"/>
-</testsuite>
-EOF
+        # The cases are SLOs on the live cluster which may be a possible UPGRADE_FAILURE_TYPE
+        local cases_from_available_operators upgrade_success_cases
+        cases_from_available_operators=$(oc get co --no-headers|awk '{print $1}'|tr '\n' ' ' || true)
+        upgrade_success_cases="${UPGRADE_FAILURE_TYPE} ${cases_from_available_operators} ${IMPLICIT_ENABLED_CASES}"
+        upgrade_success_cases=$(echo ${upgrade_success_cases} | tr ' ' '\n'|sort -u|xargs)
+        IFS=" " read -r -a cases_in_upgrade <<< "${upgrade_success_cases}"
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > "${upg_report}"
+        echo "<testsuite name=\"cluster upgrade\" tests=\"${#cases_in_upgrade[@]}\" failures=\"0\">" >> "${upg_report}"
+        for case in "${cases_in_upgrade[@]}"; do
+            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${case}\"/>" >> "${upg_report}"
+        done
+        echo '</testsuite>' >> "${upg_report}"
     else
-      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="cluster upgrade" tests="1" failures="1">
-  <testcase classname="cluster upgrade" name="upgrade should succeed: ${UPGRADE_FAILURE_TYPE}">
-    <failure message="openshift cluster upgrade failed at ${UPGRADE_FAILURE_TYPE}"></failure>
-  </testcase>
-</testsuite>
-EOF
+        IFS=" " read -r -a cases_in_upgrade <<< "${UPGRADE_FAILURE_TYPE}"
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > "${upg_report}"
+        echo "<testsuite name=\"cluster upgrade\" tests=\"${#cases_in_upgrade[@]}\" failures=\"${#cases_in_upgrade[@]}\">" >> "${upg_report}"
+        for case in "${cases_in_upgrade[@]}"; do
+            echo "  <testcase classname=\"cluster upgrade\" name=\"upgrade should succeed: ${case}\">" >> "${upg_report}"
+            echo "    <failure message=\"openshift cluster upgrade failed at ${case}\"></failure>" >> "${upg_report}"
+            echo "  </testcase>" >> "${upg_report}"
+        done
+        echo '</testsuite>' >> "${upg_report}"
     fi
 }
 
@@ -90,12 +100,14 @@ function run_command() {
 function rollback() {
     res=$(env "OC_ENABLE_CMD_UPGRADE_ROLLBACK=true" oc adm upgrade rollback 2>&1 || true)
     out="Requested rollback from ${SOURCE_VERSION} to ${TARGET_VERSION}"
+    local testcase="OCP-70838"
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     if [[ ${res} == *"${out}"* ]]; then
         echo "Rolling back cluster from ${SOURCE_VERSION} to ${TARGET_VERSION} started..."
     else
         echo "Rolling back cluster returned unexpected:\n${res}\nexpecting: ${out}"
         # Explicitly set failure to rollback
-        export UPGRADE_FAILURE_TYPE="rollback"
+        export UPGRADE_FAILURE_TYPE="${testcase}"
         return 1
     fi
 }
@@ -131,15 +143,16 @@ function check_rollback_status() {
 
 # Check version, state in history
 function check_history() {
-    local version state
+    local version state testcase="OCP-70838"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
+    export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now rollbacked to ${TARGET_VERSION}" && return 0
     else
         echo >&2 "History check FAILED, cluster rollbacked to ${TARGET_VERSION} failed, current version is ${version}, state is ${state}, exiting"
 	# Explicitly set failure to cvo
-	export UPGRADE_FAILURE_TYPE="cvo"
+	export UPGRADE_FAILURE_TYPE="${testcase}"
 	return 1
     fi
 }
@@ -167,6 +180,8 @@ export TARGET_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}"
 # Set genenral upgrade ci failure to overall as default
 export UPGRADE_FAILURE_TYPE="overall"
+# The cases are from existing general checkpoints enabled implicitly in upgrade step, which may be a possible UPGRADE_FAILURE_TYPE
+export IMPLICIT_ENABLED_CASES=""
 
 rollback
 check_rollback_status

@@ -220,13 +220,26 @@ EOF
     subnet_edge=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
       --query "Stacks[0].Outputs[?OutputKey=='PublicSubnetId'].OutputValue" \
       --output text)
+    unmanaged_subnet=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
+      --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnetId'].OutputValue" \
+      --output text)
   else
     subnet_edge=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
       --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnetId'].OutputValue" \
       --output text)
+    unmanaged_subnet=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
+      --query "Stacks[0].Outputs[?OutputKey=='PublicSubnetId'].OutputValue" \
+      --output text)
   fi
+
   SUBNETS_STR=$(jq -c ". + [\"$subnet_edge\"]" <(echo "$SUBNETS_STR"))
   echo_date "Subnets (with edge zones): ${SUBNETS_STR}"
+
+  echo_date "Setting unused subnet with required cluster tag by installer: ${unmanaged_subnet}"
+  aws ec2 create-tags --resources "${unmanaged_subnet}" --tags "Key=kubernetes.io/cluster/unmanaged,Value=true" || \
+    echo_date "WARNING: Failed to tag subnet ${unmanaged_subnet}"
+  aws ec2 describe-subnets --filters Name=vpc-id,Values="${VPC_ID}" \
+    | jq -c '.Subnets[] | {SubnetId, State, AvailabilityZoneId, AvailabilityZone, CidrBlock, Tags}' > ${ARTIFACT_DIR}/vpc-subnets.json || true
 }
 
 function create_edge_subnets() {
@@ -288,10 +301,35 @@ compute:
   platform:
     aws:
       zones: ${ZONES_STR}
-platform:
-  aws:
-    subnets: ${SUBNETS_CONFIG}
 EOF
+
+
+RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
+if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
+  # If there is no initial release, we will be installing latest.
+  RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_LATEST:-}"
+fi
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
+ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
+ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
+rm /tmp/pull-secret
+tmp_file=$(mktemp)
+
+if ((ocp_major_version == 4 && ocp_minor_version <= 18)); then
+  for s in $(echo "${SUBNETS_CONFIG}" | yq-go r - '[*]');
+  do
+    # platform.aws.subnets
+    yq-go w -i ${PATCH} 'platform.aws.subnets[+]' "$s"
+  done
+else
+  for s in $(echo "${SUBNETS_CONFIG}" | yq-go r - '[*]');
+  do
+    # platform.aws.vpc.subnets
+    yq-go r -j ${PATCH} | jq --arg s $s '.platform.aws.vpc.subnets += [{"id": $s}]' | yq-go r - -P > ${tmp_file} && mv ${tmp_file} ${PATCH}
+  done
+fi
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 

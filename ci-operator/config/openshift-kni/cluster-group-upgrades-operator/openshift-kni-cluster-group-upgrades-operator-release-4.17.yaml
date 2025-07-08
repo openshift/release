@@ -54,9 +54,9 @@ tests:
     make ci-job
   container:
     from: src
-  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: integration
-  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws-telco
     env:
@@ -72,6 +72,22 @@ tests:
         ci-job-type optional-operators-ci-aws
         ci-repo-name cluster-group-upgrades-operator
         ci-org-name openshift-kni
+    pre:
+    - chain: ipi-aws-pre
+    - as: pre
+      cli: latest
+      commands: |
+        KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG
+        cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        make non-kind-deps-update
+        make install-acm-crds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: optional-operators-subscribe
     test:
     - as: integration
       cli: latest

@@ -289,8 +289,8 @@ function prepare_next_steps() {
 
 function inject_promtail_service() {
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
-  export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
-  export PROMTAIL_VERSION="v2.4.1"
+  export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+  export PROMTAIL_VERSION="v3.4.3"
   export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
 
   config_dir=/tmp/promtail
@@ -606,6 +606,9 @@ azure4|azuremag|azure-arm64)
     if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
         echo "Setting AZURE credential with minimal permissions for installer"
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+    elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+        echo "Setting AZURE credential with Contributor role only for installer"
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
     else
         export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     fi
@@ -699,7 +702,11 @@ set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
+azure4|azure-arm64)
+    if [[ "${BOOT_DIAGNOSTICS:-}" == "true" ]]; then
+      inject_boot_diagnostics ${dir}
+    fi
+    ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config "${dir}" "workers"

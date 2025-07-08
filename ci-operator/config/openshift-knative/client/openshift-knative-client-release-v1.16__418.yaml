@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+  openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.22-openshift-4.17
+    tag: rhel-8-release-golang-1.23-openshift-4.19
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -23,7 +23,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-client-kn
@@ -32,7 +32,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-client-test-grpc-ping
@@ -41,7 +41,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-client-test-helloworld
@@ -50,7 +50,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-client-test-servingcontainer
@@ -59,7 +59,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: knative-client-test-sidecarcontainer
@@ -70,13 +70,12 @@ promotion:
   to:
   - additional_images:
       client-src: src
+    name: knative-v1.16
     namespace: openshift
-    tag: knative-v1.16
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.18"
 resources:
   '*':
@@ -85,14 +84,16 @@ resources:
       memory: 1Gi
 tests:
 - as: test-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.18"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -139,7 +140,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -161,7 +161,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-v1.16

@@ -5,12 +5,13 @@ build_root:
     tag: latest
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.17"
+    release:
+      channel: stable
+      version: "4.18"
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -23,13 +24,41 @@ tests:
   steps:
     cluster_profile: metal-perfscale-telco
     env:
-      LAB: scalelab
-      LAB_CLOUD: cloud126
       TYPE: mno
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-load-kubeconfig
-    - chain: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-cluster-health
+- always_run: false
+  as: rds-core
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      SRIOV_NODE_SELECTOR: node-role.kubernetes.io/worker
+      TELCO: "true"
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-installer-bm-day2-metallb
+    - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: openshift-qe-rds-core
+    workflow: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: rds-core-test
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    test:
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-rds-core
 zz_generated_metadata:
   branch: main
   org: openshift-eng

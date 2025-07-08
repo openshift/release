@@ -60,15 +60,28 @@ elif [ "$platform" = "IBMCloud" ]; then
     export IBMC_URL
     IBMC_APIKEY=$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-api-key)
     export IBMC_APIKEY
-    ACTION="$CLOUD_TYPE-node-reboot"
-    export ACTION
     NODE_NAME=$(oc get nodes -l $LABEL_SELECTOR --no-headers | head -1 | awk '{printf $1}' )
     export NODE_NAME
     export TIMEOUT=320
-
+elif [ "$platform" = "VSphere" ]; then
+    export CLOUD_TYPE="vsphere"
+    VSPHERE_IP=$(oc get infrastructures.config.openshift.io cluster -o jsonpath='{.spec.platformSpec.vsphere.vcenters[0].server}')
+    export VSPHERE_IP
+    VSPHERE_IP_WITHOUTDOT=$(echo "$VSPHERE_IP" | sed 's/\./\\./g')
+    jsonpath_username="{.data.${VSPHERE_IP_WITHOUTDOT}\.username}"
+    jsonpath_password="{.data.${VSPHERE_IP_WITHOUTDOT}\.password}"
+    VSPHERE_USERNAME=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_username" | base64 --decode)
+    export VSPHERE_USERNAME
+    VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
+    export VSPHERE_PASSWORD
 fi
 
 ./node-disruptions/prow_run.sh
 rc=$?
+
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
+
 echo "Finished running node disruptions"
 echo "Return code: $rc"

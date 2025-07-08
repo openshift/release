@@ -7,18 +7,14 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.17_base-rhel9:
+  ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-8-golang-1.23-openshift-4.19
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
@@ -36,34 +32,30 @@ canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -99,11 +91,14 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
+- as: e2e-aws-ovn-edge-zones
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-local-gateway
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
@@ -194,6 +189,21 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
   timeout: 5h30m0s
+- as: e2e-aws-ovn-upgrade-ipsec
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
+- as: e2e-aws-ovn-serial-ipsec
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-upgrade-local-gateway
   steps:
     cluster_profile: aws
@@ -248,14 +258,14 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -283,16 +293,18 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        FEATURE_SET=TechPreviewNoUpgrade
-      EXTRA_MG_ARGS: --host-network
-      TEST_SKIPS: Services should fallback to local terminating endpoints when there
-        are no ready endpoints with externalTrafficPolicy=Local
-    pre:
-    - chain: baremetalds-ofcir-pre
-    - ref: baremetalds-e2e-ovn-bgp-pre
-    workflow: baremetalds-e2e-ovn-dualstack
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-bgp-dualstack
+  timeout: 5h0m0s
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-hypershift
   steps:
     cluster_profile: hypershift
@@ -327,10 +339,10 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 6h0m0s
-- as: e2e-aws-ovn-kubevirt
+- as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: hypershift-kubevirt-conformance
   timeout: 6h0m0s
 - as: security
@@ -353,14 +365,15 @@ tests:
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
       ITERATION_MULTIPLIER_ENV: "15"
       OUTPUT_FORMAT: JUNIT
-      RUN_ORION: "false"
+      RUN_ORION: "true"
+      VERSION: "4.19"
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
-- always_run: false
+- always_run: true
   as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
   steps:
@@ -370,6 +383,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
       ITERATION_MULTIPLIER_ENV: "3"
+      RUN_ORION: "true"
       VERSION: "4.19"
     post:
     - chain: ipi-aws-post
@@ -389,7 +403,8 @@ tests:
       COMPUTE_NODE_TYPE: m5.xlarge
       ENABLE_LAYER_3: "false"
       ITERATION_MULTIPLIER_ENV: "3"
-      KUBE_BURNER_VERSION: 1.5.0
+      RUN_ORION: "true"
+      VERSION: "4.19"
     post:
     - chain: ipi-aws-post
     pre:
@@ -400,7 +415,7 @@ tests:
 - as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -409,7 +424,7 @@ tests:
 - as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -420,7 +435,7 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
     workflow: hypershift-aws-conformance
   timeout: 6h0m0s
 - as: e2e-azure-ovn-techpreview
@@ -510,16 +525,15 @@ tests:
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-virt-techpreview
+  as: e2e-aws-ovn-virt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       CNV_PRERELEASE_LATEST_CHANNEL: "true"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
       EXTRA_MG_ARGS: --host-network
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-ovn-virt
   timeout: 6h0m0s
 - always_run: false

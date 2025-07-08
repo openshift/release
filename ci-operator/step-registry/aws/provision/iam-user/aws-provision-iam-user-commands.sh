@@ -91,8 +91,6 @@ function create_cred_file()
 		return 1
 	fi
 
-
-	echo "Key id: ${key_id} sec: ${key_sec:0:5}"
 	cat <<EOF >"${cred_file}"
 [default]
 aws_access_key_id     = ${key_id}

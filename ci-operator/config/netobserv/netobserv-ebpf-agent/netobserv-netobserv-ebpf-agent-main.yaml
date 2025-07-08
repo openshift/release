@@ -3,6 +3,10 @@ base_images:
     name: flowlogs-pipeline
     namespace: netobserv
     tag: ci
+  netobserv-perfscale:
+    name: netobserv-perfscale
+    namespace: ci
+    tag: latest
   network-observability-console-plugin:
     name: network-observability-console-plugin
     namespace: netobserv
@@ -14,16 +18,11 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.18"
-  ubi:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "9"
+    tag: "4.19"
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: ubi
   to: netobserv-ebpf-agent
 promotion:
   to:
@@ -34,7 +33,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -60,6 +59,45 @@ tests:
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
+- always_run: false
+  as: ebpf-node-density-heavy-25nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      EBPFAGENT_PR_IMAGE: pipeline:netobserv-ebpf-agent
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "25"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
+      ES_METADATA_INDEX: perf_scale_ci*
+      ES_TYPE: qe
+      EXTRA_FLAGS: --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
+      INSTALLATION_SOURCE: Source
+      KAFKA_CONSUMER_REPLICAS: "6"
+      LOKISTACK_SIZE: 1x.small
+      LOOKBACK: "90"
+      LOOKBACK_SIZE: "15"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: https://github.com/cloud-bulldozer/orion/blob/3ccfb0437810057c546656689b427373159fa4de/examples/netobserv-node-density-heavy.yaml
+      ORION_ENVS: PLATFORM=AWS
+      PATCH_EBPFAGENT_IMAGE: "true"
+      PODS_PER_NODE: "200"
+      RUN_ORION: "false"
+      SIZE_VARIANT: large
+      VERSION: "4.19"
+      WORKLOAD: node-density-heavy
+      ZONES_COUNT: "3"
+    post:
+    - ref: netobserv-perf-test-cleanup
+    - chain: ipi-aws-post
+    test:
+    - ref: netobserv-perf-test-deploy
+    - ref: openshift-qe-kube-burner-ingress-perf
+    - chain: netobserv-perf-test-post-workload
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: main
   org: netobserv

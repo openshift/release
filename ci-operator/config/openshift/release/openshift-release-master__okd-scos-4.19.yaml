@@ -1,4 +1,36 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   upi-installer:
     name: "4.19"
     namespace: origin
@@ -30,32 +62,41 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-upgrade
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
-- as: e2e-gcp-ovn-upgrade
+- as: e2e-gcp
   interval: 168h
   steps:
     cluster_profile: gcp-3
-    env:
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-gcp
+    workflow: openshift-e2e-gcp
 - as: e2e-vsphere-ovn
   interval: 168h
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
+- as: e2e-agent-single-node-ipv6
+  cluster: build05
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+  timeout: 5h0m0s
+- as: e2e-aws-ovn-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: master
   org: openshift

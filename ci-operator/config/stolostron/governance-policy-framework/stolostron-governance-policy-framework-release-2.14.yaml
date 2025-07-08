@@ -6,13 +6,15 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.e2etest
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.e2etest
   from: base
+  optional: true
   to: grc-policy-framework-tests
 promotion:
   to:
-  - disabled: true
-    name: "2.14"
+  - name: "2.14"
     namespace: stolostron
 resources:
   '*':
@@ -20,14 +22,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: grc-policy-framework-tests
-    env:
-      IMAGE_REPO: grc-policy-framework-tests
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: test-e2e-grc-framework
   steps:
     dependencies:
@@ -77,7 +71,8 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

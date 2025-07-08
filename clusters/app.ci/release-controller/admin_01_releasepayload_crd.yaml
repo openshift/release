@@ -66,6 +66,16 @@ spec:
                         releaseCreationJobName:
                           description: ReleaseCreationJobName the name the release creation batchv1.Job
                           type: string
+                    releaseMirrorCoordinates:
+                      description: ReleaseMirrorCoordinates houses the configuration of the release mirror job
+                      type: object
+                      properties:
+                        namespace:
+                          description: Namespace the namespace where the release mirror batchv1.Jobs are created
+                          type: string
+                        releaseMirrorJobName:
+                          description: ReleaseCreationJobName the name the release mirror batchv1.Job
+                          type: string
                 payloadOverride:
                   description: PayloadOverride specified when manual intervention is required to manually Accept or Reject a ReleasePayload
                   type: object
@@ -150,6 +160,19 @@ spec:
                   x-kubernetes-validations:
                     - rule: '!has(oldSelf.payloadVerificationDataSource) || has(self.payloadVerificationDataSource)'
                       message: PayloadVerificationDataSource is required once set
+                releaseCoordinates:
+                  description: ReleaseCoordinates list of ReleaseCoordinates where this ReleasePayload has been, or will be, published
+                  type: array
+                  items:
+                    description: ReleaseCoordinates specifies the location where this ReleasePayload has been, or will be, published to.
+                    type: object
+                    properties:
+                      digest:
+                        type: string
+                      repository:
+                        type: string
+                      tag:
+                        type: string
             status:
               description: Status is the current status of the ReleasePayload
               type: object
@@ -327,6 +350,24 @@ spec:
                       type: string
                     status:
                       description: Status is the current status of the release creation job
+                      type: string
+                releaseMirrorJobResult:
+                  description: ReleaseMirrorJobResult stores the coordinates and status of the release mirror job that is created, by the release-controller, to mirror the release, defined by the PayloadCoordinates in the ReleasePayloadSpec, to an external registry.  If the release mirror job fails to get created or completes unsuccessfully, the ReleasePayload may still be processed and verified accordingly.  If the release mirror job is successful, then this ReleasePayload will be available in the external registry.
+                  type: object
+                  properties:
+                    coordinates:
+                      description: Coordinates the location of the batch/v1 Job
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                    message:
+                      description: Message is a human-readable message indicating details about the result of the release mirror job
+                      type: string
+                    status:
+                      description: Status is the current status of the release mirror job
                       type: string
                 upgradeJobResults:
                   description: UpgradeJobResults stores the results of generated upgrade jobs

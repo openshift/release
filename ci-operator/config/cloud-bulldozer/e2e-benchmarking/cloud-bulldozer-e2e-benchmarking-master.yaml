@@ -5,15 +5,13 @@ build_root:
       USER 0
 releases:
   arm64-latest:
-    candidate:
+    release:
       architecture: arm64
-      product: ocp
-      stream: nightly
+      channel: stable
       version: "4.18"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.18"
 resources:
   '*':
@@ -402,7 +400,7 @@ tests:
     - ref: cloud-bulldozer-e2e-benchmarking-router-perf
     workflow: openshift-qe-installer-aws
 - always_run: false
-  as: e2e-udn-density-pods-l3
+  as: e2e-udn-density-pods-l3-single-node
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -426,7 +424,7 @@ tests:
     - ref: cloud-bulldozer-e2e-benchmarking-udn-density-pods
     workflow: openshift-qe-installer-aws
 - always_run: false
-  as: e2e-udn-density-pods-l2
+  as: e2e-udn-density-pods-l2-single-node
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -473,6 +471,39 @@ tests:
     test:
     - ref: cloud-bulldozer-e2e-benchmarking-egressip
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: e2e-rds-core-mno
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      SRIOV_NODE_SELECTOR: node-role.kubernetes.io/worker
+      TELCO: "true"
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-installer-bm-day2-metallb
+    - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: cloud-bulldozer-e2e-benchmarking-rds-core
+    workflow: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: e2e-vm-density-single-node
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-cnv
+    - ref: cloud-bulldozer-e2e-benchmarking-virt-density
+    workflow: openshift-qe-installer-bm-deploy
 zz_generated_metadata:
   branch: master
   org: cloud-bulldozer

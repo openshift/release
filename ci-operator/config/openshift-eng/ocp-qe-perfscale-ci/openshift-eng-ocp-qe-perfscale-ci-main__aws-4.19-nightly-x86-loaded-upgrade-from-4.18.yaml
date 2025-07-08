@@ -23,8 +23,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: loaded-upgrade-417to418-24nodes
-  cron: 0 10 3,10,17,24 * *
+- as: loaded-upgrade-418to419-24nodes
+  cron: 0 10 10,24 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -49,7 +49,7 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     workflow: openshift-qe-upgrade
   timeout: 8h0m0s
-- as: loaded-upgrade-417to418-120nodes
+- as: loaded-upgrade-418to419-120nodes
   cron: 0 0 24 * *
   steps:
     allow_skip_on_success: true
@@ -82,7 +82,7 @@ tests:
     workflow: openshift-qe-upgrade
   timeout: 8h0m0s
 - always_run: false
-  as: loaded-upgrade-417to418-180nodes
+  as: loaded-upgrade-418to419-180nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -113,8 +113,8 @@ tests:
     - ref: openshift-qe-cluster-density-v2
     workflow: openshift-qe-upgrade
   timeout: 8h0m0s
-- as: loaded-upgrade-417to418-252nodes
-  cron: 0 6 24 * *
+- as: loaded-upgrade-418to419-252nodes
+  cron: 0 7 10 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -145,6 +145,88 @@ tests:
     - ref: openshift-qe-cluster-density-v2
     workflow: openshift-qe-upgrade
   timeout: 8h0m0s
+- as: loaded-upgrade-418to419-3nodes-udn
+  cron: 0 9 17 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      RUN_ORION: "false"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-upgrade
+  timeout: 7h0m0s
+- as: loaded-upgrade-418to419-24nodes-72udn
+  cron: 0 2 24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      MAX_UNAVAILABLE: "3"
+      RUN_ORION: "false"
+      WORKER_REPLICA_COUNT: "24"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-upgrade
+  timeout: 7h55m0s
+- as: loaded-upgrade-418to419-24nodes-layer2-72udn
+  cron: 0 0 17 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      ENABLE_LAYER_3: "false"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      MAX_UNAVAILABLE: "3"
+      RUN_ORION: "false"
+      WORKER_REPLICA_COUNT: "24"
+      ZONES_COUNT: "3"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-udn-density-pods
+    workflow: openshift-qe-upgrade
+  timeout: 7h55m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng

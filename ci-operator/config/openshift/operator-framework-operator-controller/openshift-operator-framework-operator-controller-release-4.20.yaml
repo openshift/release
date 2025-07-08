@@ -2,48 +2,49 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
-  ocp_4.19_base-rhel9:
+    tag: latest
+  ocp_4.20_base-rhel9:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: openshift/catalogd.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: olm-catalogd
 - dockerfile_path: openshift/operator-controller.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: olm-operator-controller
 - dockerfile_path: openshift/registry.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: e2e-test-registry
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - e2e-test-registry
     name: "4.20"
     namespace: ocp
@@ -85,28 +86,25 @@ tests:
   commands: commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
+- as: check-sync-pr-valid
+  commands: |
+    cd /tmp
+    curl -sSLfo jq --retry 5 --retry-delay 60 https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64
+    chmod a+x jq
+    pull_labels=$(curl -sSLf --retry 5 --retry-delay 60 "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}")
+    if [ $( echo "$pull_labels" | ./jq -e '.labels[] | select(.name=="kind/sync") | .name' | wc -l ) -gt 0 ]; then
+      remote_base_latest_commit=$(git ls-remote --exit-code -q --refs git@github.com:${REPO_OWNER}/${REPO_NAME}.git refs/heads/${PULL_BASE_REF} | cut -f1)
+      if [ -n "${remote_base_latest_commit}" ] && [ ! $(git merge-base --is-ancestor "${remote_base_latest_commit}" HEAD) ]; then
+        echo "missing commit ${remote_base_latest_commit} from branch ${PULL_HEAD_REF}: branch needs rebase on base branch ${PULL_BASE_REF}";
+        exit 1;
+      fi
+    fi
+  container:
+    from: src
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: aws
-    post:
-    - as: check-sync-pr-valid
-      commands: |
-        cd /tmp
-        curl -sSLfo jq --retry 5 --retry-delay 60 https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64
-        chmod a+x jq
-        pull_labels=$(curl -sSLf --retry 5 --retry-delay 60 "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}")
-        if [ $( echo "$pull_labels" | ./jq -e '.labels[] | select(.name=="kind/sync") | .name' | wc -l ) -gt 0 ]; then
-          remote_base_latest_commit=$(git ls-remote --exit-code -q --refs git@github.com:${REPO_OWNER}/${REPO_NAME}.git refs/heads/${PULL_BASE_REF} | cut -f1)
-          if [ -n "${remote_base_latest_commit}" ] && [ ! $(git merge-base --is-ancestor "${remote_base_latest_commit}" HEAD) ]; then
-            echo "missing commit ${remote_base_latest_commit} from branch ${PULL_HEAD_REF}: branch needs rebase on base branch ${PULL_BASE_REF}";
-            exit 1;
-          fi
-        fi
-      from: src
-      resources:
-        requests:
-          cpu: 100m
     test:
     - as: upstream-e2e
       cli: latest
@@ -124,7 +122,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -140,6 +138,24 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: default-catalog-consistency
+  run_if_changed: ^(openshift/default-catalog-consistency/|openshift/catalogd/kustomize/overlays/openshift/catalogs/)
+  steps:
+    test:
+    - as: default-catalog-tests
+      commands: |
+        echo "Running Default Catalog Tests"
+        cd openshift/default-catalog-consistency
+        REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
+      credentials:
+      - collection: ""
+        mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

@@ -1,0 +1,109 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.37.0
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM ${ARTIFACTS_BUILD_ROOT}
+      COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/oc /bin/oc
+      COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/kubectl /bin/kubectl
+      RUN umask 0002
+      WORKDIR /workspace
+      RUN curl -L -o repo.zip "https://github.com/${ORG}/${REPO}/archive/${COMMIT}.zip" && unzip repo.zip
+      WORKDIR /workspace/${REPO}-${COMMIT}
+      ${DOCKERFILE_ADDITIONS}
+      RUN find /workspace -type d -not -perm -0777 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod 777
+      RUN find /workspace -type f -not -perm -0777 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod 777
+      RUN find /go -type d -not -perm -0777 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod 777
+      RUN find /go -type f -not -perm -0777 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod 777
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: konflux-test-aws
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: aws-3
+    env:
+      OCP_ARCH: amd64
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: command-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: operator-placeholder
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: konflux-test-gcp
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: gcp
+    env:
+      OCP_ARCH: amd64
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: command-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: operator-placeholder
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: konflux-test-azure
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: azure4
+    env:
+      OCP_ARCH: amd64
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: command-placeholder
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: operator-placeholder
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: konflux-test-bundle
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: operator-placeholder
+    env:
+      OCP_ARCH: amd64
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: ns-placeholder
+    test:
+    - as: konflux-test
+      cli: latest
+      commands: command-placeholder
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: konflux-tasks

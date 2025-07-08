@@ -111,7 +111,7 @@ done
 
 TARGET_VERSION="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" -ojsonpath='{.metadata.version}')"
 _upgradeReady=0
-for ((i=1; i<=60; i++)); do
+for ((i=1; i<=120; i++)); do
     _upgradeReady=0
     for NodePool in "${NodePoolArr[@]}"
     do
@@ -124,7 +124,7 @@ for ((i=1; i<=60; i++)); do
         echo "upgrade NodePool(worker node) successful"
         break
     fi
-    echo "Try ${i}/60: HyperShift NodePool(worker node) is not updated yet. Checking again in 30 seconds"
+    echo "Try ${i}/120: HyperShift NodePool(worker node) is not updated yet. Checking again in 30 seconds"
     sleep 60
 done
 

@@ -1,34 +1,34 @@
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2a
+  name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2a
   namespace: openshift-machine-api
   labels:
-    machine.openshift.io/cluster-api-cluster: build10-znq8n
+    machine.openshift.io/cluster-api-cluster: build10-rlx6g
 spec:
   selector:
     matchLabels:
-      machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2a
+      machine.openshift.io/cluster-api-cluster: build10-rlx6g
+      machine.openshift.io/cluster-api-machineset: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2a
   template:
     metadata:
       labels:
-        machine.openshift.io/cluster-api-cluster: build10-znq8n
+        machine.openshift.io/cluster-api-cluster: build10-rlx6g
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2a
+        machine.openshift.io/cluster-api-machineset: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2a
     spec:
       metadata:
         labels:
           ci-workload: builds
           ci-instance-type: high-perf
       taints:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/ci-builds-worker
-        value: ci-builds-worker
-      - effect: NoSchedule
-        key: ci-instance-type
-        value: high-perf
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-builds-worker
+          value: ci-builds-worker
+        - effect: NoSchedule
+          key: ci-instance-type
+          value: high-perf
       providerSpec:
         value:
           userDataSecret:
@@ -47,32 +47,36 @@ spec:
                 encrypted: true
                 iops: 0
                 kmsKey:
-                  arn: ''
+                  arn: ""
                 volumeSize: 800
                 volumeType: gp3
           securityGroups:
             - filters:
-                - name: 'tag:Name'
+                - name: tag:Name
                   values:
-                    - build10-znq8n-worker-sg
+                    - build10-rlx6g-lb
+            - filters:
+                - name: tag:Name
+                  values:
+                    - build10-rlx6g-node
           kind: AWSMachineProviderConfig
           metadataServiceOptions: {}
           tags:
-            - name: kubernetes.io/cluster/build10-znq8n
+            - name: kubernetes.io/cluster/build10-rlx6g
               value: owned
           deviceIndex: 0
           ami:
             id: ami-0545fae7edbbbf061
           subnet:
-            id: subnet-0a93915ad14a9ec30
+            id: subnet-0d7e831a8559cb80f
           apiVersion: machine.openshift.io/v1beta1
           iamInstanceProfile:
-            id: build10-znq8n-worker-profile
+            id: build10-rlx6g-worker-profile
 ---
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2a
+  name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2a
   namespace: openshift-machine-api
 spec:
   maxReplicas: 1
@@ -80,27 +84,27 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2a
+    name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2a
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2b
+  name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2b
   namespace: openshift-machine-api
   labels:
-    machine.openshift.io/cluster-api-cluster: build10-znq8n
+    machine.openshift.io/cluster-api-cluster: build10-rlx6g
 spec:
   selector:
     matchLabels:
-      machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2b
+      machine.openshift.io/cluster-api-cluster: build10-rlx6g
+      machine.openshift.io/cluster-api-machineset: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2b
   template:
     metadata:
       labels:
-        machine.openshift.io/cluster-api-cluster: build10-znq8n
+        machine.openshift.io/cluster-api-cluster: build10-rlx6g
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2b
+        machine.openshift.io/cluster-api-machineset: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2b
     spec:
       metadata:
         labels:
@@ -131,32 +135,36 @@ spec:
                 encrypted: true
                 iops: 5000
                 kmsKey:
-                  arn: ''
+                  arn: ""
                 volumeSize: 800
                 volumeType: gp3
           securityGroups:
             - filters:
-                - name: 'tag:Name'
+                - name: tag:Name
                   values:
-                    - build10-znq8n-worker-sg
+                    - build10-rlx6g-lb
+            - filters:
+                - name: tag:Name
+                  values:
+                    - build10-rlx6g-node
           kind: AWSMachineProviderConfig
           metadataServiceOptions: {}
           tags:
-            - name: kubernetes.io/cluster/build10-znq8n
+            - name: kubernetes.io/cluster/build10-rlx6g
               value: owned
           deviceIndex: 0
           ami:
             id: ami-0545fae7edbbbf061
           subnet:
-            id: subnet-08eee64128a4e06be
+            id: subnet-0567a7fab56c4bcdb
           apiVersion: machine.openshift.io/v1beta1
           iamInstanceProfile:
-            id: build10-znq8n-worker-profile
+            id: build10-rlx6g-worker-profile
 ---
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2b
+  name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2b
   namespace: openshift-machine-api
 spec:
   maxReplicas: 1
@@ -164,27 +172,27 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2b
+    name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2b
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2c
+  name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2c
   namespace: openshift-machine-api
   labels:
-    machine.openshift.io/cluster-api-cluster: build10-znq8n
+    machine.openshift.io/cluster-api-cluster: build10-rlx6g
 spec:
   selector:
     matchLabels:
-      machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2c
+      machine.openshift.io/cluster-api-cluster: build10-rlx6g
+      machine.openshift.io/cluster-api-machineset: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2c
   template:
     metadata:
       labels:
-        machine.openshift.io/cluster-api-cluster: build10-znq8n
+        machine.openshift.io/cluster-api-cluster: build10-rlx6g
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2c
+        machine.openshift.io/cluster-api-machineset: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2c
     spec:
       metadata:
         labels:
@@ -215,32 +223,36 @@ spec:
                 encrypted: true
                 iops: 5000
                 kmsKey:
-                  arn: ''
+                  arn: ""
                 volumeSize: 800
                 volumeType: gp3
           securityGroups:
             - filters:
-                - name: 'tag:Name'
+                - name: tag:Name
                   values:
-                    - build10-znq8n-worker-sg
+                    - build10-rlx6g-lb
+            - filters:
+                - name: tag:Name
+                  values:
+                    - build10-rlx6g-node
           kind: AWSMachineProviderConfig
           metadataServiceOptions: {}
           tags:
-            - name: kubernetes.io/cluster/build10-znq8n
+            - name: kubernetes.io/cluster/build10-rlx6g
               value: owned
           deviceIndex: 0
           ami:
             id: ami-0545fae7edbbbf061
           subnet:
-            id: subnet-0e19e8bcfe18ea0c2
+            id: subnet-09282117d67b88b92
           apiVersion: machine.openshift.io/v1beta1
           iamInstanceProfile:
-            id: build10-znq8n-worker-profile
+            id: build10-rlx6g-worker-profile
 ---
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2c
+  name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2c
   namespace: openshift-machine-api
 spec:
   maxReplicas: 1
@@ -248,4 +260,4 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-ci-builds-highperf-worker-amd64-us-east-2c
+    name: build10-rlx6g-ci-builds-highperf-worker-amd64-us-east-2c

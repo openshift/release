@@ -33,8 +33,7 @@ operator:
     with: pipeline:cluster-nfd-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -62,7 +61,7 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -71,6 +70,12 @@ tests:
       OO_PACKAGE: nfd
       OO_TARGET_NAMESPACES: '!install'
     workflow: optional-operators-ci-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

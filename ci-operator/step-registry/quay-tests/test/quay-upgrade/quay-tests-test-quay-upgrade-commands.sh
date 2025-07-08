@@ -5,12 +5,20 @@ export REPORT_HANDLE_PATH="/usr/bin"
 
 pwd
 echo "Quay upgrade test..."
-oc version
 
 #export env variabels for Go test cases
 export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
 export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
-export QUAYREGISTRY_QUAY_VERSION=${QUAYREGISTRY_QUAY_VERSION}
+export CSO_INDEX_IMAGE_BUILD=${CSO_INDEX_IMAGE_BUILD}
+export QUAY_VERSION=${QUAY_VERSION}
+
+#qbo upgrade
+QUAY_REGISTRY_ROUTE=$([ -f "${SHARED_DIR}/quayroute" ] && cat "$SHARED_DIR"/quayroute || echo "") #https://quayhostname
+QUAY_ACCESS_TOKEN=$([ -f "${SHARED_DIR}/quay_oauth2_token" ] && cat "$SHARED_DIR"/quay_oauth2_token || echo "")
+
+export QBO_INDEX_IMAGE_BUILD
+export QUAY_REGISTRY_ROUTE
+export QUAY_ACCESS_TOKEN
 
 echo "Run extended-platform-tests"
 extended-platform-tests run all --dry-run | grep -E ${QUAY_UPGRADE_TESTCASE} | extended-platform-tests run --timeout 240m --junit-dir="${ARTIFACT_DIR}" -f - || true

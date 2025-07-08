@@ -3,15 +3,16 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 function print_node_machine_info() {
 
     label=$1
     echo "##########################################Machineset and Node Status##############################"
-    oc get machinesets -A
+    oc get machinesets.m -A
     echo "--------------------------------------------------------------------------------------------------"
     echo
-    oc get machines -A
+    oc get machines.m -A
     echo "--------------------------------------------------------------------------------------------------"
     echo
     oc get nodes
@@ -22,7 +23,7 @@ function print_node_machine_info() {
         oc describe node $node
     done
 
-    for machine in $(oc get machines -n openshift-machine-api --no-headers -l machine.openshift.io/cluster-api-machine-type=$label| grep -v "Running" | awk '{print $1}'); do
+    for machine in $(oc get machines.m -n openshift-machine-api --no-headers -l machine.openshift.io/cluster-api-machine-type=$label| grep -v "Running" | awk '{print $1}'); do
         oc describe machine $machine -n openshift-machine-api
     done
 }
@@ -47,44 +48,44 @@ function get_ref_machineset_info(){
   memorySize=""
   case ${platform_type} in
        aws)
-          instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.instanceType}')
-          volumeType=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.blockDevices[*].ebs.volumeType}')
-          volumeSize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.blockDevices[*].ebs.volumeSize}')
-          volumeIPOS=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.blockDevices[*].ebs.iops}')
+          instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.instanceType}')
+          volumeType=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.blockDevices[*].ebs.volumeType}')
+          volumeSize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.blockDevices[*].ebs.volumeSize}')
+          volumeIPOS=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.blockDevices[*].ebs.iops}')
           ;;
        azure)
-          instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.vmSize}')
-          volumeSize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.osDisk.diskSizeGB}')
-          volumeType=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.osDisk.managedDisk.storageAccountType}')
+          instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.vmSize}')
+          volumeSize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.osDisk.diskSizeGB}')
+          volumeType=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.osDisk.managedDisk.storageAccountType}')
           ;;
         gcp)
-          instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.machineType}')
-          volumeSize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.disks[*].sizeGb}')
-          volumeType=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.disks[*].type}')
+          instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.machineType}')
+          volumeSize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.disks[*].sizeGb}')
+          volumeType=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.disks[*].type}')
           ;;
         ibmcloud)
-          instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.profile}')
+          instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.profile}')
           ;;
         alibabacloud)
-          instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.instanceType}')
-          volumeType=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.systemDisk.category}')
-          volumeSize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.systemDisk.size}')
+          instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.instanceType}')
+          volumeType=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.systemDisk.category}')
+          volumeSize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.systemDisk.size}')
           ;;
         openstack)
-	  instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.flavor}')
+	  instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.flavor}')
           ;;
         nutanix)
-          instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.vcpuSockets}')
-          cpusPerSocket=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.vcpusPerSocket}')
-          memorySize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.memorySize}')
-          volumeSize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.systemDiskSize}')
+          instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.vcpuSockets}')
+          cpusPerSocket=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.vcpusPerSocket}')
+          memorySize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.memorySize}')
+          volumeSize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.systemDiskSize}')
           ;;
         vsphere)
-          instance_type=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.numCPUs}')
-          cpusPerSocket=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.numCoresPerSocket}')
-          memorySize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.memoryMiB}')
-          volumeSize=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.diskGiB}')
-          volumeType=$(oc -n openshift-machine-api get machineset $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.kind}')
+          instance_type=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.numCPUs}')
+          cpusPerSocket=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.numCoresPerSocket}')
+          memorySize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.memoryMiB}')
+          volumeSize=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.diskGiB}')
+          volumeType=$(oc -n openshift-machine-api get machinesets.m $machineset_name -ojsonpath='{.spec.template.spec.providerSpec.value.kind}')
           ;;
         *)
           echo "Non supported platform detected ..."o
@@ -182,7 +183,7 @@ function create_machineset() {
 
     #Set default value for key VARIABLE
     #Use the first machineset name by default if no REF_MACHINESET_NAME specified
-    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | grep -v rhel | head -n1)
+    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets.m | grep worker | grep -v rhel | head -n1)
     REF_MACHINESET_NAME=${REF_MACHINESET_NAME:-$ref_machineset_name}
 
     get_ref_machineset_info $REF_MACHINESET_NAME
@@ -210,7 +211,7 @@ function create_machineset() {
 
     case ${platform_type} in
         aws)
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${NODE_INSTANCE_TYPE}" \
                  --arg machineset_name "${machineset_name}" \
                  --arg volumeType "${VOLUME_TYPE}" \
@@ -234,7 +235,7 @@ function create_machineset() {
                   '>/tmp/machineset.json
             ;;
         azure)
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${NODE_INSTANCE_TYPE}" \
                  --arg machineset_name "${machineset_name}" \
                  --arg volumeType "${VOLUME_TYPE}" \
@@ -256,7 +257,7 @@ function create_machineset() {
                   '>/tmp/machineset.json
             ;;
         gcp)
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${NODE_INSTANCE_TYPE}" \
                  --arg machineset_name "${machineset_name}" \
                  --arg volumeType "${VOLUME_TYPE}" \
@@ -278,7 +279,7 @@ function create_machineset() {
                   '>/tmp/machineset.json
             ;;
         ibmcloud)
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${NODE_INSTANCE_TYPE}" \
                  --arg machineset_name "${machineset_name}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
@@ -296,7 +297,7 @@ function create_machineset() {
                   '>/tmp/machineset.json
             ;;
         alibabacloud)
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${NODE_INSTANCE_TYPE}" \
                  --arg machineset_name "${machineset_name}" \
                  --arg volumeType "${VOLUME_TYPE}" \
@@ -327,7 +328,7 @@ function create_machineset() {
                    NODE_CPU_CORE_PER_SOCKET_COUNT=${OPENSHIFT_WORKLOAD_NODE_CPU_CORE_PER_SOCKET_COUNT:-$cpusPerSocket}
                    NODE_MEMORY_SIZE=${OPENSHIFT_WORKLOAD_NODE_MEMORY_SIZE:-$memorySize}
 		fi
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${NODE_CPU_COUNT}" \
                  --arg numCoresPerSocket "${NODE_CPU_CORE_PER_SOCKET_COUNT}" \
                  --arg ramSize "${NODE_MEMORY_SIZE}" \
@@ -351,7 +352,7 @@ function create_machineset() {
                   '>/tmp/machineset.json
 		;;
         openstack)
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${NODE_INSTANCE_TYPE}" \
                  --arg machineset_name "${machineset_name}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
@@ -379,7 +380,7 @@ function create_machineset() {
 	      echo "Please specify correct VARIABLE for nutanix:\n OPENSHIFT_INFRA_NODE_INSTANCE_VCPU\nOPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE\nOPENSHIFT_WORKLOAD_NODE_INSTANCE_VCPU\nOPENSHIFT_WORKLOAD_NODE_INSTANCE_MEMORYSIZE"
 	    exit 1
             fi
-            oc get machineset ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
+            oc get machinesets.m ${REF_MACHINESET_NAME} -n openshift-machine-api -o json |
               jq --arg node_instance_type "${INSTANCE_VCPU}" \
                  --arg cpusPerSocket "${cpusPerSocket}" \
                  --arg memorySize "${INSTANCE_MEMORYSIZE}" \
@@ -412,6 +413,9 @@ function create_machineset() {
     echo -e "Reference Machineset Name: $REF_MACHINESET_NAME \nNODE_REPLICAS: $NODE_REPLICAS\nMACHINESET_TYPE: $MACHINESET_TYPE\nNODE_INSTANCE_TYPE: $NODE_INSTANCE_TYPE\nINSTANCE_VCPU: $INSTANCE_VCPU\nNODE_CPU_COUNT: $NODE_CPU_COUNT\nNODE_CPU_CORE_PER_SOCKET_COUNT: $NODE_CPU_CORE_PER_SOCKET_COUNT\nINSTANCE_MEMORYSIZE: $INSTANCE_MEMORYSIZE\ncpusPerSocket: $cpusPerSocket\nnNODE_MEMORY_SIZE: $NODE_MEMORY_SIZE\nVOLUME_TYPE: $VOLUME_TYPE\nVOLUME_SIZE: $VOLUME_SIZE\nVOLUME_IOPS: $VOLUME_IOPS"
     echo "It's normal if some ENV is empty, vsphere and nutanix use INSTANCE_VCPU/NODE_CPU_COUNT instead of NODE_INSTANCE_TYPE"
     echo "###########################################################################################"
+    echo "Remove autoscaling.openshift.io/machineautoscaler: openshift-machine-api/worker-autoscaling"
+    sed -i "/autoscaling.openshift.io/d" /tmp/machineset.json
+    sed -i "/cluster-api-autoscaler/d" /tmp/machineset.json
     if [[ $MACHINESET_TYPE == "infra" ]];then
         cat /tmp/machineset.json | jq '.spec.template.spec.metadata.labels."node-role.kubernetes.io/infra" = ""' | oc create -f -
     elif [[ $MACHINESET_TYPE == "workload" ]];then
@@ -421,12 +425,12 @@ function create_machineset() {
         exit 1
     fi
     # Scale machineset to expected number of replicas
-    oc -n openshift-machine-api scale machineset/"${machineset_name}" --replicas="${NODE_REPLICAS}"
+    oc -n openshift-machine-api scale machinesets.m/"${machineset_name}" --replicas="${NODE_REPLICAS}"
 
     echo "Waiting for ${MACHINESET_TYPE} nodes to come up"
     retries=0
     attempts=180
-    while [[ $(oc -n openshift-machine-api get machineset/${machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${NODE_REPLICAS}" ]];
+    while [[ $(oc -n openshift-machine-api get machinesets.m/${machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${NODE_REPLICAS}" ]];
     do 
         ((retries += 1))
         echo -n "." && sleep 10;
@@ -448,8 +452,8 @@ function create_machineset() {
     oc label nodes --overwrite -l "node-role.kubernetes.io/${MACHINESET_TYPE}=" node-role.kubernetes.io/worker-
     echo
     echo "###########################################################################################"
-    oc get machineset -A
-    oc get machines -A
+    oc get machinesets.m -A
+    oc get machines.m -A
     oc get nodes -l node-role.kubernetes.io/${MACHINESET_TYPE}
     echo "###########################################################################################"
 }
@@ -576,9 +580,9 @@ node_arch=$(oc get nodes -ojsonpath='{.items[*].status.nodeInfo.architecture}')
 platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 node_arch=$(echo $node_arch | tr -s " " "\n"| sort -u)
-all_machinesets=$(oc -n openshift-machine-api get machineset -ojsonpath='{.items[*].metadata.name}{"\n"}')
-machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3)
-machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3 |wc -l)
+all_machinesets=$(oc -n openshift-machine-api get machinesets.m -ojsonpath='{.items[*].metadata.name}{"\n"}')
+machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3)
+machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3 |wc -l)
 total_worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker= -oname|wc -l)
 
 scale_type=""

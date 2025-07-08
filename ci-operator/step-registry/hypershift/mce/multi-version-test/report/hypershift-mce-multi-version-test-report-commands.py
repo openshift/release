@@ -19,7 +19,7 @@ class Job:
     guest_version: str
     platform: str
     job: str
-    job_id: str
+    job_url: str
     status: str
 
 class JobList:
@@ -105,7 +105,7 @@ def main():
                 guest_version=job_data.get("HostedCluster", ""),
                 platform=job_data.get("PLATFORM", ""),
                 job=job_data.get("JOB", ""),
-                job_id=job_data.get("JOB_ID", ""),
+                job_url=job_data.get("JOB_URL", ""),
                 status=status
             ))
     writing_to_sheet(sheet_title, joblist)

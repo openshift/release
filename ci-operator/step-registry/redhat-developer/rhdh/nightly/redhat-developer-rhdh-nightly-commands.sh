@@ -41,17 +41,8 @@ echo "To debug issues or log in to the cluster manually, use the script: .ibm/pi
 
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
-K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
+K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
 oc logout
-
-echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
-
-mkdir -p /tmp/openshift-client
-# Download and Extract the oc binary
-wget -O /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OC_CLIENT_VERSION/openshift-client-linux.tar.gz
-tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz
-export PATH=/tmp/openshift-client:$PATH
-oc version
 
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
@@ -101,12 +92,22 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-if [[ "$ONLY_IN_DIRS" == "true" || "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
-    TAG_NAME="next"
+if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
         TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+    else
+        TAG_NAME="next"
+    fi
+elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
+    if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
+        QUAY_REPO="rhdh/rhdh-hub-rhel9"
+        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
+        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+    else
+        QUAY_REPO="rhdh-community/rhdh"
+        TAG_NAME="next"
     fi
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
@@ -140,6 +141,38 @@ else
             exit 1
         fi
     done
+fi
+
+export SL_BUILD_SESSION_ID
+
+if [[ "$JOB_NAME" == *sealight* ]]; then
+    # Create a directory for cosign
+    mkdir -p /tmp/cosign-client
+    curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 && chmod +x /tmp/cosign-client/cosign
+    export PATH=/tmp/cosign-client:$PATH
+
+    COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
+    cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
+    SL_BUILD_SESSION_ID="$(jq -r \
+            '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
+            select(.invocation.environment.labels."konflux-ci/sealights" == "true")
+            | .results[] | select(.name == "sealights-bsid") | .value' \
+            cosign_metadata.json)"
+    echo "SL_BSID: $SL_BUILD_SESSION_ID"
+    SL_CONTAINER_IMAGE="$(jq -r '
+            .payload
+            | @base64d
+            | fromjson
+            | first(
+              .predicate.buildConfig.tasks[]
+              | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
+              | .invocation.parameters.IMAGE
+              )
+          ' cosign_metadata.json)"
+    echo "SL_CONTAINER_IMAGE: $SL_CONTAINER_IMAGE"
+
+    QUAY_REPO=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f1 | sed 's|quay.io/||' | head -n1)
+    TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2 | head -n1)
 fi
 
 echo "############## Current branch ##############"

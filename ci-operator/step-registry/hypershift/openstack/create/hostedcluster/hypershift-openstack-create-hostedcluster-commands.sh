@@ -35,7 +35,6 @@ COMMAND=(
   --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}"
   --openstack-external-network-id "${OPENSTACK_EXTERNAL_NETWORK_ID}"
   --openstack-node-flavor "${OPENSTACK_COMPUTE_FLAVOR}"
-  --openstack-node-image-name "${RHCOS_IMAGE_NAME}"
   --node-upgrade-type InPlace
   --base-domain "${HYPERSHIFT_BASE_DOMAIN}"
   --control-plane-availability-policy "${HYPERSHIFT_CP_AVAILABILITY_POLICY}"
@@ -71,6 +70,10 @@ fi
 if [ -f "${SHARED_DIR}/HCP_INGRESS_IP" ]; then
   HCP_INGRESS_IP=$(<"${SHARED_DIR}/HCP_INGRESS_IP")
   COMMAND+=(--openstack-ingress-floating-ip "${HCP_INGRESS_IP}")
+fi
+
+if [[ -n $RHCOS_IMAGE_NAME ]]; then
+  COMMAND+=(--openstack-node-image-name "${RHCOS_IMAGE_NAME}")
 fi
 
 if [[ -n $EXTRA_ARGS ]]; then

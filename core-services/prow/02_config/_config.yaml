@@ -146,6 +146,7 @@ deck:
       - org: opendatahub-io
         slug: notebook-devs
       github_users:
+      - andyatmiami
       - atheo89
       - caponetto
       - daniellutz
@@ -159,6 +160,7 @@ deck:
       - org: red-hat-data-services
         slug: notebook-admins
       github_users:
+      - andyatmiami
       - atheo89
       - caponetto
       - daniellutz
@@ -228,7 +230,7 @@ deck:
       optional_files:
       - .*/monitor.*\.xml
       required_files:
-      - .*/junit.*\.xml
+      - .*junit.*\.xml
     - lens:
         name: podinfo
       required_files:
@@ -293,6 +295,8 @@ plank:
   default_decoration_config_entries:
   - config:
       censor_secrets: true
+      censoring_options:
+        minimum_secret_length: 6
       gcs_configuration:
         bucket: test-platform-results
         compress_file_types:
@@ -336,10 +340,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250318-bb46d5967
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20250318-bb46d5967
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20250318-bb46d5967
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20250318-bb46d5967
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250626-3e50f2237
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20250626-3e50f2237
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20250626-3e50f2237
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20250626-3e50f2237
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -412,10 +416,10 @@ plank:
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
     repo: openshift-kni/eco-ci-cd-private
   - config:
-      timeout: 23h55m0s
+      timeout: 36h0m0s
     repo: openshift-kni/eco-ci-cd
   - config:
-      timeout: 12h0m0s
+      timeout: 23h55m0s
     repo: openshift-eng/ocp-qe-perfscale-ci
   - config:
       timeout: 12h0m0s
@@ -454,6 +458,7 @@ plank:
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
   max_concurrency: 1500
   max_goroutines: 20
+  max_revivals: 3
   pod_pending_timeout: 30m0s
   pod_running_timeout: 48h0m0s
   pod_unscheduled_timeout: 30m0s
@@ -612,7 +617,14 @@ tide:
             skip-unknown-contexts: true
           assisted-test-infra:
             skip-unknown-contexts: true
+          cert-manager-operator-release:
+            skip-unknown-contexts: true
           ci-docs:
+            skip-unknown-contexts: true
+          jenkins:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          lightspeed-service:
             skip-unknown-contexts: true
           lvm-operator:
             skip-unknown-contexts: true
@@ -626,7 +638,19 @@ tide:
           cnf-features-deploy:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
+          lifecycle-agent:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
           numaresources-operator:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          oran-hwmgr-plugin:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          oran-o2ims:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          scheduler-plugins:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
           telco-reference:
@@ -636,6 +660,9 @@ tide:
         repos:
           assisted-installer:
             skip-unknown-contexts: true
+          jenkins:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
           lvm-operator:
             skip-unknown-contexts: true
       operator-framework:
@@ -670,6 +697,11 @@ tide:
         repos:
           release:
             skip-unknown-contexts: true
+      rh-ecosystem-edge:
+        repos:
+          recert:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
   display_all_tide_queries_in_status: true
   max_goroutines: 100
   merge_label: tide/merge-method-merge
