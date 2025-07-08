@@ -1,6 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
+printenv
+
 if [ -z "${SHARED_DIR-}" ] ; then
     echo "The SHARED_DIR environment variable is not defined"
     exit 1
