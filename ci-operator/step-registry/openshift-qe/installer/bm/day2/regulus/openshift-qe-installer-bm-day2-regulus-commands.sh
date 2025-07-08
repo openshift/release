@@ -87,9 +87,12 @@ if [ -z "${RUNLOCAL:-}" ]; then
   if [ -f "${CLUSTER_PROFILE_DIR}/lab_cloud" ]; then
     LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
     LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+    bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+    SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  else 
+    echo "Error: No valid CLUSTER_PROFILE_DIR" >&2
+    exit 1
   fi
-  bastion=$(cat /bm/address)
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 else
   bastion=$BASTION
   SSH_ARGS="-i $PRIVATE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
