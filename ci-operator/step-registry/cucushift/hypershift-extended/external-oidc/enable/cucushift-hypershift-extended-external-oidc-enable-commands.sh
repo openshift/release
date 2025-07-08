@@ -69,7 +69,7 @@ cat <<EOF >> /tmp/patch.yaml
       type: OIDC
 EOF
 
-if [[ "$HYPERSHIFT_CREATE_CLUSTER_RENDER" == "true" ]]; then
+if [[ -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml" ]]; then
    echo "Patching rendered artifacts"
    yq-v4 'select(.kind == "HostedCluster") *= load("/tmp/patch.yaml")' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml \
       > "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
