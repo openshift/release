@@ -80,7 +80,7 @@ cat > packet-config.yaml <<-EOF
         fi
 
         IP=\$(cat "\${SHARED_DIR}/server-ip")
-        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/equinix-ssh-key")
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
 
         # Checkout packet server
         for x in \$(seq 10) ; do
@@ -95,6 +95,13 @@ cat > packet-config.yaml <<-EOF
 EOF
 
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+
+# Using equinix-ssh-key for provisioning arm64 host in metal-qe project
+# To be removed when arm64 can be provisioned in ofcir
+if [[ "${PACKET_PLAN}" == "c3.large.arm64" && -f "${CLUSTER_PROFILE_DIR}"/equinix-ssh-key ]] ; then
+  echo -e "\n-- arm64 cluster, using equinix-ssh-key --\n"
+  sed -i 's/packet-ssh-key/equinix-ssh-key/' "${SHARED_DIR}/packet-conf.sh"
+fi
 
 # Avoid requesting a bunch of servers at the same time so they
 # don't race each other for available resources in a metro
