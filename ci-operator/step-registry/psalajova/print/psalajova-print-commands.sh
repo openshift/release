@@ -8,11 +8,16 @@ for file in "$SECRETS_DIR"/*; do
   fi
 done
 
+echo "Processing second set of secrets..."
+
 SECRETS_DIR="/var/my-secrets-diff-mount-path"
 for file in "$SECRETS_DIR"/*; do
   if [ -f "$file" ]; then
-    echo "Processing: $file"
+    echo "Secret content:"
+    cat "$file"
+    echo "--- End of secret content ---"
   fi
 done
+
 
 sleep 10m
