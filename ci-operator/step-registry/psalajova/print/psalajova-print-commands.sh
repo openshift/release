@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Test-step executing."
+echo "Print step executing."
 
 SECRETS_DIR="/var/my-secrets"
 for file in "$SECRETS_DIR"/*; do
@@ -8,7 +8,7 @@ for file in "$SECRETS_DIR"/*; do
   fi
 done
 
-SECRETS_DIR="/var/my-secrets2"
+SECRETS_DIR="/var/my-secrets-diff-mount-path"
 for file in "$SECRETS_DIR"/*; do
   if [ -f "$file" ]; then
     echo "Processing: $file"

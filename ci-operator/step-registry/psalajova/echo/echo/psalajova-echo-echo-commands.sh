@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Pre-step executing: This should list 2 files in my-secrets dir."
+echo "Pre-step executing: This should list 1 file in my-secrets dir."
 
 SECRETS_DIR="/var/my-secrets"
 for file in "$SECRETS_DIR"/*; do
