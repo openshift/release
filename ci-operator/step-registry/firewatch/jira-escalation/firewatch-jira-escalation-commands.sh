@@ -9,6 +9,8 @@ firewatch jira-config-gen --token-path "${FIREWATCH_JIRA_API_TOKEN_PATH}" --serv
 
 escalation_command="firewatch jira-escalation"
 
+sleep 3600
+
 
 if [ -f "${FIREWATCH_DEFAULT_JIRA_PROJECT}" ]; then
     escalation_command+=" --default-jira-project=${FIREWATCH_DEFAULT_JIRA_PROJECT}"
