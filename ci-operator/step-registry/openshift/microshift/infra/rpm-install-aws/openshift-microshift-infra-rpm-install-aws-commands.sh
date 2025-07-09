@@ -74,12 +74,23 @@ if "${SRC_FROM_GIT}"; then
 fi
 ci_clone_src
 
-# RELEASE_IMAGE_INITIAL is set in the job spec for payload testing. This
-# variable holds the pullspec of the release image. If it is present this means
-# we need to perform a rebase and then proceed with tests.
 REBASE_SUCCEEDED=false
-REBASE_TO="${RELEASE_IMAGE_INITIAL:-}"
+REBASE_TO=""
+# RELEASE_IMAGE_INITIAL is set in the job spec for payload testing, but this variable
+# is not propagated by the release-controller, so we can not rely on it. However, the
+# same value is availabie in the imagestream tag release:initial in the job's namespace.
+# We identify this job being a payload test by checking if the prowjobid contains
+# the word "nightly".
+# Should we find any errors, we simply proceed without rebasing.
+PROWJOB_ID=$(echo "${JOB_SPEC}" | jq -r '.prowjobid // empty')
+if [[ -n "${PROWJOB_ID}" && "${PROWJOB_ID}" =~ .*nightly.* ]]; then
+  if oc get istag "release:initial" -n ${NAMESPACE} > /dev/null 2>&1; then
+    REBASE_TO=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
+  fi
+fi
+
 if [ -n "${REBASE_TO}" ]; then
+  echo "REBASE_TO is set to ${REBASE_TO}"
   export PATH="${HOME}/.local/bin:${PATH}"
   python3 -m ensurepip --upgrade
   pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
@@ -100,6 +111,8 @@ if [ -n "${REBASE_TO}" ]; then
     DRY_RUN=y \
     ./scripts/auto-rebase/rebase_job_entrypoint.sh || { echo "rebase failed" > "${SHARED_DIR}"/rebase_failure; exit 0; }
   REBASE_SUCCEEDED=true
+else
+  echo "REBASE_TO is not set, skipping rebase"
 fi
 
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
