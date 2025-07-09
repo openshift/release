@@ -1456,6 +1456,43 @@ tests:
       OUTBOUND_TYPE: NATGatewaySingleZone
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
+- as: gcp-custom-endpoints-private
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["GCPCustomAPIEndpoints=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      PUBLISH: Internal
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - ref: ipi-deprovision-deprovision-in-bastion
+    - ref: gcp-deprovision-custom-endpoints
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: gcp-provision-custom-endpoints
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-custom-endpoints
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install-in-bastion
+    - ref: proxy-config-generate
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-gcp-private
+    test:
+    - ref: cucushift-installer-check-cluster-health
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

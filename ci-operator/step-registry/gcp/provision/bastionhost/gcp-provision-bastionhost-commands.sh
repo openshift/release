@@ -12,8 +12,27 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
+function run_command() {
+    local cmd="$1"
+    echo "Running Command: ${cmd}"
+    eval "${cmd}"
+}
+
+function run_ssh_cmd() {
+    local sshkey=$1
+    local user=$2
+    local host=$3
+    local remote_cmd=$4
+
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=300 -o ServerAliveCountMax=10 "
+    cmd="ssh ${options} -i \"${sshkey}\" ${user}@${host} \"${remote_cmd}\""
+    run_command "$cmd" || return 2
+    return 0
+}
+
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
+SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
@@ -195,3 +214,32 @@ rm -rf "${workdir}"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300
+
+if [[ -f "${SHARED_DIR}/gcp_custom_endpoint" ]]; then
+  gcp_custom_endpoint=$(< "${SHARED_DIR}/gcp_custom_endpoint")
+
+  echo "$(date -u --rfc-3339=seconds) - Ensure GCP custom endpoint '${gcp_custom_endpoint}' is accessible..."
+
+  test_fqdn="compute-${gcp_custom_endpoint}.p.googleapis.com"
+  test_cmd="dig ${test_fqdn} | grep -q 'ANSWER: 1, '"
+  test_done=0
+
+  set +e
+  for i in {1..20}
+  do
+    run_ssh_cmd "${SSH_PRIV_KEY_PATH}" core "${bastion_public_ip}" "${test_cmd}"
+    if [ $? -eq 0 ]; then
+      echo "$(date -u --rfc-3339=seconds) - [$i] The custom endpoint turns accessible."
+      test_done=1
+      break
+    else
+      echo "$(date -u --rfc-3339=seconds) - [$i] Waiting for another 60 seconds..."
+      sleep 60s
+    fi
+  done
+  set -e
+
+  if [[ ${test_done} -eq 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to wait for the custom endpoint turning into accessible, abort. " && exit 1
+  fi
+fi
