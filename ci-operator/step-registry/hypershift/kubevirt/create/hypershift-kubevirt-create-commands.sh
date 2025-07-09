@@ -217,10 +217,22 @@ else
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
     --cluster-cidr 10.136.0.0/14 --render --render-sensitive > /tmp/hc.yaml"
-
-  sleep 3600
 fi
 
+sed -i '/kind: NodePool/{
+n
+a\
+  annotations:\
+    hypershift.openshift.io/kubevirt-vm-jsonpatch: |\
+      [\
+        {\
+          "op": "remove",\
+          "path": "/spec/template/metadata/annotations/kubevirt.io/allow-pod-bridge-network-live-migration"\
+        }\
+      ]
+}' /tmp/hc.yaml
+
+oc apply -f /tmp/hc.yaml
 
 if [[ -n ${MCE} ]] ; then
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
