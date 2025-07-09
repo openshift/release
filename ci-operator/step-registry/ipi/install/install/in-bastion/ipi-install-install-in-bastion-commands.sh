@@ -249,6 +249,8 @@ set -o errexit
 # debug
 echo "the content of ${dir} in local container "
 ls -ltra ${dir}
+echo "$(date -u --rfc-3339=seconds) - DEBUG: Saving the kubeconfig..."
+cp "${dir}/auth/kubeconfig" "${ARTIFACT_DIR}/"
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"

@@ -1,0 +1,28 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-disconnected-provision
+  steps: 
+  - ref: gcp-provision-minimal-permission
+  - ref: openshift-cluster-bot-rbac
+  - ref: gcp-provision-vpc
+  - ref: gcp-provision-custom-endpoints
+  - ref: ignition-bastionhost
+  - ref: gcp-provision-bastionhost
+  - ref: mirror-images-by-oc-adm-in-bastion
+  - chain: ipi-conf-gcp
+  - ref: ipi-conf-gcp-custom-endpoints
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-install-in-bastion
+  - ref: ipi-install-times-collection
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  env:
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  - name: ENABLE_PRIVATE_IP_GOOGLE_ACCESS
+    default: "no"
+  documentation: |-
+    Create an IPI disconnected cluster with custom endpoints on GCP for QE e2e tests.
