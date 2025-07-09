@@ -7,17 +7,35 @@ if [[ -z "${LOGGING_TLS_SECURITY_PROFILE:-}" ]]; then
 fi
 
 echo "Waiting for APIServer 'cluster' to become available..."
-for i in {1..30}; do
+retries=30
+interval=5
+found=false
+
+for ((i=1; i<=retries; i++)); do
   if oc get apiserver cluster &>/dev/null; then
     echo "APIServer is available."
+    found=true
     break
   fi
-  sleep 5
+  sleep "$interval"
 done
 
+if [[ "$found" != "true" ]]; then
+  echo "ERROR: Timed out waiting for APIServer 'cluster' to become available."
+  exit 1
+fi
+
 echo "Comparing current TLS profile to expected..."
-current=$(oc get apiserver cluster -o jsonpath='{.spec.tlsSecurityProfile}' | jq -c .)
-expected=$(echo "${LOGGING_TLS_SECURITY_PROFILE}" | jq -c .)
+
+if ! current=$(oc get apiserver cluster -o jsonpath='{.spec.tlsSecurityProfile}' | jq -c .); then
+  echo "ERROR: Failed to retrieve current TLS profile from APIServer."
+  exit 1
+fi
+
+if ! expected=$(echo "${LOGGING_TLS_SECURITY_PROFILE}" | jq -c .); then
+  echo "ERROR: Failed to parse expected TLS profile."
+  exit 1
+fi
 
 echo "Expected: ${expected}"
 echo "Current:  ${current}"
