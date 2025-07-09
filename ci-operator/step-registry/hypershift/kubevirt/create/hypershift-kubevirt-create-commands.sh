@@ -227,7 +227,7 @@ a\
       [\
         {\
           "op": "remove",\
-          "path": "/spec/template/metadata/annotations/kubevirt.io/allow-pod-bridge-network-live-migration"\
+          "path": "/spec/template/metadata/annotations/kubevirt.io~1allow-pod-bridge-network-live-migration"\
         }\
       ]
 }' /tmp/hc.yaml
