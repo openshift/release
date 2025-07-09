@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: interop-jira-escalation-bot
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_JIRA_ADDITIONAL_LABELS: ""
+      FIREWATCH_JIRA_DEFAULT_LABELS: 4.18-lp
+      FIREWATCH_JIRA_SERVER: https://issues.stage.redhat.com
+      REPORTER_EMAIL: vshakya@redhat.com
+      SLACK_CHANNEL: test-jira-slack-bot
+      SLACK_TEAM_HANDLE: test-jira-bot
+      TEAM_MANAGER_EMAIL: vshakya@redhat.com
+    test:
+    - ref: firewatch-jira-escalation
+zz_generated_metadata:
+  branch: RedHATQE-firewatch-main
+  org: RedHatQE
+  repo: firewatch
+  variant: mpiit_jira_escalation
