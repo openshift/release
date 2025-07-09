@@ -15,6 +15,7 @@ function debug() {
     oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
     echo -e "Describing abnormal operators...\n"
     oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
+    sleep 600
   fi
 }
 
@@ -190,3 +191,4 @@ fi
 # Add operators status checking until monitoring enhanced to do this
 echo "Check all cluster operators get stable and ready"
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
+

@@ -6,8 +6,6 @@ set -o pipefail
 
 RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 
-day2_arch="$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-
 # Create an agent-config file containing only the minimum required configuration
 ntp_host=$(< "${CLUSTER_PROFILE_DIR}/aux-host-internal-name")
 cat > "${SHARED_DIR}/agent-config-unconfigured.yaml" <<EOF
@@ -21,6 +19,8 @@ EOF
 # https://issues.redhat.com/browse/AGENT-677 - Pass BMC details to cluster if provided
 # To test this feature the using the BareMetal platform the BMC info should be added to the hosts in install-config.yaml.
 # In this case, no hosts should be defined in agent-config.yaml since these will take precedence in order to maintain backwards compatibility.
+cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
+EOF
 
 if [ "${AGENT_BM_HOSTS_IN_INSTALL_CONFIG}" = "false" ]; then
 cat > "${SHARED_DIR}/agent-config.yaml" <<EOF
@@ -32,23 +32,18 @@ additionalNTPSources:
 hosts: []
 EOF
 
-cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
-cpuArchitecture: ${day2_arch}
-hosts: []
-EOF
-
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [[ "${name}" != *-a-* ]] || [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
-    ADAPTED_YAML="
-  role: ${name%%-[0-9]*}"
-  else
-    ADAPTED_YAML=""
+# shellcheck disable=SC2154
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not create host config for additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+    # on a single-arch payload migrated to a multi-arch cluster)
+    continue
   fi
-
-  ADAPTED_YAML+="
+  ADAPTED_YAML="
+  role: ${name%%-[0-9]*}
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
     ${root_dev_hctl:+hctl: ${root_dev_hctl}}
@@ -69,6 +64,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
               prefix-length: ${INTERNAL_NET_CIDR##*/}
       ipv6:
         enabled: ${ipv6_enabled}
+    dns-resolver:
+          config:
+            server:
+              - ${INTERNAL_NET_IP}
+    routes:
+      config:
+        - destination: 0.0.0.0/0
+          next-hop-address: ${INTERNAL_NET_IP}
+          next-hop-interface: ${baremetal_iface}
 "
 
 # Workaround: Comment out this code until OCPBUGS-34849 is fixed
@@ -89,25 +93,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 #    "
 #  done
 
-  # Take care of the indentation when adding the dns and routes to the above yaml
-  ADAPTED_YAML+="
-    dns-resolver:
-          config:
-            server:
-              - ${INTERNAL_NET_IP}
-    routes:
-      config:
-        - destination: 0.0.0.0/0
-          next-hop-address: ${INTERNAL_NET_IP}
-          next-hop-interface: ${baremetal_iface}
-  "
-  # Patch agent-config.yaml or nodes-config.yaml if host used for day2 by adding the given host to the hosts list
-  CONFIG_FILE=agent-config.yaml
-  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
-    CONFIG_FILE="nodes-config.yaml"
-  fi
+  # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
-      "$SHARED_DIR/$CONFIG_FILE" - <<< "$ADAPTED_YAML"
+    "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
 done
 
 else
