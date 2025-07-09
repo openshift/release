@@ -100,10 +100,11 @@ if [ -n "${REBASE_TO}" ]; then
   cd /go/src/github.com/openshift/microshift/
   DEST_DIR="${HOME}"/.local/bin ./scripts/fetch_tools.sh yq
   # Extract the ARM release image from the last_rebase.sh file (third parameter)
-  ARM_RELEASE_IMAGE=$(grep -o 'registry\.ci\.openshift\.org/ocp-arm64/release-arm64:[^[:space:]"]*' /go/src/github.com/openshift/microshift/scripts/auto-rebase/last_rebase.sh | head -1)
+  ARM_RELEASE_IMAGE=$(grep -o 'registry\.ci\.openshift\.org/ocp-arm64/release-arm64:[^[:space:]"]*' ./scripts/auto-rebase/last_rebase.sh | head -1)
   if [[ -z "${ARM_RELEASE_IMAGE}" ]]; then
     echo "Failed to extract ARM release image from last_rebase.sh"
-    exit 1
+    echo "rebase failed" > "${SHARED_DIR}"/rebase_failure
+    exit 0
   fi
   # Bail out without error if the rebase fails. Next steps should be skipped if this happens.
   PULLSPEC_RELEASE_AMD64="${REBASE_TO}" \
