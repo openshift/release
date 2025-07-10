@@ -43,32 +43,6 @@ tests:
   steps:
     cluster_profile: aws
     test:
-    - as: setup-registry
-      cli: latest
-      commands: |
-        oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
-        REGISTRY_HOST=$(oc get routes --namespace openshift-image-registry default-route -o jsonpath='{.spec.host}')
-        openssl s_client -showcerts -connect "${REGISTRY_HOST}:443" < /dev/null 2>/dev/null | sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' > /tmp/registry.crt
-        oc create cm -n openshift-config registry-certs --from-file=${REGISTRY_HOST}=/tmp/registry.crt
-        oc patch image.config.openshift.io/cluster --type merge -p '{"spec":{"additionalTrustedCA":{"name":"registry-certs"}}}'
-
-        echo "Waiting until image registry is ready..."
-        sleep 15
-        time {
-          oc wait --for=condition=Available clusteroperator/image-registry --timeout=10m && \
-          oc wait --for=condition=Progressing=False clusteroperator/image-registry --timeout=10m && \
-          oc wait --for=condition=Degraded=False clusteroperator/image-registry --timeout=10m
-        }
-        echo "Waiting until apiserver is ready..."
-        time {
-          oc wait --for=condition=Available clusteroperator/openshift-apiserver --timeout=10m && \
-          oc wait --for=condition=Progressing=False clusteroperator/openshift-apiserver --timeout=10m && \
-          oc wait --for=condition=Degraded=False clusteroperator/openshift-apiserver --timeout=10m
-        }
-      from: src
-      resources:
-        requests:
-          cpu: 100m
     - as: test
       cli: latest
       commands: |
