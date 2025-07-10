@@ -206,7 +206,7 @@ EOF_JUNIT
   sed -i "1 a <testsuite name=\"$testsuite_name\" failures=\"$failure_count\" errors=\"0\" skipped=\"0\" tests=\"$(wc -w <<< $step_dirs)\">" "$junit_file"
   sed -i '$ a </testsuite>' "$junit_file"
   cp "$junit_file" "${ARTIFACT_DIR}"
-  find "$LOCAL_DIR_ORI" -name "*.xml" -exec cp {} "$LOCAL_DIR_RST" \;
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
 
   ls -alR "$LOCAL_DIR"
 }
