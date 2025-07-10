@@ -90,12 +90,9 @@ tests:
       commands: |
         oc create namespace openshift-metallb-operator
         oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
-        export OPERATOR_SDK_VERSION=1.40.0
-        export ARCH=amd64
-        curl -Lo operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_linux_${ARCH}
-        chmod 755 operator-sdk
-        ./operator-sdk version
-        ./operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
+        make operator-sdk
+        ./_cache/operator-sdk version
+        ./_cache/operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
       dependencies:
