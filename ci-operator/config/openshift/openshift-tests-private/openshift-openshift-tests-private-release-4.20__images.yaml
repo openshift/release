@@ -2,15 +2,11 @@ base_images:
   ci_tests-private-base:
     name: tests-private-base
     namespace: ci
-    tag: latest
+    tag: "4.20"
   ci_tests-private-baseui:
     name: tests-private-baseui
     namespace: ci
-    tag: latest
-  cli:
-    name: "4.20"
-    namespace: ocp
-    tag: cli
+    tag: "4.20"
   network-observability-cli:
     name: network-observability-cli
     namespace: netobserv
@@ -27,16 +23,12 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: tools
-  upi-installer:
-    name: "4.20"
-    namespace: ocp
-    tag: upi-installer
 binary_build_commands: make go-mod-tidy;make all
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_literal: |
     FROM src AS builder
@@ -61,18 +53,14 @@ images:
         pip3 uninstall PyYAML -y && yum -y remove python3-requests && pip3 install --upgrade setuptools pip && pip3 install dotmap minio python-openstackclient pyyaml requests && \
         sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=0\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo' && \
         yum -y install --setopt=tsflags=nodocs --enablerepo=azure-cli azure-cli && \
-        sh -c 'echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el7-x86_64\nenabled=0\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg\n       https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo' && \
-        yum -y install --setopt=tsflags=nodocs --enablerepo=google-cloud-sdk google-cloud-sdk && \
-        sh -c 'echo -e "[rhel9.2-baseos]\nname=rhel9.2-baseos\nbaseurl=http://download.eng.pek2.redhat.com/rhel-9/rel-eng/RHEL-9/latest-RHEL-9.2/compose/BaseOS/x86_64/os/\nenabled=0\ngpgcheck=1" >/etc/yum.repos.d/rhel9.2-baseos.repo' && \
-        yum -y --enablerepo=rhel9.2-baseos install sos && \
+        sh -c 'echo -e "[google-cloud-cli]\nname=Google Cloud CLI\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64\nenabled=0\ngpgcheck=1\nrepo_gpgcheck=0\ngpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo' && \
+        yum -y install --setopt=tsflags=nodocs --enablerepo=google-cloud-cli google-cloud-cli && \
+        yum -y install sos && \
         curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
         unzip -q awscliv2.zip && ./aws/install -b /bin && \
         rm -rf ./aws awscliv2.zip && \
         chmod g+w /etc/passwd && \
         MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
-        curl -skL ${MIRRORURL}/ocp/candidate/openshift-client-linux-amd64-rhel9.tar.gz -o openshift-client-linux.tar.gz && \
-        tar -C /usr/bin/ -xzvf openshift-client-linux.tar.gz && rm -f openshift-client-linux.tar.gz && \
-        OCP_VERSION="$(/usr/bin/oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs)" && \
         curl -skL ${MIRRORURL}/ocp/candidate/opm-linux-rhel9.tar.gz -o opm-linux.tar.gz  && \
         tar -C /usr/bin/ -xzvf opm-linux.tar.gz && mv /usr/bin/opm-rhel9 /usr/bin/opm && opm version && rm -f opm-linux.tar.gz && \
         curl -skL ${MIRRORURL}/ocp/candidate/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
@@ -136,6 +124,18 @@ images:
       - src
   to: tests-private-burner
 - dockerfile_literal: |
+    FROM this-is-ignored-and-not-used
+    RUN set -x && \
+        curl -skL https://repository-basic.engineering.redhat.com/nexus/repository/dno-raw/droute-client/latest/droute-linux-amd64 -o /usr/local/bin/droute && \
+        chmod +x /usr/local/bin/droute && \
+        pushd /etc/pki/ca-trust/source/anchors && \
+        curl -skL -O https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem && \
+        update-ca-trust extract && \
+        popd
+  from: ci_tests-private-base
+  optional: true
+  to: datarouter
+- dockerfile_literal: |
     FROM bin AS bin
     FROM this-is-ignored-and-not-used
     COPY --from=bin /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
@@ -145,6 +145,17 @@ images:
       as:
       - bin
   to: tests-private
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ci_tests-private-baseui
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-ui
 promotion:
   to:
   - namespace: ci

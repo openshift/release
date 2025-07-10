@@ -198,12 +198,22 @@ tests:
     - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-clean-up
   timeout: 1h0m0s
 - as: e2e-tests-auth-providers-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
   cron: 0 7 * * TUE,THU,SAT,SUN
+  optional: true
+  presubmit: true
   steps:
-    post:
-    - ref: redhat-developer-rhdh-send-alert
     test:
-    - ref: redhat-developer-rhdh-auth-providers-nightly
+    - ref: redhat-developer-rhdh-nightly
+    workflow: generic-claim
 - as: e2e-tests-upgrade-nightly
   cluster_claim:
     architecture: amd64
@@ -218,11 +228,25 @@ tests:
   optional: true
   presubmit: true
   steps:
-    post:
-    - ref: redhat-developer-rhdh-send-alert
-    - chain: gather
     test:
     - ref: redhat-developer-rhdh-upgrade-nightly
+    workflow: generic-claim
+- as: e2e-tests-sealight-helm-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 7 * * *
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-nightly
     workflow: generic-claim
 zz_generated_metadata:
   branch: main

@@ -68,6 +68,11 @@ tests:
     make lint
   container:
     from: assisted-test-infra-internal
+- as: ansible-lint
+  commands: |
+    make ci_ansible_lint
+  container:
+    from: assisted-test-infra-internal
 - as: e2e-metal-assisted-4-19
   cluster: build05
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -86,6 +91,7 @@ tests:
       ASSISTED_CONFIG: |
         ENABLE_KUBE_API=true
         IPv4=true
+        IPv6=false
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.19
@@ -368,27 +374,6 @@ tests:
       TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-kube-api-late-binding-sno-4-18
-  cluster: build05
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        WORKER_DISK=40000000000
-        WORKER_CPU=3
-        WORKER_MEMORY=10240
-        OPENSHIFT_VERSION=4.18
-      CLUSTERTYPE: assisted_large_el9
-      POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_late_binding_kube_api_sno
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        export MASTER_CPU=5
-        export MASTER_MEMORY=18432
-        export SET_INFRAENV_VERSION=true
-        make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-ofcir-baremetal
-- always_run: false
   as: e2e-metal-assisted-kube-api-late-binding-sno-4-19
   cluster: build05
   optional: true
@@ -406,6 +391,7 @@ tests:
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         export MASTER_CPU=5
         export MASTER_MEMORY=18432
+        export SET_INFRAENV_VERSION=true
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-sno-4-19-periodic
@@ -575,6 +561,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         ENABLE_KUBE_API=true
+        IPv4=false
         IPv6=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
@@ -589,6 +576,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         ENABLE_KUBE_API=true
+        IPv4=false
         IPv6=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
@@ -603,7 +591,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         ENABLE_KUBE_API=true
-        IPvd=true
+        IPv4=true
+        IPv6=false
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=4.19
@@ -745,10 +734,10 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ASSISTED_CONFIG: |
-        KUBE_API=true
         ENABLE_KUBE_API=true
         NUM_WORKERS=0
         IPv4=true
+        IPv6=false
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
@@ -898,7 +887,6 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
-      ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
@@ -906,13 +894,12 @@ tests:
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
         DAY2_CPU_ARCHITECTURE=arm64
         OPENSHIFT_VERSION=4.19-multi
-    workflow: assisted-equinix
+    workflow: assisted-ofcir-baremetal-heterogeneous
 - as: e2e-metal-assisted-day2-arm-workers-4-19-periodic
   cron: 30 01 * * 1,4
   steps:
     cluster_profile: packet-assisted
     env:
-      ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
@@ -920,7 +907,7 @@ tests:
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
         DAY2_CPU_ARCHITECTURE=arm64
         OPENSHIFT_VERSION=4.19-multi
-    workflow: assisted-equinix
+    workflow: assisted-ofcir-baremetal-heterogeneous
 - always_run: false
   as: e2e-oci-assisted-4-19
   optional: true
@@ -1006,6 +993,7 @@ tests:
         ENABLE_KUBE_API=true
         LOAD_BALANCER_TYPE=user-managed
         IPv4=true
+        IPv6=false
         OPENSHIFT_VERSION=4.19
     workflow: assisted-ofcir-baremetal
 - always_run: false
@@ -1022,14 +1010,14 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere-external-lb
 - always_run: false
-  as: e2e-metal-assisted-virtualization-4-18
+  as: e2e-metal-assisted-virtualization-4-19
   cluster: build05
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
         MASTER_MEMORY=18700
         MASTER_CPU=10
         MASTER_DISK_COUNT=2
@@ -1039,30 +1027,32 @@ tests:
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ai-nvidia-4-18
+  as: e2e-metal-assisted-ai-nvidia-4-19
   cluster: build05
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
         NVIDIA_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ai-amd-4-18
+  as: e2e-metal-assisted-ai-amd-4-19
   cluster: build05
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
         AMD_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-virtualization-4-18-periodic
+- as: e2e-metal-assisted-virtualization-4-19-periodic
   cluster: build05
   cron: 30 11 * * 0,2,4
   steps:
@@ -1070,7 +1060,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
         MASTER_MEMORY=18700
         MASTER_CPU=10
         MASTER_DISK_COUNT=2
@@ -1079,7 +1069,7 @@ tests:
         WORKER_DISK_COUNT=2
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ai-nvidia-4-18-periodic
+- as: e2e-metal-assisted-ai-nvidia-4-19-periodic
   cluster: build05
   cron: 30 12 * * 0,2,4
   steps:
@@ -1087,11 +1077,12 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
         NVIDIA_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ai-amd-4-18-periodic
+- as: e2e-metal-assisted-ai-amd-4-19-periodic
   cluster: build05
   cron: 30 13 * * 0,2,4
   steps:
@@ -1099,9 +1090,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
         AMD_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: master

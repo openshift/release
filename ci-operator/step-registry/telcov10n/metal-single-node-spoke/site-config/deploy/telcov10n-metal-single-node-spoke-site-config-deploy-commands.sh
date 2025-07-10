@@ -58,6 +58,36 @@ function generate_network_config {
   #   done
 }
 
+function clear_partition_disk_table {
+
+  echo "************ telcov10n Clear Partition Disk Table ************"
+
+  set -x
+  node_name="$(oc get node -oname)"
+  devices_to_be_wiped=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+    jq -c '
+      .status.deviceClassStatuses[]
+      | select(.name == "vg1").nodeStatus[].devices')
+  set +x
+
+  echo ${devices_to_be_wiped} | jq -r '.[]' | while read -r node_dev; do
+    echo
+    echo "Wiping device $node_dev..."
+    echo
+    oc debug ${node_name} -n default -- chroot /host bash -c "
+     set -x ;
+     lsblk --fs ${node_dev} ;
+     sgdisk --zap-all ${node_dev} ;
+     sleep 3 ;
+     kpartx -d ${node_dev} ;
+     sleep 30 ;
+     lsblk --fs ${node_dev} ;
+     set +x ;
+     echo ;
+     echo '${node_dev} Wiped'"
+  done
+}
+
 function get_storage_class_name {
 
   echo "************ telcov10n Get the Storage Class name to be used ************"
@@ -84,7 +114,11 @@ EOF
     attempts=0
     while sleep 10s ; do
       oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break
-      [ $(( attempts=${attempts} + 1 )) -lt 3 ] || exit 1
+      [ $(( attempts=${attempts} + 1 )) -lt 2 ] || {
+        clear_partition_disk_table ;
+        oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break ;
+        exit 1 ;
+      }
     done
     set +x
     oc -n openshift-storage get lvmcluster/lvmcluster -oyaml

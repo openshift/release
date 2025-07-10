@@ -117,7 +117,7 @@ set -eux
   sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 
   echo "Checking NVIDIA driver availability with nvidia-smi..."
-  MAX_RETRIES=10
+  MAX_RETRIES=20
   RETRY_DELAY_SECONDS=10
   attempt=1
 
