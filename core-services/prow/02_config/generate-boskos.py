@@ -90,6 +90,9 @@ CONFIG = {
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
     },
+    'metal-perfscale-osp-quota-slice': {
+        'metal-perfscale-osp-rdu2': 1,
+    },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
     },
