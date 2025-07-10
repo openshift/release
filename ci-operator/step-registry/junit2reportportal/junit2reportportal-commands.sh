@@ -112,7 +112,7 @@ function generate_attribute_version_installed() {
   version_installed="unknown"
   release_dir="${LOCAL_DIR_ORI}/release/artifacts"
   release_file="release-images-latest"
-  arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value')"
+  arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
   if [[ "$arch" = 'arm64' ]]
   then
     release_file="release-images-arm64-latest"
