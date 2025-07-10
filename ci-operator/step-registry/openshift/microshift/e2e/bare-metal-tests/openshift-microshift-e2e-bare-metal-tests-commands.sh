@@ -13,7 +13,7 @@ source /tmp/ci-functions.sh
 ci_subscription_register
 
 download_microshift_scripts
-"\${DNF_RETRY}" "install" "jq"
+"\${DNF_RETRY}" "install" "jq git"
 ci_copy_secrets "${CACHE_REGION}"
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
@@ -35,6 +35,19 @@ scp \
   "${INSTANCE_PREFIX}:/tmp"
 
 ssh "${INSTANCE_PREFIX}" "/tmp/prepare.sh"
+
+# nvidia-device-plugin scripts live primarily in the main branch of microshift.
+# If the $SUITE is nvidia-device-plugin, we clone the main branch of microshift and copy the scripts to right version of MicroShift's repo.
+if [[ "${SUITE}" == "nvidia-device-plugin" ]]; then
+    ssh "${INSTANCE_PREFIX}" \
+        "git clone --filter=blob:none --no-checkout --depth 1 --sparse https://github.com/openshift/microshift.git /home/${HOST_USER}/microshift-main && \
+            cd /home/${HOST_USER}/microshift-main && \
+            git sparse-checkout add ./scripts/ci-nvidia-device-plugin/ && \
+            git checkout main"
+
+    ssh "${INSTANCE_PREFIX}" \
+        "cp -r /home/${HOST_USER}/microshift-main/scripts/ci-nvidia-device-plugin /home/${HOST_USER}/microshift/scripts/ci-nvidia-device-plugin/"
+fi
 
 setup_ok=true
 if ! ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"; then
