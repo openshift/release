@@ -122,9 +122,18 @@ create_icsp_connected() {
     name: $ICSP_NAME
   spec:
     repositoryDigestMirrors:
-    - mirrors:
-      - registry.stage.redhat.io
-      source: registry.redhat.io
+    - source: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-collector
+    - source: registry.redhat.io/rhosdt/opentelemetry-target-allocator-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-target-allocator
+    - source: registry.redhat.io/rhosdt/opentelemetry-rhel8-operator
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-operator
+    - source: registry.redhat.io/rhosdt/opentelemetry-operator-bundle
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-bundle
 EOF
 		echo "!!! fail to create the ICSP"
 		return 1
