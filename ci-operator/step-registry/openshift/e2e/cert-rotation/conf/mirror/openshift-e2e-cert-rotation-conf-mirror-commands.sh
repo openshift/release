@@ -277,7 +277,6 @@ cat /etc/pki/ca-trust/source/anchors/server.pem >> /home/assisted/custom_manifes
 ls -la /home/assisted/custom_manifests/ca.pem
 echo "export REGISTRY_CA_PATH=/home/assisted/custom_manifests/ca.pem" >> ~/config.sh
 
-kubectl patch deployment -n assisted-installer assisted-service --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "mirror-registry-ca", "mountPath": "/etc/pki/tls/certs/ca-bundle.crt", "readOnly": true, "subPath": "mirror_ca.pem"}}]'
 kubectl -n assisted-installer rollout status deploy/assisted-service --timeout=5m
 
 # Point assisted service to mirror first

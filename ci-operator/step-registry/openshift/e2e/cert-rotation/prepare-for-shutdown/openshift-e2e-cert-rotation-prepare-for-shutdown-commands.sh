@@ -44,6 +44,9 @@ else
   mapfile -d ' ' -t compute_nodes < /srv/compute_node_ips
 fi
 
+# Apply ICMS to fallback to local mirror in case time skew is too large to pull images from registry.redhat.io or quay
+oc apply -f /tmp/icsp.yaml
+
 function run-on-all-nodes {
   for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
