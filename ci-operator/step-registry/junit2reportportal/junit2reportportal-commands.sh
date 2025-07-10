@@ -190,13 +190,20 @@ function generate_results() {
       result=$(jq -r '.result' "${file_finished}")
       if [[ "$result" = 'SUCCESS' ]]
       then
-        cat >> "$junit_file" << EOF_JUNIT
+        cat >> "$junit_file" << EOF_JUNIT_SUCCESS
   <testcase classname="$testsuite_name" name="$step_name" time="1">
     <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
-EOF_JUNIT
-      else
+EOF_JUNIT_SUCCESS
+      elif [[ "$result" = 'FAILURE' ]]
+      then
         let failure_count+=1
+        cat >> "$junit_file" << EOF_JUNIT_FAILURE
+  <testcase classname="$testsuite_name" name="$step_name" time="1">
+    <failure message="Step $step_name failed" type="failed"/>
+    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+  </testcase>
+EOF_JUNIT_FAILURE
       fi
     else
       let failure_count+=1
