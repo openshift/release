@@ -120,6 +120,32 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     - ref: stackrox-qa-e2e
   timeout: 8h0m0s
+- as: interop-ocp-acs-with-odf
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      ODF_VERSION_MAJOR_MINOR: "4.18"
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-deprovision
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
+    - ref: stackrox-qa-e2e
+  timeout: 8h0m0s
 - as: interop-opp-aws
   cron: 0 23 31 2 *
   steps:
