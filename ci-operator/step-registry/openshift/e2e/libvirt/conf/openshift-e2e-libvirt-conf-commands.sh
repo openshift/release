@@ -290,9 +290,12 @@ elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
     # Skip the below defect for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-46563 is fixed
+    # Skip the below etcd testcases for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-54839 is fixed
     if [ "${INSTALLER}" == "powervs" ]; then
        cat >> "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[bz-etcd][invariant] alert/etcdMemberCommunicationSlow should not be at or above info"
+"[sig-etcd] etcd should not log excessive took too long messages"
 EOF
     fi
 else
