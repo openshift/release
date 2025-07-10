@@ -51,6 +51,10 @@ if [ "${ENABLE_SIZE_TAGGING}" == "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-size-tagging"
 fi
 
+if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
+fi
+
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
