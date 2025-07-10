@@ -3,6 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+set +x
+
 export STORAGECLASS_LOCATION=${SHARED_DIR}/efs-sc.yaml
 export MANIFEST_LOCATION=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -46,7 +48,13 @@ DriverInfo:
     multiplePVsSameID: true
 EOF
 else
-  /usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --local-aws-creds=true --namespace openshift-cluster-csi-drivers
+  ARG=(--kubeconfig "$KUBECONFIG" --local-aws-creds=true --namespace openshift-cluster-csi-drivers)
+  if [[ ${ENABLE_SINGLE_ZONE} == "true" ]]; then
+    ZONE_NAME=$(oc get node -l node-role.kubernetes.io/worker \
+      -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')
+    ARG+=(--single-zone="$ZONE_NAME")
+  fi
+  /usr/bin/create-efs-volume start "${ARG[@]}"
   echo "Using storageclass ${STORAGECLASS_LOCATION}"
   cat ${STORAGECLASS_LOCATION}
 
