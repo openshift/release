@@ -7,8 +7,10 @@ set -o verbose
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 operator_configs=$(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort --version-sort)
-RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
+RUN_COMMAND="uv run ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
 OPERATORS_CMD=""
+
+sleep 1800
 
 extract_operator_config() {
     echo "$1" | sed -E 's/^OPERATOR[0-9]+_CONFIG=//'
@@ -56,4 +58,5 @@ if [ "${COLLECT_MUST_GATHER}" = "true" ]; then
   RUN_COMMAND+=" --must-gather-output-dir=${ARTIFACT_DIR} "
 fi
 
-${RUN_COMMAND}
+echo $RUN_COMMAND
+eval "$RUN_COMMAND"
