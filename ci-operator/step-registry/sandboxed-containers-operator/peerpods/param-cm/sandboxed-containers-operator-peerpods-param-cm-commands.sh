@@ -74,6 +74,30 @@ EOF
 EOF
 }
 
+# Create a SSH keys pair. The public key is exported and later set in
+# the peerpods-param-cm.
+#
+create_ssh_key() {
+
+    # The following was copied from the ipi-config-sshkey step
+    #
+    # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+    # to be able to SSH.
+    if ! whoami &> /dev/null; then
+        if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        else
+            echo "/etc/passwd is not writeable, and user matching this uid is not found."
+            exit 1
+        fi
+    fi
+
+    local key_file="/tmp/id_ed25519"
+    ssh-keygen -t ed25519 -f "${key_file}" -N ""
+    PP_SSH_KEY_PUB=$(base64 -w 0 < "${key_file}.pub")
+    export PP_SSH_KEY_PUB
+}
+
 handle_azure() {
     local AZURE_RESOURCE_GROUP
     local AZURE_AUTH_LOCATION
@@ -191,6 +215,8 @@ fi
 
     # Start the downstream-only commands
 
+    create_ssh_key
+
     # Creating peerpods-param-cm config map with all the cloud params needed for test case execution
     cat <<- EOF > "${PP_CONFIGM_PATH}"
     apiVersion: v1
@@ -203,6 +229,7 @@ fi
       VXLAN_PORT: "9000"
       AZURE_INSTANCE_SIZE: "Standard_B2als_v2"
       AZURE_INSTANCE_SIZES: Standard_B2als_v2,Standard_B2as_v2,Standard_D2as_v5,Standard_B4als_v2,Standard_D4as_v5,Standard_D8as_v5,Standard_NC64as_T4_v3,Standard_NC8as_T4_v3
+      AZURE_SSH_KEY_PUB: "${PP_SSH_KEY_PUB}"
       AZURE_SUBNET_ID: "${PP_SUBNET_ID}"
       AZURE_NSG_ID: "${PP_NSG_ID}"
       AZURE_RESOURCE_GROUP: "${PP_RESOURCE_GROUP}"
