@@ -52,8 +52,21 @@ fi
 # calculate checksum
 KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
 
+# Upload and verify
+FAILED_NODES=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
-    oc debug -n default -T "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm.md5sum"
+    OUTPUT=$(oc debug -n default "${node}" -- sh -c "md5sum  /host/var/local/kata-containers.rpm")
+    if [ "${KATA_RPM_MD5SUM}" != $(echo ${OUTPUT} | cut -d ' ' -f1) ]
+    then
+        FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
+    fi
 done
+
+# check for failures
+if [ ${FAILED_NODES} != "" ]
+then
+    echo "ERROR: uploads failed on nodes $FAILED_NODES"
+    exit 4
+fi
