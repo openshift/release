@@ -51,10 +51,11 @@ oc delete ns netperf --wait=true --ignore-not-found=true
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 rm -f ${SHARED_DIR}/index.json
-
+echo "pausing for config........................................................................................................................"
+sleep 3600
 WORKLOAD=full-run.yaml ./run.sh
 echo "pause to run cross arch test locall"
-sleep 3600
+#sleep 3600
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 mv $folder_name/index_data.json ${SHARED_DIR}/index_data-pod.json
 
