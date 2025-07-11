@@ -49,11 +49,11 @@ then
     exit 2
 fi
 
-md5sum_file="${KATA_RPM_BUILD_MD5SUM}  kata-containers.rpm"
-echo "${md5sum_file}" | md5sum -c -
+# calculate checksum
+KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
 
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
-    oc debug -n default -T "${node}" -- bash -c "echo ${md5sum_file} > /host/var/local/kata-containers.rpm.md5sum"
+    oc debug -n default -T "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm.md5sum"
 done
