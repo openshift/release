@@ -26,7 +26,7 @@ if [[ "\$NAME" == "CentOS Stream" && "\$VERSION_ID" == "8" ]]; then
 fi
 set +x
 
-sudo dnf install -y podman firewalld
+sudo dnf install -y container-tools crun podman firewalld
 
 # The default "10:30:100" results in connections being rejected
 # Password auth is disabled so we can bump this up a bit and make it
