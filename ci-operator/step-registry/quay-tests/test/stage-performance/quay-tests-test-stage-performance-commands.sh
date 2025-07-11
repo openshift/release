@@ -4,11 +4,13 @@
 set -o nounset
 
 # 1, Prepare Quay stage-performance test environment
-QUAY_ROUTE="https://stage.quay.io"
+# QUAY_ROUTE="https://stage.quay.io"
+QUAY_ROUTE=$([ -f "$SHARED_DIR/quayroute" ] && cat "$SHARED_DIR/quayroute" | "https://stage.quay.io")
 
 STAGE_USERNAME=$(cat /var/run/stagequayqe/username)
 STAGE_PASSWORD=$(cat /var/run/stagequayqe/password)
 QUAY_OAUTH_TOKEN=$(cat /var/run/stagequayqe/oauth)
+
 
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
@@ -177,7 +179,7 @@ if [[ -z "${quayperf_pod_name}" ]]; then
   exit 1
 fi
 
-sleep 120 #wait pod start
+sleep 120 #wait for pod start
 
 # Fetch UUID,JOB_START etc required data to dashboard
 TEST_UUID=$(oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" | grep 'test_uuid' | sed -n 's/^.*test_uuid=\s*\(\S*\).*$/\1/p')
