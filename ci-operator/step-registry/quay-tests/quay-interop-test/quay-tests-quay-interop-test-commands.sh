@@ -53,6 +53,3 @@ registry="${registryEndpoint#https://}"
 echo "The Quay hostname is $registryEndpoint"
 export CYPRESS_QUAY_ENDPOINT=$registry
 yarn run smoke || true
-
-
-sleep 2h
