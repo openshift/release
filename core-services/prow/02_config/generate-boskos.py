@@ -221,6 +221,9 @@ CONFIG = {
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 25,
     },
+    'azure-confidential-qe-quota-slice': {
+        'eastus': 6,
+    },
     'equinix-ocp-metal-quota-slice': {
         'default': 110,
     },
