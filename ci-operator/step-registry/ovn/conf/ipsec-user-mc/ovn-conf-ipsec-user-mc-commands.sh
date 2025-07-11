@@ -8,7 +8,13 @@ if [ -n "$MCP_ROLLOUT_TIMEOUT" ] && [ "$MCP_ROLLOUT_TIMEOUT" = "0s" ]; then
     unset MCP_ROLLOUT_TIMEOUT
 fi
 
-osCustomImageURL="quay.io/pepalani/ipsec-rhcos-layered-image:4.20.0-0.nightly-2025-05-28-190420"
+# Check if the osImageURL is set
+if [ -z "${IPSEC_RHCOS_LAYERED_IMAGE:-}" ]; then
+    echo "There is no custom OS IMAGE URL which is required, exit 1."
+    exit 1
+fi
+
+osCustomImageURL="${IPSEC_RHCOS_LAYERED_IMAGE}"
 
 apply_ipsec_user_ipsec_mc_config()
 {
