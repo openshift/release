@@ -59,7 +59,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --gc=false --iterations=${ITERATIONS} --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
