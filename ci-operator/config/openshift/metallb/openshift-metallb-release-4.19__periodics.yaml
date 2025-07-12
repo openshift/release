@@ -1,0 +1,62 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  metallb:
+    name: "4.19"
+    namespace: ocp
+    tag: metallb
+  metallb-operator:
+    name: "4.19"
+    namespace: ocp
+    tag: metallb-operator
+  ocp_builder_rhel-9-base-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.18
+  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: metallb-e2e-metal-periodic
+  cluster: build05
+  interval: 72h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        BGP_TYPE=frr-k8s-cno
+    workflow: baremetalds-metallb-e2e
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: metallb
+  variant: periodics
