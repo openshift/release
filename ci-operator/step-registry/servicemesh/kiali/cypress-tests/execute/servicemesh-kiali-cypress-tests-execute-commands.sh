@@ -71,7 +71,7 @@ export TEST_GROUP="not @crd-validation and not @multi-cluster and not @smoke and
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 # save screenshots from the 1st run
 cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
-export TEST_GROUP="@crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @cytoscape and not @skip-lpinterop"
+export TEST_GROUP="@istio-config-editor"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 
 # merge all reports together
