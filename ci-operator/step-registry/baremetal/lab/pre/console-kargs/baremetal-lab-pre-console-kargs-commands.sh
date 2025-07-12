@@ -22,7 +22,7 @@ function join_by_semicolon() {
 
 echo "Rendering the ignition hook from butane..."
 
-base_url="http://${INTERNAL_NET_IP}/$(<"${SHARED_DIR}/cluster_name")"
+base_url="http://[fd99:2222:3456::1]/$(<"${SHARED_DIR}/cluster_name")"
 
 # We use a different console-hook ignition file for each node to allow the configuration of heterogeneous nodes
 # (i.e., nodes from different vendors)
@@ -69,6 +69,7 @@ systemd:
       ExecStartPre=-bash -c 'set -x; for i in \$(lsblk -I8,259 -nd --output name); do wipefs -a /dev/\$i; done; set +x'
       ExecStartPre=/usr/bin/coreos-installer install $root_device \
         --delete-karg console=ttyS0,115200n8 $(join_by_semicolon "${console_kargs}" "--append-karg console=" "") \
+        --append-karg rd.break=pre-mount \
         --ignition-url ${base_url%%*(/)}/${role}.ign \
         --insecure-ignition --copy-network
       # Some servers' firmware push any new detected boot options to the tail of the boot order.
@@ -89,7 +90,24 @@ systemd:
 
       [Install]
       RequiredBy=default.target
-
+storage:
+  files:
+    - path: /etc/NetworkManager/system-connections/${baremetal_iface}.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=${baremetal_iface}
+          type=ethernet
+          interface-name=${baremetal_iface}
+          [ipv4]
+          method=disabled
+          [ipv6]
+          address1=${ipv6}/64,fd99:2222:3456::1
+          dns=fd99:2222:3456::1;
+          dns-search=
+          may-fail=false
+          method=manual
 EOF
 done
 
