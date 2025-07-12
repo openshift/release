@@ -31,14 +31,12 @@ tests:
       VMI_READY_THRESHOLD: "180"
       VMS_PER_NODE: "200"
     test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
-    - ref: openshift-qe-installer-bm-day2-cnv
-    - ref: openshift-qe-cluster-health
     - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-cnv
     - chain: openshift-qe-data-path-tests
     - ref: openshift-qe-virt-density
     - ref: openshift-qe-virt-udn-density
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 8h0m0s
 - always_run: false
   as: deploy-6nodes
@@ -60,6 +58,27 @@ tests:
       TYPE: sno
     workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
+- always_run: false
+  as: virt-density-6nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CNV_VERSION: "4.20"
+      CONFIG: config/standard-scalelab.yml
+      INFRA: "true"
+      VM: "true"
+      VMI_READY_THRESHOLD: "180"
+      VMS_PER_NODE: "200"
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-cnv
+    - ref: openshift-qe-virt-density
+    workflow: openshift-qe-installer-bm-deploy
+  timeout: 8h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
   capabilities:
