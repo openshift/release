@@ -217,10 +217,11 @@ set +e
 for retry in {1..5}
 do
     echo "[$(date)] Retrying mirror #${retry}"
-    oc adm release mirror -a ~/pull-secret \
-        --from="${RELEASE_IMAGE_LATEST}" \
-        --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
-        --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output \
+    oc adm release new \
+        -a ~/pull-secret \
+        --from-release="${RELEASE_IMAGE_LATEST}" \
+        --to-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
+        --mirror="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output \
     && break
     sleep 15
 done
@@ -247,30 +248,8 @@ done
 set -e
 echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
 
-# Build registries.conf
-tail -n 12 /tmp/oc-mirror.output | tee /tmp/icsp.yaml
-SOURCE1=$(/tmp/yq eval '.spec.repositoryDigestMirrors[0].source' "/tmp/icsp.yaml")
-SOURCE2=$(/tmp/yq eval '.spec.repositoryDigestMirrors[1].source' "/tmp/icsp.yaml")
-
-cat > /tmp/registries.conf << EOZ
-unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
-[[registry]]
-    prefix = ""
-    location = "${SOURCE1}"
-    mirror-by-digest-only = true
-    [[registry.mirror]]
-    location = "${LOCAL_REG}/${LOCAL_REPO}"
-[[registry]]
-    prefix = ""
-    location = "${SOURCE2}"
-    mirror-by-digest-only = true
-    [[registry.mirror]]
-    location = "${LOCAL_REG}/${LOCAL_REPO}"
-EOZ
-cat /tmp/registries.conf
-
 # Create a new CA bundle with registry CA included, restart assisted-service
-kubectl create configmap mirror-registry-ca -n assisted-installer --from-file=ca-bundle.crt=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem --from-file=registries.conf=/tmp/registries.conf
+kubectl create configmap mirror-registry-ca -n assisted-installer --from-file=ca-bundle.crt=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 mkdir -p /home/assisted/custom_manifests
 cat /etc/pki/ca-trust/source/anchors/ca.pem > /home/assisted/custom_manifests/ca.pem
 cat /etc/pki/ca-trust/source/anchors/server.pem >> /home/assisted/custom_manifests/ca.pem
