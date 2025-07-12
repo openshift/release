@@ -27,10 +27,12 @@ while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
   sleep 15
 done
 
-while [ "$(oc get network.config.openshift.io cluster -o jsonpath='{.status.networkType}')" != "OVNKubernetes" ]; do
-  echo "The network is still SDN, not migrate CNI to OVN from SDN "
-  sleep 30
-done
+if [[ $IF_CHECK_NETWORK_TYPE == "true" ]];then
+   while [ "$(oc get network.config.openshift.io cluster -o jsonpath='{.status.networkType}')" != "OVNKubernetes" ]; do
+       echo "The network is still SDN, not migrate CNI to OVN from SDN "
+       sleep 30
+   done
+fi
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TEST_NAMESPACE
