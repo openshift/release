@@ -37,6 +37,7 @@ case "${SIZE_VARIANT}" in
 	;;
 esac
 
+
 # Select zone(s) based on REGION and ZONE_COUNT
 REGION="${LEASED_RESOURCE}"
 echo "ibmcloud region: ${REGION}"
