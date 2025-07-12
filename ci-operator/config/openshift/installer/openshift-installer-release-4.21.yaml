@@ -424,7 +424,7 @@ tests:
     - chain: cucushift-installer-check-cluster-health
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
+  as: aws-custom-dns-private
   optional: true
   steps:
     cluster_profile: aws
@@ -432,7 +432,33 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
+    pre:
+    - ref: aws-provision-vpc-shared
+    - chain: aws-provision-bastionhost
+    - ref: aws-provision-security-group
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-usage-info
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-aws-custom-security-groups
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install-in-bastion
+    - ref: aws-provision-private-custom-dns
+    - ref: bastion-dnsmasq
+    - ref: proxy-config-generate
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-aws-private
+    - ref: cucushift-installer-check-user-provisioned-dns
+    - ref: cucushift-installer-check-aws-custom-vpc
+    test:
+    - ref: cucushift-installer-check-cluster-health
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
