@@ -22,15 +22,51 @@ fi
 
 brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"
 
-md5sum_file="${KATA_RPM_BUILD_MD5SUM}  kata-containers.rpm"
-curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}"
+# get the output of curl in case there is an error
+OUTPUT=$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL} 2>&1)"
+err=$?
+if [ $err -ne 0 ]
+then
+    echo "ERROR: curl error ${err} trying to get ${KATA_RPM_BUILD_URL}"
+    echo "ERROR: ${OUTPUT}"
+    exit $err
+fi
+
 echo "Debug:"
 ls -l kata-containers.rpm || true
-echo "Checking against md5sum ${KATA_RPM_BUILD_MD5SUM}"
-echo "${md5sum_file}" | md5sum -c -
 
+# no error from curl
+# do some rudimentry checking of the contents.
+# file kata-containers.rpm would show that it is a valid rpm
+
+# checks for a bad URL
+grep -q 'URL was not found' kata-containers.rpm
+if [ $? -eq 0 ]
+then
+    echo "ERROR: curl couldn't find ${KATA_RPM_BUILD_URL}"
+    # show the 1st 20 lines of the file
+    head -20 kata_containers.rpm
+    exit 2
+fi
+
+# calculate checksum
+KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
+
+# Upload and verify
+FAILED_NODES=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
-    oc debug -n default -T "${node}" -- bash -c "echo ${md5sum_file} > /host/var/local/kata-containers.rpm.md5sum"
+    OUTPUT=$(oc debug -n default "${node}" -- sh -c "md5sum  /host/var/local/kata-containers.rpm")
+    if [ "${KATA_RPM_MD5SUM}" != $(echo ${OUTPUT} | cut -d ' ' -f1) ]
+    then
+        FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
+    fi
 done
+
+# check for failures
+if [ ${FAILED_NODES} != "" ]
+then
+    echo "ERROR: uploads failed on nodes $FAILED_NODES"
+    exit 4
+fi
