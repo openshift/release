@@ -1,0 +1,24 @@
+workflow:
+  as: baremetalds-etcd-certrotation
+  steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: baremetal-ipi-pre
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: baremetalds-ipi-post
+    env:
+      PACKET_OS: rocky_9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="DevPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+      TEST_IMPORTANCE: "LEVEL0"
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_SUITE: openshift/etcd/certrotation
+  documentation: |-
+    The Openshift E2E baremetal `etcd-certrotation` workflow executes the `openshift/etcd/certrotation` end-to-end test suite on baremetal with a default cluster configuration.
