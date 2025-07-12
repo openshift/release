@@ -5,9 +5,42 @@ chain:
   - ref: kueue-operator-install-catalog
   - as: run-sdk
     commands: |
+      # Debug: Check SHARED_DIR contents
+      echo "=== SHARED_DIR Debug Info ==="
+      echo "SHARED_DIR: ${SHARED_DIR}"
+      echo "SHARED_DIR contents:"
+      ls -la "${SHARED_DIR}/" || echo "Failed to list SHARED_DIR"
+      echo "Mirror registry URL file:"
+      cat "${SHARED_DIR}/mirror_registry_url" 2>/dev/null || echo "No mirror_registry_url file"
+      echo "Env file:"
+      cat "${SHARED_DIR}/env" 2>/dev/null || echo "No env file"
+      echo "=========================="
+      # Source proxy configuration if it exists
+      if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+          echo "Setting proxy configuration..."
+          source "${SHARED_DIR}/proxy-conf.sh"
+      else
+          echo "No proxy settings found. Skipping proxy configuration..."
+      fi
+      
+      # Configure authentication for mirror registry by reusing saved auth
+      export HOME="${HOME:-/tmp/home}"
+      export XDG_RUNTIME_DIR="${HOME}/run"
+      mkdir -p "${XDG_RUNTIME_DIR}/containers"
+      
+      if test -f "${SHARED_DIR}/containers-auth.json"; then
+          echo "Reusing authentication file from catalog step..."
+          cp "${SHARED_DIR}/containers-auth.json" "${XDG_RUNTIME_DIR}/containers/auth.json"
+          echo "Authentication configured successfully"
+      else
+          echo "No saved auth file found. Using default authentication..."
+      fi
+      
       source "${SHARED_DIR}/env"
       echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+      
+      echo "Running operator-sdk run bundle..."
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator --skip-tls-verify --verbose "$BUNDLE_IMAGE"
     from: operator-sdk
     resources:
       requests:

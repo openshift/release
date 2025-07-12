@@ -23,23 +23,6 @@ function set_proxy () {
     fi
 }
 
-function wait_for_state() {
-    local object="$1"
-    local state="$2"
-    local timeout="$3"
-    local namespace="${4:-}"
-    local selector="${5:-}"
-
-    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
-    for _ in {1..30}; do
-        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
-    done
-
-    echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
-    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
-    return $?
-}
-
 # Applicable for 'disconnected' env
 function check_mirror_registry () {
     if test -s "${SHARED_DIR}/mirror_registry_url" ; then
@@ -71,6 +54,10 @@ function configure_host_pull_secret () {
     echo "Appending the pull secrets to Podman auth configuration file '${XDG_RUNTIME_DIR}/containers/auth.json'..."
     oc extract secret/pull-secret -n openshift-config --confirm --to ${TMP_DIR}
     jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
+    
+    # Save auth file to SHARED_DIR for reuse by other steps
+    echo "Saving auth file to SHARED_DIR for reuse by other steps..."
+    cp "${XDG_RUNTIME_DIR}/containers/auth.json" "${SHARED_DIR}/containers-auth.json"
 }
 
 # Applicable for 'disconnected' env
@@ -103,10 +90,14 @@ function mirror_catalog_and_operator() {
     echo "Using OPERATOR_IMAGE from compute step: ${OPERATOR_IMAGE}"
     
     # For disconnected environments, the images will be mirrored to the mirror registry
-    # Set the mirrored image paths for disconnected environments
-    MIRRORED_MUST_GATHER_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather"
-    MIRRORED_BUNDLE_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-1-0"
-    MIRRORED_OPERATOR_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0"
+    # Set the mirrored image paths for disconnected environments, preserving the original tags
+    MUST_GATHER_TAG=$(echo "${MUST_GATHER_IMAGE}" | sed 's/.*://')
+    BUNDLE_TAG=$(echo "${BUNDLE_IMAGE}" | sed 's/.*://')
+    OPERATOR_TAG=$(echo "${OPERATOR_IMAGE}" | sed 's/.*://')
+    
+    MIRRORED_MUST_GATHER_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather:${MUST_GATHER_TAG}"
+    MIRRORED_BUNDLE_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-1-0:${BUNDLE_TAG}"
+    MIRRORED_OPERATOR_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:${OPERATOR_TAG}"
     
     echo "Mirrored MUST_GATHER_IMAGE for disconnected environment: ${MIRRORED_MUST_GATHER_IMAGE}"
     echo "Mirrored BUNDLE_IMAGE for disconnected environment: ${MIRRORED_BUNDLE_IMAGE}"
@@ -186,6 +177,9 @@ function tmp_prune_distruptive_resource() {
     echo "[$(timestamp)] Rollout progress completed"
 }
 
+echo "[$(timestamp)] Kueue operator catalog step - this step only handles image mirroring for disconnected environments"
+echo "[$(timestamp)] The operator installation is done via operator-sdk run bundle, no catalog source needed"
+
 timestamp
 set_proxy
 
@@ -195,16 +189,30 @@ if test -s "${SHARED_DIR}/env" ; then
     source "${SHARED_DIR}/env"
 fi
 
-export TMP_DIR=/tmp/mirror-operators
-export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
-export XDG_RUNTIME_DIR="${TMP_DIR}/run"
-mkdir -p "${XDG_RUNTIME_DIR}/containers"
-cd "$TMP_DIR"
+# Check if this is a disconnected environment that needs image mirroring
+if test -s "${SHARED_DIR}/mirror_registry_url" ; then
+    echo "[$(timestamp)] Disconnected environment detected - setting up image mirroring..."
+    
+    export TMP_DIR=/tmp/mirror-operators
+    export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
+    export XDG_RUNTIME_DIR="${TMP_DIR}/run"
+    mkdir -p "${XDG_RUNTIME_DIR}/containers"
+    cd "$TMP_DIR"
 
-check_mirror_registry
-tmp_prune_distruptive_resource
-configure_host_pull_secret
-install_oc_mirror
-mirror_catalog_and_operator
+    check_mirror_registry
+    tmp_prune_distruptive_resource
+    configure_host_pull_secret
+    install_oc_mirror
+    mirror_catalog_and_operator
+    
+    echo "[$(timestamp)] Image mirroring completed for disconnected environment"
+else
+    echo "[$(timestamp)] Connected environment detected - no image mirroring needed"
+fi
 
-check_catalog_readiness 
+# Create and label the namespace for the operator installation
+echo "[$(timestamp)] Creating and labeling namespace for kueue operator..."
+oc create namespace openshift-kueue-operator || true
+oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+
+echo "[$(timestamp)] Catalog step completed successfully!" 
