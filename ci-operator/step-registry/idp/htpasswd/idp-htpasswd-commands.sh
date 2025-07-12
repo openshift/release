@@ -19,7 +19,7 @@ function check_if_hypershift_env () {
     elif [ -f "${SHARED_DIR}/mgmt_kubeconfig" ]; then
         export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
     else
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="/tmp/kubeconfig"
     fi
 
     HYPERSHIFT_NAMESPACE=$(oc get hostedclusters -A -ojsonpath="{.items[?(@.metadata.name==\"$(cat ${SHARED_DIR}/cluster-name)\")].metadata.namespace}")

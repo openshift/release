@@ -536,8 +536,8 @@ function check_ota_case_enabled() {
     return 1
 }
 
-if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+if [[ -f "/tmp/kubeconfig" ]] ; then
+    export KUBECONFIG=/tmp/kubeconfig
 fi
 
 #support HyperShift upgrade

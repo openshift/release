@@ -4,10 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+if [ -f "/tmp/kubeconfig" ] ; then
+    export KUBECONFIG=/tmp/kubeconfig
 fi
-cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
+#cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
 if [ -f "${SHARED_DIR}/runtime_env" ] ; then
     source "${SHARED_DIR}/runtime_env"
