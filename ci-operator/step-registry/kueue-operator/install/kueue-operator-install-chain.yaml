@@ -1,0 +1,19 @@
+chain:
+  as: kueue-operator-install
+  steps:
+  - ref: kueue-operator-install-compute
+  - ref: kueue-operator-install-catalog
+  - as: run-sdk
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  - ref: kueue-operator-install-operator
+  documentation: |-
+    Install the kueue Operator for Red Hat OpenShift from a catalog source.
+    This chain includes image patching to use mirrored images in disconnected environments.
