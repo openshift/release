@@ -40,20 +40,6 @@ function wait_for_state() {
     return $?
 }
 
-function create_catalog () {
-    echo "Creating a custom catalog source using image: '$CATSRC_IMG'..."
-    oc apply -f - << EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: $CATSRC_NAME
-  namespace: openshift-marketplace
-spec:
-  sourceType: grpc
-  image: $CATSRC_IMG
-EOF
-}
-
 # Applicable for 'disconnected' env
 function check_mirror_registry () {
     if test -s "${SHARED_DIR}/mirror_registry_url" ; then
@@ -101,43 +87,82 @@ function mirror_catalog_and_operator() {
         echo "ERROR: MUST_GATHER_IMAGE not set by compute step"
         exit 1
     fi
+    
+    if [[ -z "${BUNDLE_IMAGE:-}" ]]; then
+        echo "ERROR: BUNDLE_IMAGE not set by compute step"
+        exit 1
+    fi
+
+    if [[ -z "${OPERATOR_IMAGE:-}" ]]; then
+        echo "ERROR: OPERATOR_IMAGE not set by compute step"
+        exit 1
+    fi
 
     echo "Using MUST_GATHER_IMAGE from compute step: ${MUST_GATHER_IMAGE}"
+    echo "Using BUNDLE_IMAGE from compute step: ${BUNDLE_IMAGE}"
+    echo "Using OPERATOR_IMAGE from compute step: ${OPERATOR_IMAGE}"
     
-    # For disconnected environments, the image will be mirrored to the mirror registry
-    # Set the mirrored image path for disconnected environments
+    # For disconnected environments, the images will be mirrored to the mirror registry
+    # Set the mirrored image paths for disconnected environments
     MIRRORED_MUST_GATHER_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather"
+    MIRRORED_BUNDLE_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-1-0"
+    MIRRORED_OPERATOR_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0"
+    
     echo "Mirrored MUST_GATHER_IMAGE for disconnected environment: ${MIRRORED_MUST_GATHER_IMAGE}"
-    # Update the environment variable to use the mirrored image for disconnected environments
-    echo "export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}" >> "${SHARED_DIR}/env"
+    echo "Mirrored BUNDLE_IMAGE for disconnected environment: ${MIRRORED_BUNDLE_IMAGE}"
+    echo "Mirrored OPERATOR_IMAGE for disconnected environment: ${MIRRORED_OPERATOR_IMAGE}"
+    
+    # Update the environment variables to use the mirrored images for disconnected environments
+    # Replace the original values with mirrored paths
+    sed -i "s|export MUST_GATHER_IMAGE=.*|export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}|" "${SHARED_DIR}/env"
+    sed -i "s|export BUNDLE_IMAGE=.*|export BUNDLE_IMAGE=${MIRRORED_BUNDLE_IMAGE}|" "${SHARED_DIR}/env"
+    sed -i "s|export OPERATOR_IMAGE=.*|export OPERATOR_IMAGE=${MIRRORED_OPERATOR_IMAGE}|" "${SHARED_DIR}/env"
 
-    echo "[$(timestamp)] Creating ImageSetConfiguration for catalog and operator related images..."
+    echo "[$(timestamp)] Creating ImageSetConfiguration for bundle and related images..."
     cat > ${TMP_DIR}/imageset.yaml << EOF
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
 mirror:
-  operators:
-  - catalog: ${CATSRC_IMG}
-    packages:
-    - name: openshift-cert-manager-operator
-    - name: kueue-operator
-      channels:
-      - name: stable-v1.0
-  additionalImages: # additional images used in e2e test code
-  - name: quay.io/openshift/origin-oauth-proxy:4.14
+  additionalImages: # bundle and related images
+  - name: ${BUNDLE_IMAGE}
   - name: ${MUST_GATHER_IMAGE}
+  - name: ${OPERATOR_IMAGE}
+  - name: quay.io/openshift/origin-oauth-proxy:4.14
 EOF
 
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
     run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
 
-    echo "[$(timestamp)] Replacing the generated catalog source name with the ENV var '$CATSRC_NAME'..."
-    run_command "curl -k -L -o yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') && chmod +x ./yq"
-    run_command "./yq eval '.metadata.name = \"$CATSRC_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/cs-*.yaml"
+    echo "[$(timestamp)] Setting up image mirroring for disconnected environment..."
+    run_command "oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: kueue-digest-mirrorset
+spec:
+  imageDigestMirrors:
+    - mirrors:
+        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
+      source: registry.redhat.io/kueue/kueue-rhel9-operator
+    - mirrors:
+        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
+      source: registry.redhat.io/kueue/kueue-rhel9
+EOF
 
-    echo "[$(timestamp)] Checking and applying the generated resource files..."
-    run_command "find ${OC_MIRROR_OUTPUT_DIR} -type f | xargs -I{} bash -c 'cat {}; echo \"---\"'"
-    run_command "oc apply -f ${OC_MIRROR_OUTPUT_DIR}"
+oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: kueue-mirrorset
+spec:
+  imageTagMirrors:
+    - mirrors:
+        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
+      source: registry.redhat.io/kueue/kueue-rhel9-operator
+    - mirrors:
+        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
+      source: registry.redhat.io/kueue/kueue-rhel9
+EOF"
 
     echo "[$(timestamp)] Waiting for the MachineConfigPool to finish rollout..."
     oc wait mcp --all --for=condition=Updating --timeout=5m || true
@@ -161,26 +186,6 @@ function tmp_prune_distruptive_resource() {
     echo "[$(timestamp)] Rollout progress completed"
 }
 
-function check_catalog_readiness () {
-    echo "Waiting the applied catalog source to become READY..."
-    if wait_for_state "catalogsource/${CATSRC_NAME}" "jsonpath={.status.connectionState.lastObservedState}=READY" "5m" "openshift-marketplace"; then
-        echo "CatalogSource is ready"
-    else
-        echo "Timed out after 5m. Dumping resources for debugging..."
-        run_command "oc get pod -n openshift-marketplace"
-        run_command "oc get event -n openshift-marketplace | grep ${CATSRC_NAME}"
-        exit 1
-    fi
-
-    echo "Storing the catalog source name to '${SHARED_DIR}/catsrc_name'..."
-    echo "${CATSRC_NAME}" > "${SHARED_DIR}"/catsrc_name
-}
-
-if [ -z "${CATSRC_IMG}" ]; then
-    echo "'CATSRC_IMG' is empty. Skipping catalog source creation..."
-    exit 0
-fi
-
 timestamp
 set_proxy
 
@@ -190,20 +195,16 @@ if test -s "${SHARED_DIR}/env" ; then
     source "${SHARED_DIR}/env"
 fi
 
-if [ "${MIRROR_OPERATORS}" == "true" ]; then
-    export TMP_DIR=/tmp/mirror-operators
-    export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
-    export XDG_RUNTIME_DIR="${TMP_DIR}/run"
-    mkdir -p "${XDG_RUNTIME_DIR}/containers"
-    cd "$TMP_DIR"
+export TMP_DIR=/tmp/mirror-operators
+export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
+export XDG_RUNTIME_DIR="${TMP_DIR}/run"
+mkdir -p "${XDG_RUNTIME_DIR}/containers"
+cd "$TMP_DIR"
 
-    check_mirror_registry
-    tmp_prune_distruptive_resource
-    configure_host_pull_secret
-    install_oc_mirror
-    mirror_catalog_and_operator
-else
-    create_catalog
-fi
+check_mirror_registry
+tmp_prune_distruptive_resource
+configure_host_pull_secret
+install_oc_mirror
+mirror_catalog_and_operator
 
 check_catalog_readiness 
