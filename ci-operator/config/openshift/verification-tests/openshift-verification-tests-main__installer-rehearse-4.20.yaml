@@ -58,6 +58,31 @@ tests:
     - chain: aws-provision-bastionhost
     test:
     - ref: cucushift-installer-wait
+- as: installer-rehearse-gcp-byo-priv-zone
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      PRIVATE_ZONE_PROJECT_TYPE: third-project
+      SLEEP_DURATION: 30m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-in-third-project-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-in-third-project-provision
+- as: installer-rehearse-gcp-byo-priv-zone2
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CREATE_PRIVATE_ZONE: "no"
+      PRIVATE_ZONE_PROJECT_TYPE: third-project
+      SLEEP_DURATION: 30m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-in-third-project-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-in-third-project-provision
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
