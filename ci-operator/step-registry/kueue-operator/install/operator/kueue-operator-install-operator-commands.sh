@@ -40,95 +40,30 @@ function wait_for_state() {
     return $?
 }
 
-function subscribe_operator () {
-    echo "Checking if the PackageManifests exist in the CatalogSource before installing the operators..."
+function install_operator_bundle () {
+    echo "Patching CSV to use mirrored operator image..."
     
-    # Check for cert-manager operator
-    cert_manager_output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CATSRC_NAME --field-selector=metadata.name=openshift-cert-manager-operator 2>&1)
-    if [[ $? -ne 0 ]] || echo "$cert_manager_output" | grep -q "No resources found"; then
-        echo "No cert-manager PackageManifest found. Skipping cert-manager installation..."
-    else
-        echo "Installing cert-manager operator..."
-        oc apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cert-manager-operator
----
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: cert-manager-operator-og
-  namespace: cert-manager-operator
-spec:
-  targetNamespaces: []
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: openshift-cert-manager-operator
-  namespace: cert-manager-operator
-spec:
-  channel: stable-v1
-  name: openshift-cert-manager-operator
-  source: $CATSRC_NAME
-  sourceNamespace: openshift-marketplace
-EOF
-
-        if wait_for_state "deployment/cert-manager-operator-controller-manager" "condition=Available" "5m" "cert-manager-operator"; then
-            echo "Cert-manager operator is ready"
-        else
-            echo "Timed out waiting for cert-manager operator. Dumping resources for debugging..."
-            run_command "oc get pod -n cert-manager-operator"
-            run_command "oc get event -n cert-manager-operator"
-            exit 1
-        fi
+    # Source environment variables from previous steps
+    if test -s "${SHARED_DIR}/env" ; then
+        echo "Sourcing environment variables from previous steps..."
+        source "${SHARED_DIR}/env"
     fi
-
-    # Check for kueue operator
-    kueue_output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CATSRC_NAME --field-selector=metadata.name=kueue-operator 2>&1)
-    if [[ $? -ne 0 ]] || echo "$kueue_output" | grep -q "No resources found"; then
-        echo "No kueue PackageManifest found. Skipping kueue installation..."
-        exit 0
+    
+    if [[ -z "${OPERATOR_IMAGE:-}" ]]; then
+        echo "ERROR: OPERATOR_IMAGE not set by previous steps"
+        exit 1
     fi
-
-    if [[ "$TARGET_NAMESPACES" == "!all" ]]; then
-        TARGET_NAMESPACES=""
-    fi
-
-    echo "Creating the Namespace, OperatorGroup and Subscription for the kueue operator installation..."
-    oc apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-kueue-operator
----
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: kueue-operator-group
-  namespace: openshift-kueue-operator
-spec:
-  targetNamespaces: [$TARGET_NAMESPACES]
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: kueue-operator
-  namespace: openshift-kueue-operator
-spec:
-  channel: $CHANNEL
-  name: kueue-operator
-  source: $CATSRC_NAME
-  sourceNamespace: openshift-marketplace
-EOF
-
+    
+    echo "Using OPERATOR_IMAGE: ${OPERATOR_IMAGE}"
+    
+    # Wait for the operator deployment to be ready (installed by run-sdk step)
     if wait_for_state "deployment/openshift-kueue-operator" "condition=Available" "5m" "openshift-kueue-operator"; then
-        echo "Kueue operator is ready"        
-        installedCSV=$(oc get subscription kueue-operator -n openshift-kueue-operator -o jsonpath='{.status.installedCSV}')
-        run_command "oc get csv $installedCSV -n openshift-kueue-operator"
-        run_command "oc get csv $installedCSV -n openshift-kueue-operator -o=jsonpath='{.spec.relatedImages}'"
-        echo
+        echo "Kueue operator is ready"
+    else
+        echo "Timed out waiting for kueue operator. Dumping resources for debugging..."
+        run_command "oc get pod -n openshift-kueue-operator"
+        run_command "oc get event -n openshift-kueue-operator"
+        exit 1
     fi
 
     # Wait for Kueue CRD to be available
@@ -140,20 +75,21 @@ EOF
         exit 1
     fi
 
-    # Wait for openshift-kueue-operator pod to be ready
-    echo "Waiting for openshift-kueue-operator pod to be ready..."
-    if wait_for_state "pod" "condition=Ready" "5m" "openshift-kueue-operator" "name=openshift-kueue-operator"; then
-        echo "openshift-kueue-operator pod is ready"
+    # Patch the CSV to use the mirrored operator image
+    echo "Patching CSV to use mirrored operator image..."
+    CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}')
+    if [[ -n "$CSV" ]]; then
+        echo "Patching CSV $CSV to use mirrored operator image..."
+        oc patch csv -n openshift-kueue-operator $CSV --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$OPERATOR_IMAGE\"}]"
+        echo "CSV patched successfully"
+    else
+        echo "WARNING: No CSV found to patch"
+        exit 1
     fi
 }
 
-if [ -s "${SHARED_DIR}/catsrc_name" ]; then
-    echo "Loading the catalog source name to use from the '${SHARED_DIR}/catsrc_name'..."
-    CATSRC_NAME=$(cat "${SHARED_DIR}"/catsrc_name)
-fi
-
 timestamp
 set_proxy
-subscribe_operator
+install_operator_bundle
 
-echo "[$(timestamp)] Succeeded in installing the kueue Operator for Red Hat OpenShift!" 
+echo "[$(timestamp)] Succeeded in installing the kueue Operator for Red Hat OpenShift!"
