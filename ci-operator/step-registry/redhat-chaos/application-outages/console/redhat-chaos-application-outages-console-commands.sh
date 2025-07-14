@@ -21,7 +21,6 @@ export KUBECONFIG=/tmp/config
 OPENSHIFT_PASSWORD="$(cat "$KUBEADMIN_PASSWORD_FILE")"
 console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
 export HEALTH_CHECK_URL=https://$console_url
-export HEALTH_CHECK_AUTH=("kubeadmin", "$OPENSHIFT_PASSWORD")
 
 set -o nounset
 set -o pipefail
