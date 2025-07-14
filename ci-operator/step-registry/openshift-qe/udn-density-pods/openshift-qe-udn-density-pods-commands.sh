@@ -63,7 +63,11 @@ EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --gc=false --iterations=${ITERATIONS} 
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
-./run.sh
+./run.sh || true
+
+# Check state of the run, since we disabled gc.
+for project in `oc get projects | grep udn | awk '{print $1}'`; do for client in `oc get pods -n $project | grep client | awk '{print $1}'`; do echo $project $client; oc describe -n $project pod $client;  done; done | tee ${ARTIFACT_DIR}/pod-describe-udn.out
+
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
