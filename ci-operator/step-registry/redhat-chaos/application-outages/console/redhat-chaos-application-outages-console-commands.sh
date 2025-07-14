@@ -18,7 +18,6 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 
-OPENSHIFT_PASSWORD="$(cat "$KUBEADMIN_PASSWORD_FILE")"
 console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
 export HEALTH_CHECK_URL=https://$console_url
 
