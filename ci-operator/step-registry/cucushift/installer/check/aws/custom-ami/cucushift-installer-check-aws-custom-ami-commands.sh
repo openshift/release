@@ -65,6 +65,11 @@ ic_control_plane_ami=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.amiID')
 ic_compute_ami=$(yq-go r "${CONFIG}" 'compute[0].platform.aws.amiID')
 echo "AMI in install-config: platform: [${ic_platform_ami}], controlPlane: [${ic_control_plane_ami}], compute: [${ic_compute_ami}]"
 
+if test -f "${SHARED_DIR}/proxy-conf.sh" 
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 # https://issues.redhat.com/browse/OCPBUGS-57348 Cluster manages bootimages despite explicit bootimages in installconfig
 machineset_ami=$(oc get machineset.machine.openshift.io -n openshift-machine-api -A -ojson | jq -r '.items[] | .spec.template.spec.providerSpec.value.ami.id' | sort | uniq)
 controlplanemachineset_ami=$(oc get controlplanemachineset.machine.openshift.io -n openshift-machine-api -A -ojson | jq -r '.items[] | .spec.template."machines_v1beta1_machine_openshift_io".spec.providerSpec.value.ami.id')
