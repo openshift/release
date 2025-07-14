@@ -1,27 +1,22 @@
 postsubmits:
-  openshift-priv/file-integrity-operator:
+  openshift/csi-external-snapshot-metadata:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.10$
-    cluster: build01
+    - ^release-4\.21$
     decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-priv-file-integrity-operator-release-4.10-images
-    path_alias: github.com/openshift/file-integrity-operator
+    name: branch-ci-openshift-csi-external-snapshot-metadata-release-4.21-images
+    path_alias: github.com/kubernetes-csi/external-snapshot-metadata
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
@@ -37,9 +32,6 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -54,9 +46,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
