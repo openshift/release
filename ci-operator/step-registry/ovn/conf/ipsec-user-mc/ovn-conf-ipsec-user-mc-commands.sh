@@ -10,11 +10,12 @@ fi
 
 # Check if the osImageURL is set
 if [ -z "${IPSEC_RHCOS_LAYERED_IMAGE:-}" ]; then
-    echo "There is no custom OS IMAGE URL which is required, exit 1."
-    exit 1
+    echo "There is NO IPSEC RHCOS Layered Image URL offered, then no need to apply MC, exit "
+    exit 0
 fi
 
 osCustomImageURL="${IPSEC_RHCOS_LAYERED_IMAGE}"
+echo "IPSEC_RHCOS_LAYERED_IMAGE is ${IPSEC_RHCOS_LAYERED_IMAGE}"
 
 apply_ipsec_user_ipsec_mc_config()
 {
