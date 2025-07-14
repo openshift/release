@@ -79,6 +79,6 @@ if [ $_apiReady -eq 0 ]; then
 fi
 echo "nfd-operator installed successfully"
 
-oc get csv -n openshift-nfd $CSVName -o jsonpath='{.metadata.annotations.alm-examples}' | jq '.[0]'  > /tmp/nodefeaturediscovery.json
+oc get csv -n openshift-nfd $CSVName -o jsonpath='{.metadata.annotations.alm-examples}' | jq '.[1]'  > /tmp/nodefeaturediscovery.json
 oc apply -f /tmp/nodefeaturediscovery.json
 oc wait nodefeaturediscovery -n openshift-nfd --for=condition=Available --timeout=15m --all

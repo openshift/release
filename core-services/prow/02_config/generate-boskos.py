@@ -6,11 +6,10 @@ import yaml
 CONFIG = {
 
     'aws-quota-slice': {
-        # Wild guesses.  We'll see when we hit quota issues
-        'us-east-1': 50,
-        'us-east-2': 35,
-        'us-west-1': 35,
-        'us-west-2': 35,
+        'us-east-1': 35,
+        'us-east-2': 30,
+        'us-west-1': 30,
+        'us-west-2': 30,
     },
     'aws-1-qe-quota-slice': {
         'us-east-1': 10,
@@ -89,6 +88,9 @@ CONFIG = {
     },
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
+    },
+    'metal-perfscale-osp-quota-slice': {
+        'metal-perfscale-osp-rdu2': 1,
     },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
@@ -555,9 +557,9 @@ for i in range(2,7):
 for i in range(1, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
-for i in range(4):
-    CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-{}'.format(i)] = 1
-
+for i in range(0, 2):
+    for j in range(4):
+        CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
