@@ -15,9 +15,15 @@ set_proxy() {
     echo "setting the proxy"
     echo "source ${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
+    export no_proxy=mirror.openshift.com,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
+    export NO_PROXY=mirror.openshift.com,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
   }
   echo "no proxy setting. skipping this step"
   return 0
+}
+
+timestamp() {
+  date -u --rfc-3339=seconds
 }
 
 # create ICSP for connected env.
@@ -64,8 +70,8 @@ check_mcp_status() {
     fi
   done
   if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
-    run_command "oc get mcp,node"
-    run_command "oc get mcp worker -o yaml"
+    run "oc get mcp,node"
+    run "oc get mcp worker -o yaml"
     return 1
   fi
 }
@@ -147,6 +153,127 @@ EOF
   return 0
 }
 
+# Applicable for 'disconnected' env
+check_mirror_registry() {
+  if test -s "${SHARED_DIR}/mirror_registry_url"; then
+    MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+    export MIRROR_REGISTRY_HOST
+    echo "Using mirror registry: ${MIRROR_REGISTRY_HOST}"
+  else
+    echo "This is not a disconnected environment as no mirror registry url set. Skipping rest of steps..."
+    exit 1
+  fi
+}
+
+# Applicable for 'disconnected' env
+function configure_host_pull_secret () {
+    echo "Retrieving the redhat, redhat stage, and mirror registries pull secrets from shared credentials..."
+    redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
+    redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
+    redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
+    redhat_registry_auth=$(echo -n " " "$redhat_auth_user":"$redhat_auth_password" | base64 -w 0)
+
+    mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
+    mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
+
+    echo "Appending the pull secrets to Podman auth configuration file '${XDG_RUNTIME_DIR}/containers/auth.json'..."
+    oc extract secret/pull-secret -n openshift-config --confirm --to ${TMP_DIR}
+    jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
+}
+
+# Applicable for 'disconnected' env
+install_oc_mirror() {
+  echo "Installing the latest oc-mirror client..."
+  run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
+  if ls /tmp/oc-mirror > /dev/null; then
+    chmod +x /tmp/oc-mirror
+  else
+    echo "ERROR: can not find oc-mirror"
+    exit 1
+  fi
+}
+
+extract_image_path() {
+  local image_string="$1"
+  # 1. Remove the 'quay.io/' prefix
+  # 2. Remove everything from '@' or ':' to the end
+  echo "$image_string" | sed 's|^quay.io/||' | sed 's|[@:].*||'
+}
+
+# Applicable for 'disconnected' env
+mirror_catalog_and_operator() {
+  echo "[$(timestamp)]create registry.conf"
+  cat <<EOF | tee "${XDG_RUNTIME_DIR}/containers/registries.conf"
+[[registry]]
+  location = "registry.redhat.io/compliance/openshift-file-integrity-operator-bundle"
+  insecure = true
+  blocked = false
+  mirror-by-digest-only = false
+  [[registry.mirror]]
+      location = "quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle-${TEST_TYPE}"
+      insecure = true
+[[registry]]
+ location = "registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator"
+ insecure = true
+ blocked = false
+ mirror-by-digest-only = false
+ [[registry.mirror]]
+    location = "quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-${TEST_TYPE}"
+    insecure = true
+EOF
+  cat "${XDG_RUNTIME_DIR}/containers/registries.conf"
+
+  echo "Try to mirror with oc-mirror v1"
+  skopeo copy "docker://${INDEX_IMAGE}" "oci://${TMP_DIR}/oci-local-catalog" --remove-signatures
+
+  echo "create ImageSetConfiguration"
+cat <<EOF |tee "/${TMP_DIR}/imageset-config.yaml"
+kind: ImageSetConfiguration
+apiVersion: mirror.openshift.io/v1alpha2
+storageConfig:
+  local:
+    path: mirror
+mirror:
+  operators:
+  - catalog: "oci://${TMP_DIR}/oci-local-catalog"
+    targetCatalog: ${TARGET_CATALOG}
+    targetTag: "latest"
+EOF
+  run "/tmp/oc-mirror --config=${TMP_DIR}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${XDG_RUNTIME_DIR}/containers/registries.conf --continue-on-error --skip-missing"
+}
+
+function create_icsp_disconnected() {
+cat << EOF | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: ${CATALOG_SOURCE_NAME}
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/compliance
+    source: registry.redhat.io/compliance
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads
+    source: quay.io/redhat-user-workloads
+EOF
+}
+# Applicable for 'disconnected' env
+# Note: This is a temporary workaround to avoid the disruptive impact of the 'enable-qe-catalogsource-disconnected' step.
+# As per current implementation, that step is called by every 'disconnected' cluster provisioning workflow that maintained by QE.
+# Hence this function can be removed in future once above mentioned design is well refined.
+function tmp_prune_distruptive_resource() {
+  echo "Pruning the disruptive resources in pervious step 'enable-qe-catalogsource-disconnected'..."
+  run "oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found"
+  run "oc delete imagecontentsourcepolicy image-policy-aosqe --ignore-not-found"
+  run "oc delete imagedigestmirrorset image-policy-aosqe --ignore-not-found"
+
+  echo "[$(timestamp)] Waiting for the MachineConfigPool to finish rollout..."
+  oc wait mcp --all --for=condition=Updating --timeout=5m || true
+  oc wait mcp --all --for=condition=Updated --timeout=20m || true
+  echo "[$(timestamp)] Rollout progress completed"
+}
+
 main() {
   echo "Enabling konflux catalogsource"
   set_proxy
@@ -154,23 +281,64 @@ main() {
   run "oc whoami"
   run "oc version -o yaml"
 
-  create_icsp_connected || {
-    echo "failed to create imagecontentsourcepolicies. resolve the above errors"
-    return 1
-  }
+  if [ "${MIRROR_OPERATORS}" == "true" ]; then
+    export TMP_DIR=/tmp/mirror-operators
+    export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
+    export XDG_RUNTIME_DIR="${TMP_DIR}/run"
+    target_catalog=$(extract_image_path "${INDEX_IMAGE}")
+    export TARGET_CATALOG=${target_catalog}
+    mkdir -p "${XDG_RUNTIME_DIR}/containers"
+    cd "$TMP_DIR"
 
-  check_mcp_status || {
-    echo "failed to check mcp status. resolve the above errors"
-  }
+    check_mirror_registry || {
+      echo "failed to get mirror registry. resolve the above errors"
+      return 1
+    }
 
-  check_marketplace || {
-    echo "failed to check marketplace. resolve the above errors"
-    return 1
-  }
+    configure_host_pull_secret || {
+      echo "failed to configure pull secret on the host. resolve the above errors"
+      return 1
+    }
 
-  if [[ -z "${INDEX_IMAGE}" ]]; then
-    echo "'INDEX_IMAGE' is empty. Skipping catalog source creation..."
-    exit 0
+    tmp_prune_distruptive_resource || {
+      echo "failed to prune distruptive resources. resolve the above errors"
+      return 1
+    }
+
+    install_oc_mirror || {
+      echo "failed to install oc mirror. resolve the above errors"
+      return 1
+    }
+
+    mirror_catalog_and_operator || {
+      echo "failed to mirror catalog and operator. resolve the above errors"
+      return 1
+    }
+    create_icsp_disconnected || {
+       echo "failed to create icsp for disconnected env. resolve the above errors"
+      return 1
+    }
+    check_mcp_status || {
+      echo "failed to check mcp status. resolve the above errors"
+    }
+  else
+    create_icsp_connected || {
+      echo "failed to create imagecontentsourcepolicies. resolve the above errors"
+      return 1
+    }
+
+    check_mcp_status || {
+      echo "failed to check mcp status. resolve the above errors"
+    }
+    check_marketplace || {
+      echo "failed to check marketplace. resolve the above errors"
+      return 1
+    }
+
+    if [[ -z "${INDEX_IMAGE}" ]]; then
+      echo "'INDEX_IMAGE' is empty. Skipping catalog source creation..."
+      exit 0
+    fi
   fi
 
   create_catalog_sources || {
