@@ -50,7 +50,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
+    tag: release
   tests-private:
     name: tests-private
     namespace: ci
@@ -1251,6 +1251,31 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: rosa-lifecycle-private-advanced
+- as: aws-rosa-hcp-private-proxy-int-full-f7
+  cron: 35 16 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.19"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hcp-private-proxy
+- as: aws-rosa-hcp-private-proxy-stage-full-f7
+  cron: 46 22 2,11,18,25 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      OPENSHIFT_VERSION: "4.19"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-rosa-hcp-shared-vpc-advanced-f7
   cron: 6 22 4,13,20,27 * *
   steps:
