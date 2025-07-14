@@ -56,7 +56,7 @@ nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 for node in $nodes; do
     dd if=kata-containers.rpm | oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
     OUTPUT=$(oc debug -n default "${node}" -- sh -c "md5sum  /host/var/local/kata-containers.rpm")
-    if [ "${KATA_RPM_MD5SUM}" != $(echo ${OUTPUT} | cut -d ' ' -f1) ]; then
+    if [ "${KATA_RPM_MD5SUM}" != "$(echo ${OUTPUT} | cut -d ' ' -f1)" ]; then
         FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
     fi
 done
