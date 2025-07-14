@@ -152,6 +152,34 @@ tests:
     - ref: openshift-instaslice-operator-e2e-kind
     test:
     - ref: openshift-instaslice-operator-e2e-kind-test
+- as: e2e-ocp-gcp-gpu
+  steps:
+    cluster_profile: gcp
+    env:
+      GPU_COMPUTE_NODE_REPLICAS: "1"
+      GPU_COMPUTE_NODE_TYPE: a2-highgpu-1g
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-gpu-computing-node
+    - ref: ipi-conf-gcp-gpu-on-host-maintenance
+    - chain: ipi-install
+    test:
+    - ref: instaslice-operator-bundle
+    - as: e2e-gcp
+      cli: latest
+      commands: |
+        make deploy-cert-manager-ocp
+        make deploy-nfd-ocp
+        make deploy-nvidia-ocp
+        make test-e2e-ocp
+      from: instaslice-base-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
 zz_generated_metadata:
   branch: next
   org: openshift
