@@ -125,7 +125,7 @@ ExecStart=/usr/bin/podman run --name "squid-proxy" \
 -v /srv/squid/etc:/etc/squid:Z \
 -v /srv/squid/cache:/var/spool/squid:Z \
 -v /srv/squid/log:/var/log/squid:Z \
-quay.io/coreos/squid
+quay.io/openshifttest/squid-proxy:4.13-fc31
 
 ExecReload=-/usr/bin/podman stop "squid-proxy"
 ExecReload=-/usr/bin/podman rm "squid-proxy"
