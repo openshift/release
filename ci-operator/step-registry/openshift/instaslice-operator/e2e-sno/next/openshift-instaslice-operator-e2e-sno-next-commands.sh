@@ -41,6 +41,37 @@ echo "Deploying node feature discovery nfd-operator for ocp"
 make deploy-nfd-ocp
 echo "Deploying nvidia-gpu-operator for ocp"
 make deploy-nvidia-ocp
+
+echo "Creating ClusterRole 'dasoperator-viewer-cluster-wide'..."
+cat <<EOF | oc apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dasoperator-viewer-cluster-wide
+rules:
+- apiGroups: ["inference.redhat.com"]
+  resources: ["dasoperators"]
+  verbs: ["get", "list", "watch"]
+EOF
+echo "ClusterRole 'dasoperator-viewer-cluster-wide' created."
+
+echo "Creating ClusterRoleBinding 'e2e-sno-gpu-dasoperator-viewer-cluster-binding' for ServiceAccount 'e2e-sno-gpu' in namespace '${NAMESPACE}'..."
+cat <<EOF | oc apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: e2e-sno-gpu-dasoperator-viewer-cluster-binding
+subjects:
+- kind: ServiceAccount
+  name: e2e-sno-gpu
+  namespace: ${NAMESPACE}
+roleRef:
+  kind: ClusterRole
+  name: dasoperator-viewer-cluster-wide
+  apiGroup: rbac.authorization.k8s.io
+EOF
+echo "ClusterRoleBinding 'e2e-sno-gpu-dasoperator-viewer-cluster-binding' created."
+
 echo "Deploying instaslice-operator"
 make deploy-das-ocp
 echo "Running e2e tests"
