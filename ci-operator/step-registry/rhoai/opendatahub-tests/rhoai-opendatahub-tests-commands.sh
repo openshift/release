@@ -47,6 +47,10 @@ if [ -n "${TEST_SELECTORS}" ]; then
     RUN_COMMAND+=" -k ${TEST_SELECTORS} "
 fi
 
+if [ "${STOP_ON_FAILURE}" = "false" ]; then
+    RUN_COMMAND+=" || true "
+fi
+
 echo "$RUN_COMMAND"
 
 ${RUN_COMMAND}
