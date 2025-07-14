@@ -1,17 +1,17 @@
 presubmits:
-  openshift/kubernetes-sigs-kueue:
+  openshift/csi-external-snapshot-metadata:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.21$
-    - ^release-4\.21-
-    cluster: build04
+    - ^release-4\.20$
+    - ^release-4\.20-
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-4.21-images
+    name: pull-ci-openshift-csi-external-snapshot-metadata-release-4.20-images
+    path_alias: github.com/kubernetes-csi/external-snapshot-metadata
     rerun_command: /test images
     spec:
       containers:
@@ -20,7 +20,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,23 +56,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.21$
-    - ^release-4\.21-
-    cluster: build04
-    context: ci/prow/integration
+    - ^release-4\.20$
+    - ^release-4\.20-
+    context: ci/prow/unit
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-4.21-integration
-    rerun_command: /test integration
+    name: pull-ci-openshift-csi-external-snapshot-metadata-release-4.20-unit
+    path_alias: github.com/kubernetes-csi/external-snapshot-metadata
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=integration
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -106,27 +105,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.21$
-    - ^release-4\.21-
-    cluster: build04
-    context: ci/prow/test
+    - ^release-4\.20$
+    - ^release-4\.20-
+    context: ci/prow/verify-commits
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-4.21-test
-    rerun_command: /test test
+    name: pull-ci-openshift-csi-external-snapshot-metadata-release-4.20-verify-commits
+    path_alias: github.com/kubernetes-csi/external-snapshot-metadata
+    rerun_command: /test verify-commits
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=test
+        - --target=verify-commits
         command:
         - ci-operator
         image: ci-operator:latest
@@ -159,27 +158,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify-commits,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.21$
-    - ^release-4\.21-
-    cluster: build04
-    context: ci/prow/vet
+    - ^release-4\.20$
+    - ^release-4\.20-
+    context: ci/prow/verify-deps
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-4.21-vet
-    rerun_command: /test vet
+    name: pull-ci-openshift-csi-external-snapshot-metadata-release-4.20-verify-deps
+    path_alias: github.com/kubernetes-csi/external-snapshot-metadata
+    rerun_command: /test verify-deps
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=vet
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=verify-deps
         command:
         - ci-operator
         image: ci-operator:latest
@@ -189,6 +189,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -203,6 +206,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -212,4 +218,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )vet,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
