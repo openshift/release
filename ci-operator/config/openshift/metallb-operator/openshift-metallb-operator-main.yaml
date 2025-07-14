@@ -23,10 +23,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
-  operator-sdk:
-    name: "4.19"
-    namespace: origin
-    tag: operator-sdk
 build_root:
   from_repository: true
 images:
@@ -94,13 +90,15 @@ tests:
       commands: |
         oc create namespace openshift-metallb-operator
         oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
-        operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
+        make operator-sdk
+        ./_cache/operator-sdk version
+        ./_cache/operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
         oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
       dependencies:
       - env: OO_BUNDLE
         name: operatorbundle
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
