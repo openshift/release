@@ -1992,6 +1992,26 @@ tests:
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: aws-ipi-disconnected-private-f999-file-integrity
+  cron: 8 8 2 9 *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      MIRROR_OPERATORS: "true"
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-19:latest
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&; ~ConnectedOnly&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: baremetalds-ipi-ovn-lvms-f14-security-profiles
   cluster: build05
   cron: 23 3 7,23 * *
