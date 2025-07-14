@@ -4,6 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+set -x # Turn on command tracing
+
 # read the secrets and login as the user
 export TEST_USER_CLIENT_ID; TEST_USER_CLIENT_ID=$(cat /var/run/hcp-integration-credentials/client-id)
 export TEST_USER_CLIENT_SECRET; TEST_USER_CLIENT_SECRET=$(cat /var/run/hcp-integration-credentials/client-secret)
@@ -30,6 +32,10 @@ export RESOURCE_GROUP_RESOURCE_ID; RESOURCE_GROUP_RESOURCE_ID="${SUBSCRIPTION_RE
 export CLUSTER_RESOURCE_ID; CLUSTER_RESOURCE_ID="${RESOURCE_GROUP_RESOURCE_ID}/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/${CLUSTER_NAME}"
 export NODE_POOL_RESOURCE_ID; NODE_POOL_RESOURCE_ID="${CLUSTER_RESOURCE_ID}/nodePools/${NP_NAME}"
 
+# creating this file so that we can see if the delete-all-tracked-* steps
+mkdir -p "${SHARED_DIR}/tracked-resource-groups"
+touch "${SHARED_DIR}/tracked-resource-groups/${CUSTOMER_RG_NAME}"
+ls -al "${SHARED_DIR}/tracked-resource-groups"
 
 az group create \
   --name "${CUSTOMER_RG_NAME}" \
