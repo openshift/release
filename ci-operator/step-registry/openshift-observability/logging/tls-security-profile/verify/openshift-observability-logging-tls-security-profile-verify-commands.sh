@@ -12,11 +12,18 @@ interval=5
 found=false
 
 for ((i=1; i<=retries; i++)); do
-  if oc get apiserver cluster &>/dev/null; then
+  echo "[$i/$retries] Checking if APIServer is available..."
+
+  if output=$(oc get apiserver cluster 2>&1); then
+    echo "$output"
     echo "APIServer is available."
     found=true
     break
+  else
+    echo "$output"
+    echo "APIServer not available. Retrying in $interval seconds..."
   fi
+
   sleep "$interval"
 done
 
