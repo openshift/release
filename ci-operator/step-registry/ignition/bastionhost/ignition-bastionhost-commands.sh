@@ -103,6 +103,7 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+cache deny all
 ${proxy_dns_config}
 EOF
 
