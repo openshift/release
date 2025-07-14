@@ -22,27 +22,27 @@ items:
       images:
       - from:
           kind: ImageStreamTag
-          name: 4.12:cli
+          name: 4.19:cli
           namespace: ocp
         paths:
         - destinationDir: .
           sourcePath: /usr/bin/oc
       - from:
           kind: ImageStreamTag
-          name: 4.12:installer
+          name: 4.19:installer
           namespace: ocp
         paths:
         - destinationDir: .
-          sourcePath: /bin/openshift-install
+          sourcePath: /usr/bin/openshift-install
       - from:
           kind: ImageStreamTag
-          name: 4.12:hypershift-operator
-          namespace: ocp
+          name: 4.19:hypershift-operator
+          namespace: hypershift
         paths:
         - destinationDir: .
-          sourcePath: /bin/hypershift
+          sourcePath: /usr/bin/hypershift
       dockerfile: |
-        FROM quay.io/centos/centos:stream8
+        FROM quay.io/centos/centos:stream9
         LABEL maintainer="nmoraiti@redhat.com"
 
         ARG JQ_VERSION=1.6
@@ -61,9 +61,8 @@ items:
     strategy:
       dockerStrategy:
         from:
-          kind: ImageStreamTag
-          name: centos:stream8
-          namespace: origin
+          kind: DockerImage
+          name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:
@@ -74,17 +73,17 @@ items:
       imageChange:
         from:
           kind: ImageStreamTag
-          name: 4.12:cli
+          name: 4.19:cli
           namespace: ocp
     - type: ImageChange
       imageChange:
         from:
           kind: ImageStreamTag
-          name: 4.12:installer
+          name: 4.19:installer
           namespace: ocp
     - type: ImageChange
       imageChange:
         from:
           kind: ImageStreamTag
-          name: 4.12:hypershift-operator
-          namespace: ocp
+          name: 4.19:hypershift-operator
+          namespace: hypershift
