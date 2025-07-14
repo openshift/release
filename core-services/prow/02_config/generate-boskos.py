@@ -557,9 +557,9 @@ for i in range(2,7):
 for i in range(1, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
-for i in range(4):
-    CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-{}'.format(i)] = 1
-
+for i in range(0, 2):
+    for j in range(4):
+        CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
