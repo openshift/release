@@ -260,6 +260,8 @@ metadata:
   name: ${CLUSTER_NAME}
 platform:
   none: {}
+bootstrapInPlace:
+  installationDisk: "/dev/sdb"
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -299,8 +301,18 @@ done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.ya
 
 ### Create Ignition configs
 echo -e "\nCreating Ignition configs..."
-oinst create ignition-configs
+oinst create single-node-ignition-config
 export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
+
+CONSOLE="ttyS1,115200n8"
+b64_pre=$(jq -r '.storage.files[] | select( .path == "/usr/local/bin/install-to-disk.sh" ).contents.source' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign | cut -d"," -f2)
+b64_new=$(echo "${b64_pre}" | base64 -d | \
+  sed -e 's/^\(.*coreos-installer install.*\)$/\1 --delete-karg console=ttyS0,115200n8 --append-karg console='"${CONSOLE}"' --insecure-ignition --copy-network\n  echo "Adding UEFI boot entry for Red Hat CoreOS"\n  efibootmgr -c -d \/dev\/sdb -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shimx64.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | \
+  base64 -w0)
+sed -i -e 's/'"${b64_pre}"'/'"${b64_new}"'/g' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign
+
+mv ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign ${INSTALL_DIR}/bootstrap.ign
+chmod 644 ${INSTALL_DIR}/bootstrap.ign
 
 echo -e "\nPreparing firstboot ignitions for sync..."
 cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
@@ -344,7 +356,7 @@ if ! wait $!; then
   exit 1
 fi
 
-destroy_bootstrap &
+# destroy_bootstrap &
 approve_csrs &
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
