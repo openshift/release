@@ -4,12 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "SHARED_DIR before sourcing: ${SHARED_DIR}"
 source "${SHARED_DIR}/nutanix_context.sh"
+echo "SHARED_DIR after sourcing: ${SHARED_DIR}"
 
 CR_DIR="/tmp/credentials_request"
 mkdir -p "${CR_DIR}"
 
 MANIFEST_PREFIX="${SHARED_DIR}/manifest"
+echo "MANIFEST_PREFIX: ${MANIFEST_PREFIX}"
 
 # Create the Nutanix credentials secret
 cat > ${SHARED_DIR}/credentials <<EOF
@@ -21,6 +24,23 @@ credentials:
       password: ${NUTANIX_PASSWORD}
     prismElements: null
 EOF
+echo "Created credentials file at ${SHARED_DIR}/credentials"
+
+
+if [[ "${HIVE_NUTANIX_RESOURCE}" == "true" ]]; then
+  pushd "${SHARED_DIR}"
+  mkdir -p hive-manifests
+
+  HIVE_MANIFEST_DIR="${SHARED_DIR}/hive-manifests"
+  if [[ -d "${HIVE_MANIFEST_DIR}" ]]; then
+    echo "Directory ${HIVE_MANIFEST_DIR} created successfully or already exists."
+  else
+    echo "Failed to create directory ${HIVE_MANIFEST_DIR}."
+    exit 1
+  fi
+
+  popd
+fi
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
@@ -91,5 +111,12 @@ pushd "/tmp/manifests"
 for FILE in *.yaml; do
   echo "Copying ${FILE} to ${MANIFEST_PREFIX}"
   cp "${FILE}" "${MANIFEST_PREFIX}_${FILE}"
+  if [[ "${HIVE_NUTANIX_RESOURCE}" == "true" ]]; then
+    echo "Copying ${FILE} to ${HIVE_MANIFEST_DIR}"
+    cp "${FILE}" "${HIVE_MANIFEST_DIR}/${FILE}"
+  fi
 done
 popd
+
+echo "$(date -u --rfc-3339=seconds) - Hive Manifest files created successfully, listing them:"
+ls -l "${HIVE_MANIFEST_DIR}"
