@@ -225,7 +225,6 @@ EOF_JUNIT_FAILURE
 function droute_send() {
   which droute && droute version
   droute send --url="$(< /var/run/datarouter/dataroute)" \
-              --verbose --wirelog \
               --username="$(< /var/run/datarouter/username)" \
               --password="$(< /var/run/datarouter/password)" \
               --metadata="$DATAROUTER_JSON" \
