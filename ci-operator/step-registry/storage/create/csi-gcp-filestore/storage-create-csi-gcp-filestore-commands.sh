@@ -16,14 +16,10 @@ then
 fi
 
 CLUSTER_NAME="$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)"
-if [[ -s "${SHARED_DIR}/xpn.json" ]]
+if [[ -s "${SHARED_DIR}/install-config.yaml" ]]
 then
-	echo "Reading variables from 'xpn_project_setting.json'..."
-	cat ${CLUSTER_PROFILE_DIR}/xpn_project_setting.json
-	HOST_PROJECT=$(jq -r '.hostProject' "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json")
-	HOST_PROJECT_NETWORK=$(jq -r '.clusterNetwork' "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json")
-	NETWORK=$(basename ${HOST_PROJECT_NETWORK})
-	NETWORK_NAME=projects/${HOST_PROJECT}/global/networks/${NETWORK}
+	echo "Getting NETWORK_NAME from install-config"
+	NETWORK_NAME=$(yq-go r "${SHARED_DIR}"/install-config.yaml 'platform.gcp.network')
 else 
 	NETWORK_NAME="$CLUSTER_NAME-network"
 fi
