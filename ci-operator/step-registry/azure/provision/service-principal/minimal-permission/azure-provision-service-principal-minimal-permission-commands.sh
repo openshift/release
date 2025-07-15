@@ -43,14 +43,14 @@ function run_cmd_with_retries_save_output()
 
 function run_cmd_with_retries()
 {
-    local cmd="$1" retries="${2:-}"
+    local cmd="$1" retries="${2}" print_cmd="${3:-${cmd}}"
     local try=0 ret=0
     [[ -z ${retries} ]] && max="20" || max=${retries}
-    echo "Trying ${max} times max to run '${cmd}'"
+    echo "Trying ${max} times max to run '${print_cmd}'"
 
     res=$(eval "${cmd}") || ret=$?
     while [[ ${ret} -ne 0 || -z "${res}" ]] && [ ${try} -lt ${max} ]; do
-        echo "'${cmd}' did not return success or return empty, waiting 60 sec....."
+        echo "'${print_cmd}' did not return success or return empty, waiting 60 sec....."
         sleep 60
         try=$(( try + 1 ))
         ret=0
@@ -147,9 +147,14 @@ EOF
     # ensure that role assignment creation is successful
     echo "Ensure that role ${role_name} assigned successfully"
     cmd="az role assignment list --role '${role_name}'"
-    run_cmd_with_retries "${cmd}"
+    run_cmd_with_retries "${cmd}" 20
 
     if [[ "${role_name}" == "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
         az role assignment list --assignee ${sp_app_id} --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
     fi
+
+    # ensure that new service principal can be login successfully
+    echo "Login with new service principal to ensure that new SP works well"
+    cmd="az login --service-principal -u ${sp_app_id} -p ${sp_password} --tenant ${sp_tenant}"
+    run_cmd_with_retries "${cmd}" 10 "az login --service-principal"
 done
