@@ -1,0 +1,188 @@
+base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.21"
+    namespace: origin
+    tag: operator-sdk
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+  to: compliance-operator
+operator:
+  bundles:
+  - as: compliance-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/compliance-operator/compliance-operator:1.7.0
+    with: pipeline:compliance-operator
+  - pullspec: quay.io/compliance-operator/compliance-operator:latest
+    with: pipeline:compliance-operator
+promotion:
+  to:
+  - name: "4.21"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: go-build
+  commands: make
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-aws
+  skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-rosa
+  optional: true
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BYO_OIDC: "true"
+      CHANNEL_GROUP: stable
+      ENABLE_BILLING_ACCOUNT: "yes"
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.15"
+      REGION: us-east-2
+    test:
+    - ref: ipi-install-rbac
+    - as: test-rosa
+      cli: latest
+      commands: oc adm wait-for-stable-cluster --minimum-stable-period 5m --timeout
+        30m; make e2e-rosa
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
+- as: e2e-bundle-aws
+  optional: true
+  run_if_changed: ^(config|bundle)
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-compliance
+        operator-sdk run bundle --security-context-config restricted -n openshift-compliance "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-compliance deployment compliance-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: compliance-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-bundle
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-compliance TEST_OPERATOR_NAMESPACE=openshift-compliance
+        make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-bundle-aws-upgrade
+  optional: true
+  run_if_changed: ^(config|bundle)
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-compliance
+        operator-sdk run bundle --security-context-config restricted -n openshift-compliance quay.io/compliance-operator/compliance-operator-bundle:latest
+        oc wait --timeout=10m --for condition=Available -n openshift-compliance deployment compliance-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --security-context-config restricted -n openshift-compliance "$OO_BUNDLE"
+        oc wait --timeout=10m --for condition=Available -n openshift-compliance deployment compliance-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: compliance-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-compliance TEST_OPERATOR_NAMESPACE=openshift-compliance
+        make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: ComplianceAsCode
+  repo: ocp4e2e
