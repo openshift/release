@@ -152,12 +152,16 @@ function generate_metadata() {
                 "value": "${BUILD_ID}"
               },
               {
+                "key": "jobname",
+                "value": "${JOB_NAME_SAFE}"
+              },
+              {
                 "key": "namespace",
                 "value": "${NAMESPACE}"
               },
               {
-                "key": "jobname",
-                "value": "${JOB_NAME_SAFE}"
+                "key": "uploadfrom",
+                "value": "prow"
               }
             ],
             "description": "https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
@@ -221,7 +225,6 @@ EOF_JUNIT_FAILURE
 function droute_send() {
   which droute && droute version
   droute send --url="$(< /var/run/datarouter/dataroute)" \
-              --verbose --wirelog \
               --username="$(< /var/run/datarouter/username)" \
               --password="$(< /var/run/datarouter/password)" \
               --metadata="$DATAROUTER_JSON" \
