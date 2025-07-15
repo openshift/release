@@ -28,17 +28,20 @@ resources:
       memory: 200Mi
 tests:
 - as: integration-tests
-  optional: true
   steps:
     cluster_profile: aws
     test:
     - as: run-integration-tests
       cli: latest
-      command: |
+      commands: |
         short_sha=$(git rev-parse --short HEAD)
         USER=netobserv VERSION=$short_sha make commands
-        #TODO: download ginkgo
-        ginkgo e2e/integration-tests
+        tmpHome=$USER/home
+        mkdir -p $tmpHome
+        export GOBIN=$PATH:$tmpHome
+        # download the ginkgo cli binary
+        go install
+        ginkgo e2e/integration-tests --junit-report="${ARTIFACT_DIR}/junit/report.xml"
       from: src
       resources:
         requests:
