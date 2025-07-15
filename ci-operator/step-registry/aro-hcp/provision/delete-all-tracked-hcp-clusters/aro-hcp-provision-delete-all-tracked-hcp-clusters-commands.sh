@@ -13,6 +13,8 @@ export TEST_USER_TENANT_ID; TEST_USER_TENANT_ID=$(cat /var/run/hcp-integration-c
 az login --service-principal -u "${TEST_USER_CLIENT_ID}" -p "${TEST_USER_CLIENT_SECRET}" --tenant "${TEST_USER_TENANT_ID}"
 
 # iterate over every tracked resource group
+mount
+ls -al "${SHARED_DIR}"
 ls -al "${SHARED_DIR}"/tracked-resource-groups
 for file in "${SHARED_DIR}"/tracked-resource-groups/*; do
     if [ -f "$file" ]; then

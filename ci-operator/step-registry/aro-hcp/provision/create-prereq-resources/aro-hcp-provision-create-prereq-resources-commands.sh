@@ -33,6 +33,7 @@ export CLUSTER_RESOURCE_ID; CLUSTER_RESOURCE_ID="${RESOURCE_GROUP_RESOURCE_ID}/p
 export NODE_POOL_RESOURCE_ID; NODE_POOL_RESOURCE_ID="${CLUSTER_RESOURCE_ID}/nodePools/${NP_NAME}"
 
 # creating this file so that we can see if the delete-all-tracked-* steps
+mount
 mkdir -p "${SHARED_DIR}/tracked-resource-groups"
 touch "${SHARED_DIR}/tracked-resource-groups/${CUSTOMER_RG_NAME}"
 ls -al "${SHARED_DIR}/tracked-resource-groups"
