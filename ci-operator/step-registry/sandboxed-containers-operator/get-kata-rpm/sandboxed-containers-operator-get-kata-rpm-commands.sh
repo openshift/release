@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Download and copy the kata containers RPM to /host/var/local/kata-containers.rpm
 # on each worker node. The RPM is going to be installed by the test automation code.
@@ -39,7 +39,7 @@ ls -l kata-containers.rpm || true
 # file kata-containers.rpm would show that it is a valid rpm
 
 # checks for a bad URL
-grep -q 'URL was not found' kata-containers.rpm
+grep 'URL was not found' kata-containers.rpm
 if [ $? -eq 0 ]; then
     echo "ERROR: curl couldn't find ${KATA_RPM_BUILD_URL}"
     # show the 1st 20 lines of the file
@@ -49,6 +49,7 @@ fi
 
 # calculate checksum
 KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
+echo $KATA_RPM_MD5SUM
 
 # Upload and verify
 FAILED_NODES=""
@@ -57,6 +58,7 @@ for node in $nodes; do
     dd if=kata-containers.rpm | oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
     OUTPUT=$(oc debug -n default "${node}" -- sh -c "md5sum  /host/var/local/kata-containers.rpm")
     if [ "${KATA_RPM_MD5SUM}" != "$(echo ${OUTPUT} | cut -d ' ' -f1)" ]; then
+        echo $OUTPUT
         FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
     fi
 done
