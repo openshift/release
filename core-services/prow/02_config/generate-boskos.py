@@ -6,11 +6,10 @@ import yaml
 CONFIG = {
 
     'aws-quota-slice': {
-        # Wild guesses.  We'll see when we hit quota issues
-        'us-east-1': 50,
-        'us-east-2': 35,
-        'us-west-1': 35,
-        'us-west-2': 35,
+        'us-east-1': 35,
+        'us-east-2': 30,
+        'us-west-1': 30,
+        'us-west-2': 30,
     },
     'aws-1-qe-quota-slice': {
         'us-east-1': 10,
@@ -48,7 +47,7 @@ CONFIG = {
         'us-east-2': 2,
     },
     'aws-sd-qe-quota-slice': {
-        'us-west-2': 3,
+        'us-west-2': 10,
     },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
@@ -89,6 +88,9 @@ CONFIG = {
     },
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
+    },
+    'metal-perfscale-osp-quota-slice': {
+        'metal-perfscale-osp-rdu2': 1,
     },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
@@ -521,8 +523,9 @@ CONFIG = {
     'aws-ip-pools-us-east-1': {
         'default': 256,
     },
-    'observability-aws-quota-slice': {
-        'default': 50,
+    'aws-observability-quota-slice': {
+        'us-east-1': 25,
+        'us-east-2': 25,
     },
     'aro-redhat-tenant-quota-slice': {
         'default': 1,
@@ -550,16 +553,13 @@ CONFIG = {
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-# Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
-for i in range(3):
+# Excluding Mihawk0 from lease pool due to S2S migration
+for i in range(1, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
-# Reserve one for internal debugging use
-del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-0-3']
-
-for i in range(4):
-    CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-{}'.format(i)] = 1
-
+for i in range(0, 2):
+    for j in range(4):
+        CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 

@@ -7,7 +7,15 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 
 declare ICSP_NAME=${TEMPO_ICSP_NAME}
 declare CATALOG_SOURCE=${TEMPO_CATALOG_SOURCE}
-declare DT_INDEX_IMAGE=${TEMPO_INDEX_IMAGE}
+declare DT_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE}
+
+# Check if DT_INDEX_IMAGE is not empty
+if [[ -z "$DT_INDEX_IMAGE" ]]; then
+    echo "Error: DT_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "DT_INDEX_IMAGE is set to: $DT_INDEX_IMAGE"
+fi
 
 set_proxy() {
 	[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
@@ -114,9 +122,27 @@ create_icsp_connected() {
     name: $ICSP_NAME
   spec:
     repositoryDigestMirrors:
-    - mirrors:
-      - registry.stage.redhat.io
-      source: registry.redhat.io
+    - source: registry.redhat.io/rhosdt/tempo-rhel8-operator
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-operator
+    - source: registry.redhat.io/rhosdt/tempo-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo
+    - source: registry.redhat.io/rhosdt/tempo-query-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-query
+    - source: registry.redhat.io/rhosdt/tempo-jaeger-query-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-jaeger-query
+    - source: registry.redhat.io/rhosdt/tempo-gateway-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-gateway
+    - source: registry.redhat.io/rhosdt/tempo-gateway-opa-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-opa
+    - source: registry.redhat.io/rhosdt/tempo-operator-bundle
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-bundle
 EOF
 		echo "!!! fail to create the ICSP"
 		return 1
