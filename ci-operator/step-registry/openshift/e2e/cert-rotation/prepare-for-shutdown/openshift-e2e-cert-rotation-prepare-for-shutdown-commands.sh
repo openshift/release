@@ -315,6 +315,14 @@ oc patch proxy/cluster \
      --type=merge \
      --patch='{"spec":{"trustedCA":{"name":"custom-ca"}}}'
 
+oc create configmap custom-image-ca \
+    --from-file=10.101.72.196..443="${temp_dir}/ca.crt" \
+    -n openshift-config
+
+oc patch image.config.openshift.io/cluster \
+    --type=merge \
+    --patch='{"spec":{"additionalTrustedCA":{"name":"custom-image-ca"}}}'
+
 defaultIngressDomain=$(oc get ingresscontroller default -o=jsonpath='{.status.domain}' -n openshift-ingress-operator)
 cat <<EOZ > "${temp_dir}/tmp.conf"
 [cus]
