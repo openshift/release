@@ -34,6 +34,11 @@ fi
 
 echo "Comparing current TLS profile to expected..."
 
+echo "Fetching full .spec block from APIServer..."
+
+spec_block=$(oc get apiserver cluster -o json | jq '.spec')
+echo "$spec_block"
+
 if ! current=$(oc get apiserver cluster -o jsonpath='{.spec.tlsSecurityProfile}' | jq -c .); then
   echo "ERROR: Failed to retrieve current TLS profile from APIServer."
   exit 1
