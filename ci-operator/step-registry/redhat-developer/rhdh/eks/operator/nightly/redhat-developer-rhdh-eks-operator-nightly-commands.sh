@@ -8,6 +8,12 @@ NAME_SPACE="showcase-k8s-ci-nightly"
 NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
 export NAME_SPACE NAME_SPACE_RBAC
 
+AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
+AWS_SECRET_ACCESS_KEY=$(cat /tmp/secrets/AWS_SECRET_ACCESS_KEY)
+AWS_DEFAULT_REGION=$(cat /tmp/secrets/AWS_DEFAULT_REGION)
+AWS_S3_BUCKET=$(cat /tmp/secrets/AWS_S3_BUCKET)
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
+
 # use kubeconfig from mapt
 chmod 600 "${SHARED_DIR}/kubeconfig"
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
