@@ -11,8 +11,7 @@ export NAME_SPACE NAME_SPACE_RBAC
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
 AWS_SECRET_ACCESS_KEY=$(cat /tmp/secrets/AWS_SECRET_ACCESS_KEY)
 AWS_DEFAULT_REGION=$(cat /tmp/secrets/AWS_DEFAULT_REGION)
-AWS_S3_BUCKET=$(cat /tmp/secrets/AWS_S3_BUCKET)
-export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
 aws configure set aws_access_key_id "${AWS_ACCESS_KEY_ID}"
 aws configure set aws_secret_access_key "${AWS_SECRET_ACCESS_KEY}"
 aws configure set default.region "${AWS_DEFAULT_REGION}"
