@@ -20,6 +20,10 @@ export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
+if [[ "$NUM_WORKER_NODES" == "" ]]; then
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  export NUM_WORKER_NODES
+fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 
@@ -157,7 +161,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    source bootstrap.sh
 "
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+cp ${CLUSTER_PROFILE_DIR}/pull_secret /tmp/pull-secret
 oc registry login --to=/tmp/pull-secret
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml

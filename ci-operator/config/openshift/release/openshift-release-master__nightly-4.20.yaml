@@ -461,6 +461,38 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-two-node-arbiter-ipv6-techpreview
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        ENABLE_ARBITER=true
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-two-node-arbiter-dualstack-techpreview
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        ENABLE_ARBITER=true
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter-techpreview
 - as: e2e-metal-ovn-two-node-fencing
   cluster: build05
   cron: '@daily'
@@ -656,7 +688,7 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-host-groups-ovn
-  cron: '@daily'
+  cron: 0 */12 * * *
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -1842,7 +1874,7 @@ tests:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
   timeout: 6h0m0s
-- as: e2e-aws-ovn-ipsec-upgrade
+- as: e2e-aws-ovn-upgrade-ipsec
   cron: '@daily'
   steps:
     cluster_profile: aws
@@ -1851,7 +1883,27 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
+- as: e2e-aws-ovn-serial-ipsec
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
+  timeout: 6h0m0s
+- as: e2e-short-cert-rotation
+  cron: 0 8 * * Sun
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-cert-rotation-short-aws
+  timeout: 8h0m0s
+- as: e2e-short-cert-rotation-azure
+  cron: 0 8 * * Sun
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-cert-rotation-short-azure
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

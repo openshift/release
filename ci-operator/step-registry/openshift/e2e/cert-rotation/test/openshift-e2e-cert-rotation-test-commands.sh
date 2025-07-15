@@ -25,6 +25,8 @@ EOF
 
 # If not running on a bastion host run openshift-tests directly
 if [[ ! -f "${SHARED_DIR}/packet-conf.sh" ]]; then
+    # Set Azure-specific env var
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
     # Add Short Cert Rotation specific test
     echo '"[sig-arch][Late][Jira:\"kube-apiserver\"] [OCPFeatureGate:ShortCertRotation] all certificates should expire in no more than 8 hours [Suite:openshift/conformance/parallel]"' >> ${SHARED_DIR}/test-list
     openshift-tests run \
@@ -59,7 +61,8 @@ done
 fi
 source ~/config.sh
 export EXTENSIONS_PAYLOAD_OVERRIDE=${RELEASE_IMAGE_LATEST}
-export EXTENSIONS_PAYLOAD_OVERRIDE_hyperkube=${HYPERKUBE_IMAGE}
+export EXTENSIONS_PAYLOAD_OVERRIDE_hyperkube=${MIRRORED_HYPERKUBE_IMAGE}
+export EXTENSIONS_PAYLOAD_OVERRIDE_machine_config_operator=${MIRRORED_MCO_IMAGE}
 export REGISTRY_AUTH_FILE=~/pull-secret
 openshift-tests run \
     -v 5 \

@@ -168,7 +168,7 @@ export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapp
 export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
 export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
 set +x # We don't wan't to see it in the logs
-ARTIFACTORY_USER=ci-bot-read-interop
+ARTIFACTORY_USER=$(head -1 "${BW_PATH}"/artifactory-user || printf ci-read-only-user)
 ARTIFACTORY_TOKEN=$(head -1 "${BW_PATH}"/artifactory-token)
 ARTIFACTORY_SERVER=$(head -1 "${BW_PATH}"/artifactory-server)
 ACCESS_TOKEN=$(head -1 "${BW_PATH}"/bitwarden-client-secret)

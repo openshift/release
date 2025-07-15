@@ -4,6 +4,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# read the secrets and login as the user
+export TEST_USER_CLIENT_ID; TEST_USER_CLIENT_ID=$(cat /var/run/hcp-integration-credentials/client-id)
+export TEST_USER_CLIENT_SECRET; TEST_USER_CLIENT_SECRET=$(cat /var/run/hcp-integration-credentials/client-secret)
+export TEST_USER_TENANT_ID; TEST_USER_TENANT_ID=$(cat /var/run/hcp-integration-credentials/tenant)
+az login --service-principal -u "${TEST_USER_CLIENT_ID}" -p "${TEST_USER_CLIENT_SECRET}" --tenant "${TEST_USER_TENANT_ID}"
+
 
 # Defined here because it's used here.
 is_int_testing_subscription() {
@@ -34,7 +40,7 @@ az deployment group create \
   --name 'infra' \
   --subscription "${SUBSCRIPTION}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
-  --template-file bicep/customer-infra.bicep \
+  --template-file demo/bicep/customer-infra.bicep \
   --parameters \
     customerNsgName="${CUSTOMER_NSG}" \
     customerVnetName="${CUSTOMER_VNET_NAME}" \

@@ -75,19 +75,28 @@ if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
 
-  echo "Approving CSRs at $(date)"
+  echo "Approving CSRs at $(date +%X)"
   fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
   for field in ${fields[@]}; do
     (( required_csrs=${#nodes[@]} ))
     approved_csrs=0
+    attempt=0
     until (( approved_csrs >= required_csrs )); do
-      mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
+      ((attempt++))
+      echo -n ""
+      echo -n ""
+      echo "$(date +%X) attempt #${attempt}"
+      mapfile -t all_csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers)
+      echo "found ${#all_csrs[@]} CSRs"
+      mapfile -t csrs < <(echo ${all_csrs[@]} | grep Pending | cut -f1 -d" ")
+      echo "found ${#csrs[@]} pending CSRs"
       if [[ ${#csrs[@]} -gt 0 ]]; then
-        echo
+        echo "approving ${csrs[@]}"
         oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
       fi
-      sleep 10
-      done | /usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null
+      sleep 60
+      echo "" >&3
+    done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
   done
   echo "All CSRs approved at $(date)"
 
