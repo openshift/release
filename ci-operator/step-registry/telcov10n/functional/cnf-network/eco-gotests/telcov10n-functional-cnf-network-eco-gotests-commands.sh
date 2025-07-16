@@ -5,6 +5,12 @@ set -o pipefail
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 PROJECT_DIR="/tmp"
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Create group_vars directory"
 mkdir "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
