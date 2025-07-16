@@ -5,6 +5,8 @@ set -o pipefail
 
 env > ${ARTIFACT_DIR}/env
 echo $FORCE_RUN
+echo $MULTISTAGE_PARAM_OVERRIDE_ENFORCE_RUN
+
 # Date of the first event
 if [ "$VERSION" = "4.15" ] || [ "$VERSION" = "4.17" ]; then
   FIRST_EVENT_DATE="2025-07-09"
