@@ -93,6 +93,32 @@ tests:
     - chain: redhat-chaos-hog-scenarios
     workflow: baremetal-lab-upi
   timeout: 7h0m0s
+- always_run: false
+  as: krkn-hub-node-tests-metal
+  capabilities:
+  - intranet
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      CHURN: "true"
+      CLOUD_TYPE: baremetal
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      TELEMETRY_GROUP: prow-ocp-4.18
+      architecture: amd64
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    workflow: baremetal-lab-upi
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
