@@ -6,6 +6,17 @@ set -o pipefail
 touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
+ALLOWED_REPOS=("openshift-tests-private"
+               "verification-tests"
+              )
+repo="$(jq -r '.extra_refs[].repo' <<< ${JOB_SPEC:-''})"
+# shellcheck disable=SC2076
+if ! [[ "${ALLOWED_REPOS[*]}" =~ "$repo" ]]
+then
+    echo "Skip repo: $repo"
+    exit 0
+fi
+
 LOGS_PATH="logs"
 if [[ "$(jq -r '.type' <<< ${JOB_SPEC:-''})" = "presubmit" ]]
 then
