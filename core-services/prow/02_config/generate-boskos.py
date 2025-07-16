@@ -6,10 +6,11 @@ import yaml
 CONFIG = {
 
     'aws-quota-slice': {
-        'us-east-1': 35,
-        'us-east-2': 30,
-        'us-west-1': 30,
-        'us-west-2': 30,
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-1-qe-quota-slice': {
         'us-east-1': 10,
@@ -73,8 +74,8 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-edge-zones-quota-slice': {
-        'us-east-1': 5,
-        'us-west-2': 5
+        'us-east-1': 10,
+        'us-west-2': 10,
     },
     'aws-splat-quota-slice': {
         'us-east-1': 5,
