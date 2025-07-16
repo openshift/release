@@ -226,6 +226,25 @@ function update_image_registry() {
   oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 
+function update_bip_live_iso {
+  CONSOLE="ttyS1,115200n8"
+  root_device=$(echo "$architecture" | sed 's/arm64/\/dev\/nvme0n1/;s/amd64/\/dev\/sdb/')
+  escaped_root_device=$(echo "$root_device" | sed 's/\//\\\//g')
+  shim_arch=$(echo "$architecture" | sed 's/arm64/aa64/;s/amd64/x64/')
+
+  b64_pre=$(jq -r '.storage.files[] | select( .path == "/usr/local/bin/install-to-disk.sh" ).contents.source' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign | cut -d"," -f2)
+
+  b64_new=$(echo "${b64_pre}" | base64 -d | \
+    sed -e 's/^\(.*coreos-installer install.*\)$/\1 --delete-karg console=ttyS0,115200n8 --append-karg console='"${CONSOLE}"' --insecure-ignition --copy-network\n  echo "Adding UEFI boot entry for Red Hat CoreOS"\n  efibootmgr -c -d '"${escaped_root_device}"' -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shim'"${shim_arch}"'.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | \
+    base64 -w0)
+
+  sed -i -e 's/'"${b64_pre}"'/'"${b64_new}"'/g' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign
+
+  # mv ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign ${INSTALL_DIR}/bootstrap.ign
+  # chmod 644 ${INSTALL_DIR}/bootstrap.ign
+
+}
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -304,15 +323,7 @@ echo -e "\nCreating Ignition configs..."
 oinst create single-node-ignition-config
 export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 
-CONSOLE="ttyS1,115200n8"
-b64_pre=$(jq -r '.storage.files[] | select( .path == "/usr/local/bin/install-to-disk.sh" ).contents.source' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign | cut -d"," -f2)
-b64_new=$(echo "${b64_pre}" | base64 -d | \
-  sed -e 's/^\(.*coreos-installer install.*\)$/\1 --delete-karg console=ttyS0,115200n8 --append-karg console='"${CONSOLE}"' --insecure-ignition --copy-network\n  echo "Adding UEFI boot entry for Red Hat CoreOS"\n  efibootmgr -c -d \/dev\/sdb -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shimx64.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | \
-  base64 -w0)
-sed -i -e 's/'"${b64_pre}"'/'"${b64_new}"'/g' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign
-
-mv ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign ${INSTALL_DIR}/bootstrap.ign
-chmod 644 ${INSTALL_DIR}/bootstrap.ign
+update_bip_live_iso
 
 echo -e "\nPreparing firstboot ignitions for sync..."
 cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
