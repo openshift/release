@@ -74,8 +74,8 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-edge-zones-quota-slice': {
-        'us-east-1': 5,
-        'us-west-2': 5
+        'us-east-1': 10,
+        'us-west-2': 10,
     },
     'aws-splat-quota-slice': {
         'us-east-1': 5,
@@ -89,6 +89,9 @@ CONFIG = {
     },
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
+    },
+    'metal-perfscale-osp-quota-slice': {
+        'metal-perfscale-osp-rdu2': 1,
     },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
@@ -338,6 +341,7 @@ CONFIG = {
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
+    'vsphere-elastic-poc-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -555,9 +559,9 @@ for i in range(2,7):
 for i in range(1, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
-for i in range(4):
-    CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-{}'.format(i)] = 1
-
+for i in range(0, 2):
+    for j in range(4):
+        CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
@@ -596,6 +600,9 @@ for i in [871,991,1165,1154,1148,1140]:
 
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
+
+for i in range(0,2):
+    CONFIG['vsphere-elastic-poc-quota-slice']['vsphere-elastic-poc-{}'.format(i)] = 1
 
 for i in range(0,80):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1

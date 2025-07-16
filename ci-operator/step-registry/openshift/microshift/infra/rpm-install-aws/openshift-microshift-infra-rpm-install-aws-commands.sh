@@ -76,17 +76,16 @@ ci_clone_src
 
 REBASE_SUCCEEDED=false
 REBASE_TO=""
-# RELEASE_IMAGE_INITIAL is set in the job spec for payload testing, but this variable
-# is not propagated by the release-controller, so we can not rely on it. However, the
-# same value is availabie in the imagestream tag release:initial in the job's namespace.
-# We identify this job being a payload test by checking if the prowjobid contains
-# the word "nightly".
+# RELEASE_IMAGE_LATEST is always set by the release-controller, whether this is
+# a payload job, a periodic, or a presubmit. In order to distinguish between
+# payload/not payload, we inspect the prow job id, which includes the word "nightly"
+# among the version and the date for the promotion candidate if its a payload test
+# and a UUID otherwise.
 # Should we find any errors, we simply proceed without rebasing.
 PROWJOB_ID=$(echo "${JOB_SPEC}" | jq -r '.prowjobid // empty')
 if [[ -n "${PROWJOB_ID}" && "${PROWJOB_ID}" =~ .*nightly.* ]]; then
-  if oc get istag "release:initial" -n ${NAMESPACE} > /dev/null 2>&1; then
-    REBASE_TO=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
-  fi
+
+  REBASE_TO="${RELEASE_IMAGE_LATEST}"
 fi
 
 if [ -n "${REBASE_TO}" ]; then

@@ -50,7 +50,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
+    tag: release
   tests-private:
     name: tests-private
     namespace: ci
@@ -286,6 +286,16 @@ tests:
     test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: olmv1-benchmark-test
+  cluster: build05
+  cron: 0 0,4 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    test:
+    - ref: olmv1-performance
+    workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 1h0m0s
 - as: aws-ipi-f14-stress-olm
   cron: 34 22 1,15 * *
   steps:
@@ -935,8 +945,8 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
-- as: aws-ipi-proxy-fips-f14-fips-check
-  cron: 18 22 7,21 * *
+- as: aws-ipi-proxy-fips-f999-fips-check
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -1251,6 +1261,31 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: rosa-lifecycle-private-advanced
+- as: aws-rosa-hcp-private-proxy-int-full-f7
+  cron: 35 16 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.19"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hcp-private-proxy
+- as: aws-rosa-hcp-private-proxy-stage-full-f7
+  cron: 46 22 2,11,18,25 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      OPENSHIFT_VERSION: "4.19"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-rosa-hcp-shared-vpc-advanced-f7
   cron: 6 22 4,13,20,27 * *
   steps:
@@ -2111,9 +2146,9 @@ tests:
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
-- as: baremetalds-ipi-ovn-lvms-f14-file-integrity
+- as: baremetalds-ipi-ovn-lvms-f999-file-integrity
   cluster: build05
-  cron: 33 19 7,23 * *
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
