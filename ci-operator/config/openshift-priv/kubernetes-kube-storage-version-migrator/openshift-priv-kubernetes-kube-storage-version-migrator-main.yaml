@@ -1,4 +1,8 @@
 base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
   ocp_4.19_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
@@ -62,6 +66,11 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: verify-commits
+  commands: |
+    commitchecker --start {$PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: main
   org: openshift-priv
