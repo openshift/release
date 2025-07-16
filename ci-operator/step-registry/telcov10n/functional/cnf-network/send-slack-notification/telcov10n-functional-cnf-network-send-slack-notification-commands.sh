@@ -11,6 +11,12 @@ NIC_FILE="${SHARED_DIR}/ocp_nic"
 SECONDARY_NIC_FILE="${SHARED_DIR}/secondary_nic"
 JIRA_LINK_FILE="${SHARED_DIR}/jira_link"
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${SHARED_DIR}/bastion" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${SHARED_DIR}/all" | sed "s/'//g")

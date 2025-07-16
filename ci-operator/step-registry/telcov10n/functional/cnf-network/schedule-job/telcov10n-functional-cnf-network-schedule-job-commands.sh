@@ -3,9 +3,18 @@
 set -e
 set -o pipefail
 
-env > ${ARTIFACT_DIR}/env
-echo $FORCE_RUN
-echo $MULTISTAGE_PARAM_OVERRIDE_ENFORCE_RUN
+echo "Validate JOB_TYPE variable: ${JOB_TYPE}"
+if [ "$JOB_TYPE" = "presubmit" ]; then
+  echo "JOB_TYPE=presubmit — skipping script"
+  exit 0
+fi
+
+echo "Validate MULTISTAGE_PARAM_OVERRIDE_ENFORCE_RUN variable: ${MULTISTAGE_PARAM_OVERRIDE_ENFORCE_RUN}"
+if [[ "${MULTISTAGE_PARAM_OVERRIDE_ENFORCE_RUN,,}" = "yes" ]]; then
+  echo "🛑 MULTISTAGE_PARAM_OVERRIDE_ENFORCE_RUN=yes — skipping script"
+  exit 0
+fi
+
 
 # Date of the first event
 if [ "$VERSION" = "4.15" ] || [ "$VERSION" = "4.17" ]; then
@@ -39,5 +48,5 @@ if (( dow == 5 )) && (( offset >= 1 && offset <= 6 )); then
     echo "$TODAY ✅ $offset day(s) until event — run CI"
 else
     echo "$TODAY ❌ $offset day(s) until event — Skip"
-    touch $SHARED_DIR/condition.txt
+    touch "${SHARED_DIR}"/skip.txt
 fi

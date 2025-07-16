@@ -2,6 +2,13 @@
 set -e
 set -o pipefail
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
+
 echo "Create group_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
 
