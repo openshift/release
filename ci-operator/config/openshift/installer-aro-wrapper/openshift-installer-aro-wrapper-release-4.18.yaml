@@ -1,25 +1,20 @@
-base_images:
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.46.0
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.24
 images:
 - dockerfile_path: Dockerfile.aro
   to: azure-installer-aro-wrapper
 promotion:
   to:
-  - name: "4.11"
+  - name: "4.18"
     namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -38,20 +33,15 @@ tests:
   container:
     from: src
 - as: lint
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    golangci-lint run --verbose
+  commands: make lint-go
   container:
-    clone: true
-    from: golangci-lint
+    from: src
 - as: vendor
   commands: go mod vendor && git diff --exit-code
   container:
     from: src
   run_if_changed: (go\.(mod|sum)$)|(^vendor/)
 zz_generated_metadata:
-  branch: release-4.11
+  branch: release-4.18
   org: openshift
   repo: installer-aro-wrapper
