@@ -25,8 +25,6 @@ OPENSEARCH_USERNAME=$(<"/secret/telco5g/username")
 OPENSEARCH_HOST=$(<"/secret/telco5g/hostname")
 ES_SERVER="https://${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD}@${OPENSEARCH_HOST}"
 
-export ES_SERVER
-
 pip install .
 export EXTRA_FLAGS=" --anomaly-detection"
 
