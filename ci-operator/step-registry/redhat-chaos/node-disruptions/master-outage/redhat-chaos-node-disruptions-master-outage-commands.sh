@@ -78,6 +78,26 @@ elif [ "$platform" = "VSphere" ]; then
     export VSPHERE_USERNAME
     VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
     export VSPHERE_PASSWORD
+elif [ "$platform" = "None" ] && [ "${CLOUD_TYPE:-}" = "baremetal" ]; then
+    # Handle bare metal testing when platform is None AND CLOUD_TYPE is baremetal
+    export CLOUD_TYPE="baremetal"
+    # Get a node that matches the LABEL_SELECTOR using oc command
+    target_node=$(oc get nodes -l "${LABEL_SELECTOR}" --no-headers | head -1 | awk '{print $1}')
+    
+    # Extract BMC credentials from hosts.yaml for the target node
+    if [ -f "${SHARED_DIR}/hosts.yaml" ] && [ -n "$target_node" ]; then
+        for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+            # shellcheck disable=SC1090
+            . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+            if [[ "${name}" == "${target_node}" ]]; then
+                export BMC_USER="${bmc_user}"
+                export BMC_PASSWORD="${bmc_pass}"
+                export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+                export NODE_NAME="${name}"
+                break
+            fi
+        done
+    fi
 fi
 
 ./node-disruptions/prow_run.sh
