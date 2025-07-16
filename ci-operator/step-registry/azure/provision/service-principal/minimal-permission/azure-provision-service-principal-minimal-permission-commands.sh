@@ -96,8 +96,6 @@ if [[ "${CLUSTER_TYPE}" == "azuremag" ]] || [[ "${CLUSTER_TYPE}" == "azurestack"
 else
     az cloud set --name AzureCloud
 fi
-az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
@@ -111,6 +109,9 @@ if [[ -z "${sp_list}" ]]; then
 fi
 
 for sp_type in ${sp_list}; do
+    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+    az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
+
     sp_name="${CLUSTER_NAME}-sp-${sp_type}"
     sp_output="$(mktemp)"
     if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]] && [[ "${sp_type}" == "cluster" ]]; then
