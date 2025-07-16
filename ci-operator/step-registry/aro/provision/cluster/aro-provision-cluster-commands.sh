@@ -79,6 +79,21 @@ if [[ -n ${ARO_CLUSTER_VERSION} ]]; then
     echo "Will attempt to install ARO cluster using Openshift ${ARO_CLUSTER_VERSION}"
     echo "Available versions in ${LOCATION}:"
     az aro get-versions -l ${LOCATION} -o table
+    
+    # Check if base version format (e.g., 4.16) to auto-select latest patch version
+    if [[ ${ARO_CLUSTER_VERSION} =~ ^[0-9]+\.[0-9]+$ ]]; then
+        available_versions=$(az aro get-versions -l ${LOCATION} -o json)
+        latest_version=$(echo "$available_versions" | jq -r '.[]' | grep "^${ARO_CLUSTER_VERSION}\." | sort -V | tail -1)
+        
+        if [[ -n ${latest_version} ]]; then
+            echo "Using latest version: ${latest_version}"
+            ARO_CLUSTER_VERSION=${latest_version}
+        else
+            echo "No versions found matching ${ARO_CLUSTER_VERSION}.x pattern"
+            exit 1
+        fi
+    fi
+    
     CREATE_CMD="${CREATE_CMD} --version ${ARO_CLUSTER_VERSION}"
 fi
 
