@@ -306,22 +306,15 @@ openssl req -newkey rsa:4096 -nodes -sha256 -keyout "${temp_dir}/ca.key" -x509 -
 
 openssl genrsa -out "${temp_dir}/ca.key" 4096
 openssl req -x509 -sha256 -key "${temp_dir}/ca.key" -nodes -new -days ${tenYears} -out "${temp_dir}/ca.crt" -subj "/CN=${baseDomain}" -set_serial 1
+cat ${temp_dir}/ca.crt >> /home/assisted/custom_manifests/ca.pem
 
 oc create configmap custom-ca \
-     --from-file=ca-bundle.crt="${temp_dir}/ca.crt" \
+     --from-file=ca-bundle.crt="/home/assisted/custom_manifests/ca.pem" \
      -n openshift-config
 
 oc patch proxy/cluster \
      --type=merge \
      --patch='{"spec":{"trustedCA":{"name":"custom-ca"}}}'
-
-oc create configmap custom-image-ca \
-    --from-file=10.101.72.196..443="${temp_dir}/ca.crt" \
-    -n openshift-config
-
-oc patch image.config.openshift.io/cluster \
-    --type=merge \
-    --patch='{"spec":{"additionalTrustedCA":{"name":"custom-image-ca"}}}'
 
 defaultIngressDomain=$(oc get ingresscontroller default -o=jsonpath='{.status.domain}' -n openshift-ingress-operator)
 cat <<EOZ > "${temp_dir}/tmp.conf"
