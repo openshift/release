@@ -1104,7 +1104,7 @@ periodics:
       - --future-release=4.21
       - --self-approve=true
       - --assign=openshift/test-platform
-      - --rebalancer-cron=0 0 * * 1
+      - --rebalancer-cron=0 0 * * 0
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/autoconfigbrancher
@@ -1118,10 +1118,19 @@ periodics:
       - mountPath: /etc/github
         name: token
         readOnly: true
+      - mountPath: /etc/prometheus
+        name: prometheus
+        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+    - name: prometheus
+      secret:
+        items:
+        - key: sa.ci-monitoring.app.ci.token.txt
+          path: token
+        secretName: app-ci-openshift-user-workload-monitoring-credentials
 - agent: kubernetes
   cluster: app.ci
   cron: 0 0 1 6 *
