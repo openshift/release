@@ -162,6 +162,9 @@ fi
 max_time=4
 default_time=3
 
+# Trim whitespace from time variable
+time=$(echo "$time" | tr -d '[:space:]')
+
 # Parse and validate time format
 if [[ $time =~ ^([0-9]+(\.[0-9]+)?)h$ ]]; then
     hours=${BASH_REMATCH[1]}
@@ -187,7 +190,7 @@ comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
    • Username: \`CLUSTER_ADMIN_USERNAME\`
    • Password: \`CLUSTER_ADMIN_PASSWORD\`
 
-⏰ **Cluster Availability:** Next $hours hours
+⏰ **Cluster Availability:** Next $time
 "
 echo "$comment"
 gh_comment "$comment"

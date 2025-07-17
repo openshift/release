@@ -15,32 +15,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: daily-6nodes
-  capabilities:
-  - intranet
-  cron: 0 0 * * 2
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      CONFIG: config/standard-scalelab.yml
-      INFRA: "true"
-      NUM_WORKER_NODES: "6"
-      RUN_CERBERUS: "false"
-    test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
-    - ref: openshift-qe-cluster-health
-    - ref: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-data-path-tests
-    - chain: openshift-qe-node-density
-    - chain: openshift-qe-node-density-heavy
-  timeout: 8h0m0s
 - as: daily-virt-6nodes
   capabilities:
   - intranet
-  cron: 0 8 * * *
+  cron: 0 0 * * *
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
@@ -49,7 +27,6 @@ tests:
       CNV_VERSION: "4.19"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
-      NUM_WORKER_NODES: "6"
       VM: "true"
       VMI_READY_THRESHOLD: "180"
       VMS_PER_NODE: "200"
@@ -63,6 +40,25 @@ tests:
     - ref: openshift-qe-virt-density
     - ref: openshift-qe-virt-udn-density
   timeout: 8h0m0s
+- as: weekly-6nodes
+  capabilities:
+  - intranet
+  cron: 0 5 * * 2
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CONFIG: config/standard-scalelab.yml
+      INFRA: "true"
+      RUN_CERBERUS: "false"
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-node-density
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-bm-deploy
+  timeout: 8h0m0s
 - always_run: false
   as: deploy-6nodes
   capabilities:
@@ -70,11 +66,7 @@ tests:
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
-    env:
-      NUM_WORKER_NODES: "6"
-    test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: deploy-sno
@@ -85,9 +77,7 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       TYPE: sno
-    test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
@@ -98,12 +88,10 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      NUM_WORKER_NODES: "6"
       RUN_CERBERUS: "false"
     test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
     - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
@@ -116,14 +104,12 @@ tests:
       BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
-      NUM_WORKER_NODES: "6"
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h55m0s
 - always_run: false
   as: web-burner-node-density-6nodes
@@ -134,7 +120,6 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      NUM_WORKER_NODES: "6"
       PUBLIC_VLAN: "false"
     test:
     - ref: openshift-qe-installer-bm-ping
@@ -153,7 +138,6 @@ tests:
       BAREMETAL: "true"
       KUBE_BURNER_VERSION: 1.2.9
       LIMIT_COUNT: "1"
-      NUM_WORKER_NODES: "6"
       PUBLIC_VLAN: "false"
       WORKLOAD: web-burner-cluster-density
     test:
