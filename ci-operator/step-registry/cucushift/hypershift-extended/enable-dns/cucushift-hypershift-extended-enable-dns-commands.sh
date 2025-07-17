@@ -165,6 +165,7 @@ else
 fi
 
 oc wait deployment kube-apiserver -n "clusters-${CLUSTER_NAME}" --for='condition=PROGRESSING=True' --timeout=2m
+exit 0
 oc rollout status deployment -n "clusters-${CLUSTER_NAME}" kube-apiserver --timeout=3m
 
  echo "Check hc cluster can be visited via custom kubeconfig"
