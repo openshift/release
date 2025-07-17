@@ -12,6 +12,6 @@ export GINKGO_VERSION
 # export GOBIN=$PATH:$tmpHome
 # download the ginkgo cli binary
 go mod tidy
-go install github.com/onsi/ginkgo/v2/ginkgo@$GINKGO_VERSION
+go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@$GINKGO_VERSION
 ginkgo version
 ginkgo e2e/integration-tests --junit-report="${ARTIFACT_DIR}/junit/report.xml"
