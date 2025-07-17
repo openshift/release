@@ -103,6 +103,7 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+cache deny all
 ${proxy_dns_config}
 EOF
 
@@ -124,7 +125,7 @@ ExecStart=/usr/bin/podman run --name "squid-proxy" \
 -v /srv/squid/etc:/etc/squid:Z \
 -v /srv/squid/cache:/var/spool/squid:Z \
 -v /srv/squid/log:/var/log/squid:Z \
-quay.io/coreos/squid
+quay.io/openshifttest/squid-proxy:4.13-fc31
 
 ExecReload=-/usr/bin/podman stop "squid-proxy"
 ExecReload=-/usr/bin/podman rm "squid-proxy"

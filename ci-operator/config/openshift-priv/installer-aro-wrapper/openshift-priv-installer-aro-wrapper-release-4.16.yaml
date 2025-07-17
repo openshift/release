@@ -1,13 +1,8 @@
-base_images:
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.54.2
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.22
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.24-openshift-4.20
 canonical_go_repository: github.com/openshift/installer-aro-wrapper
 images:
 - dockerfile_path: Dockerfile.aro
@@ -43,10 +38,9 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    golangci-lint run --verbose
+    make lint-go
   container:
-    clone: true
-    from: golangci-lint
+    from: src
 - as: vendor
   commands: go mod vendor && git diff --exit-code
   container:

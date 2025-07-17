@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
 set -o pipefail
 
 # the exit code of this step is not expected to be caught from the overall test suite in ReportPortal. Excluding it
@@ -9,9 +7,15 @@ touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
 LOGS_PATH="logs"
-if [[ -n "$PULL_NUMBER" ]]
+if [[ "$(jq -r '.type' <<< ${JOB_SPEC:-''})" = "presubmit" ]]
 then
-  LOGS_PATH="pr-logs/pull/openshift_release/${PULL_NUMBER}"
+  pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
+  if [[ -z "$pr_number" ]]
+  then
+    echo "Expected pull number not found, exit 1"
+    exit 1
+  fi
+  LOGS_PATH="pr-logs/pull/openshift_release/${pr_number}"
 fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
@@ -24,8 +28,8 @@ function download_logs() {
   logfile_name="${ARTIFACT_DIR}/rsync.log"
   gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml|build-log.txt|skip_overall_if_fail)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
-  gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &> "$logfile_name"
-  #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &> "$logfile_name"
+  gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
+  #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
 }
 
 function write_attribute() {
@@ -108,7 +112,7 @@ function generate_attribute_version_installed() {
   version_installed="unknown"
   release_dir="${LOCAL_DIR_ORI}/release/artifacts"
   release_file="release-images-latest"
-  arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value')"
+  arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
   if [[ "$arch" = 'arm64' ]]
   then
     release_file="release-images-arm64-latest"
@@ -148,12 +152,16 @@ function generate_metadata() {
                 "value": "${BUILD_ID}"
               },
               {
+                "key": "jobname",
+                "value": "${JOB_NAME_SAFE}"
+              },
+              {
                 "key": "namespace",
                 "value": "${NAMESPACE}"
               },
               {
-                "key": "jobname",
-                "value": "${JOB_NAME_SAFE}"
+                "key": "uploadfrom",
+                "value": "prow"
               }
             ],
             "description": "https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
@@ -186,13 +194,20 @@ function generate_results() {
       result=$(jq -r '.result' "${file_finished}")
       if [[ "$result" = 'SUCCESS' ]]
       then
-        cat >> "$junit_file" << EOF_JUNIT
+        cat >> "$junit_file" << EOF_JUNIT_SUCCESS
   <testcase classname="$testsuite_name" name="$step_name" time="1">
     <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
-EOF_JUNIT
-      else
+EOF_JUNIT_SUCCESS
+      elif [[ "$result" = 'FAILURE' ]]
+      then
         let failure_count+=1
+        cat >> "$junit_file" << EOF_JUNIT_FAILURE
+  <testcase classname="$testsuite_name" name="$step_name" time="1">
+    <failure message="Step $step_name failed" type="failed"/>
+    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+  </testcase>
+EOF_JUNIT_FAILURE
       fi
     else
       let failure_count+=1
@@ -202,7 +217,7 @@ EOF_JUNIT
   sed -i "1 a <testsuite name=\"$testsuite_name\" failures=\"$failure_count\" errors=\"0\" skipped=\"0\" tests=\"$(wc -w <<< $step_dirs)\">" "$junit_file"
   sed -i '$ a </testsuite>' "$junit_file"
   cp "$junit_file" "${ARTIFACT_DIR}"
-  find "$LOCAL_DIR_ORI" -name "*.xml" -exec cp {} "$LOCAL_DIR_RST" \;
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
 
   ls -alR "$LOCAL_DIR"
 }
@@ -210,7 +225,6 @@ EOF_JUNIT
 function droute_send() {
   which droute && droute version
   droute send --url="$(< /var/run/datarouter/dataroute)" \
-              --verbose --wirelog \
               --username="$(< /var/run/datarouter/username)" \
               --password="$(< /var/run/datarouter/password)" \
               --metadata="$DATAROUTER_JSON" \
