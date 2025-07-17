@@ -45,6 +45,7 @@ run-on-all-nodes "systemctl mask chronyd --now && sudo timedatectl set-time +${S
 # a random one as primary
 run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
 
+run-on-first-master "echo -n \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\" > /var/cluster-shutdown-time"
 # Shutdown nodes
 mapfile -d ' ' -t VMS < <( virsh list --all --name )
 set +x
@@ -62,6 +63,8 @@ for vm in ${VMS[@]}; do
     sleep 10
   done | /usr/local/bin/tqdm --desc "Shutting down ${vm} VM" --null
 done
+
+
 
 # Set date for host
 sudo timedatectl status
@@ -87,6 +90,9 @@ set -x
 
 # Check that time on nodes has been updated
 until run-on-all-nodes "timedatectl status"; do sleep 30; done
+
+# Restart kubelet
+run-on-all-nodes "systemctl restart kubelet"
 
 pod-restart-workarounds
 
