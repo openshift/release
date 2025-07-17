@@ -1,8 +1,8 @@
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.24
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.24-openshift-4.20
 canonical_go_repository: github.com/openshift/installer-aro-wrapper
 images:
 - dockerfile_path: Dockerfile.aro
@@ -34,7 +34,11 @@ tests:
   container:
     from: src
 - as: lint
-  commands: make lint-go
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint-go
   container:
     from: src
 - as: vendor
