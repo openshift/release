@@ -91,6 +91,29 @@ function generate_attribute_cloud_provider() {
   write_attribute cloud_provider "$cloud_provider"
 }
 
+function generate_attribute_install() {
+  install="fail"
+  for keyword in 'cucushift-installer-reportportal-marker' \
+                 'idp-htpasswd' \
+                 'fips-check-fips-or-die' \
+                 'fips-check-node-scan' \
+                 'cucushift-pre' \
+                 'cucushift-e2e' \
+                 'openshift-extended-test' \
+                 'openshift-extended-test-longduration' \
+                 'openshift-extended-test-supplementary' \
+                 'openshift-extended-web-tests' \
+                 'openshift-e2e-test-clusterinfra-qe' \
+                 'openshift-e2e-test-qe-report'
+  do
+    if [[ -d "$LOCAL_DIR_ORI/$keyword" ]] ; then
+      install="succeed"
+      break
+    fi
+  done
+  write_attribute install "$install"
+}
+
 function generate_attribute_install_method() {
   install_method="unknown"
   for keyword in 'agent' \
@@ -139,6 +162,7 @@ function generate_attribute_version_installed() {
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
+  generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
   generate_attribute_version_installed
