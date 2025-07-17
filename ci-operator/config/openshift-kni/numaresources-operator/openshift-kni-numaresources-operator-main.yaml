@@ -188,6 +188,62 @@ tests:
     env:
       PROJECT_NAME: numaresources-operator
     workflow: openshift-ci-security
+- as: ci-install-e2e-compact
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: numaresources-operator
+      SIZE_VARIANT: compact
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-ci-install-e2e-numaresources-operator-main
+        ci-job-type ci-install-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: make test-install-e2e test-uninstall-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: ci-e2e-compact
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      SIZE_VARIANT: compact
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-ci-e2e-numaresources-operator-main
+        ci-job-type ci-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni
