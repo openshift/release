@@ -41,12 +41,12 @@ function configure_host_pull_secret () {
     redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
     redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
     redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
-    redhat_registry_auth=$(echo -n " " "$redhat_auth_user":"$redhat_auth_password" | base64 -w 0)
+    redhat_registry_auth=$(echo -n "$redhat_auth_user:$redhat_auth_password" | base64 -w 0)
 
     stage_registry_path="/var/run/vault/mirror-registry/registry_stage.json"
     stage_auth_user=$(jq -r '.user' $stage_registry_path)
     stage_auth_password=$(jq -r '.password' $stage_registry_path)
-    stage_registry_auth=$(echo -n " " "$stage_auth_user":"$stage_auth_password" | base64 -w 0)
+    stage_registry_auth=$(echo -n "$stage_auth_user:$stage_auth_password" | base64 -w 0)
 
     mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
     mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
@@ -214,5 +214,62 @@ fi
 echo "[$(timestamp)] Creating and labeling namespace for kueue operator..."
 oc create namespace openshift-kueue-operator || true
 oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+
+# workaround for OLM pod not running with restricted PSA (openshift-* namespace pattern)
+oc label --overwrite ns openshift-kueue-operator security.openshift.io/scc.podSecurityLabelSync=true
+
+# Verify namespace labels were applied correctly
+echo "[$(timestamp)] Verifying namespace labels..."
+oc get ns openshift-kueue-operator -o yaml | grep -E "(security|pod-security|cluster-monitoring)" || echo "Some labels may not be present"
+
+# Specifically check for the OLM PSA workaround labels
+if oc get ns openshift-kueue-operator -o jsonpath='{.metadata.labels.security\.openshift\.io/scc\.podSecurityLabelSync}' | grep -q "false"; then
+    echo "✓ OLM PSA workaround applied: podSecurityLabelSync=false"
+else
+    echo "✗ WARNING: OLM PSA workaround not applied correctly"
+fi
+
+# Additional verification for disconnected environments
+if test -s "${SHARED_DIR}/mirror_registry_url" ; then
+    echo "[$(timestamp)] Verifying auth file was saved for disconnected environment..."
+    if test -f "${SHARED_DIR}/containers-auth.json"; then
+        echo "Auth file successfully saved to SHARED_DIR"
+        echo "Auth file size: $(stat -c%s "${SHARED_DIR}/containers-auth.json") bytes"
+    else
+        echo "WARNING: Auth file not found in SHARED_DIR - this may cause authentication failures"
+    fi
+fi
+
+# Final verification before completing catalog step
+echo "[$(timestamp)] Performing final verification..."
+
+# Check namespace exists and has required labels
+if oc get ns openshift-kueue-operator >/dev/null 2>&1; then
+    echo "✓ Namespace openshift-kueue-operator exists"
+    
+    # Check for required labels
+    if oc get ns openshift-kueue-operator -o jsonpath='{.metadata.labels}' | grep -q "security.openshift.io/scc.podSecurityLabelSync.*false"; then
+        echo "✓ Security label is present (podSecurityLabelSync=false)"
+    else
+        echo "✗ WARNING: Security label missing or incorrect - this may cause registry pod failures"
+    fi
+    
+    if oc get ns openshift-kueue-operator -o jsonpath='{.metadata.labels}' | grep -q "pod-security.kubernetes.io/enforce.*privileged"; then
+        echo "✓ Pod security enforcement is set to privileged"
+    else
+        echo "✗ WARNING: Pod security enforcement not set to privileged - this may cause registry pod failures"
+    fi
+else
+    echo "✗ ERROR: Namespace openshift-kueue-operator does not exist"
+    exit 1
+fi
+
+# Check bundle image environment variable
+if [[ -n "${BUNDLE_IMAGE:-}" ]]; then
+    echo "✓ BUNDLE_IMAGE is set: ${BUNDLE_IMAGE}"
+else
+    echo "✗ ERROR: BUNDLE_IMAGE is not set"
+    exit 1
+fi
 
 echo "[$(timestamp)] Catalog step completed successfully!" 
