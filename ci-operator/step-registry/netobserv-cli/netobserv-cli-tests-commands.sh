@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+
+set -x
+short_sha=$(git rev-parse --short HEAD)
+USER=netobserv VERSION=$short_sha make commands
+export GINGKO_VERSION=$(go list -mod=readonly -m -f '{{ .Version }}'  github.com/onsi/ginkgo/v2)
+# export tmpHome="/tmp/home"
+# mkdir -p $tmpHome
+# export GOBIN=$PATH:$tmpHome
+# export PATH=$PATH:$PWD/build:$tmpHome
+# download the ginkgo cli binary
+go install github.com/onsi/ginkgo/v2/ginkgo@$GINKGO_VERSION
+ginkgo version
+ginkgo e2e/integration-tests --junit-report="${ARTIFACT_DIR}/junit/report.xml"
