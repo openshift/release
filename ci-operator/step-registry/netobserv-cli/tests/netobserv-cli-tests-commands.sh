@@ -4,7 +4,8 @@
 set -x
 short_sha=$(git rev-parse --short HEAD)
 USER=netobserv VERSION=$short_sha make commands
-export GINGKO_VERSION=$(go list -mod=readonly -m -f '{{ .Version }}'  github.com/onsi/ginkgo/v2)
+GINKGO_VERSION=$(go list -mod=readonly -m -f '{{ .Version }}'  github.com/onsi/ginkgo/v2)
+export GINKGO_VERSION
 # export tmpHome="/tmp/home"
 # mkdir -p $tmpHome
 # export GOBIN=$PATH:$tmpHome
