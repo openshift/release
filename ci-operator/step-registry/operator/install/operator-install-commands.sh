@@ -10,8 +10,6 @@ operator_configs=$(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort --version-sort)
 RUN_COMMAND="uv run ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
 OPERATORS_CMD=""
 
-sleep 1800
-
 extract_operator_config() {
     echo "$1" | sed -E 's/^OPERATOR[0-9]+_CONFIG=//'
 }
