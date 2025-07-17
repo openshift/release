@@ -9,6 +9,7 @@ set -x
 
 quads_pwd=$(cat "${CLUSTER_PROFILE_DIR}/quads_pwd")
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
+LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 
 # Login to get token
 set +x
@@ -76,3 +77,17 @@ while [[ $(curl -fsSk $QUADS_INSTANCE/api/v3/assignments/$ASSIGNMENT_ID | jq -r 
   echo "Waiting for validation ..."
   sleep 60s
 done
+
+# Wait for bastion host to be accessible via ssh
+
+OCPINV=$QUADS_INSTANCE/instack/$CLOUD\_ocpinventory.json
+bastion=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+echo "The bastion host is: $BASTION"
+while ! nc -z $bastion 22; do
+  echo "Trying SSH port on host $i ..."
+  sleep 60
+done
+
+# Copy the ssh key to the bastion host
+sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@{$bastion}
+ssh -p $LOGIN -o StrictHostKeyChecking=no root@{$bastion} hostname
