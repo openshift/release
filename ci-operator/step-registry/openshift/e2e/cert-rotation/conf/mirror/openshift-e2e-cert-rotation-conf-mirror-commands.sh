@@ -239,7 +239,7 @@ set +e
 for retry in {1..5}
 do
     echo "[$(date)] Retrying test image mirror #${retry}"
-    openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror && \
+    openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} | grep ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror && \
     echo && \
     oc image mirror -f /tmp/mirror --registry-config ~/pull-secret && \
     break
