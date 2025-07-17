@@ -10,11 +10,14 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 
+# shellcheck disable=SC2154
+installation_disk=$(echo -n "$architecture" | sed 's/arm64/\/dev\/nvme0n1/;s/amd64/\/dev\/sda/')
+
 cat <<EOF > "${SHARED_DIR}/sno_bip_patch_install_config.yaml"
 platform:
   none: {}
 bootstrapInPlace:
-  installationDisk: $(echo -n "$architecture" | sed 's/arm64/\/dev\/nvme0n1/;s/amd64/\/dev\/sdb/')
+  installationDisk: ${installation_disk}
 EOF
 
 echo "Created install config patch to configure SNO bootstrap in place "
