@@ -1,0 +1,108 @@
+base_images:
+  acmqe-grc-test:
+    name: "2.14"
+    namespace: acm-qe
+    tag: acmqe-grc-test
+  application-ui-test:
+    name: "2.14"
+    namespace: acm-qe
+    tag: application-ui-test
+  clc-ui-e2e:
+    name: "2.14"
+    namespace: acm-qe
+    tag: clc-ui-e2e
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  fetch-managed-clusters:
+    name: autotest
+    namespace: acm-qe
+    tag: fetch-managed-clusters
+  multicluster-observability-operator-opp:
+    name: "2.14"
+    namespace: acm-qe
+    tag: multicluster-observability-operator-opp
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- dockerfile_literal: |
+    FROM this-is-ignored
+    RUN dnf install -y git python39
+  from: cli
+  optional: true
+  to: cli-with-git
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: acm-cnv-ipi-aws-419
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CLUSTER_NAME: acm-spoke
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","ipi-aws-p2p","pipelines-serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
+      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "!default", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      REGION: us-west-2
+      TEST_IMPORTANCE: LEVEL0
+      TEST_SCENARIOS: Cluster_Observability
+      USER_TAGS: |
+        scenario acm-cnv-p2p
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: acm-inspector
+    - ref: p2p-acm-cluster-uninstall
+    - ref: gather-aws-console
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: p2p-acm-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-acm-cnv-additional-test-setup
+    - ref: p2p-acm-cluster-upgrade
+    - ref: acm-tests-grc
+    - ref: acm-tests-observability
+    - ref: acm-tests-alc
+    - ref: openshift-extended-test
+  timeout: 10h0m0s
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: acmqe-autotest
+  variant: acm-ocp4.19-p2p-interop
