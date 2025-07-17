@@ -1495,24 +1495,56 @@ periodics:
   name: periodic-org-sync
   spec:
     containers:
-    - args:
-      - --config-path=./org/config.yaml
-      - --confirm=true
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --fix-org
-      - --fix-org-members
-      - --fix-teams
-      - --fix-team-members
-      - --fix-team-repos
-      - --fix-repos
-      - --github-hourly-tokens=600
-      - --github-allowed-burst=600
-      - --allow-repo-archival
-      command:
-      - /ko-app/peribolos
+    - command:
+      - sh
+      - -c
+      - |
+        set -euo pipefail
+
+        echo "Filtering openshift-priv from org/config.yaml"
+
+        # Safety check: ensure openshift-priv exists exactly once
+        count=$(grep -cE '^  openshift-priv:' org/config.yaml || true)
+        if [ "$count" -ne 1 ]; then
+            echo "ERROR: expected exactly one 'openshift-priv:' key, found $count" >&2
+            exit 1
+        fi
+
+        # Remove the openshift-priv org block using range deletion
+        # This deletes from "  openshift-priv:" line up to (but not including) the next org
+        sed -E '/^  openshift-priv:/,/^  [a-zA-Z0-9_-]+:/{/^  openshift-priv:/d; /^  [a-zA-Z0-9_-]+:/!d;}' \
+            org/config.yaml > /tmp/stripped-config.yaml
+
+        # Verify the result is valid
+        if ! grep -qE '^orgs:' /tmp/stripped-config.yaml; then
+            echo "ERROR: Output YAML appears malformed (no 'orgs:' found)" >&2
+            exit 1
+        fi
+
+        if grep -qE '^  openshift-priv:' /tmp/stripped-config.yaml; then
+            echo "ERROR: openshift-priv still present in output" >&2
+            exit 1
+        fi
+
+        echo "Successfully removed openshift-priv from configuration"
+
+        # Run peribolos with the filtered config
+        exec /ko-app/peribolos \
+          --config-path=/tmp/stripped-config.yaml \
+          --confirm=true \
+          --github-token-path=/etc/github/oauth \
+          --github-endpoint=http://ghproxy \
+          --github-endpoint=https://api.github.com \
+          --github-graphql-endpoint=http://ghproxy/graphql \
+          --fix-org \
+          --fix-org-members \
+          --fix-teams \
+          --fix-team-members \
+          --fix-team-repos \
+          --fix-repos \
+          --github-hourly-tokens=600 \
+          --github-allowed-burst=600 \
+          --allow-repo-archival
       image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
