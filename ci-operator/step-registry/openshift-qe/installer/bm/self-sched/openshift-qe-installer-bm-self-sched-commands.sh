@@ -82,12 +82,12 @@ done
 
 OCPINV=$QUADS_INSTANCE/instack/$CLOUD\_ocpinventory.json
 bastion=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
-echo "The bastion host is: $BASTION"
+echo "The bastion host is: $bastion"
 while ! nc -z $bastion 22; do
   echo "Trying SSH port on host $i ..."
   sleep 60
 done
 
 # Copy the ssh key to the bastion host
-sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@{$bastion}
-ssh -p $LOGIN -o StrictHostKeyChecking=no root@{$bastion} hostname
+sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@${bastion}
+ssh -p $LOGIN -o StrictHostKeyChecking=no root@${bastion} hostname
