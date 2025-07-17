@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.19"
+    name: "4.16"
     namespace: ocp
     tag: cli
   ocp-addons-operators-cli:
@@ -11,42 +11,41 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: golang-1.19
 images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: openshift-pipelines-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.19"
+    release:
+      channel: candidate
+      version: "4.17"
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "1"
+      memory: 4Gi
 tests:
-- as: openshift-pipelines-serverless-p2p-419-iib-aws
+- as: openshift-pipelines-serverless-ipi-aws-416-iib
   cron: 0 6 25 10 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
+      AWS_REGION: us-east-1
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
               [
-                {"step": "openshift-pipelines-install", "failure_type": "all", "classification": "Operator Installation Failure", "jira_additional_labels": ["!default","p2p-tests"]},
                 {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Product to Product Test Failure", "jira_project": "SRVKP", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default"], "jira_epic": "!default"}
               ],
           "success_rules": [{"jira_epic": "INTEROP-7595", "jira_additional_labels": ["!default"]}]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-p2p","self-managed-p2p","pipelines-serverless-p2p"]'
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-p2p","ipi-aws-p2p","pipelines-serverless-p2p"]'
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
       FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
@@ -62,7 +61,7 @@ tests:
     - ref: openshift-pipelines-tests
     - ref: p2p-additional-labels
     workflow: firewatch-ipi-aws
-- as: openshift-pipelines-serverless-p2p-419-rc-aws
+- as: openshift-pipelines-serverless-ipi-aws-417-rc
   cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
@@ -76,8 +75,8 @@ tests:
               ],
           "success_rules": [{"jira_epic": "INTEROP-7595", "jira_additional_labels": ["!default"]}]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-p2p","self-managed-p2p","pipelines-serverless-p2p"]'
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","ipi-aws-p2p","pipelines-serverless-p2p"]'
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
       FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
