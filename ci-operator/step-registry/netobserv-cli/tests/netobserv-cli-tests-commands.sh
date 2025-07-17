@@ -14,4 +14,5 @@ export GINKGO_VERSION
 go mod tidy
 go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@$GINKGO_VERSION
 ginkgo version
+test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
 ginkgo e2e/integration-tests --junit-report="${ARTIFACT_DIR}/junit/report.xml"
