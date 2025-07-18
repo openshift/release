@@ -8,18 +8,20 @@ workflow:
       HYPERSHIFT_DISK_ENCRYPTION: "true"
       HYPERSHIFT_ETCD_ENCRYPTION: "true"
     pre:
-    - ref: aws-provision-kms-key
-    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
-    - ref: cucushift-hypershift-extended-enable-dns
-    - ref: cucushift-hypershift-extended-capacity-reservation-create
-    - ref: hypershift-aws-create-nodepool
-    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
-    - ref: cucushift-hypershift-extended-enable-guest
+      - ref: aws-provision-kms-key
+      - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
+      - ref: cucushift-hypershift-extended-enable-dns
+      - ref: cucushift-hypershift-extended-capacity-reservation-create
+      - ref: hypershift-aws-create-nodepool
+      - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+      - ref: cucushift-hypershift-extended-enable-guest
+      - ref: cucushift-installer-reportportal-marker
     post:
-    - ref: cucushift-hypershift-extended-disable-guest
-    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
-    - ref: cucushift-hypershift-extended-capacity-reservation-cancel
-    - ref: aws-deprovision-kms-key
+      - ref: cucushift-hypershift-extended-disable-guest
+      - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
+      - ref: cucushift-hypershift-extended-capacity-reservation-cancel
+      - ref: aws-deprovision-kms-key
+      - ref: junit2reportportal
   documentation: |-
     This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow.
     The hosted cluster default storage will use the aws efs csi.
