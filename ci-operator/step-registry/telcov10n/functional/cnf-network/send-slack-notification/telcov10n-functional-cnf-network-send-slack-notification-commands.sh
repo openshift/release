@@ -10,6 +10,7 @@ CLUSTER_NAME_FILE="${SHARED_DIR}/cluster_name"
 NIC_FILE="${SHARED_DIR}/ocp_nic"
 SECONDARY_NIC_FILE="${SHARED_DIR}/secondary_nic"
 JIRA_LINK_FILE="${SHARED_DIR}/jira_link"
+PHASE1_BUILD_ID_FILE="${SHARED_DIR}/phase1_build_id"
 
 echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
@@ -62,6 +63,15 @@ else
   echo "No polarion URL file found or file is empty"
 fi
 
+# Read phase1_build_id if available
+PHASE1_BUILD_ID="" 
+if [[ -f "$PHASE1_BUILD_ID_FILE" ]] && [[ -s "$PHASE1_BUILD_ID_FILE" ]]; then
+  PHASE1_BUILD_ID="$(cat "$PHASE1_BUILD_ID_FILE")"
+  echo "Phase 1 Build ID: ${PHASE1_BUILD_ID}"
+else #
+  echo "No phase1_build_id file found or file is empty"
+fi
+
 WEBHOOK_URL="$(cat $WEBHOOK_URL_FILE)"
 Z_STREAM_VERSION="$(cat $CLUSTER_VERSION_FILE)"
 CLUSTER_NAME="$(cat $CLUSTER_NAME_FILE)"
@@ -78,7 +88,8 @@ python3 $PYTHON_SCRIPT \
   --cluster-name "$CLUSTER_NAME" \
   --nic "$NIC" \
   --secondary-nic "$SECONDARY_NIC" \
-  --jira-link "$JIRA_LINK"
+  --jira-link "$JIRA_LINK" \
+  --phase1-build-id "$PHASE1_BUILD_ID"
 
 
 
