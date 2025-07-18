@@ -378,7 +378,6 @@ function summarize_test_results() {
     combinedxml="${ARTIFACT_DIR}/junit_cucushift-e2e-combined.xml"
     jrm "$combinedxml" $xmlfiles || exit 0
     rm -f $xmlfiles
-    set -x
 
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
     if [ -f "$combinedxml" ] ; then
