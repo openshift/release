@@ -101,7 +101,9 @@ EOF
 }
 
 function create_catalog_source_for_netobserv() {
-    echo "create QE catalogsource: netobserv-konflux-fbc"
+    catalogsource_namespace="openshift-netobserv-operator"
+    catalogsource_name="netobserv-konflux-fbc"
+    echo "create QE catalogsource: $catalogsource_name in namespace: $catalogsource_namespace"
 
 cat <<EOF | oc create -f -
 apiVersion: config.openshift.io/v1
@@ -146,15 +148,15 @@ kind: Namespace
 metadata:
   labels:
     openshift.io/cluster-monitoring: "true"
-  name: openshift-netobserv-operator
+  name: $catalogsource_namespace
 EOF
 
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: netobserv-konflux-fbc
-  namespace: openshift-netobserv-operator
+  name: $catalogsource_name
+  namespace: $catalogsource_namespace
 spec:
   displayName: NetObserv Konflux
   image: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
@@ -164,7 +166,7 @@ spec:
     registryPoll:
       interval: 15m
 EOF
-    wait_for_catalogsource "openshift-netobserv-operator" "netobserv-konflux-fbc"
+    wait_for_catalogsource "$catalogsource_namespace" "$catalogsource_name"
 }
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
