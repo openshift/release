@@ -90,7 +90,7 @@ spec:
           export LATEST_RELEASE="LATEST_RELEASE_VAL"
 
           # run latest release on upstream main branch
-          git clone --single-branch --branch add-curl-prometheus https://github.com/edcdavid/ptp-operator-upstream.git
+          git clone --single-branch --branch add-curl-prometheus https://github.com/edcdavid/ptp-operator-upstream.git ptp-operator
 
           cd ptp-operator
           # OCPBUGS-52327 fix build due to libresolv.so link error
