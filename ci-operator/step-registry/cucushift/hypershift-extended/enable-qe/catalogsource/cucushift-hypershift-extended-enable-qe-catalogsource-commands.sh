@@ -40,7 +40,33 @@ metadata:
   name: openshift-marketplace
 EOF
 }
+function wait_for_catalogsource() {
+    local namespace=$1
+    local name=$2
 
+    set +e
+    COUNTER=0
+    while [ $COUNTER -lt 600 ]
+    do
+        sleep 20
+        COUNTER=`expr $COUNTER + 20`
+        echo "waiting ${COUNTER}s"
+        STATUS=`oc -n "$namespace" get catalogsource "$name" -o=jsonpath="{.status.connectionState.lastObservedState}"`
+        if [[ $STATUS = "READY" ]]; then
+            echo "create catalogsource $name successfully"
+            break
+        fi
+    done
+    if [[ $STATUS != "READY" ]]; then
+        echo "!!! fail to create CatalogSource $name"
+        run_command "oc get pods -o wide -n $namespace"
+        run_command "oc -n $namespace get catalogsource $name -o yaml"
+        run_command "oc -n $namespace get pods -l olm.catalogSource=$name -o yaml"
+        return 1
+    fi
+    set -e
+
+}
 function create_catalog_sources() {
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
@@ -71,32 +97,74 @@ spec:
     registryPoll:
       interval: 15m
 EOF
-    set +e
-    COUNTER=0
-    while [ $COUNTER -lt 600 ]
-    do
-        sleep 20
-        COUNTER=`expr $COUNTER + 20`
-        echo "waiting ${COUNTER}s"
-        STATUS=`oc -n openshift-marketplace get catalogsource qe-app-registry -o=jsonpath="{.status.connectionState.lastObservedState}"`
-        if [[ $STATUS = "READY" ]]; then
-            echo "create the QE CatalogSource successfully"
-            break
-        fi
-    done
-    if [[ $STATUS != "READY" ]]; then
-        echo "!!! fail to create QE CatalogSource"
-        # ImagePullBackOff nothing with the imagePullSecrets
-        # run_command "oc get operatorgroup -n openshift-marketplace"
-        # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
-        # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
+    wait_for_catalogsource "openshift-marketplace" "qe-app-registry"
+}
 
-        run_command "oc get pods -o wide -n openshift-marketplace"
-        run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
-        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
-        return 1
-    fi
-    set -e
+function create_catalog_source_for_netobserv() {
+    echo "create QE catalogsource: netobserv-konflux-fbc"
+
+cat <<EOF | oc create -f -
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: netobserv
+spec:
+  imageDigestMirrors:
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-ystream
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-zstream
+      source: registry.redhat.io/network-observability/network-observability-rhel9-operator
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/flowlogs-pipeline-ystream
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/flowlogs-pipeline-zstream
+      source: registry.redhat.io/network-observability/network-observability-flowlogs-pipeline-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-ystream
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-zstream
+      source: registry.redhat.io/network-observability/network-observability-ebpf-agent-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-ystream
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-zstream
+      source: registry.redhat.io/network-observability/network-observability-console-plugin-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-cli-ystream
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-cli-zstream
+      source: registry.redhat.io/network-observability/network-observability-cli-rhel9
+    - mirrors:
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-bundle-ystream
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-bundle-zstream
+      source: registry.redhat.io/network-observability/network-observability-operator-bundle
+    - mirrors:
+        - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-pf4-ystream
+      source: registry.redhat.io/network-observability/network-observability-console-plugin-compat-rhel9
+EOF
+
+      cat <<EOF | oc create -f -
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    openshift.io/cluster-monitoring: "true"
+  name: openshift-netobserv-operator
+EOF
+
+    cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: netobserv-konflux-fbc
+  namespace: openshift-netobserv-operator
+spec:
+  displayName: NetObserv Konflux
+  image: quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest
+  publisher: NetObserv QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+    wait_for_catalogsource "openshift-netobserv-operator" "netobserv-konflux-fbc"
 }
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -117,3 +185,4 @@ export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 
 check_marketplace
 create_catalog_sources
+create_catalog_source_for_netobserv
