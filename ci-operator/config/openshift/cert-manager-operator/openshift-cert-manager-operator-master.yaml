@@ -6,7 +6,7 @@ base_images:
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
-    tag: v1.30.0
+    tag: v1.39.2
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
@@ -84,12 +84,18 @@ tests:
     test:
     - ref: fips-check-image-scan
 - as: e2e-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.19"
   steps:
-    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
-      FIPS_ENABLED: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
@@ -98,11 +104,14 @@ tests:
       cli: latest
       commands: |
         oc -n cert-manager-operator rollout status deployment cert-manager-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
       from: src
       resources:
         requests:
           cpu: 100m
-    - ref: fips-check-fips-or-die
+    - ref: wait
     - as: test
       cli: latest
       commands: |
@@ -111,10 +120,10 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 - as: e2e-operator-tech-preview
   optional: true
-  run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     dependencies:
