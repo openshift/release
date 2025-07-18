@@ -10,9 +10,13 @@ echo "Setup compute-nto pipeline environment"
 # set +x
 
 echo "${CLUSTER_NAME}" > ${SHARED_DIR}/cluster_name
+echo "${VERSION}" > ${SHARED_DIR}/cluster_version
 
 echo "Cluster name"
 cat ${SHARED_DIR}/cluster_name
+
+echo "Cluster version"
+cat ${SHARED_DIR}/cluster_version
 
 # echo "OCP primary nic"
 # cat ${SHARED_DIR}/ocp_nic
