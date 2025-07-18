@@ -2,4 +2,4 @@
 
 set -xeuo pipefail
 
-sleep "$KEEP_DURATION"
+sleep 1
