@@ -63,6 +63,12 @@ promotion:
   - name: "4.20"
     namespace: ocp
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.20"
   initial:
     integration:
       name: "4.20"
@@ -124,6 +130,48 @@ tests:
     git diff --exit-code
   container:
     from: get-collections
+- as: aws-arm-cluster
+  steps:
+    cluster_profile: aws-3
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      OCP_ARCH: arm64
+    test:
+    - as: pre-notifier
+      commands: curl -d "Cluster is ready for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}"
+        ntfy.sh/notify-chiragkyal
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    - as: sleeper
+      commands: |
+        #!/bin/bash
+        total_duration=21300 # 5h55m, timeout is 6h
+        elapsed_time=0
+        while [ $elapsed_time -lt $total_duration ]; do
+            sleep 30
+            elapsed_time=$((elapsed_time + 30))
+            echo "Elapsed time: $((elapsed_time / 3600)) hours $(((elapsed_time % 3600) / 60)) minutes $((elapsed_time % 60)) seconds"
+        done
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+      timeout: 6h0m0s
+    - as: post-notifier
+      commands: curl -d "cluster about to be destroyed for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}"
+        ntfy.sh/notify-chiragkyal
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    workflow: ipi-aws
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
