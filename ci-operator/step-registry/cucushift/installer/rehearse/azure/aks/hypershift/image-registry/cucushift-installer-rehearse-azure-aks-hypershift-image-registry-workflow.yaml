@@ -1,0 +1,20 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-aks-hypershift-image-registry
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-azure-aks-hypershift-base-provision
+    - ref: cucushift-hypershift-extended-enable-guest
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: cucushift-installer-rehearse-azure-aks-hypershift-base-deprovision
+    env:
+      AKS_ADDONS: "azure-keyvault-secrets-provider"
+      AKS_USE_HYPERSHIFT_MI: "true"
+      HYPERSHIFT_AZURE_CP_MI: "true"
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      HYPERSHIFT_BASE_DOMAIN: "qe1.azure.devcluster.openshift.com"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "qe1.azure.devcluster.openshift.com"
+  documentation: |-
+    Creates and destroys a hypershift cluster on AKS management cluster
