@@ -550,8 +550,8 @@ then
 	exit 0
 fi
 
-# Patch 4.19 version
-echo "ANCOLLIN Patching rhcos version with 9.4 build and wait"
+# Patch in older RHCOS to current 4.20 payload
+echo "SDODSON Patching rhcos version back to a version without Kubelet 1.33"
 # Apply the changes
 oc apply -f- <<EOF
 apiVersion: v1
@@ -563,7 +563,7 @@ items:
       machineconfiguration.openshift.io/role: worker
     name: os-layer-custom-worker
   spec:
-    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:f29553f34b300ecab5282338d79f9685a8d75e5b0ceb75e514569759c8d6d560
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:2ea08b5d4790448ea2041d6308893a79cee99b5a2337e7fddb2b889a356a3f32
 - apiVersion: machineconfiguration.openshift.io/v1
   kind: MachineConfig
   metadata:
@@ -571,7 +571,7 @@ items:
       machineconfiguration.openshift.io/role: master
     name: os-layer-custom-master
   spec:
-    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:f29553f34b300ecab5282338d79f9685a8d75e5b0ceb75e514569759c8d6d560
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:2ea08b5d4790448ea2041d6308893a79cee99b5a2337e7fddb2b889a356a3f32
 kind: List
 metadata:
   resourceVersion: ""
