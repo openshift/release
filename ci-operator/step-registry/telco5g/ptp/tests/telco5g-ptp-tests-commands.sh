@@ -90,7 +90,7 @@ spec:
           export LATEST_RELEASE="LATEST_RELEASE_VAL"
 
           # run latest release on upstream main branch
-          git clone --single-branch --branch add-curl-prometheus https://github.com/edcdavid/ptp-operator.git
+          git clone --single-branch --branch add-curl-prometheus https://github.com/edcdavid/ptp-operator-upstream.git
 
           cd ptp-operator
           # OCPBUGS-52327 fix build due to libresolv.so link error
@@ -263,7 +263,7 @@ build_images
 # run latest release on upstream main branch
 
 
-git clone https://github.com/edcdavid/ptp-operator.git -b add-curl-prometheus ptp-operator-under-test
+git clone https://github.com/edcdavid/ptp-operator-upstream.git -b add-curl-prometheus ptp-operator-under-test
 
 
 cd ptp-operator-under-test
@@ -311,7 +311,7 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
 # always run test from latest upstream
-git clone https://github.com/edcdavid/ptp-operator.git -b add-curl-prometheus ptp-operator-conformance-test
+git clone https://github.com/edcdavid/ptp-operator-upstream.git -b add-curl-prometheus ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
