@@ -89,10 +89,15 @@ elif [ "$platform" = "None" ] && [ "${CLOUD_TYPE:-}" = "baremetal" ]; then
         for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
             # shellcheck disable=SC1090
             . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+            # shellcheck disable=SC2154
             if [[ "${name}" == "${target_node}" ]]; then
+                # shellcheck disable=SC2154
                 export BMC_USER="${bmc_user}"
+                # shellcheck disable=SC2154
                 export BMC_PASSWORD="${bmc_pass}"
+                # shellcheck disable=SC2154
                 export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+                # shellcheck disable=SC2154
                 export NODE_NAME="${name}"
                 break
             fi
