@@ -154,8 +154,9 @@ kind: CatalogSource
 metadata:
   name: $CATALOGSOURCE_NAME
   namespace: openshift-marketplace
-  annotations:
-    olm.catalogImageTemplate: "${QE_INDEX_IMAGE_BASE}:v{kube_major_version}.{kube_minor_version}"
+  $([[ "$openshift_version" != 4.20* ]] && echo "annotations:
+    olm.catalogImageTemplate: \"${QE_INDEX_IMAGE_BASE}:v{kube_major_version}.{kube_minor_version}\"
+  ")
 spec:
   displayName: Production Operators
   grpcPodConfig:
