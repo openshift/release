@@ -263,7 +263,8 @@ function droute_send() {
               --username="$(< /var/run/datarouter/username)" \
               --password="$(< /var/run/datarouter/password)" \
               --metadata="$DATAROUTER_JSON" \
-              --results="${LOCAL_DIR_RST}/*"
+              --results="${LOCAL_DIR_RST}/*" \
+              --wait
 }
 
 download_logs
