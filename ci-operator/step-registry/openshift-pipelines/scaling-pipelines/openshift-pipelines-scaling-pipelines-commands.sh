@@ -47,8 +47,10 @@ else
     exit 1
 fi
 
-export AWS_ACCESS_ID AWS_BUCKET_NAME AWS_SECRET_KEY
+export AWS_ACCESS_ID AWS_BUCKET_NAME AWS_SECRET_KEY AWS_ENDPOINT AWS_REGION
 
+AWS_REGION="eu-west-1"
+AWS_ENDPOINT="https://s3.eu-west-1.amazonaws.com"
 AWS_ACCESS_ID="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-access-id )"
 AWS_BUCKET_NAME="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-bucket-name )"
 AWS_SECRET_KEY="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-secret-key )"
