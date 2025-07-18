@@ -60,9 +60,6 @@ for kubeconfig in $(find ${KUBECONFIG} -type f); do
 done
 fi
 source ~/config.sh
-export EXTENSIONS_PAYLOAD_OVERRIDE=${RELEASE_IMAGE_LATEST}
-export EXTENSIONS_PAYLOAD_OVERRIDE_hyperkube=${MIRRORED_HYPERKUBE_IMAGE}
-export EXTENSIONS_PAYLOAD_OVERRIDE_machine_config_operator=${MIRRORED_MCO_IMAGE}
 export REGISTRY_AUTH_FILE=~/pull-secret
 openshift-tests run \
     -v 5 \

@@ -100,12 +100,6 @@ images:
 - context_dir: .
   dockerfile_path: runtimes/rocm-pytorch/ubi9-python-3.12/Dockerfile.rocm
   to: rocm-runtime-pytorch-ubi9-python-3.12
-- context_dir: .
-  dockerfile_path: runtimes/rocm-tensorflow/ubi9-python-3.12/Dockerfile.rocm
-  to: rocm-runtime-tensorflow-ubi9-python-3.12
-- context_dir: .
-  dockerfile_path: jupyter/rocm/tensorflow/ubi9-python-3.12/Dockerfile.rocm
-  to: rocm-jupyter-tensorflow-ubi9-python-3.12
 promotion:
   to:
   - namespace: opendatahub-io
@@ -729,26 +723,6 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: rocm-jupyter-minimal-ubi9-python-3.12
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-rocm-jupyter-tf-ubi9-python-3-12-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: rocm-jupyter-tensorflow-ubi9-python-3.12
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: rocm-jupyter-tensorflow-ubi9-python-3.12
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-rocm-jupyter-tf-ubi9-python-3-12-pr-image-mirror
-  run_if_changed: (jupyter\/rocm\/tensorflow\/ubi9-python-3.12\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: rocm-jupyter-tensorflow-ubi9-python-3.12
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: rocm-jupyter-tensorflow-ubi9-python-3.12
-    workflow: opendatahub-io-ci-image-mirror
 - as: notebook-rocm-jupyter-pt-ubi9-python-3-12-image-mirror
   postsubmit: true
   steps:
@@ -788,26 +762,6 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: rocm-runtime-pytorch-ubi9-python-3.12
-    workflow: opendatahub-io-ci-image-mirror
-- as: rocm-runtime-tf-ubi9-python-3-12-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: rocm-runtime-tensorflow-ubi9-python-3.12
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: rocm-runtime-tensorflow-ubi9-python-3.12
-    workflow: opendatahub-io-ci-image-mirror
-- as: rocm-runtime-tf-ubi9-python-3-12-pr-image-mirror
-  run_if_changed: (runtimes\/rocm-tensorflow\/ubi9-python-3.12\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: rocm-runtime-tensorflow-ubi9-python-3.12
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: rocm-runtime-tensorflow-ubi9-python-3.12
     workflow: opendatahub-io-ci-image-mirror
 - as: notebooks-ubi9-e2e-tests
   run_if_changed: (jupyter\/minimal\/ubi9-python-3.11\/*)|(jupyter\/datascience\/ubi9-python-3.11\/*)|(jupyter\/pytorch\/ubi9-python-3.11\/*)|(jupyter\/tensorflow\/ubi9-python-3.11\/*)|(jupyter\/trustyai\/ubi9-python-3.11\/*)
@@ -1244,7 +1198,7 @@ tests:
           memory: 200Mi
     workflow: hypershift-hostedcluster-workflow
 - as: rocm-notebooks-py312-e2e-tests
-  run_if_changed: (rocm\/ubi9-python-3.12\/*)|(jupyter\/rocm\/pytorch\/ubi9-python-3.12\/*)|(jupyter\/rocm\/tensorflow\/ubi9-python-3.12\/*)
+  run_if_changed: (rocm\/ubi9-python-3.12\/*)|(jupyter\/rocm\/pytorch\/ubi9-python-3.12\/*)
   steps:
     cluster_profile: aws-opendatahub
     env:
@@ -1253,23 +1207,6 @@ tests:
       HYPERSHIFT_BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.2-multi
     test:
-    - as: rocm-jupyter-tf-ubi9-python-3-12-test-e2e
-      cli: latest
-      commands: |
-        oc new-project rocm-jupyter-tensorflow-python-3-12
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_rocm__TENSORFLOW_IMAGE}"
-        make deploy9-jupyter-rocm-tensorflow-ubi9-python-3.12 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-rocm-tensorflow-ubi9-python-3.12
-        make undeploy9-jupyter-rocm-tensorflow-ubi9-python-3.12
-      dependencies:
-      - env: JUPYTER_rocm__TENSORFLOW_IMAGE
-        name: rocm-jupyter-tensorflow-ubi9-python-3.12
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: rocm-jupyter-pt-ubi9-python-3-12-test-e2e
       cli: latest
       commands: |
