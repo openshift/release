@@ -549,6 +549,48 @@ ${t_all}     cluster:etcd:write:requests:latency:total:avg sum(rate(etcd_request
 ${t_install} cluster:etcd:write:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"create|update|delete"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"create|update|delete"}[${d_install}])) by (le,scope)
 ${t_test}    cluster:etcd:write:requests:latency:test:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"create|update|delete"}[${d_test}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"create|update|delete"}[${d_test}])) by (le,scope)
 
+${t_all}     cluster:etcd:disk:backend:commit:total:max   max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_disk_backend_commit_duration_seconds_bucket[2m])) by (pod, le))[${d_all}:]))
+${t_install} cluster:etcd:disk:backend:commit:install:max max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_disk_backend_commit_duration_seconds_bucket[2m])) by (pod, le))[${d_install}:]))
+${t_test}    cluster:etcd:disk:backend:commit:test:max    max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_disk_backend_commit_duration_seconds_bucket[2m])) by (pod, le))[${d_test}:]))
+
+${t_all}     cluster:etcd:disk:wal:fsync:total:max   max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_disk_wal_fsync_duration_seconds_bucket[2m])) by (pod, le))[${d_all}:]))
+${t_install} cluster:etcd:disk:wal:fsync:install:max max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_disk_wal_fsync_duration_seconds_bucket[2m])) by (pod, le))[${d_install}:]))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max    max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_disk_wal_fsync_duration_seconds_bucket[2m])) by (pod, le))[${d_test}:]))
+
+${t_all}     cluster:etcd:network:peer:rtt:total:max   max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_network_peer_round_trip_time_seconds_bucket[2m])) by (pod, le))[${d_all}:]))
+${t_install} cluster:etcd:network:peer:rtt:install:max max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_network_peer_round_trip_time_seconds_bucket[2m])) by (pod, le))[${d_install}:]))
+${t_test}    cluster:etcd:network:peer:rtt:test:max    max(max_over_time(histogram_quantile(0.99, sum(irate(etcd_network_peer_round_trip_time_seconds_bucket[2m])) by (pod, le))[${d_test}:]))
+
+${t_all}     cluster:etcd:db:compaction:total:max   max(max_over_time((delta(etcd_debugging_mvcc_db_compaction_total_duration_milliseconds_sum[1m:30s])/2)[${d_all}:30s]))
+${t_install} cluster:etcd:db:compaction:install:max max(max_over_time((delta(etcd_debugging_mvcc_db_compaction_total_duration_milliseconds_sum[1m:30s])/2)[${d_install}:30s]))
+${t_test}    cluster:etcd:db:compaction:test:max    max(max_over_time((delta(etcd_debugging_mvcc_db_compaction_total_duration_milliseconds_sum[1m:30s])/2)[${d_test}:30s]))
+
+${t_all}     cluster:etcd:disk:backend:defrag:total:max   max(max_over_time((delta(etcd_disk_backend_defrag_duration_seconds_sum[1m:30s])/2)[${d_all}:30s]))
+${t_install} cluster:etcd:disk:backend:defrag:install:max max(max_over_time((delta(etcd_disk_backend_defrag_duration_seconds_sum[1m:30s])/2)[${d_install}:30s]))
+${t_test}    cluster:etcd:disk:backend:defrag:test:max    max(max_over_time((delta(etcd_disk_backend_defrag_duration_seconds_sum[1m:30s])/2)[${d_test}:30s]))
+
+${t_all}     cluster:etcd:server:leader:changes:total:max   max(max_over_time(changes(etcd_server_leader_changes_seen_total{namespace="openshift-etcd"}[${d_all}])[${d_all}:]))
+${t_install} cluster:etcd:server:leader:changes:install:max max(max_over_time(changes(etcd_server_leader_changes_seen_total{namespace="openshift-etcd"}[${d_install}])[${d_install}:]))
+${t_test}    cluster:etcd:server:leader:changes:test:max    max(max_over_time(changes(etcd_server_leader_changes_seen_total{namespace="openshift-etcd"}[${d_test}])[${d_test}:]))
+
+${t_all}     cluster:etcd:server:operations:latency:total:max   max(max_over_time(histogram_quantile(0.99,sum(rate(grpc_server_handling_seconds_bucket{grpc_method!="Defragment",grpc_type="unary"}[5m])) by (le,pod,grpc_method))[${d_all}:]))
+${t_install} cluster:etcd:server:operations:latency:install:max max(max_over_time(histogram_quantile(0.99,sum(rate(grpc_server_handling_seconds_bucket{grpc_method!="Defragment",grpc_type="unary"}[5m])) by (le,pod,grpc_method))[${d_install}:]))
+${t_test}    cluster:etcd:server:operations:latency:test:max    max(max_over_time(histogram_quantile(0.99,sum(rate(grpc_server_handling_seconds_bucket{grpc_method!="Defragment",grpc_type="unary"}[5m])) by (le,pod,grpc_method))[${d_test}:]))
+
+${t_all}     cluster:etcd:server:apply:latency:total:max   max(max_over_time(delta(etcd_server_slow_apply_total{namespace="openshift-etcd"}[2m])[${d_all}:]))
+${t_install} cluster:etcd:server:apply:latency:install:max max(max_over_time(delta(etcd_server_slow_apply_total{namespace="openshift-etcd"}[2m])[${d_install}:]))
+${t_test}    cluster:etcd:server:apply:latency:test:max    max(max_over_time(delta(etcd_server_slow_apply_total{namespace="openshift-etcd"}[2m])[${d_test}:]))
+
+${t_all}     cluster:etcd:server:read:latency:total:max   max(max_over_time(delta(etcd_server_slow_read_indexes_total{namespace="openshift-etcd"}[2m])[${d_all}:]))
+${t_install} cluster:etcd:server:read:latency:install:max max(max_over_time(delta(etcd_server_slow_read_indexes_total{namespace="openshift-etcd"}[2m])[${d_install}:]))
+${t_test}    cluster:etcd:server:read:latency:test:max    max(max_over_time(delta(etcd_server_slow_read_indexes_total{namespace="openshift-etcd"}[2m])[${d_test}:]))
+
+${t_all}     cluster:etcd:server:heartbeat:failures:total:max max(max_over_time(etcd_server_heartbeat_send_failures_total{namespace="openshift-etcd"}[${d_all}:]))
+${t_test}    cluster:etcd:server:heartbeat:failures:test:max  max(max_over_time(etcd_server_heartbeat_send_failures_total{namespace="openshift-etcd"}[${d_test}:]))
+
+${t_all}     cluster:etcd:server:health:failures:total:max max(max_over_time(etcd_server_health_failures{namespace="openshift-etcd"}[${d_all}:]))
+${t_test}    cluster:etcd:server:health:failures:test:max  max(max_over_time(etcd_server_health_failures{namespace="openshift-etcd"}[${d_test}:]))
+
 ${t_all}     cluster:node:total:boots sum(increase(node_boots_total[${d_all}]))
 ${t_test}    cluster:node:test:boots sum(increase(node_boots_total[${d_test}]))
 
