@@ -1,16 +1,12 @@
 base_images:
-  ubi:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "9"
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: ubi
   to: network-observability-cli
 promotion:
   to:
@@ -33,6 +29,8 @@ tests:
 - as: integration-tests
   steps:
     cluster_profile: aws
+    dependencies:
+      NETOBSERV_COLLECTOR_IMAGE: ""
     test:
     - ref: netobserv-cli-tests
     workflow: cucushift-installer-rehearse-aws-ipi
