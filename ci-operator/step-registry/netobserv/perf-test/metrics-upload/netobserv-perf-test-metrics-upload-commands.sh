@@ -62,9 +62,13 @@ function upload_baseline(){
 function get_baseline(){
     cd /scripts || exit
     install_requirements requirements.txt
-    python nope.py baseline --fetch "$WORKLOAD"
-    BASELINE_UUID=$(jq '.BASELINE_UUID' < /tmp/data/baseline.json)
-    BASELINE_UUID=${BASELINE_UUID//\"/}
+    if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_CUSTOM_UUID:-} ]]; then
+        BASELINE_UUID=${MULTISTAGE_PARAM_OVERRIDE_CUSTOM_UUID//\"/}
+    else
+        python nope.py baseline --fetch "$WORKLOAD"
+        BASELINE_UUID=$(jq '.BASELINE_UUID' < /tmp/data/baseline.json)
+        BASELINE_UUID=${BASELINE_UUID//\"/}
+    fi
     export BASELINE_UUID
 }
 
@@ -94,7 +98,13 @@ function generate_sheet(){
     export GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
     install_requirements requirements.txt
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    SHEET_NAME=""
     # JOB_NAME, JOB_NAME_SAFE, PULL_NUMBER vars are set by prow.
+
+    # Set custom sheet name prefix if SHEET_NAME_PREFIX is defined
+    if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_SHEET_PREFIX:-} ]]; then
+        SHEET_NAME+="${MULTISTAGE_PARAM_OVERRIDE_SHEET_PREFIX}-"
+    fi
 
     # check if JOB_PREFIX is a rehearsal of periodic job.
     if [[ $JOB_NAME =~ ^"rehearse" ]]; then
@@ -106,16 +116,16 @@ function generate_sheet(){
             JOB_PREFIX=${JOB_NAME%-pull*}
         fi
         
-        SHEET_NAME="$JOB_NAME_SAFE-$JOB_PREFIX-$timestamp"
+        SHEET_NAME+="$JOB_NAME_SAFE-$JOB_PREFIX-$timestamp"
     fi
 
     # check if the job starts from PR of component test
     if [[ $JOB_NAME =~ ^"pull" ]]; then
-        SHEET_NAME="$JOB_NAME_SAFE-pull-$PULL_NUMBER-$timestamp"
+        SHEET_NAME+="$JOB_NAME_SAFE-pull-$PULL_NUMBER-$timestamp"
     fi
 
     if [[ $JOB_NAME =~ ^"periodic" ]]; then
-        SHEET_NAME="periodic-$JOB_NAME_SAFE-$timestamp"
+        SHEET_NAME+="periodic-$JOB_NAME_SAFE-$timestamp"
     fi
     
     if [[ -n $ops && $ops == "comparison" ]]; then
@@ -154,6 +164,16 @@ generate_metrics_sheet
 generate_sheet "$ARTIFACT_DIR/${UUID}_metrics.csv"
 get_baseline
 
+function get_env() {
+    EXECUTOR=$(curl "https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}" 2> /dev/null | yq '.metadata.annotations["ci.openshift.io/executor"]')
+    export EXECUTOR
+
+    if [[ $EXECUTOR =~ "gangway" ]]; then
+        GANGWAY_API_ENV=$(curl "https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}" 2> /dev/null  | yq '.spec.pod_spec.containers[] | has("env")')
+        export GANGWAY_API_ENV
+    fi
+}
+
 if [[ -n $BASELINE_UUID ]]; then
     # get the last value from output of do_comparison for the return code of comparison
     comparison_rc=$(do_comparison | tail -n 1)
@@ -162,7 +182,7 @@ if [[ -n $BASELINE_UUID ]]; then
     else
         echo "All metrics are within tolerance limits compared to current baseline."
         # upload Baselines only for periodic job triggers.
-        if [[ -n $JOB_NAME && $JOB_NAME =~ ^"periodic" ]]; then
+        if [[ -n $JOB_NAME && $JOB_NAME =~ ^"periodic" && ! ($EXECUTOR =~ "gangway" && $GANGWAY_API_ENV == true) ]]; then
             echo "Uploading $UUID as new baseline for $WORKLOAD"
             upload_baseline 
         fi

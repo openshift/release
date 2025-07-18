@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function add_lb_record() {
+    local name="$1"
+    local target="$2"
+    local record_type="$3"
+    local out="$4"
+    if [ ! -e "$out" ]; then
+        echo -n '[]' > "$out"
+    fi
+    cat <<< "$(jq --arg n "${name}" --arg t "${target}" --arg r "${record_type}" '. += [{"name": $n, "target": $t, "record_type": $r}]' "$out")" > "$out"
+}
+
 function find_out_api_and_ingress_ip_addresses() {
   local -r infra_id="$1"
   local -r region="$2"
@@ -27,10 +38,9 @@ function find_out_api_and_ingress_ip_addresses() {
   fi
 
   echo "$(date -u --rfc-3339=seconds) - INFO: Populate the file '${out_file}' with API server IP (${api_ip_address}) and INGRESS server IP (${ingress_ip_address})..."
-  cat > "${out_file}"  << EOF
-api.${cluster_domain}. ${api_ip_address}
-*.apps.${cluster_domain}. ${ingress_ip_address}
-EOF
+
+  add_lb_record "api.${cluster_domain}." "${api_ip_address}" "A" ${out_file}
+  add_lb_record "*.apps.${cluster_domain}." "${ingress_ip_address}" "A" ${out_file}
 }
 
 GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
@@ -53,7 +63,9 @@ fi
 GCP_REGION="${LEASED_RESOURCE}"
 
 ret=0
-find_out_api_and_ingress_ip_addresses "${INFRA_ID}" "${GCP_REGION}" "${cluster_domain}" "${SHARED_DIR}/public-custom-dns"
 
-echo "$(date -u --rfc-3339=seconds) - INFO: See '${SHARED_DIR}/public-custom-dns'."
+find_out_api_and_ingress_ip_addresses "${INFRA_ID}" "${GCP_REGION}" "${cluster_domain}" "${SHARED_DIR}/public_custom_dns.json"
+
+echo "$(date -u --rfc-3339=seconds) - INFO: See '${SHARED_DIR}/public_custom_dns.json'."
+cat ${SHARED_DIR}/public_custom_dns.json
 exit "${ret}"

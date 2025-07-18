@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ ! -f "${SHARED_DIR}/public-custom-dns" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - ERROR: File '${SHARED_DIR}/public-custom-dns' doesn't exist, abort."
+if [[ ! -f "${SHARED_DIR}/public_custom_dns.json" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: File '${SHARED_DIR}/public_custom_dns.json' doesn't exist, abort."
   exit 1
 fi
 
@@ -65,22 +65,25 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 }
 EOF
 
-while read -r line; do
-  # api.abc.com. 1.1.1.1
-  fqdn="${line% *}"
-  vip="${line#* }"
-  echo "[DEBUG] line: '${line}'"
-  echo "[DEBUG] fqdn: '${fqdn}'"
-  echo "[DEBUG] vip: '${vip}'"
+count=$(jq '.|length' ${SHARED_DIR}/public_custom_dns.json)
+for i in $(seq 0 $((count-1)));
+do
+    name=$(jq --argjson i $i -r '.[$i].name' ${SHARED_DIR}/public_custom_dns.json)
+    target=$(jq --argjson i $i -r '.[$i].target' ${SHARED_DIR}/public_custom_dns.json)
+    record_type=$(jq --argjson i $i -r '.[$i].record_type' ${SHARED_DIR}/public_custom_dns.json)
 
-  if [[ -n "${vip}" ]]; then
-    echo "$(date -u --rfc-3339=seconds) - INFO: Adding '${fqdn} ${vip}' to batch files"
-    dns_reserve_and_defer_cleanup "${vip}" "${fqdn}" "A"
-  else
-    echo "$(date -u --rfc-3339=seconds) - ERROR: Empty VIP for '${fqdn}', skipped."
-    ret=1
-  fi
-done < "${SHARED_DIR}/public-custom-dns"
+    if [[ -n "${target}" ]]; then
+        echo "$(date -u --rfc-3339=seconds) - INFO: Adding '${name} ${target}' to batch files"
+        dns_reserve_and_defer_cleanup "${target}" "${name}" "${record_type}"
+    else
+        echo "$(date -u --rfc-3339=seconds) - ERROR: Empty VIP for '${name}', skipped."
+        ret=1
+    fi
+done
+
+echo "dns-create.json:"
+cat "${SHARED_DIR}/dns-create.json"
+
 
 id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 
