@@ -6,193 +6,6 @@ presubmits:
     - ^release-v1\.17$
     - ^release-v1\.17-
     cluster: build04
-    context: ci/prow/418-e2e-oncluster-test
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "418"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-418-e2e-oncluster-test
-    rerun_command: /test 418-e2e-oncluster-test
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-oncluster-test
-        - --variant=418
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )418-e2e-oncluster-test,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build04
-    context: ci/prow/418-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "418"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-418-images
-    rerun_command: /test 418-images
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=src
-        - --variant=418
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )418-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build04
-    context: ci/prow/418-unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "418"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-418-unit
-    rerun_command: /test 418-unit
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=unit
-        - --variant=418
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )418-unit,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build04
     context: ci/prow/419-e2e-oncluster-test
     decorate: true
     decoration_config:
@@ -200,7 +13,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-419-e2e-oncluster-test
     rerun_command: /test 419-e2e-oncluster-test
@@ -260,7 +72,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )419-e2e-oncluster-test,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.17$
     - ^release-v1\.17-
@@ -272,10 +84,10 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-419-images
     rerun_command: /test 419-images
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -331,7 +143,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-419-unit
     rerun_command: /test 419-unit
@@ -376,3 +187,192 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )419-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build04
+    context: ci/prow/420-e2e-oncluster-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "420"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-420-e2e-oncluster-test
+    rerun_command: /test 420-e2e-oncluster-test
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-oncluster-test
+        - --variant=420
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )420-e2e-oncluster-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build04
+    context: ci/prow/420-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "420"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-420-images
+    rerun_command: /test 420-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=src
+        - --variant=420
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )420-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build04
+    context: ci/prow/420-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "420"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-kn-plugin-func-release-v1.17-420-unit
+    rerun_command: /test 420-unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit
+        - --variant=420
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )420-unit,?($|\s.*)
