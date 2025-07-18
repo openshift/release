@@ -180,18 +180,29 @@ tests:
           cpu: 100m
 - as: tests-extension
   steps:
+    cluster_profile: aws
     test:
     - as: tests-extension
+      cli: latest
       commands: |
         echo "Build binary olmv1-tests-ext"
         cd openshift/tests-extension
         make build
+
         echo "Running olmv1-tests-ext with all tests"
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
         ./bin/olmv1-tests-ext run-suite olmv1/all
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: olm-operator-controller
+      - env: CATALOGD_IMAGE
+        name: olm-catalogd
       from: src
       resources:
         requests:
           cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
