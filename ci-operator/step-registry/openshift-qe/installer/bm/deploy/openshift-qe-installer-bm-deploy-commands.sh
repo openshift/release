@@ -87,6 +87,12 @@ fi
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
+# Copy the ssh key to the bastion host
+OCPINV=$QUADS_INSTANCE/instack/$CLOUD\_ocpinventory.json
+bastion=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@${bastion}
+ssh -p $LOGIN -o StrictHostKeyChecking=no root@${bastion} hostname
+
 # Clean up previous attempts
 cat > /tmp/clean-resources.sh << 'EOF'
 echo 'Running clean-resources.sh'
