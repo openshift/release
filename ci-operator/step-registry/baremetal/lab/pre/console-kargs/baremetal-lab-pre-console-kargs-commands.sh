@@ -69,7 +69,7 @@ systemd:
       ExecStartPre=-bash -c 'set -x; for i in \$(lsblk -I8,259 -nd --output name); do wipefs -a /dev/\$i; done; set +x'
       ExecStartPre=/usr/bin/coreos-installer install $root_device \
         --delete-karg console=ttyS0,115200n8 $(join_by_semicolon "${console_kargs}" "--append-karg console=" "") \
-        --ignition-url ${base_url%%*(/)}/${role}.ign \
+        --ignition-url ${base_url%%*(/)}/bootstrap.ign \
         --insecure-ignition --copy-network
       # Some servers' firmware push any new detected boot options to the tail of the boot order.
       # When other boot options are present and bootable, such a server will boot from them instead of the new one.
