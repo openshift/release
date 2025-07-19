@@ -214,10 +214,12 @@ export LOCAL_REPO='ocp/openshift4'
 
 # Mirror release
 set +e
+set -x
 for retry in {1..5}
 do
     echo "[$(date)] Retrying mirror #${retry}"
     oc adm release new \
+        --keep-manifest-list \
         -a ~/pull-secret \
         --from-release="${RELEASE_IMAGE_LATEST}" \
         --to-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
@@ -225,6 +227,7 @@ do
     && break
     sleep 15
 done
+set +x
 set -e
 
 # Copy pull secret for external binary extraction
