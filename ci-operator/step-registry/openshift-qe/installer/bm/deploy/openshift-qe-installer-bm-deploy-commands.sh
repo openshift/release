@@ -26,6 +26,7 @@ if [[ "$NUM_WORKER_NODES" == "" ]]; then
 fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
+LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
