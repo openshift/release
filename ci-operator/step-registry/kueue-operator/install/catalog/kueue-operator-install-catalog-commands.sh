@@ -104,12 +104,25 @@ function mirror_catalog_and_operator() {
 
     echo "Using MUST_GATHER_IMAGE from compute step: ${MUST_GATHER_IMAGE}"
     
-    # For disconnected environments, the image will be mirrored to the mirror registry
-    # Set the mirrored image path for disconnected environments
-    MIRRORED_MUST_GATHER_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather"
-    echo "Mirrored MUST_GATHER_IMAGE for disconnected environment: ${MIRRORED_MUST_GATHER_IMAGE}"
-    # Update the environment variable to use the mirrored image for disconnected environments
-    echo "export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}" >> "${SHARED_DIR}/env"
+    # For disconnected environments, the images will be mirrored to the mirror registry
+    # Set the mirrored image paths for disconnected environments, preserving the original tags
+    MUST_GATHER_TAG=$(echo "${MUST_GATHER_IMAGE}" | sed 's/.*://')
+    OPERATOR_TAG=$(echo "${OPERATOR_IMAGE}" | sed 's/.*://')
+    OPERAND_TAG=$(echo "${RELATED_IMAGE_OPERAND_IMAGE}" | sed 's/.*://')
+    
+    MIRRORED_MUST_GATHER_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather:${MUST_GATHER_TAG}"
+    MIRRORED_OPERATOR_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:${OPERATOR_TAG}"
+    MIRRORED_OPERAND_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-0-11:${OPERAND_TAG}"
+    
+    echo "Mirrored images for disconnected environment:"
+    echo "  MIRRORED_MUST_GATHER_IMAGE: ${MIRRORED_MUST_GATHER_IMAGE}"
+    echo "  MIRRORED_OPERATOR_IMAGE: ${MIRRORED_OPERATOR_IMAGE}"
+    echo "  MIRRORED_OPERAND_IMAGE: ${MIRRORED_OPERAND_IMAGE}"
+    
+    # Update the environment variables to use the mirrored images for disconnected environments
+    sed -i "s|export MUST_GATHER_IMAGE=.*|export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}|" "${SHARED_DIR}/env"
+    sed -i "s|export OPERATOR_IMAGE=.*|export OPERATOR_IMAGE=${MIRRORED_OPERATOR_IMAGE}|" "${SHARED_DIR}/env"
+    sed -i "s|export RELATED_IMAGE_OPERAND_IMAGE=.*|export RELATED_IMAGE_OPERAND_IMAGE=${MIRRORED_OPERAND_IMAGE}|" "${SHARED_DIR}/env"
 
     echo "[$(timestamp)] Creating ImageSetConfiguration for catalog and operator related images..."
     cat > ${TMP_DIR}/imageset.yaml << EOF
@@ -125,7 +138,9 @@ mirror:
       - name: stable-v1.0
   additionalImages: # additional images used in e2e test code
   - name: quay.io/openshift/origin-oauth-proxy:4.14
-  - name: ${MUST_GATHER_IMAGE}
+  - name: ${MIRRORED_MUST_GATHER_IMAGE}
+  - name: ${MIRRORED_OPERATOR_IMAGE}
+  - name: ${MIRRORED_OPERAND_IMAGE}
 EOF
 
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
