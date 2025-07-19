@@ -116,6 +116,28 @@ tests:
     test:
     - ref: redhat-developer-rhdh-aks-operator-nightly
     workflow: redhat-developer-rhdh-aks-mapt
+- as: e2e-tests-eks-helm-nightly
+  cron: 0 7 * * TUE,THU,SAT,SUN
+  optional: true
+  presubmit: true
+  steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - ref: redhat-developer-rhdh-eks-mapt-destroy
+    test:
+    - ref: redhat-developer-rhdh-eks-helm-nightly
+    workflow: redhat-developer-rhdh-eks-mapt
+- as: e2e-tests-eks-operator-nightly
+  cron: 0 7 * * TUE,THU,SAT,SUN
+  optional: true
+  presubmit: true
+  steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - ref: redhat-developer-rhdh-eks-mapt-destroy
+    test:
+    - ref: redhat-developer-rhdh-eks-operator-nightly
+    workflow: redhat-developer-rhdh-eks-mapt
 - as: e2e-tests-gke-helm-nightly
   cron: 0 7 * * TUE,THU,SAT,SUN
   optional: true
@@ -163,6 +185,15 @@ tests:
     - ref: redhat-developer-rhdh-aks-mapt-orphaned-get
     test:
     - ref: redhat-developer-rhdh-aks-mapt-orphaned-destroy
+- as: cleanup-mapt-destroy-orphaned-eks-clusters
+  cron: 0 2 * * SUN
+  optional: true
+  presubmit: true
+  steps:
+    pre:
+    - ref: redhat-developer-rhdh-eks-mapt-orphaned-get
+    test:
+    - ref: redhat-developer-rhdh-eks-mapt-orphaned-destroy
 - as: e2e-tests-osd-gcp-helm-nightly
   cron: 0 10 * * TUE,THU,SAT,SUN
   optional: true
