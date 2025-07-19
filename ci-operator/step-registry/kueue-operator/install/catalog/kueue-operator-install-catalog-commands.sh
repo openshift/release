@@ -119,6 +119,7 @@ mirror:
   - name: ${MUST_GATHER_IMAGE}
   - name: ${OPERATOR_IMAGE}
   - name: quay.io/openshift/origin-oauth-proxy:4.14
+  - name: registry.access.redhat.com/ubi9/ubi:9.4
 EOF
 
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
