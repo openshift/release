@@ -10,16 +10,40 @@ PATCH="${SHARED_DIR}/install-config-patch.yaml"
 CLUSTER_NAME=${NAMESPACE}-${UNIQUE_HASH}
 CLUSTER_PVTZ_PROJECT="$(< ${SHARED_DIR}/cluster-pvtz-project)"
 
-cat > "${PATCH}" << EOF
+if [[ "${PRIVATE_ZONE_PROJECT_TYPE}" == "service-project" ]] || [[ "${PRIVATE_ZONE_PROJECT_TYPE}" == "host-project" ]]; then
+  cat > "${PATCH}" << EOF
 platform:
   gcp:
     privateDNSZone: 
       id: ${CLUSTER_NAME}-private-zone
       project: ${CLUSTER_PVTZ_PROJECT}
 EOF
+elif [[ "${PRIVATE_ZONE_PROJECT_TYPE}" == "third-project" ]]; then
+  if [[ -f "${CLUSTER_PROFILE_DIR}/third_project_setting.json" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - INFO: Reading third project settings from '${CLUSTER_PROFILE_DIR}/third_project_setting.json'..."
+    GCP_BASE_DOMAIN=$(jq -r '.baseDomain' "${CLUSTER_PROFILE_DIR}/third_project_setting.json")
+  else
+    echo "$(date -u --rfc-3339=seconds) - INFO: '${CLUSTER_PROFILE_DIR}/third_project_setting.json' not found, using the default..."
+    GCP_BASE_DOMAIN="regional.qe.gcp.devcluster.openshift.com"
+  fi
+
+  cat > "${PATCH}" << EOF
+baseDomain: ${GCP_BASE_DOMAIN%.}
+platform:
+  gcp:
+    privateZone: 
+      zone: ${CLUSTER_NAME}-private-zone
+      projectID: ${CLUSTER_PVTZ_PROJECT}
+EOF
+else
+  echo "$(date -u --rfc-3339=seconds) - ERROR: Unknown private zone project type '${PRIVATE_ZONE_PROJECT_TYPE}', abort. " && exit 1
+fi
+
 yq-go m -x -i "${CONFIG}" "${PATCH}"
-echo "Updated platform.gcp.privateDNSZone in '${CONFIG}'."
+echo "Updated platform.gcp.privateDNSZone (or platform.gcp.privateZone) in '${CONFIG}'."
 
 echo "(debug)--------------------"
 yq-go r "${CONFIG}" platform
+echo "(debug)--------------------"
+yq-go r "${CONFIG}" baseDomain
 echo "(debug)--------------------"
