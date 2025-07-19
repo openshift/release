@@ -61,8 +61,10 @@ if [[ "${RESTRICTED_NETWORK}" = "yes" ]]; then
   echo "Updating the VPC into a disconnected network (removing NAT and enabling Private Google Access)..."
   gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-master" --router "${CLUSTER_NAME}-router" --region "${REGION}"
   gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-worker" --router "${CLUSTER_NAME}-router" --region "${REGION}"
-  gcloud compute networks subnets update "${CLUSTER_NAME}-master-subnet" --region "${REGION}" --enable-private-ip-google-access
-  gcloud compute networks subnets update "${CLUSTER_NAME}-worker-subnet" --region "${REGION}" --enable-private-ip-google-access
+  if [[ "${ENABLE_PRIVATE_IP_GOOGLE_ACCESS}" == "yes" ]]; then
+    gcloud compute networks subnets update "${CLUSTER_NAME}-master-subnet" --region "${REGION}" --enable-private-ip-google-access
+    gcloud compute networks subnets update "${CLUSTER_NAME}-worker-subnet" --region "${REGION}" --enable-private-ip-google-access
+  fi
 fi
 
 cat > "${SHARED_DIR}/customer_vpc_subnets.yaml" << EOF
