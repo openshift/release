@@ -72,7 +72,6 @@ ARGS=(
   --webhook-url "$WEBHOOK_URL"
   --version "$Z_STREAM_VERSION"
   --cluster-name "$CLUSTER_NAME"
-  --domain "compute-nto"
 )
 
 if [[ -n "$POLARION_URL" ]]; then
