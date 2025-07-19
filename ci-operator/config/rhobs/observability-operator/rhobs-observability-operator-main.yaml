@@ -56,7 +56,14 @@ tests:
     timeout: 3h0m0s
     version: "4.15"
   steps:
+    env:
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
     test:
+    - ref: install-operators
     - as: install
       cli: latest
       commands: |
@@ -85,6 +92,7 @@ tests:
           cpu: 100m
           memory: 400Mi
     - ref: rhobs-enable-ocp
+    - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: rhobs-obo-test-harness
     workflow: generic-claim
 zz_generated_metadata:

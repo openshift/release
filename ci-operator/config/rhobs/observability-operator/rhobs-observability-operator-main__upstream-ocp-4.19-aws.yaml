@@ -34,7 +34,15 @@ tests:
     version: "4.19"
   cron: '@daily'
   steps:
+    env:
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
     test:
+    - ref: install-operators
+    - ref: distributed-tracing-tests-tracing-ui-integration
     - as: obo-e2e
       cli: latest
       commands: |
