@@ -49,4 +49,8 @@ fi
 
 echo "$RUN_COMMAND"
 
-${RUN_COMMAND}
+if [ "${STOP_ON_FAILURE}" = "false" ]; then
+  "${RUN_COMMAND}" || true
+else
+  "${RUN_COMMAND}"
+fi
