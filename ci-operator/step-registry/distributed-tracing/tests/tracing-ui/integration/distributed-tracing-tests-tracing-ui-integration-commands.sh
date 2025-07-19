@@ -11,6 +11,7 @@ vars=(
   CYPRESS_KONFLUX_COO_BUNDLE_IMAGE
   CYPRESS_CUSTOM_COO_BUNDLE_IMAGE
   CYPRESS_DT_CONSOLE_IMAGE
+  KUBEADMIN_PASSWORD_FILE
 )
 
 # Loop through each variable.
@@ -22,6 +23,20 @@ for var in "${vars[@]}"; do
     echo "$var is set to '${!var}'"
   fi
 done
+
+# Read kubeadmin password from file
+if [[ -z "${KUBEADMIN_PASSWORD_FILE:-}" ]]; then
+  echo "Error: KUBEADMIN_PASSWORD_FILE variable is not set"
+  exit 1
+fi
+
+if [[ ! -f "${KUBEADMIN_PASSWORD_FILE}" ]]; then
+  echo "Error: Kubeadmin password file ${KUBEADMIN_PASSWORD_FILE} does not exist"
+  exit 1
+fi
+
+kubeadmin_password=$(cat "${KUBEADMIN_PASSWORD_FILE}")
+echo "Successfully read kubeadmin password from ${KUBEADMIN_PASSWORD_FILE}"
 
 # Set proxy vars.
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -95,8 +110,11 @@ console_route=$(oc get route console -n openshift-console -o jsonpath='{.spec.ho
 export CYPRESS_BASE_URL=https://$console_route
 
 # Set Cypress authentication username and password.
-export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
-export CYPRESS_LOGIN_USERS=${users}
+# Use the IDP once issue https://issues.redhat.com/browse/OCPBUGS-59366 is fixed.
+#export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
+#export CYPRESS_LOGIN_USERS=${users}
+export CYPRESS_LOGIN_IDP=kube:admin
+export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 
 # Run the Cypress tests.
 export NO_COLOR=1
@@ -117,6 +135,7 @@ if [[ "$oc_version_minor" -ge 19 ]]; then
   git clone "$repo_url" "$target_dir"
   if [ $? -eq 0 ]; then
     cd "$target_dir/tests"
+    git checkout release-1.0
     echo "Successfully cloned the repository and changed directory to $target_dir/tests."
   else
     echo "Error cloning the repository."
@@ -141,7 +160,6 @@ else
 fi
 
 # Install npm modules
-ls -ltr
 npm install
 
 # Run the Cypress tests
