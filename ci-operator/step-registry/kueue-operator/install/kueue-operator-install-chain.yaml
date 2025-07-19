@@ -1,0 +1,43 @@
+chain:
+  as: kueue-operator-install
+  steps:
+  - ref: kueue-operator-install-compute
+  - ref: kueue-operator-install-catalog
+  - ref: wait
+  - as: run-sdk
+    commands: |
+      # Source proxy configuration if it exists
+      if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+          echo "Setting proxy configuration..."
+          source "${SHARED_DIR}/proxy-conf.sh"
+      else
+          echo "No proxy settings found. Skipping proxy configuration..."
+      fi
+      
+      # Configure authentication for mirror registry by reusing saved auth
+      export HOME="${HOME:-/tmp/home}"
+      export XDG_RUNTIME_DIR="${HOME}/run"
+      mkdir -p "${XDG_RUNTIME_DIR}/containers"
+      
+      if test -f "${SHARED_DIR}/containers-auth.json"; then
+          echo "Reusing authentication file from catalog step..."
+          cp "${SHARED_DIR}/containers-auth.json" "${XDG_RUNTIME_DIR}/containers/auth.json"
+          echo "Authentication configured successfully"
+      else
+          echo "No saved auth file found. Using default authentication..."
+      fi
+      
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      
+      echo "Running operator-sdk run bundle..."
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator --skip-tls-verify --verbose --security-context-config restricted "$BUNDLE_IMAGE"
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  - ref: kueue-operator-install-operator
+  documentation: |-
+    Install the kueue Operator for Red Hat OpenShift from a catalog source.
+    This chain includes image patching to use mirrored images in disconnected environments.
