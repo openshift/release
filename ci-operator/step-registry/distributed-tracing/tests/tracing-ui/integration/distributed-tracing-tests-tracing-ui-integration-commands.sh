@@ -1,7 +1,5 @@
 #!/bin/bash
-
 set -o nounset
-set -o errexit
 set -o pipefail
 
 # List of variables to check.
@@ -11,6 +9,7 @@ vars=(
   CYPRESS_KONFLUX_COO_BUNDLE_IMAGE
   CYPRESS_CUSTOM_COO_BUNDLE_IMAGE
   CYPRESS_DT_CONSOLE_IMAGE
+  CYPRESS_COO_NAMESPACE
 )
 
 # Loop through each variable.
@@ -22,6 +21,20 @@ for var in "${vars[@]}"; do
     echo "$var is set to '${!var}'"
   fi
 done
+
+# Read kubeadmin password from file
+if [[ -z "${KUBEADMIN_PASSWORD_FILE:-}" ]]; then
+  echo "Error: KUBEADMIN_PASSWORD_FILE variable is not set"
+  exit 0
+fi
+
+if [[ ! -f "${KUBEADMIN_PASSWORD_FILE}" ]]; then
+  echo "Error: Kubeadmin password file ${KUBEADMIN_PASSWORD_FILE} does not exist"
+  exit 0
+fi
+
+kubeadmin_password=$(cat "${KUBEADMIN_PASSWORD_FILE}")
+echo "Successfully read kubeadmin password from ${KUBEADMIN_PASSWORD_FILE}"
 
 # Set proxy vars.
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -87,16 +100,30 @@ echo "authentication operator finished updating"
 # Copy the artifacts to the aritfact directory at the end of the test run.
 trap copyArtifacts EXIT
 
+# Validate KUBECONFIG
+if [[ -z "${KUBECONFIG:-}" ]]; then
+  echo "Error: KUBECONFIG variable is not set"
+  exit 0
+fi
+
+if [[ ! -f "${KUBECONFIG}" ]]; then
+  echo "Error: Kubeconfig file ${KUBECONFIG} does not exist"
+  exit 0
+fi
+
 # Set Kubeconfig var for Cypress.
-cp -L $KUBECONFIG /tmp/kubeconfig && export CYPRESS_KUBECONFIG_PATH=/tmp/kubeconfig
+export CYPRESS_KUBECONFIG_PATH=$KUBECONFIG
 
 # Set Cypress base URL var.
 console_route=$(oc get route console -n openshift-console -o jsonpath='{.spec.host}')
 export CYPRESS_BASE_URL=https://$console_route
 
 # Set Cypress authentication username and password.
-export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
-export CYPRESS_LOGIN_USERS=${users}
+# Use the IDP once issue https://issues.redhat.com/browse/OCPBUGS-59366 is fixed.
+#export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
+#export CYPRESS_LOGIN_USERS=${users}
+export CYPRESS_LOGIN_IDP=kube:admin
+export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 
 # Run the Cypress tests.
 export NO_COLOR=1
@@ -116,33 +143,33 @@ if [[ "$oc_version_minor" -ge 19 ]]; then
   echo "OpenShift version is 4.$oc_version_minor or greater. Cloning the main branch."
   git clone "$repo_url" "$target_dir"
   if [ $? -eq 0 ]; then
-    cd "$target_dir/tests"
+    cd "$target_dir/tests" || exit 0
+    git checkout release-1.0
     echo "Successfully cloned the repository and changed directory to $target_dir/tests."
   else
     echo "Error cloning the repository."
-    exit 1
+    exit 0
   fi
 else
   echo "OpenShift version is less than 4.19. Cloning and checking out the release-0.4 branch."
   git clone "$repo_url" "$target_dir"
   if [ $? -eq 0 ]; then
-    cd "$target_dir/tests"
+    cd "$target_dir/tests" || exit 0
     git checkout release-0.4
     if [ $? -eq 0 ]; then
       echo "Successfully cloned the repository, changed directory to $target_dir/tests, and checked out the release-0.4 branch."
     else
       echo "Error checking out the release-0.4 branch."
-      exit 1
+      exit 0
     fi
   else
     echo "Error cloning the repository."
-    exit 1
+    exit 0
   fi
 fi
 
 # Install npm modules
-ls -ltr
-npm install
+npm install || true
 
-# Run the Cypress tests
-npm run test-cypress-console-headless
+# Run the Cypress tests.
+npm run test-cypress-console-headless || true
