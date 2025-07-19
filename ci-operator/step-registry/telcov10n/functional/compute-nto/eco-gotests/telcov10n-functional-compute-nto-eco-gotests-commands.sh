@@ -3,7 +3,7 @@ set -e
 set -o pipefail
 set -x
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
+ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 PROJECT_DIR="/tmp"
 
 echo "Create group_vars directory"
@@ -50,10 +50,17 @@ echo "Setup compute-nto test script"
 cd /eco-ci-cd
 
 # shellcheck disable=SC2154
-no_run_it_ansible-playbook ./playbooks/cnf/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
-    --extra-vars "features=${FEATURES} labels=${LABELS} \
-    kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig additional_test_env_variables='${ECO_GOTESTS_ENV_VARS}'"
-set +x
+ansible-playbook ./playbooks/compute/deploy-nto-gotest.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "cluster_name=${CLUSTER_NAME} \
+    kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+# set +x
+
+echo "Run NTO gotests script"
+cd /tmp/gotest/
+bash run_gotests.sh
+
+echo "Copy test reports to shared directory"
+cp -v /tmp/artifacts/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No test reports found to copy"
 
 echo "Set bastion ssh configuration"
 grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
