@@ -40,7 +40,33 @@ ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_COMPUTE_NTO_ENABLED=true ${ECO_GOTESTS_ENV
 if [[ "${ECO_GOTEST_BMC_ACCESS}" = "true" ]]; then
   ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_USER=$(grep -oP "(?<=bmc_user: ).*" "${SHARED_DIR}/all" | sed "s/'//g")"
   ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_PASS=$(grep -oP "(?<=bmc_password: ).*" "${SHARED_DIR}/all" | sed "s/'//g")"
-  ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_NAMES=$(grep -oP "(?<=bmc_address: ).*" "${SHARED_DIR}/worker0" | sed "s/'//g")"
+
+  # Handle BMC address extraction from all worker files
+  BMC_ADDRESSES=""
+  for worker_file in "${SHARED_DIR}"/worker*; do
+    if [[ -f "${worker_file}" ]]; then
+      worker_name=$(basename "${worker_file}")
+      BMC_ADDRESS=$(grep -oP "(?<=bmc_address: ).*" "${worker_file}" | sed "s/'//g" || echo "")
+      if [[ -n "${BMC_ADDRESS}" ]]; then
+        if [[ -n "${BMC_ADDRESSES}" ]]; then
+          BMC_ADDRESSES="${BMC_ADDRESSES},${BMC_ADDRESS}"
+        else
+          BMC_ADDRESSES="${BMC_ADDRESS}"
+        fi
+        echo "BMC address found in ${worker_name}: ${BMC_ADDRESS}"
+      else
+        echo "Warning: bmc_address not found in ${worker_name}"
+      fi
+    fi
+  done
+
+  if [[ -n "${BMC_ADDRESSES}" ]]; then
+    ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_NAMES=${BMC_ADDRESSES}"
+    echo "All BMC addresses: ${BMC_ADDRESSES}"
+  else
+    echo "Warning: No BMC addresses found in any worker files"
+    ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_NAMES="
+  fi
 fi
 
 echo "Show compute-nto eco-gotests environment variables"
@@ -53,14 +79,8 @@ cd /eco-ci-cd
 ansible-playbook ./playbooks/compute/deploy-nto-gotest.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "cluster_name=${CLUSTER_NAME} \
     kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
-# set +x
 
-echo "Run NTO gotests script"
-cd /tmp/gotest/
-bash run_gotests.sh
-
-echo "Copy test reports to shared directory"
-cp -v /tmp/artifacts/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No test reports found to copy"
+echo "Run NTO gotests via SSH (playbook creates files on bastion, not locally)"
 
 echo "Set bastion ssh configuration"
 grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
@@ -70,12 +90,13 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
 echo "Run compute-nto eco-gotests via ssh tunnel"
-ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/eco_gotests;./eco-gotests-run.sh || true"
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/gotest && ./run_gotests.sh || true"
 
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/eco_gotests/report/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/"
+mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests/"
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/" || echo "No XML reports found on bastion"
 rm -rf "${PROJECT_DIR}/temp_ssh_key"
 
-echo "Store polarion report for reporter step"
-mv "${ARTIFACT_DIR}/junit_eco_gotests/report_testrun.xml" "${SHARED_DIR}/report_testrun.xml"
+echo "Copy test reports to shared directory for reporter step"
+cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No test reports found to copy to SHARED_DIR"
