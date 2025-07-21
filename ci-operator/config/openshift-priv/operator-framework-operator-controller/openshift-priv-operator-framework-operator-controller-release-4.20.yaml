@@ -129,7 +129,9 @@ tests:
     test:
     - as: upstream-e2e
       cli: latest
-      commands: make -C openshift test-e2e
+      commands: |
+        make -C openshift test-e2e
+        make -C openshift test-experimental-e2e
       dependencies:
       - env: E2E_REGISTRY_IMAGE
         name: e2e-test-registry
@@ -161,6 +163,18 @@ tests:
       commands: |
         echo "Verifying Default Catalog Tests"
         cd openshift/default-catalog-consistency
+        make verify
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: tests-extension-verify
+  run_if_changed: ^(openshift/tests-extension/)
+  steps:
+    test:
+    - as: tests-extension-verify
+      commands: |
+        cd openshift/tests-extension
         make verify
       from: src
       resources:

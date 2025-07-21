@@ -3,6 +3,12 @@ set -e
 set -o pipefail
 PROJECT_DIR="/tmp"
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Set bastion ssh configuration"
 grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" \
   | sed -e 's/ansible_ssh_private_key: //g' -e "s/'//g" \
