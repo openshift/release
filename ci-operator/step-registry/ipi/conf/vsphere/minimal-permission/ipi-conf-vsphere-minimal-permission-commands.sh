@@ -19,6 +19,7 @@ platform:
   vsphere:
     vcenters:
     - datacenters:
+      - DEVQEdatacenter-2
       user: "${vcenter_username_minimal_permission}"
       password: "${vcenter_password_minimal_permission}"
 EOF
