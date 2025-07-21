@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# TODO: should use configurable branch instead of 'devel'?
-podvm_img_url="https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/devel/config/peerpods/podvm/"
 configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
 
 # TODO: still needed? 600 seconds will cause the step timeout?
@@ -189,7 +187,7 @@ data:
   eligibility: "false"
   eligibleSingleNode: "false"
   enableGPU: "${ENABLEGPU}"
-  podvmImageUrl: "${podvm_img_url}"
+  podvmImageUrl: "${PODVM_IMAGE_URL}"
   runtimeClassName: "${RUNTIMECLASS}"
   trusteeCatalogSourcename: "${TRUSTEE_CATALOG_SOURCE_NAME}"
   trusteeUrl: "${TRUSTEE_URL}"
