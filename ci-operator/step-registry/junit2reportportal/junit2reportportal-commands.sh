@@ -6,6 +6,23 @@ set -o pipefail
 touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
+if ! (env | grep -q JOB_SPEC)
+then
+  echo "No JOB_SPEC. Skip"
+  exit 0
+fi
+
+ALLOWED_REPOS=("openshift-tests-private"
+               "verification-tests"
+              )
+repo="$(jq -r '.extra_refs[].repo' <<< ${JOB_SPEC:-''})"
+# shellcheck disable=SC2076
+if ! [[ "${ALLOWED_REPOS[*]}" =~ "$repo" ]]
+then
+    echo "Skip repo: $repo"
+    exit 0
+fi
+
 LOGS_PATH="logs"
 if [[ "$(jq -r '.type' <<< ${JOB_SPEC:-''})" = "presubmit" ]]
 then
@@ -51,12 +68,36 @@ function generate_attribute_architecture() {
                  'multi' \
                  'ppc64le'
   do
-    if [[ "$JOB_NAME" =~ $keyword ]] ; then
+    if [[ "$JOB_NAME" =~ $keyword ]]
+    then
       architecture="$keyword"
       break
     fi
   done
-  write_attribute architecture "$architecture"
+  if [[ "$architecture" = 'unknown' ]]
+  then
+    release_dir="${LOCAL_DIR_ORI}/release/artifacts"
+    for release_file in 'release-images-arm64-latest' \
+                        'release-images-latest'
+    do
+      release_info_file="$release_dir/$release_file"
+      if [[ -f "$release_info_file" ]]
+      then
+        version_installed="$(jq -r '.metadata.name' "$release_info_file")"
+        write_attribute version_installed "$version_installed"
+        if [[ "$version_installed" =~ multi ]]
+        then
+          architecture='multi'
+        elif [[ "$version_installed" =~ arm64 ]]
+        then
+          architecture='arm64'
+        else
+          architecture='amd64'
+        fi
+        write_attribute architecture "$architecture"
+      fi
+    done
+  fi
 }
 
 function generate_attribute_cloud_provider() {
@@ -72,12 +113,37 @@ function generate_attribute_cloud_provider() {
                  'openstack' \
                  'vsphere'
   do
-    if [[ "$JOB_NAME_SAFE" =~ $keyword ]] ; then
+    if [[ "$JOB_NAME_SAFE" =~ $keyword ]]
+    then
       cloud_provider="$keyword"
       break
     fi
   done
   write_attribute cloud_provider "$cloud_provider"
+}
+
+function generate_attribute_install() {
+  install="fail"
+  for keyword in 'cucushift-installer-reportportal-marker' \
+                 'idp-htpasswd' \
+                 'fips-check-fips-or-die' \
+                 'fips-check-node-scan' \
+                 'cucushift-pre' \
+                 'cucushift-e2e' \
+                 'openshift-extended-test' \
+                 'openshift-extended-test-longduration' \
+                 'openshift-extended-test-supplementary' \
+                 'openshift-extended-web-tests' \
+                 'openshift-e2e-test-clusterinfra-qe' \
+                 'openshift-e2e-test-qe-report'
+  do
+    if [[ -d "$LOCAL_DIR_ORI/$keyword" ]]
+    then
+      install="succeed"
+      break
+    fi
+  done
+  write_attribute install "$install"
 }
 
 function generate_attribute_install_method() {
@@ -88,7 +154,8 @@ function generate_attribute_install_method() {
                  'rosa' \
                  'upi'
   do
-    if [[ "$JOB_NAME_SAFE" =~ $keyword ]] ; then
+    if [[ "$JOB_NAME_SAFE" =~ $keyword ]]
+    then
       install_method="$keyword"
       break
     fi
@@ -109,25 +176,29 @@ function generate_attribute_profilename() {
 }
 
 function generate_attribute_version_installed() {
-  version_installed="unknown"
-  release_dir="${LOCAL_DIR_ORI}/release/artifacts"
-  release_file="release-images-latest"
-  arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
-  if [[ "$arch" = 'arm64' ]]
+  version_installed="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="version_installed").value' "$DATAROUTER_JSON")"
+  if [[ -z "$version_installed" ]]
   then
-    release_file="release-images-arm64-latest"
+    release_dir="${LOCAL_DIR_ORI}/release/artifacts"
+    release_file="release-images-latest"
+    arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
+    if [[ "$arch" = 'arm64' ]]
+    then
+      release_file="release-images-arm64-latest"
+    fi
+    release_info_file="$release_dir/$release_file"
+    if [[ -f "$release_info_file" ]]
+    then
+      version_installed="$(jq -r '.metadata.name' "$release_info_file")"
+    fi
+    write_attribute version_installed "$version_installed"
   fi
-  release_info_file="$release_dir/$release_file"
-  if [[ -f "$release_info_file" ]]
-  then
-    version_installed="$(jq -r '.metadata.name' "$release_info_file")"
-  fi
-  write_attribute version_installed "$version_installed"
 }
 
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
+  generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
   generate_attribute_version_installed
@@ -228,7 +299,8 @@ function droute_send() {
               --username="$(< /var/run/datarouter/username)" \
               --password="$(< /var/run/datarouter/password)" \
               --metadata="$DATAROUTER_JSON" \
-              --results="${LOCAL_DIR_RST}/*"
+              --results="${LOCAL_DIR_RST}/*" \
+              --wait
 }
 
 download_logs
