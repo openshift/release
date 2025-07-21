@@ -4,7 +4,7 @@ set -e
 set -u
 set -o pipefail
 
-index_image=${MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE}
+index_image="${MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE/registry-proxy.engineering.redhat.com/brew.registry.redhat.io}"
 
 if [[ -z ${index_image} ]] ; then
   echo "index_image is not set."
@@ -102,7 +102,7 @@ function create_icsp_connected () {
 
     run_command "oc delete imagecontentsourcepolicies.operator.openshift.io/brew-registry --ignore-not-found=true"
 
-    if [[ -z ${MULTISTAGE_PARAM_OVERRIDE_LOGGING_TEST_VERSION} ]] ; then
+    if [[ $index_image == "brew.registry.redhat.io/rh-osbs/iib"* ]] ; then
         cat <<EOF | oc apply -f -
         apiVersion: operator.openshift.io/v1alpha1
         kind: ImageContentSourcePolicy
@@ -115,6 +115,10 @@ function create_icsp_connected () {
             source: registry.redhat.io
 EOF
     else
+        if [[ -z ${MULTISTAGE_PARAM_OVERRIDE_LOGGING_TEST_VERSION} ]] ; then
+            echo "MULTISTAGE_PARAM_OVERRIDE_LOGGING_TEST_VERSION is not set, can't create correct ICSP"
+            exit 1
+        fi
         image_version="${MULTISTAGE_PARAM_OVERRIDE_LOGGING_TEST_VERSION//./-}"
         cat <<EOF | oc apply -f -
         apiVersion: operator.openshift.io/v1alpha1
