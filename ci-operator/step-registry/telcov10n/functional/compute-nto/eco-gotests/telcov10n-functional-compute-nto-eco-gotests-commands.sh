@@ -98,5 +98,16 @@ mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests/"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/" || echo "No XML reports found on bastion"
 rm -rf "${PROJECT_DIR}/temp_ssh_key"
 
-echo "Copy test reports to shared directory for reporter step"
-cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No test reports found to copy to SHARED_DIR"
+echo "Create junit-named copies in ARTIFACT_DIR for reporter compatibility"
+for xml_file in "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml; do
+  if [[ -f "${xml_file}" ]]; then
+    basename_file=$(basename "${xml_file}")
+    # Prepend junit_ to any XML filename
+    junit_name="junit_${basename_file}"
+    cp -v "${xml_file}" "${ARTIFACT_DIR}/junit_eco_gotests/${junit_name}"
+    echo "Created junit copy: ${basename_file} -> ${junit_name}"
+  fi
+done
+
+echo "Copy junit test reports to shared directory for reporter step"
+cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/junit_*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No junit test reports found to copy to SHARED_DIR"
