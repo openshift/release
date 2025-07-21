@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Download and copy the kata containers RPM to /host/var/local/kata-containers.rpm
 # on each worker node. The RPM is going to be installed by the test automation code.
@@ -22,15 +22,48 @@ fi
 
 brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"
 
-md5sum_file="${KATA_RPM_BUILD_MD5SUM}  kata-containers.rpm"
-curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}"
+# md5sum_file="${KATA_RPM_BUILD_MD5SUM}  kata-containers.rpm"
+OUTPUT=$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}" 2>&1)
+err=$?
+if [ $err -ne 0 ]; then
+    echo "ERROR: curl error ${err} trying to get ${KATA_RPM_BUILD_URL}"
+    echo "ERROR: ${OUTPUT}"
+    exit $err
+fi
+
 echo "Debug:"
 ls -l kata-containers.rpm || true
-echo "Checking against md5sum ${KATA_RPM_BUILD_MD5SUM}"
-echo "${md5sum_file}" | md5sum -c -
 
+#echo "Checking against md5sum ${KATA_RPM_BUILD_MD5SUM}"
+#echo "${md5sum_file}" | md5sum -c -
+
+# checks for a bad URL
+grep 'URL was not found' kata-containers.rpm
+if [ $? -eq 0 ]; then
+    echo "ERROR: curl couldn't find ${KATA_RPM_BUILD_URL}"
+    # show the 1st 20 lines of the file
+    head -20 kata_containers.rpm
+    exit 2
+fi
+
+# calculate checksum
+KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
+echo $KATA_RPM_MD5SUM
+
+# Upload and verify
+FAILED_NODES=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
-    oc debug -n default -T "${node}" -- bash -c "echo ${md5sum_file} > /host/var/local/kata-containers.rpm.md5sum"
+    OUTPUT=$(oc debug -n default "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm")
+    if [ "${KATA_RPM_MD5SUM}" != "$(echo ${OUTPUT} | cut -d ' ' -f1)" ]; then
+        echo $OUTPUT
+        FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
+    fi
 done
+
+# check for failures
+if [ ${FAILED_NODES} != "" ]; then
+    echo "ERROR: uploads failed on nodes $FAILED_NODES"
+    exit 4
+fi
