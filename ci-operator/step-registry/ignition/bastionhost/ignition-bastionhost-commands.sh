@@ -81,6 +81,19 @@ EOF
 # /srv/squid/cache
 # ----------------------------------------------------------------
 
+# Some webesites (e.g: the backend of central ci registry) support
+# dual-stack dns. When accessing these websites via proxy, if the
+# proxy server does not have ipv6 outgoing capacity, the access
+# probably timeout. Though the proxy configuration support failover,
+# that would result in instablity for clients when the failover did
+# not happen yet. So here make the proxy use ipv4 to resolve the
+# dual-stack websites as the default behavior.
+proxy_dns_config="dns_v4_first on"
+if [[ "${IPSTACK}" == "dualstack" ]]; then
+    # when no setting, ipv6 DNS is preferred in squid process
+    proxy_dns_config=""
+fi
+
 ## PROXY Config
 cat > ${workdir}/squid.conf << EOF
 auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwords
@@ -90,7 +103,8 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
-dns_v4_first on
+cache deny all
+${proxy_dns_config}
 EOF
 
 ## PROXY Service
@@ -111,7 +125,7 @@ ExecStart=/usr/bin/podman run --name "squid-proxy" \
 -v /srv/squid/etc:/etc/squid:Z \
 -v /srv/squid/cache:/var/spool/squid:Z \
 -v /srv/squid/log:/var/log/squid:Z \
-quay.io/coreos/squid
+quay.io/openshifttest/squid-proxy:4.13-fc31
 
 ExecReload=-/usr/bin/podman stop "squid-proxy"
 ExecReload=-/usr/bin/podman rm "squid-proxy"

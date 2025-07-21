@@ -12,10 +12,10 @@ spec:
   imageDigestMirrors:
     - mirrors:
         - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
-      source: registry.redhat.io/kueue-tech-preview/kueue-rhel9-operator
+      source: registry.redhat.io/kueue/kueue-rhel9-operator
     - mirrors:
         - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
-      source: registry.redhat.io/kueue-tech-preview/kueue-rhel9
+      source: registry.redhat.io/kueue/kueue-rhel9
 EOF
 
 oc apply -f - <<EOF
@@ -27,10 +27,10 @@ spec:
   imageTagMirrors:
     - mirrors:
         - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
-      source: registry.redhat.io/kueue-tech-preview/kueue-rhel9-operator
+      source: registry.redhat.io/kueue/kueue-rhel9-operator
     - mirrors:
         - quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
-      source: registry.redhat.io/kueue-tech-preview/kueue-rhel9
+      source: registry.redhat.io/kueue/kueue-rhel9
 EOF
 
 echo "Current PWD: $(pwd)"

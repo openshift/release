@@ -50,7 +50,7 @@ until [ "$(kubectl get csv -n openshift-sriov-network-operator | grep sriov-netw
   do echo "Waiting for SRIOV operator"
   sleep 5
 done
-kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname)"
+kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname | grep sriov)"
 sleep 60
 
 {

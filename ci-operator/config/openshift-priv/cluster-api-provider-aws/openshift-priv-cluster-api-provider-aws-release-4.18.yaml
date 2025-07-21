@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.18"
   commitchecker:
     name: commitchecker
     namespace: ci
@@ -97,17 +101,18 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
-- as: regression-clusterinfra-aws-ipi-proxy-techpreview
+- as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
+      E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_FILTERS: CAPI
-      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
     test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
