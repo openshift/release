@@ -77,6 +77,9 @@ chain:
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
+    - name: HC_DISABLE_CAPS
+      default: ""
+      documentation: "Disabling Capabilities in Hosted Cluster,format: 'Console,ImageRegistry...' detail see https://issues.redhat.com/browse/MGMT-20628"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -158,6 +161,38 @@ chain:
         exit 0
       fi
       
+      VALID_CAPS=("Console" "ImageRegistry" "Insights" "NodeTuning" "baremetal" "openshift-samples" "Ingress")
+      if [[ -n "$HC_DISABLE_CAPS" ]]; then
+        IFS=',' read -ra CAP_LIST <<< "$HC_DISABLE_CAPS"
+      
+        DISABLE_CONSOLE=false
+        DISABLE_INGRESS=false
+      
+        for cap in "${CAP_LIST[@]}"; do
+          cap="$(echo "$cap" | xargs)"  # trim spaces
+          if [[ -z "$cap" ]]; then
+            echo "Error: Empty capability value in HC_DISABLE_CAPS='$HC_DISABLE_CAPS'"
+            exit 1
+          fi
+          if [[ ! " ${VALID_CAPS[*]} " =~ " ${cap} " ]]; then
+            echo "Error: Invalid capability '$cap'"
+            exit 1
+          fi
+      
+          # Track Console and Ingress
+          [[ "$cap" == "Console" ]] && DISABLE_CONSOLE=true
+          [[ "$cap" == "Ingress" ]] && DISABLE_INGRESS=true
+        done
+      
+        # Enforce: If Ingress is disabled, Console must also be disabled
+        if [[ "$DISABLE_INGRESS" == true && "$DISABLE_CONSOLE" == false ]]; then
+          echo "Error: Ingress capability can only be disabled if Console capability is also disabled"
+          exit 1
+        fi
+      
+        COMMAND+=(--disable-cluster-capabilities "$HC_DISABLE_CAPS")
+      fi
+
       # add cluster-info tags if exists
       hosted_cluster_info_file=${SHARED_DIR}/hosted_cluster_info_file
       if [[ -f "${hosted_cluster_info_file}" ]] ; then
@@ -210,6 +245,8 @@ chain:
           done
         '
       fi
+
+      sleep 1h
 
       if [[ $? -ne 0 ]]; then
         cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
