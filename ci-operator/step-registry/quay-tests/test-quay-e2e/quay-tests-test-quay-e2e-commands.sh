@@ -41,10 +41,19 @@ fi
 
 #Trigget Quay E2E Testing
 set +x
+echo "get quay version from original QUAY_OPERATOR_CHANNEL = ${QUAY_OPERATOR_CHANNEL#*-}"
+operator_channel="$QUAY_OPERATOR_CHANNEL"
+echo "operator_channel = ${operator_channel}"
+quay_version=${operator_channel#*-}
+echo "quay_version=${quay_version}"
+
 quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
 echo "The Quay hostname is $quay_route"
 quay_hostname=${quay_route#*//}
 echo "The Quay hostname is $quay_hostname"
 export CYPRESS_QUAY_ENDPOINT=$quay_hostname
+export CYPRESS_QUAY_VERSION=${quay_version}
 NO_COLOR=1 yarn run smoke || true
+
+
 
