@@ -6,6 +6,12 @@ set -o pipefail
 touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
+if ! (env | grep -q JOB_SPEC)
+then
+  echo "No JOB_SPEC. Skip"
+  exit 0
+fi
+
 ALLOWED_REPOS=("openshift-tests-private"
                "verification-tests"
               )
