@@ -31,7 +31,7 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 ES_SERVER="" EXTRA_FLAGS="--layer3=${ENABLE_L3} --iteration=${current_worker_count}" CHURN=false ./run.sh
 
 # The measurable run
-EXTRA_FLAGS="--gc-metrics=true --iteration=${ITERATIONS} --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true --iteration=${ITERATIONS} --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE}"
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
