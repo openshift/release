@@ -57,7 +57,7 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${CLUSTER_NAME}/vmlinuz_${arch}_2 debug nosplash ip=${baremetal_iface}:dhcp6 $kargs coreos.live.rootfs_url=http://[fd99:2222:3456::1]/${CLUSTER_NAME}/rootfs-${arch}_2.img ignition.firstboot ignition.platform.id=metal panic=30
+    linux  /${CLUSTER_NAME}/vmlinuz_${arch}_2 debug nosplash ip=[${ipv6}]::[fd99:2222:3456::1]:64::${baremetal_iface}:none nameserver=[fd99:2222:3456::1] $kargs coreos.live.rootfs_url=http://[fd99:2222:3456::1]/${CLUSTER_NAME}/rootfs-${arch}_2.img ignition.firstboot ignition.platform.id=metal panic=30
     initrd /${CLUSTER_NAME}/initramfs_${arch}_2.img
 }
 EOF
@@ -71,7 +71,7 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp6 $kargs coreos.live.rootfs_url=http://[fd99:2222:3456::1]/${CLUSTER_NAME}/rootfs-${arch}.img ignition.firstboot ignition.platform.id=metal panic=30
+    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=[${ipv6}]::[fd99:2222:3456::1]:64::${baremetal_iface}:none nameserver=[fd99:2222:3456::1] $kargs coreos.live.rootfs_url=http://[fd99:2222:3456::1]/${CLUSTER_NAME}/rootfs-${arch}.img ignition.firstboot ignition.platform.id=metal panic=30
     initrd /${CLUSTER_NAME}/initramfs_${arch}.img
 }
 EOF
