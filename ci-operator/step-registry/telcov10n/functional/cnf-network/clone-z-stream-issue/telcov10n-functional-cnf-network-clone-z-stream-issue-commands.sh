@@ -40,10 +40,9 @@ echo "Content of shared_dir is: $(ls -la $SHARED_DIR)"
 
 echo "Running Z stream issue clone - $Z_STREAM_VERSION"
 
-export JIRA_TOKEN
-export Z_STREAM_VERSION
-export SHARED_DIR
-
 cd $SCRIPTS_FOLDER
-python3 $PYTHON_SCRIPT
+python3 $PYTHON_SCRIPT \
+  --z-stream-version "$Z_STREAM_VERSION" \
+  --jira-token "$JIRA_TOKEN" \
+  --shared-dir "$SHARED_DIR"
 
