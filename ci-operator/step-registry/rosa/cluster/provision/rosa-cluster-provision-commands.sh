@@ -10,7 +10,9 @@ STS=${STS:-true}
 HOSTED_CP=${HOSTED_CP:-false}
 COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
-CHANNEL_GROUP=${CHANNEL_GROUP}
+TARGET_VERSION="${VERSION}"  # Make sure VERSION is set before this
+RESOLVED_CHANNEL_GROUP=""
+CHANNEL_GROUPS=("nightly" "candidate" "stable")
 MULTI_AZ=${MULTI_AZ:-false}
 EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-"optional"}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
@@ -159,19 +161,36 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
-version_cmd="rosa list versions --channel-group ${CHANNEL_GROUP} -o json"
-if [[ "$HOSTED_CP" == "true" ]]; then
-  version_cmd="$version_cmd --hosted-cp"
-fi
-if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
-  # shellcheck disable=SC2089
-  version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
-else
-  version_cmd="$version_cmd | jq -r '.[].raw_id'"
-fi
-versionList=$(eval $version_cmd)
-echo -e "Available cluster versions:\n${versionList}"
+for GROUP in "${CHANNEL_GROUPS[@]}"; do
+  echo "Checking $GROUP for ${TARGET_VERSION}..."
+  version_cmd="rosa list versions --channel-group ${GROUP} -o json"
+  if [[ "${HOSTED_CP:-}" == "true" ]]; then
+    version_cmd="$version_cmd --hosted-cp"
+  fi
 
+  if [[ "${AVAILABLE_UPGRADE:-}" == "yes" ]]; then
+    versionList=$(eval $version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id')
+  else
+    versionList=$(eval $version_cmd | jq -r '.[].raw_id')
+  fi
+
+  if echo "$versionList" | grep -q "^${TARGET_VERSION}$"; then
+    echo "Found ${TARGET_VERSION} in $GROUP channel"
+    RESOLVED_CHANNEL_GROUP="$GROUP"
+    break
+  fi
+
+  sleep 1  # small delay between calls for safety
+
+done
+
+if [[ -z "$RESOLVED_CHANNEL_GROUP" ]]; then
+  echo "Version ${TARGET_VERSION} not found in any channel group (nightly/candidate/stable)"
+  exit 1
+fi
+
+CHANNEL_GROUP="$RESOLVED_CHANNEL_GROUP"
+echo "Proceeding with version ${TARGET_VERSION} from ${CHANNEL_GROUP} channel group"
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
 # supplied by CI for the payload to use. This only really works for nightlies. ROSA
 # SRE has a job that polls the release controller and syncs new nightlies every 15 minutes,
@@ -239,10 +258,10 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
   exit 1
 fi
 
-# if [[ "$CHANNEL_GROUP" != "stable" ]]; then
-#   OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${CHANNEL_GROUP}"
-# fi
-log "Choosing openshift version ${OPENSHIFT_VERSION}"
+if [[ "$RESOLVED_CHANNEL_GROUP" != "stable" ]]; then
+  OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${RESOLVED_CHANNEL_GROUP}"
+fi
+log "Choosing OpenShift version ${OPENSHIFT_VERSION}"
 
 # Add USER_TAGS to help with cloud cost and make sure to remove
 # invalid tags so that CLI usage doesn't fail later.
@@ -270,7 +289,7 @@ cat > ${cluster_config_file} << EOF
   "hypershift": ${HOSTED_CP},
   "region": "${CLOUD_PROVIDER_REGION}",
   "version": {
-    "channel_group": "${CHANNEL_GROUP}",
+    "channel_group": "${RESOLVED_CHANNEL_GROUP}",
     "raw_id": "${OPENSHIFT_VERSION}",
     "major_version": "$(echo ${OPENSHIFT_VERSION} | awk -F. '{print $1"."$2}')"
   },
@@ -509,15 +528,15 @@ if [[ "$STS" == "true" ]]; then
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
   roleARNFile="${SHARED_DIR}/account-roles-arns"
-  account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
+  account_installer_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
   account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
   account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
-  if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
+  if [[ -z "${account_installer_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
   fi
-  ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
-  record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
+  ACCOUNT_ROLES_SWITCH="--role-arn ${account_installer_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
+  record_cluster "aws.sts" "role_arn" $account_installer_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
   record_cluster "aws.sts" "worker_role_arn" $account_worker_role_arn
 
@@ -578,7 +597,7 @@ echo "  Worker disk size: ${WORKER_DISK_SIZE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Multi-az: ${MULTI_AZ}"
 echo "  Openshift version: ${OPENSHIFT_VERSION}"
-echo "  Channel group: ${CHANNEL_GROUP}"
+echo "  Channel group: ${RESOLVED_CHANNEL_GROUP}"
 echo "  Fips: ${FIPS}"
 echo "  Private: ${PRIVATE}"
 echo "  Private Link: ${PRIVATE_LINK}"
@@ -617,7 +636,7 @@ ${HYPERSHIFT_SWITCH} \
 --cluster-name ${CLUSTER_NAME} \
 --region ${CLOUD_PROVIDER_REGION} \
 --version ${OPENSHIFT_VERSION} \
---channel-group ${CHANNEL_GROUP} \
+--channel-group ${RESOLVED_CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
 --tags ${TAGS} \
 ${DOMAIN_PREFIX_SWITCH} \
