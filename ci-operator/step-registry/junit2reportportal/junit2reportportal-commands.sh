@@ -71,6 +71,7 @@ function generate_attribute_architecture() {
     if [[ "$JOB_NAME" =~ $keyword ]]
     then
       architecture="$keyword"
+      write_attribute architecture "$architecture"
       break
     fi
   done
@@ -95,6 +96,7 @@ function generate_attribute_architecture() {
           architecture='amd64'
         fi
         write_attribute architecture "$architecture"
+        break
       fi
     done
   fi
