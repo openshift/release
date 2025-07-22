@@ -2,6 +2,16 @@
 set -o nounset
 set -o pipefail
 
+# This script is designed to run as a step in Prow CI (OpenShift CI) jobs.
+# We intentionally use 'exit 0' instead of 'exit 1' for failures to prevent
+# blocking subsequent test steps in the CI pipeline. When a step exits with
+# a non-zero code, the job stops and doesn't proceed to run subsequent steps.
+# Since we're adding multiple test steps for different components, we want
+# all steps to run regardless of individual step failures. Test failures
+# can still be identified and analyzed through junit reports which are
+# stored in the artifact directory and job status. A final step can be added 
+# to parse the junit reports and fail the job if any tests fail.
+
 # List of variables to check.
 vars=(
   CYPRESS_SKIP_COO_INSTALL
