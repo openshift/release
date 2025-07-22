@@ -18,7 +18,6 @@ ALLOWED_REPOS=("openshift-tests-private"
 repo="$(jq -r 'fromjson |
                if .refs then .refs.repo
                elif .extra_refs then .extra_refs[0].repo
-               else thisIsNotaValidRepoName
                end
 ' <<< ${JOB_SPEC:-''})"
 # shellcheck disable=SC2076
