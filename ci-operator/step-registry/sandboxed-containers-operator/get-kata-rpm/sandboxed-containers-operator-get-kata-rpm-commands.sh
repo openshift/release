@@ -31,22 +31,20 @@ if [ $err -ne 0 ]; then
     exit $err
 fi
 
-echo "Debug:"
-ls -l kata-containers.rpm || true
+#echo "Debug:"
+#ls -l kata-containers.rpm || true
 
 #echo "Checking against md5sum ${KATA_RPM_BUILD_MD5SUM}"
 #echo "${md5sum_file}" | md5sum -c -
 
 # checks for a bad URL
-grep 'URL was not found' kata-containers.rpm
-if [ $? -eq 0 ]; then
-    echo "ERROR: curl couldn't find ${KATA_RPM_BUILD_URL}"
-    # show the 1st 20 lines of the file
-    head -20 kata_containers.rpm
+
+if [ !$(grep -q 'URL was not found' kata-containers.rpm) ]; then
+    echo "ERROR: curl couldn't find ${KATA_RPM_BUILD_URL} $(head -20 kata_containers.rpm)"
     exit 2
 fi
 
-# calculate checksum
+echo "calculate checksum"
 KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
 echo $KATA_RPM_MD5SUM
 
@@ -56,7 +54,7 @@ nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
     OUTPUT=$(oc debug -n default "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm")
-    if [ "${KATA_RPM_MD5SUM}" != "$(echo ${OUTPUT} | cut -d ' ' -f1)" ]; then
+    if [ ! $(echo ${OUTPUT} | grep -q $(KATA_RPM_MD5SUM}) ]; then
         echo $OUTPUT
         FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
     fi
