@@ -24,9 +24,32 @@ tests:
   restrict_network_access: false
   steps:
     env:
+      CNF_TESTS_SKIP: reconcile
+      FEATURES_TO_TEST: sctp|sriov|dpdk|vrf|ovs_qos|metallb|fec|multinetworkpolicy
+      JOB_NAME: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-network-phase2-4.19-cnf-network-functional-tests
+      JOB_TYPE: "1"
+      OPERATORS: |
+        [
+          {"name":"sriov-network-operator","catalog":"redhat-operators-stage","nsname":"openshift-sriov-network-operator","deploy_default_config":true, "og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
+          {"name":"ptp-operator","catalog":"redhat-operators-stage","nsname":"openshift-ptp","ns_labels":{"workload.openshift.io/allowed":"management","name":"openshift-ptp"}},
+          {"name":"kubernetes-nmstate-operator","catalog":"redhat-operators","nsname":"openshift-nmstate","deploy_default_config":true},
+          {"name":"sriov-fec","catalog":"certified-operators","nsname":"vran-acceleration-operators","channel":"stable"},
+          {"name":"metallb-operator","catalog":"redhat-operators-stage","nsname":"metallb-system","channel":"stable","og_spec":{},"deploy_default_config":false}
+        ]
       VERSION: "4.19"
-    test:
+    pre:
     - ref: telcov10n-functional-cnf-network-schedule-job
+    - ref: telcov10n-functional-cnf-network-setup-cluster-env
+    - ref: telcov10n-functional-cnf-network-switch-config
+    - ref: telcov10n-functional-cnf-network-ocp-deploy
+    - ref: telcov10n-functional-cnf-network-ocp-operators
+    - ref: telcov10n-functional-cnf-network-cnf-config
+    test:
+    - ref: telcov10n-functional-cnf-network-metrics-daemon-tests
+    - ref: telcov10n-functional-cnf-network-cnf-tests
+    - ref: telcov10n-functional-cnf-network-cnf-gotests
+    - ref: telcov10n-functional-cnf-network-store-artifacts-on-bastion
+    - ref: telcov10n-functional-cnf-network-trigger-job
 zz_generated_metadata:
   branch: main
   org: openshift-kni
