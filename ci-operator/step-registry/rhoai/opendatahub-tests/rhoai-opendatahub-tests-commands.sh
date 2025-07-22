@@ -50,7 +50,7 @@ fi
 echo "$RUN_COMMAND"
 
 if [ "${STOP_ON_FAILURE}" = "false" ]; then
-  "${RUN_COMMAND}" || true
+  eval "$RUN_COMMAND" || true
 else
-  "${RUN_COMMAND}"
+  eval "$RUN_COMMAND"
 fi
