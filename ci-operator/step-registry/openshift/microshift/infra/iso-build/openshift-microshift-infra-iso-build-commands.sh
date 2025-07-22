@@ -14,17 +14,11 @@ source /tmp/ci-functions.sh
 ci_subscription_register
 
 download_microshift_scripts
-"\${DNF_RETRY}" "install" "pcp-zeroconf jq"
+"\${DNF_RETRY}" "install" "pcp-zeroconf jq sos"
 ci_copy_secrets "${CACHE_REGION}"
 
-if ! sudo systemctl start pmcd; then
-    sudo journalctl -u pmcd
-    exit 1
-fi
-if ! sudo systemctl start pmlogger; then
-    sudo journalctl -u pmlogger
-    exit 1
-fi
+sudo systemctl start pmcd
+sudo systemctl start pmlogger
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift

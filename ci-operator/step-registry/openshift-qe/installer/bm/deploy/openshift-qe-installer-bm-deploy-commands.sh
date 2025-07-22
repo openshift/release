@@ -20,6 +20,10 @@ export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
+if [[ "$NUM_WORKER_NODES" == "" ]]; then
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  export NUM_WORKER_NODES
+fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 
