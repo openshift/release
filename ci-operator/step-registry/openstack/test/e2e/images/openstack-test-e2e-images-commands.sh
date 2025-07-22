@@ -21,7 +21,7 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
 fi
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 
-openshift-tests images --to-repository "${MIRROR_REGISTRY_HOST}/e2e/tests" >> "${SHARED_DIR}/mirror-images-list.yaml"
+openshift-tests images --to-repository "${MIRROR_REGISTRY_HOST}/e2e/tests" | grep "${MIRROR_REGISTRY_HOST}/e2e/tests" >> "${SHARED_DIR}/mirror-images-list.yaml"
 # "registry.k8s.io/pause:XX" is excluded from the output of the "openshift-tests images" command as some of the layers
 # aren't compressed and this isn't supported by quay.io. So we need to mirror it from source bypassing quay.io.
 cat <<EOF >> "${SHARED_DIR}/mirror-images-list.yaml"
