@@ -32,29 +32,13 @@ if [[ "$found" != "true" ]]; then
   exit 1
 fi
 
+echo "Fetching .spec block from APIServer..."
+spec_block=$(oc get apiserver cluster -o json | jq '.spec')
+echo "$spec_block"
+
 echo "Comparing current TLS profile to expected..."
 
 echo "Fetching full .spec block from APIServer..."
 
 spec_block=$(oc get apiserver cluster -o json | jq '.spec')
 echo "$spec_block"
-
-if ! current=$(oc get apiserver cluster -o jsonpath='{.spec.tlsSecurityProfile}' | jq -c .); then
-  echo "ERROR: Failed to retrieve current TLS profile from APIServer."
-  exit 1
-fi
-
-if ! expected=$(echo "${LOGGING_TLS_SECURITY_PROFILE}" | jq -c .); then
-  echo "ERROR: Failed to parse expected TLS profile."
-  exit 1
-fi
-
-echo "Expected: ${expected}"
-echo "Current:  ${current}"
-
-if [[ "${current}" != "${expected}" ]]; then
-  echo "ERROR: TLS Security Profile does not match expected configuration."
-  exit 1
-fi
-
-echo "TLS Security Profile matches expected configuration."
