@@ -1,0 +1,46 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+  use_build_cache: true
+images:
+- context_dir: .automation/images
+  dockerfile_path: Dockerfile
+  to: rhdh-certification-test
+promotion:
+  to:
+  - name: rhdh
+    namespace: ci
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 5Gi
+    requests:
+      cpu: 500m
+      memory: 2Gi
+tests:
+- as: e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-certification
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: redhat-developer
+  repo: rhdh-plugin-certification
