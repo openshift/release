@@ -76,6 +76,8 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
   || /bin/true
 
+sleep 20m
+
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
