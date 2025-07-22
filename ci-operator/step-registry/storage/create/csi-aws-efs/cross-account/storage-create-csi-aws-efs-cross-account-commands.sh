@@ -125,7 +125,7 @@ if [[ ${ENABLE_SINGLE_ZONE} == "true" ]]; then
   SINGLE_ZONE=$(oc get node -l node-role.kubernetes.io/worker \
     -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')
   AWS_ACCOUNT_B_PRIVATE_SUBNET_IDS=$(aws ec2 describe-subnets \
-  --filters "Name=availability-zone,Values=$SINGLE_ZONE" "Name=vpc-id,Values=$AWS_ACCOUNT_B_VPC_CIDR" \
+  --filters "Name=availability-zone,Values=$SINGLE_ZONE" "Name=vpc-id,Values=$AWS_ACCOUNT_B_VPC_ID" \
   --query "Subnets[*].SubnetId" \
   --output text)
 fi
