@@ -101,6 +101,10 @@ git clone https://github.com/jrichter1/rhdh-plugins
 cd rhdh-plugins/workspaces/lightspeed || exit 1
 git checkout lightspeed-e2e
 
+export LIGHTSPEED_URL LIGHTSPEED_API_KEY
+LIGHTSPEED_URL=$(cat /usr/local/lightspeed-plugin/lightspeed-url)
+LIGHTSPEED_API_KEY=$(cat /usr/local/lightspeed-plugin/lightspeed-api-key)
+
 yarn
 yarn playwright test
 
