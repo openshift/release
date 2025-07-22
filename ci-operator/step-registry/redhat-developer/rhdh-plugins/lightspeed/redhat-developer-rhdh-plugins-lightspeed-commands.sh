@@ -102,7 +102,6 @@ cd rhdh-plugins/workspaces/lightspeed || exit 1
 git checkout lightspeed-e2e
 
 yarn
-yarn playwright install chrome
 yarn playwright test
 
 cp -a e2e-test-report/* ${ARTIFACT_DIR}
