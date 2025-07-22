@@ -79,6 +79,7 @@ function generate_attribute_architecture() {
   then
     release_dir="${LOCAL_DIR_ORI}/release/artifacts"
     for release_file in 'release-images-arm64-latest' \
+                        'release-images-ppc64le-latest' \
                         'release-images-latest'
     do
       release_info_file="$release_dir/$release_file"
@@ -92,6 +93,9 @@ function generate_attribute_architecture() {
         elif [[ "$version_installed" =~ arm64 ]]
         then
           architecture='arm64'
+        elif [[ "$version_installed" =~ ppc64le ]]
+        then
+          architecture='ppc64le'
         else
           architecture='amd64'
         fi
@@ -187,6 +191,9 @@ function generate_attribute_version_installed() {
     if [[ "$arch" = 'arm64' ]]
     then
       release_file="release-images-arm64-latest"
+    elif [[ "$arch" = 'ppc64le' ]]
+    then
+      release_file="release-images-ppc64le-latest"
     fi
     release_info_file="$release_dir/$release_file"
     if [[ -f "$release_info_file" ]]
