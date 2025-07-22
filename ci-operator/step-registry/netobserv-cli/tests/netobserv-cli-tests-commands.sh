@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 set -x
 short_sha=$(git rev-parse --short HEAD)
 USER=netobserv VERSION=$short_sha make commands
