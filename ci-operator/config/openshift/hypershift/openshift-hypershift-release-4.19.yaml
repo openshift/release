@@ -7,10 +7,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-operator-init:
     name: hypershift-operator
     namespace: hypershift
     tag: "4.19"
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   manila-csi-driver-operator-test:
     name: "4.19"
     namespace: ocp
@@ -35,11 +43,6 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.19_base-rhel9:
@@ -49,25 +52,10 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
-  to: hypershift-tests
 promotion:
   to:
-  - excluded_images:
-    - hypershift-operator
-    - hypershift-tests
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
-  - additional_images:
-      hypershift-operator: hypershift-operator
-    excluded_images:
-    - '*'
-    namespace: hypershift
-    tag: "4.19"
 releases:
   initial:
     candidate:
