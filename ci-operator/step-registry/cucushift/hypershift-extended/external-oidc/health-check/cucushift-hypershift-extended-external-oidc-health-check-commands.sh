@@ -79,6 +79,8 @@ if [[ -z "$api_server_url" ]]; then
 fi
 echo "kube-apiserver address for the hosted cluster: $api_server_url"
 
+rm -rf ~/.kube/cache/oc/*
+
 echo "Login to the hosted cluster with the CLI client"
 login_output="$(oc login "$api_server_url" --insecure-skip-tls-verify=true --exec-plugin=oc-oidc --issuer-url="$ISSUER_URL" --client-id="$CLI_CLIENT_ID" --extra-scopes=email --callback-port=8080 --kubeconfig=/tmp/kubeconfig-cli)"
 if [[ ! "$login_output" =~ "Logged into" ]]; then
