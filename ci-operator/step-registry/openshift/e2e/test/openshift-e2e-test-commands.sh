@@ -562,6 +562,12 @@ ipsec-suite)
      wait_for_ipsec_external_mode
      echo "IPsec External mode rollout complete. running IPsec test suite now"
      TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec Full mode with NAT-T encapsulation and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full", "full":{"encapsulation": "Always"}}}}}}'
+     wait_for_ipsec_full_mode
+     echo "IPsec Full mode with NAT-T encapsulation rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"

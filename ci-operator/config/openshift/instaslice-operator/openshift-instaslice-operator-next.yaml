@@ -33,13 +33,16 @@ tests:
     make test
   container:
     from: instaslice-base-src
-- as: e2e-sno-gpu
+- always_run: false
+  as: e2e-sno-gpu
   optional: true
   steps:
     cluster_profile: gcp
     env:
       CONTROL_PLANE_NODE_TYPE: a2-highgpu-1g
       CONTROL_PLANE_ZONES: '[us-central1-f]'
+    post:
+    - chain: ipi-deprovision
     pre:
     - chain: ipi-conf-gcp
     - ref: single-node-conf-gcp
@@ -134,7 +137,8 @@ tests:
           cpu: 300m
           memory: 500Mi
     workflow: ipi-gcp-single-node
-- as: e2e-kind-gpu
+- always_run: false
+  as: e2e-kind-gpu
   optional: true
   steps:
     cluster_profile: gcp

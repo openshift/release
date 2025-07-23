@@ -29,12 +29,15 @@ function run_command() {
     eval "${CMD}"
 }
 
+#"oc-mirror --v2 version" return "v0.0.0-unknown" in < ocp 4.18
+#oc major version is same with the oc-mirror major version,
+#use oc version to check the oc-mirror version
 function isPreVersion() {
   local required_ocp_version="$1"
   local isPre version
-  version=$(${oc_mirror_bin} version --v2 --output json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["clientVersion"]["gitVersion"])' | cut -d '.' -f1,2)
-  echo "get ${oc_mirror_bin} version: ${version}"
-
+  #version=$(${oc_mirror_bin} version --output json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["clientVersion"]["gitVersion"])' | cut -d '.' -f1,2)
+  version=$(oc version -o json |  python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["clientVersion"]["gitVersion"])' | cut -d '.' -f1,2)
+  echo "get oc version: ${version}"
   isPre=0
   if [ -n "${version}" ] && [ "$(printf '%s\n' "${required_ocp_version}" "${version}" | sort --version-sort | head -n1)" = "${required_ocp_version}" ]; then
     isPre=1

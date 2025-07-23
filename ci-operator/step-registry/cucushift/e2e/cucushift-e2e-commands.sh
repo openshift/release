@@ -175,7 +175,7 @@ function filter_test_by_capability() {
     local enabledcaps xversion yversion
     enabledcaps="$(oc get clusterversion version -o yaml | yq '.status.capabilities.enabledCapabilities[]')"
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
-    local v411 v412 v413 v414 v415 v416 v417 v418 v419
+    local v411 v412 v413 v414 v415 v416 v417 v418 v419 v420
     v411="baremetal marketplace openshift-samples"
     v412="${v411} Console Insights Storage CSISnapshot"
     v413="${v412} NodeTuning"
@@ -185,6 +185,7 @@ function filter_test_by_capability() {
     v417="${v416}"
     v418="${v417}"
     v419="${v418}"
+    v420="${v419}"
     # [console]=console
     # the first `console` is the capability name
     # the second `console` is the tag name in verification-tests
@@ -209,6 +210,9 @@ function filter_test_by_capability() {
     local versioncaps
     versioncaps="$v416"
     case "$xversion.$yversion" in
+        4.20)
+            versioncaps="$v420"
+            ;;
         4.19)
             versioncaps="$v419"
             ;;
@@ -374,7 +378,6 @@ function summarize_test_results() {
     combinedxml="${ARTIFACT_DIR}/junit_cucushift-e2e-combined.xml"
     jrm "$combinedxml" $xmlfiles || exit 0
     rm -f $xmlfiles
-    set -x
 
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
     if [ -f "$combinedxml" ] ; then
@@ -430,7 +433,7 @@ EOF
 
     if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
-        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
+        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | grep -v -E 'grep .*/artifacts' | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
         for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
