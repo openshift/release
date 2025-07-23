@@ -350,8 +350,8 @@ EOF
     cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
     if [ "W${DEBUG}W" == "WtrueW" ] || [ "W${DEBUG}W" == "WTrueW" ] ; then
-        echo "Sleep 2 hour, so we can login the cluster"
-        sleep 2h
+        echo "Sleep 8 hour, so we can login the cluster"
+        sleep 8h
     fi
 
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
