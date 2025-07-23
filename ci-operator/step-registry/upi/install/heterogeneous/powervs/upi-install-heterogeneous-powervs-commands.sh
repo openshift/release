@@ -176,7 +176,7 @@ function configure_automation() {
     #Create the VPC to fixed transit gateway Connection for the TG
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
     echo ":started searching for gateway... output expected:"
-    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | .id')
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg name "multi-arch-x-px-${POWERVS_REGION}-1-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $name) | .id')
     do
         echo ":gateway: ${GW}"
         for CS in $(ibmcloud is vpcs --output json | jq -r --arg mn "${METADATA_NAME}" '.[] | select(.name | contains("$mn")) | .id')
