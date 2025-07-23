@@ -15,9 +15,9 @@ fi
 ALLOWED_REPOS=("openshift-tests-private"
                "verification-tests"
               )
-repo="$(jq -r 'fromjson |
-               if .refs then .refs.repo
+repo="$(jq -r 'if .refs then .refs.repo
                elif .extra_refs then .extra_refs[0].repo
+               else error
                end
 ' <<< ${JOB_SPEC:-''})"
 # shellcheck disable=SC2076
