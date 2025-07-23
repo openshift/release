@@ -23,6 +23,9 @@ export PATH
 RESOURCE_GROUP=$(yq-v4 -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
 export RESOURCE_GROUP
 
+METADATA_NAME=$(yq-v4 -r '.' "${SHARED_DIR}/install-config.yaml" | grep ci-op | awk '{print $NF}')
+export METADATA_NAME
+
 ##### Functions
 # setup ibmcloud cli and the necessary plugins
 function setup_ibmcloud_cli() {
@@ -172,10 +175,13 @@ function configure_automation() {
 
     #Create the VPC to fixed transit gateway Connection for the TG
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
-    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+    echo ":started searching for gateway... output expected:"
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | .id')
     do
-        for CS in $(ibmcloud is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
+        echo ":gateway: ${GW}"
+        for CS in $(ibmcloud is vpcs --output json | jq -r --arg mn "${METADATA_NAME}" '.[] | select(.name | contains("$mn")) | .id')
         do
+            echo ":VPC: ${CS}"
             VPC_CONN_NAME=$(ibmcloud is vpc "${CS}" --output json | jq -r .name)
             VPC_NW_ID=$(ibmcloud is vpc "${CS}" --output json | jq -r .crn)
             echo "Creating new VPC connection for gateway now."
