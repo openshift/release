@@ -227,7 +227,7 @@ function update_image_registry() {
 }
 
 function update_sno_bip_live_iso {
-  [[ "${architecture}" == "arm64" ]] && CONSOLE="ttyAMA0,115200" || CONSOLE="ttyS1,115200n8"
+  CONSOLE="ttyS1,115200n8"
   root_device=$(echo "$architecture" | sed 's/arm64/\/dev\/nvme0n1/;s/amd64/\/dev\/sda/')
   escaped_root_device=$(echo "$root_device" | sed 's/\//\\\//g')
   shim_arch=$(echo "$architecture" | sed 's/arm64/aa64/;s/amd64/x64/')
