@@ -19,6 +19,7 @@ function cerberus_cleanup() {
   oc get ns
 
   oc get pods -n $TEST_NAMESPACE
+  jobs -l
 
   oc cluster-info
   echo "ended resource watch gracefully"
@@ -30,6 +31,7 @@ function cerberus_cleanup() {
   oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
   output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
   echo "pod rsh $output"
+  exit 0
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 
