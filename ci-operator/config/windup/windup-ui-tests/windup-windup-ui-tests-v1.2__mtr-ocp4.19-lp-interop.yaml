@@ -55,6 +55,26 @@ tests:
     - ref: install-operators
     - ref: mtr-deploy-windup
     - ref: mtr-tests-ui
+    - as: datarouter-send
+      commands: |
+        export DATAROUTER_RESULTS="${SHARED_DIR}/*.xml"
+        export REPORTPORTAL_HOSTNAME="reportportal-ccit.apps.dno.ocp-hub.prod.psi.redhat.com"
+        export REPORTPORTAL_PROJECT="DR_TEST_PROJECT"
+        export REPORTPORTAL_LAUNCH_NAME="OpenShift CI Test Run"
+        datarouter-openshift-ci
+      credentials:
+      - collection: ""
+        mount_path: /datarouter/secrets
+        name: datarouter-dno-dr-dev
+        namespace: test-credentials
+      from_image:
+        name: datarouter
+        namespace: dno
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: firewatch-ipi-aws
 - as: mtr-interop-aws-fips
   cron: 0 23 31 2 *
