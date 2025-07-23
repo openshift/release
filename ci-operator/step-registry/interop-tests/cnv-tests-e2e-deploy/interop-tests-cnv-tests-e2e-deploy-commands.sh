@@ -65,5 +65,5 @@ if [[ $MAP_TESTS == "true" ]]; then
          -o ./yq && chmod +x ./yq
     fi
     echo "Mapping Test Suite Name To: CNV-lp-interop"
-    yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' junit.functest.xml
+    yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $ARTIFACT_DIR/junit.functest.xml
 fi
