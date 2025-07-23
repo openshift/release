@@ -115,7 +115,7 @@ main() {
     URL_ARTIFACTS_TOP=$(get_artifacts_url)
     echo "No fine-grained results available, sending default message."
     curl -X POST -H 'Content-type: application/json' \
-      --data "{\"text\":\":failed: \`$JOB_NAME\`, 📜 <$URL_CI_RESULTS|logs>, 📦 <$URL_ARTIFACTS_TOP|artifacts>, <!subteam^S07BMJ56R8S>.\"}" \
+      --data "{\"text\":\":failed: \`$JOB_NAME\`, 📜 <$URL_CI_RESULTS|logs>, 📦 <$URL_ARTIFACTS_TOP|artifacts>, <!subteam^S07BMJ56R8S> <@U08UP0REWG1>.\"}" \
       "$SLACK_NIGHTLY_WEBHOOK_URL"
     exit 1
   else
