@@ -56,9 +56,9 @@ die_modlist() {
 }
 
 if [[ -f "go.mod" ]]; then
-  if ! grep -Eq '^go [0-9]+\.[0-9]+\.[0-9]+$' go.mod; then
+  if ! awk -F'[ .]+' '/^go / && NF < 4 && $3 > 21 {exit 1}'; then
     # Hermeto fails if the go directive does not have a patch version.
-    echo "Error: 'go' directive in go.mod must include a patch version (e.g. go 1.22.0)"
+    echo "Error: 'go' directive in go.mod must include a patch version (e.g. go 1.22.0) for go1.22+"
     exit 1
   fi
 fi
