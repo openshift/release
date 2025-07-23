@@ -1,5 +1,8 @@
 #!/bin/bash
 set -o errexit
+
+console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+export HEALTH_CHECK_URL=https://$console_url
 set -o nounset
 set -o pipefail
 set -x
