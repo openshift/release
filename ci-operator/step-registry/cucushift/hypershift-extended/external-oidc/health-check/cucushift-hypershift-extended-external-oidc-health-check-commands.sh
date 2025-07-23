@@ -65,3 +65,38 @@ if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --
         exit 1
     fi
 fi
+
+ISSUER_URL="$(</var/run/hypershift-ext-oidc-app-cli/issuer-url)"
+CLI_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-cli/client-id)"
+CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
+CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
+
+echo "Getting kube-apiserver address for the hosted cluster"
+api_server_url="$(oc get infrastructure cluster -o jsonpath='{.status.apiServerURL}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig)"
+if [[ -z "$api_server_url" ]]; then
+    echo "Failed to get kube-apiserver address for the hosted cluster"
+    exit 1
+fi
+echo "kube-apiserver address for the hosted cluster: $api_server_url"
+
+echo "Login to the hosted cluster with the CLI client"
+login_output="$(oc login "$api_server_url" --exec-plugin=oc-oidc --issuer-url="$ISSUER_URL" --client-id="$CLI_CLIENT_ID" --extra-scopes=email --callback-port=8080 --kubeconfig=/tmp/kubeconfig-cli)"
+if [[ ! "$login_output" =~ "Logged into" ]]; then
+    echo "Failed to login to the hosted cluster with the CLI client"
+    exit 1
+fi
+echo "Login output: $login_output"
+
+# TODO: check if the login with the CLI client that is not defined in config is successful
+
+echo "Login to the hosted cluster with the console client"
+login_output="$(oc login "$api_server_url" --exec-plugin=oc-oidc --issuer-url="$ISSUER_URL" --client-id="$CONSOLE_CLIENT_ID" --client-secret="$CONSOLE_CLIENT_SECRET" --callback-port=8080 --kubeconfig=/tmp/kubeconfig-console)"
+if [[ ! "$login_output" =~ "Logged into" ]]; then
+    echo "Failed to login to the hosted cluster with the console client"
+    exit 1
+fi
+echo "Login output: $login_output"
+
+
+
+
