@@ -90,7 +90,7 @@ elif [ "$platform" = "None" ] && [ "${CLOUD_TYPE:-}" = "baremetal" ]; then
             # shellcheck disable=SC1090
             . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
             # shellcheck disable=SC2154
-            if [[ "${name}" == "${target_node}" ]]; then
+            if [[ "${target_node}" == "${name}"* ]]; then
                 # shellcheck disable=SC2154
                 export BMC_USER="${bmc_user}"
                 # shellcheck disable=SC2154
@@ -98,7 +98,7 @@ elif [ "$platform" = "None" ] && [ "${CLOUD_TYPE:-}" = "baremetal" ]; then
                 # shellcheck disable=SC2154
                 export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
                 # shellcheck disable=SC2154
-                export NODE_NAME="${name}"
+                export NODE_NAME="${target_node}"
                 break
             fi
         done
