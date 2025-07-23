@@ -44,15 +44,19 @@ tests:
     cluster_profile: gcp-observability
     env:
       COO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib@sha256:66c92e616e994506494d1d68b5fa2c3f832c98b710b240f192d9d2e0f62f7599
+      CYPRESS_COO_NAMESPACE: coo
       OPERATORS: |
         [
-            {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}
+            {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
         ]
       TEST_FILTERS: Serial
       TEST_SCENARIOS: Cluster_Observability.*DAST
     test:
     - ref: rhobs-konflux-catalogsource
     - ref: install-operators
+    - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: openshift-extended-test
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-gcp-ipi
