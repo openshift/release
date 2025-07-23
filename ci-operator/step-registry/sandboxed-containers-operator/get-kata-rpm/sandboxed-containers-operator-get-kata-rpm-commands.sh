@@ -54,7 +54,7 @@ for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
     OUTPUT=$(oc debug -n default "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm")
     echo $OUTPUT
-    if [ $(echo "${OUTPUT}" | grep -q "${KATA_RPM_MD5SUM}") ]; then
+    if [ "$(echo "${OUTPUT}" | grep -q "${KATA_RPM_MD5SUM}")" ]; then
         FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
     fi
 done
