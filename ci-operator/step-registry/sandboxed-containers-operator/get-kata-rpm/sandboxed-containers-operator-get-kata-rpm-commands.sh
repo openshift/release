@@ -39,7 +39,7 @@ fi
 
 # checks for a bad URL
 
-if [ ! "$(grep -q 'URL was not found' kata-containers.rpm)" ]; then
+if [ "$(grep -q 'URL was not found' kata-containers.rpm)" ]; then
     echo "ERROR: curl couldn't find ${KATA_RPM_BUILD_URL} $(head -20 kata_containers.rpm)"
     exit 2
 fi
