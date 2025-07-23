@@ -1,9 +1,5 @@
 #!/bin/bash
-
 set -o errexit
-set -o nounset
-set -o pipefail
-set -x
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -25,9 +21,16 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 # set the secrets from the vault as env vars
 export TELEMETRY_PASSWORD=$telemetry_password
 
+console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+export HEALTH_CHECK_URL=https://$console_url
 
-NODE_NAME=$(set +o pipefail; oc get nodes --no-headers | head -n 1 | awk '{print $1}')
+NODE_NAME=$(oc get nodes --no-headers | head -n 1 | awk '{print $1}')
 rc=$?
+
+set -o nounset
+set -o pipefail
+set -x
+
 echo "Node name return code: $rc"
 platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
 if [ "$platform" = "AWS" ]; then
@@ -55,6 +58,7 @@ elif [ "$platform" = "GCP" ]; then
     sed 's/,//g' | grep  "topology.kubernetes.io/zone" | awk '{ print $2 }' )
     export ZONE
 fi
+
 ./zone-outages/prow_run.sh
 rc=$?
 
