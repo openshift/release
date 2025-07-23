@@ -76,7 +76,17 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
   || /bin/true
 
-sleep 20m
+if [[ $MAP_TESTS == "true" ]]; then
+    # Install yq manually if its not found in image
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ ! -x "${cmd_yq}" ]; then
+        echo "Installing yq"
+        curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o ./yq && chmod +x ./yq
+    fi
+    echo "Mapping Test Suite Name To: CNV-lp-interop"
+    yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $CLUSTER_PATH/junit.xml
+fi
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))

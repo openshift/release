@@ -10,6 +10,12 @@ curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(unam
 
 sleep 1h
 
+/tmp/yq --version
+
+
+# find all junit.xml
+find $ARTIFACT_DIR -name "*.xml"
+
 
 #echo "Installing yq-v4"
 ## Install yq manually if its not found in installer image
