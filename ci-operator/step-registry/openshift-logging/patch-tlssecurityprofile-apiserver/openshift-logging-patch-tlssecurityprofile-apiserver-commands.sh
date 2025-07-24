@@ -23,6 +23,7 @@ function patch_custom_tlssecurityprofile_config(){
     oc adm wait-for-stable-cluster
 
     current_tls_profile=$(oc get apiserver/cluster -ojson | jq -r '.spec.tlsSecurityProfile.type')
+    echo "Current TLS Security Profile is: $current_tls_profile"
     if [[ "$current_tls_profile" != "$logging_tls_profile_type" ]]; then
         echo "Error: TLS Security Profile currently set is '$current_tls_profile', expected value is '$logging_tls_profile_type'"
         exit 1
