@@ -14,6 +14,7 @@ fi
 
 ALLOWED_REPOS=("openshift-tests-private"
                "verification-tests"
+               "oadp-qe-automation"
               )
 repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
                elif .refs then .refs.repo
