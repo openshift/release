@@ -110,3 +110,5 @@ esac
 # Hypershift install
 set -ex
 eval "${COMMAND[*]}"
+
+sleep 10m
