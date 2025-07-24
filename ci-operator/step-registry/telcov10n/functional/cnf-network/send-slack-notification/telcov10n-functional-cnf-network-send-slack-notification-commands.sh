@@ -2,6 +2,12 @@
 set -e
 set -o pipefail
 
+echo "Validate JOB_TYPE variable: ${JOB_TYPE}"
+if [ "$JOB_TYPE" = "presubmit" ]; then
+  echo "JOB_TYPE=presubmit — skipping script"
+  exit 0
+fi
+
 SCRIPTS_FOLDER="/eco-ci-cd/scripts"
 PYTHON_SCRIPT="send-slack-notification-bot.py"
 CLUSTER_VERSION_FILE="${SHARED_DIR}/cluster_version"

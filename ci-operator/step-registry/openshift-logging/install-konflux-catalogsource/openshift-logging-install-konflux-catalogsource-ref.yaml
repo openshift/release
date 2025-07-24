@@ -1,0 +1,41 @@
+ref:
+  as: openshift-logging-install-konflux-catalogsource
+  from: upi-installer
+  grace_period: 10m
+  commands: openshift-logging-install-konflux-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: CATALOGSOURCE_NAME
+    default: "qe-app-registry"
+    documentation: |-
+      The name of catalogsource which will be created for operator
+  - name: MULTISTAGE_PARAM_OVERRIDE_LOGGING_TEST_VERSION
+    default: ""
+    documentation: |-
+      The version of logging which will be tested, used for creating the ICSP.
+      It must be set if the MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE is not a stage image.
+      The var can be set when using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_LOGGING_TEST_VERSION": "6.3"
+        }
+      }
+  - name: MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE
+    default: ""
+    documentation: |-
+      The image used to create catalogsource.
+      The var can be set when using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE": "quay.io/example/logging-index:latest"
+        }
+      }
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  documentation: |-
+    Create catalogSources for openshift-logging operators testing.

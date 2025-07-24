@@ -1,0 +1,19 @@
+workflow:
+  as: oadp-ipi-aws-oadp-qe
+  steps:
+    env:
+        RE_TRIGGER_ON_FAILURE: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: optional-operators-configure-proxy-registry
+    - ref: optional-operators-cvp-common-apply-secrets
+    - ref: optional-operators-subscribe
+    - ref: oadp-s3-create
+    post:
+    - ref: oadp-s3-destroy
+    - chain: ipi-aws-post
+    - ref: firewatch-report-issues
+    - ref: job-re-trigger
+
+  documentation: |-
+    An extension of the firewatch-ipi-aws workflow that adds a S3 bucket creation and destruction step specific to the OADP interop scenario.
