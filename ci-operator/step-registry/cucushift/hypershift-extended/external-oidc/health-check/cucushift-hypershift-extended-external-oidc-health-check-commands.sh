@@ -66,6 +66,7 @@ if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --
     fi
 fi
 
+set +x
 ISSUER_URL="$(</var/run/hypershift-ext-oidc-app-cli/issuer-url)"
 CLI_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-cli/client-id)"
 CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
@@ -98,7 +99,4 @@ if [[ ! "$login_output" =~ "Logged into" ]]; then
     exit 1
 fi
 echo "Login output: $login_output"
-
-
-
-
+set -x
