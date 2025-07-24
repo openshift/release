@@ -1,5 +1,5 @@
 #!/bin/bash
-set -o errexit # Nozero exit code of any of the commands below will fail the test.
+set -o errexit # Nonzero exit code of any of the commands below will fail the test.
 set -o nounset
 set -o pipefail
 
@@ -54,6 +54,14 @@ die_modlist() {
     echo "    replace k8s.io/foo => k8s.io/foo v0.26.0"
     exit 1
 }
+
+if [[ -f "go.mod" ]]; then
+  if ! awk -F'[ .]+' '/^go / && NF < 4 && $3 > 21 {exit 1}' go.mod; then
+    # Hermeto fails if the go directive does not have a patch version.
+    echo "Error: 'go' directive in go.mod must include a patch version (e.g. go 1.22.0) for go1.22+"
+    exit 1
+  fi
+fi
 
 if [[ ! -f "go.mod" || ! -d "vendor" ]]; then
     echo "No go.mod vendoring detected in ${PWD}; skipping dependency checks."
