@@ -1,7 +1,7 @@
 presubmits:
   openshift-knative/serving:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -16,6 +16,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-serving-release-next-414-images
     rerun_command: /test 414-images
+    run_if_changed: ^non-existing$
     spec:
       containers:
       - args:
@@ -59,7 +60,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )414-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -134,7 +135,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )414-test-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )(414-test-e2e|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -195,7 +196,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )419-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-next$
     - ^release-next-
@@ -211,6 +212,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-serving-release-next-419-test-e2e
     rerun_command: /test 419-test-e2e
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
