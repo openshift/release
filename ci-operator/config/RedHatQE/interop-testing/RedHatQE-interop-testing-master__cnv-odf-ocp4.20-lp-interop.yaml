@@ -117,6 +117,31 @@ tests:
     - ref: interop-tests-openshift-virtualization-tests
     workflow: firewatch-ipi-aws
   timeout: 6h0m0s
+- as: cnv-component-readiness-aws-ipi-ocp420
+  cron: 0 3,15 * * *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CNV_SUBSCRIPTION_CHANNEL: candidate
+      COMPUTE_NODE_TYPE: c5n.metal
+      OCP_VERSION: "4.20"
+      ODF_OPERATOR_CHANNEL: stable-4.19
+      ODF_VERSION_MAJOR_MINOR: "4.19"
+      USER_TAGS: |
+        scenario cnv
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: install-operators-verify
+    - chain: ipi-aws-pre
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-cnv-tests-e2e-deploy
+    - ref: interop-tests-openshift-virtualization-tests
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE
