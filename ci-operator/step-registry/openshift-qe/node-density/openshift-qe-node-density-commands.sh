@@ -75,9 +75,28 @@ export EXTRA_FLAGS
 rm -f ${SHARED_DIR}/index.json
 
 RANDOM_WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | shuf -n1)
-oc adm must-gather --timeout=3h --dest-dir "${ARTIFACT_DIR}/" -- PROFILING_NODE_SECONDS=60 gather_profiling_node $RANDOM_WORKER_NODE &
 
-./run.sh 
+gather_loop() {
+  local end=$((SECONDS + 2 * 60 * 60))  # 2 hours
+  local count=1
+
+  while [ "$SECONDS" -lt "$end" ]; do
+    echo "Starting background must-gather iteration #$count..."
+    timestamp=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+    gather_dir="${ARTIFACT_DIR}/node-profile-${timestamp}"
+    # Start must-gather in background and let it run independently
+    oc adm must-gather --dest-dir "$gather_dir" -- gather_profiling_node "$RANDOM_WORKER_NODE" \
+      >"${gather_dir}/gather.log" 2>&1 &
+    count=$((count + 1))
+    sleep 60
+  done
+}
+
+# Run the gather loop in background
+gather_loop &
+
+# Run workload immediately
+./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
