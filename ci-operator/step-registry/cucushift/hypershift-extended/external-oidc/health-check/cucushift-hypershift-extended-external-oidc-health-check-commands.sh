@@ -100,3 +100,6 @@ if [[ ! "$login_output" =~ "Logged into" ]]; then
 fi
 echo "Login output: $login_output"
 set -x
+
+echo "Waiting for a while"
+sleep 1800
