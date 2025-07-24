@@ -56,7 +56,7 @@ fi
 
 if [[ $MAP_TESTS == "true" ]]; then
     results_file="${ARTIFACT_DIR}/junit.functest.xml"
-    if [ -f $result_file ]; then
+    if [ -f results_file ]; then
         # Install yq manually if its not found in image
         cmd_yq="$(yq --version 2>/dev/null || true)"
         if [ ! -x "${cmd_yq}" ]; then
