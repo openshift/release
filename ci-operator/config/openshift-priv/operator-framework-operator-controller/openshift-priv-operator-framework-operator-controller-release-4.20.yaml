@@ -168,32 +168,30 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: tests-extension-verify
+- as: tests-extension
   run_if_changed: ^(openshift/tests-extension/)
   steps:
     test:
-    - as: tests-extension-verify
+    - as: sanity
       commands: |
         cd openshift/tests-extension
         make verify
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-- as: tests-extension
-  steps:
-    test:
-    - as: tests-extension
-      commands: |
-        echo "Build binary olmv1-tests-ext"
-        cd openshift/tests-extension
         make build
-        echo "Running olmv1-tests-ext with all tests"
-        ./bin/olmv1-tests-ext run-suite olmv1/all
+        make verify-metadata
       from: src
       resources:
         requests:
           cpu: 100m
+- as: e2e-aws-techpreview-olmv1-ext
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/all
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
