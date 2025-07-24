@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: golang-1.22
   use_build_cache: true
 releases:
   latest:
@@ -45,10 +45,13 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  cron: 0 4 * * *
+  cron: 0 6 * * *
   optional: true
   presubmit: true
   steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
     test:
     - ref: redhat-developer-rhdh-nightly
     workflow: generic-claim
@@ -66,6 +69,9 @@ tests:
   steps:
     env:
       OC_CLIENT_VERSION: stable-4.16
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
     test:
     - ref: redhat-developer-rhdh-nightly
     workflow: generic-claim
@@ -83,6 +89,9 @@ tests:
   steps:
     env:
       OC_CLIENT_VERSION: stable-4.15
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
     test:
     - ref: redhat-developer-rhdh-nightly
     workflow: generic-claim
@@ -92,17 +101,44 @@ tests:
   optional: true
   presubmit: true
   steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - ref: redhat-developer-rhdh-aks-mapt-destroy
     test:
     - ref: redhat-developer-rhdh-aks-helm-nightly
     workflow: redhat-developer-rhdh-aks-mapt
 - always_run: false
-  as: e2e-tests-gke-helm-nightly
-  cron: 0 9 * * MON,WED,FRI
+  as: e2e-tests-aks-operator-nightly
+  cron: 0 6 * * MON,WED,FRI
   optional: true
   presubmit: true
   steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - ref: redhat-developer-rhdh-aks-mapt-destroy
+    test:
+    - ref: redhat-developer-rhdh-aks-operator-nightly
+    workflow: redhat-developer-rhdh-aks-mapt
+- always_run: false
+  as: e2e-tests-gke-helm-nightly
+  cron: 0 6 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
     test:
     - ref: redhat-developer-rhdh-gke-helm-nightly
+- always_run: false
+  as: e2e-tests-gke-operator-nightly
+  cron: 0 8 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    test:
+    - ref: redhat-developer-rhdh-gke-operator-nightly
 - always_run: false
   as: e2e-tests-operator-nightly
   cluster_claim:
@@ -118,6 +154,9 @@ tests:
   optional: true
   presubmit: true
   steps:
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
     test:
     - ref: redhat-developer-rhdh-operator-nightly
     workflow: generic-claim
@@ -129,6 +168,9 @@ tests:
   steps:
     env:
       OSD_VERSION: 4.17.12
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-delete
     test:
     - ref: redhat-developer-rhdh-osd-gcp-nightly
     workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
@@ -141,6 +183,9 @@ tests:
   steps:
     env:
       OSD_VERSION: 4.17.12
+    post:
+    - ref: redhat-developer-rhdh-send-alert
+    - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-delete
     test:
     - ref: redhat-developer-rhdh-osd-gcp-nightly
     workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
@@ -163,7 +208,25 @@ tests:
     test:
     - ref: redhat-developer-rhdh-nightly
     workflow: generic-claim
+- always_run: false
+  as: e2e-tests-upgrade-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 7 * * MON,WED,FRI
+  optional: true
+  presubmit: true
+  steps:
+    test:
+    - ref: redhat-developer-rhdh-upgrade-nightly
+    workflow: generic-claim
 zz_generated_metadata:
-  branch: release-1.5
+  branch: release-1.7
   org: redhat-developer
   repo: rhdh
