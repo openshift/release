@@ -47,7 +47,6 @@ function cleanup_ibmcloud_powervs() {
         for VPC_NAME in $(ibmcloud is vpcs --output json | jq -r --arg mn "${VPC_NAME_PREFIX}" '.[] | select(.name | contains($mn)).name')
         do
             echo ":VPC: ${VPC_NAME}"
-            VPC_CONN="${WORKSPACE_NAME}-vpc"
             VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_NAME}-vpc" | awk '{print $3}')"
             if [ -n "${VPC_CONN_ID}" ]
             then
