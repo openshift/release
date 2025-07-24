@@ -38,6 +38,10 @@ if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
     patch_netobserv "flp" "$FLP_PR_IMAGE"
 fi
 
+if [[ $PATCH_OPERATOR_IMAGE == "true" && -n $OPERATOR_PR_IMAGE ]]; then
+    patch_netobserv "operator" "$OPERATOR_PR_IMAGE"
+fi
+
 # get NetObserv metadata 
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
 LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
