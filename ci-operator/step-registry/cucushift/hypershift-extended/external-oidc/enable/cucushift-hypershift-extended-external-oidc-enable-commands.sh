@@ -67,7 +67,8 @@ yq-v4 'select(.kind == "HostedCluster") *= load("/tmp/patch.yaml")' "${SHARED_DI
     > "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
 
 echo "Applying patched artifacts"
-oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
+# TMP: Apply the original rendered yaml file
+oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render.yaml
 
 HOSTED_CLUSTER_RELEASE=$(yq-v4 'select(.kind == "HostedCluster") | .spec.release.image' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
 HOSTED_CLUSTER_NAME=$(yq-v4 'select(.kind == "HostedCluster") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
