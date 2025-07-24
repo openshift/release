@@ -29,7 +29,7 @@ if [ "${ipv4_enabled:-}" == "true" ]; then
   DNS_FORWARD="${DNS_FORWARD}
 api.${CLUSTER_NAME} IN A ${api_vip}
 provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
-api-int.${CLUSTER_NAME} IN A ${api_vip}
+api-int.${CLUSTER_NAME} IN A ${api_int}
 *.apps.${CLUSTER_NAME} IN A ${ingress_vip}"
 fi
 
@@ -43,7 +43,7 @@ if [ "${ipv6_enabled:-}" == "true" ]; then
   DNS_FORWARD="${DNS_FORWARD}
 provisioner.${CLUSTER_NAME} IN AAAA ${INTERNAL_NET_IPV6}
 api.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
-api-int.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
+api-int.${CLUSTER_NAME} IN AAAA ${api_int_v6}
 *.apps.${CLUSTER_NAME} IN AAAA ${ingress_vip_v6}"
 fi
 
