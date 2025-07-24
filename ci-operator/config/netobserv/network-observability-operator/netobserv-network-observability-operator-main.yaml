@@ -15,6 +15,10 @@ base_images:
     name: network-observability-console-plugin
     namespace: netobserv
     tag: ci
+  operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -60,18 +64,19 @@ tests:
 - as: e2e-operator
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: noo-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-netobserv-operator
+      OO_SECURITY_CONTEXT: restricted
     test:
     - as: install
       cli: latest
       commands: |
-        oc create ns openshift-netobserv-operator
-        operator-sdk run bundle "$OO_BUNDLE" -n openshift-netobserv-operator --verbose --security-context-config restricted
         oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
-      dependencies:
-      - env: OO_BUNDLE
-        name: noo-bundle
-      from: cli-operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -133,7 +138,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: netobserv
