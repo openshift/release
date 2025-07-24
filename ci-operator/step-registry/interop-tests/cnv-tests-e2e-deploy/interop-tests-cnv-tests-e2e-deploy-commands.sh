@@ -4,6 +4,29 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function check_if_yq_exists() {
+    # Install yq manually if its not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -x "${cmd_yq}" ]; then
+        echo "Installing yq"
+        curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o ./yq && chmod +x ./yq
+    fi
+}
+
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${ARTIFACT_DIR}/junit.functest.xml"
+        if [ -f $results_file ]; then
+            check_if_yq_exists
+            echo "Mapping Test Suite Name To: CNV-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        fi
+    fi
+}
+
 # Set cluster variables
 # CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
 # CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
@@ -54,19 +77,7 @@ else
     echo "deploy_test succeeded"
 fi
 
-if [[ $MAP_TESTS == "true" ]]; then
-    results_file="${ARTIFACT_DIR}/junit.functest.xml"
-    if [ -f $results_file ]; then
-        # Install yq manually if its not found in image
-        cmd_yq="$(yq --version 2>/dev/null || true)"
-        if [ ! -x "${cmd_yq}" ]; then
-            echo "Installing yq"
-            curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-             -o ./yq && chmod +x ./yq
-        fi
-        echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
-    fi
-fi
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness
 
 exit ${exit_code}

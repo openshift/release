@@ -26,6 +26,28 @@ cleanup() {
 # Set trap to catch EXIT and run cleanup on any exit code
 trap cleanup EXIT SIGINT
 
+function check_if_yq_exists() {
+    # Install yq manually if its not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -x "${cmd_yq}" ]; then
+        echo "Installing yq"
+        curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o ./yq && chmod +x ./yq
+    fi
+}
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${CLUSTER_PATH}/junit.xml"
+        if [ -f $results_file ]; then
+            check_if_yq_exists
+            echo "Mapping Test Suite Name To: CNV-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        fi
+    fi
+}
+
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
 #
@@ -76,20 +98,8 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
   || /bin/true
 
-if [[ $MAP_TESTS == "true" ]]; then
-    results_file="${CLUSTER_PATH}/junit.xml"
-    if [ -f results_file ]; then
-        # Install yq manually if its not found in image
-        cmd_yq="$(yq --version 2>/dev/null || true)"
-        if [ ! -x "${cmd_yq}" ]; then
-            echo "Installing yq"
-            curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-             -o ./yq && chmod +x ./yq
-        fi
-        echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
-    fi
-fi
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
