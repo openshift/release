@@ -60,6 +60,9 @@ fi
 
 export EVENTUALLY_VERBOSE="false"
 
+TEST_CPO_OVERRIDE="${TEST_CPO_OVERRIDE:-0}"
+export TEST_CPO_OVERRIDE
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-''} \
   -test.parallel=20 \
