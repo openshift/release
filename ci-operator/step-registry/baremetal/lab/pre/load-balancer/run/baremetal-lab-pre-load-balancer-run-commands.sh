@@ -58,6 +58,8 @@ echo -e "${DHCLIENT}" >> "$HAPROXY_DIR/dhclient.conf"
 
 echo "Create and start HAProxy container..."
 podman run --name "haproxy-$CLUSTER_NAME" -d --restart=on-failure \
+  --cap-add=NET_RAW \
+  --cap-add=NET_ADMIN \
   -v "$HAPROXY_DIR/haproxy.cfg:/etc/haproxy.cfg:Z" \
   -v "$HAPROXY_DIR/dhclient.conf:/etc/dhcp/dhclient.conf:Z" \
   --network none \
@@ -104,6 +106,13 @@ if [ "${#api_ip}" -eq 0 ]; then
   exit 1
 fi
 
+api_int_ip=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
+  /sbin/ip -o -4 a list eth2 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
+if [ "${#api_int_ip}" -eq 0 ]; then
+  echo "No IPv4 Address has been set for the external API VIP, failing"
+  exit 1
+fi
+
 api_ip_v6=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n \
   /sbin/ip -o -6 a list eth1 | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
 if [ "${#api_ip_v6}" -eq 0 ]; then
@@ -111,7 +120,15 @@ if [ "${#api_ip_v6}" -eq 0 ]; then
   exit 1
 fi
 
-printf "ingress_vip: %s\napi_vip: %s\ningress_vip_v6: %s\napi_vip_v6: %s" "$api_ip" "$api_ip" "$api_ip_v6" "$api_ip_v6" > "$BUILD_DIR/external_vips.yaml"
+api_int_ip_v6=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n \
+  /sbin/ip -o -6 a list eth2 | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
+if [ "${#api_int_ip_v6}" -eq 0 ]; then
+  echo "No global IPv6 Address has been set for the external API VIP, failing"
+  exit 1
+fi
+
+printf "ingress_vip: %s\napi_vip: %s\ningress_vip_v6: %s\napi_vip_v6: %s\napi_int: %s\napi_int_v6: %s" "$api_ip" "$api_ip" "$api_ip_v6" "$api_ip_v6" "$api_int_ip" "$api_int_ip_v6" > "$BUILD_DIR/external_vips.yaml"
+# printf "ingress_vip: %s\napi_vip: %s\ningress_vip_v6: %s\napi_vip_v6: %s" "$api_ip" "$api_ip" "$api_ip_v6" "$api_ip_v6" > "$BUILD_DIR/external_vips.yaml"
 # TODO[disconnected/BM/IPI]
 #if [ "$DISCONNECTED" == "true" ] && IPI; then
 #  cp "$BUILD_DIR/vips.yaml" "$BUILD_DIR/external_vips.yaml"
