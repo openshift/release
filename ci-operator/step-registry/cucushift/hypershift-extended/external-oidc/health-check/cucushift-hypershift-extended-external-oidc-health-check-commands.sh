@@ -102,4 +102,4 @@ echo "Login output: $login_output"
 set -x
 
 echo "Waiting for a while"
-sleep 1800
+sleep 1799
