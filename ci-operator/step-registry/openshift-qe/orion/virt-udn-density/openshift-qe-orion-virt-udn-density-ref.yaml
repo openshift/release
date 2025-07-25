@@ -1,5 +1,5 @@
 ref:
-  as: openshift-qe-orion
+  as: openshift-qe-orion-virt-udn-density
   from_image:
     namespace: ci
     name: ocp-qe-perfscale-ci
@@ -11,7 +11,7 @@ ref:
     documentation: |-
       Orion github repository
   - name: TAG
-    default: "latest"
+    default: "v0.0.18"
     documentation: |-
       Override branch of orion
   - name: ES_BENCHMARK_INDEX
@@ -22,18 +22,26 @@ ref:
     default: "perf_scale_ci-*"
     documentation:
       Index which contains metadata about runs.
+  - name: ACK_FILE
+    default: virt-udn-density_ack.yaml
+    documentation:
+      File will be prefixed with the version
   - name: ES_TYPE
     default: "qe"
     documentation: |-
       Set es type to internal or qe for getting data
   - name: CONFIG
-    default: "examples/payload-scale-415.yaml"
+    default: "examples/metal-perfscale-cpt-virt-udn-density.yaml"
     documentation: |-
       Configuration file to run orion on
   - name: UUID
     default: ""
     documentation: |-
       Default is blank, which means the uuid will not be applied to the command line args
+  - name: VERSION
+    default: ""
+    documentation:
+      Version of OCP to run Orion against, ex 4.18
   - name: IGNORE_JOB_ITERATIONS
     default: "false"
     documentation:
@@ -42,30 +50,22 @@ ref:
     default: "TEXT"
     documentation:
       Export in desired output format
-  - name: VERSION
-    default: ""
-    documentation:
-      Version of OCP to run Orion against, ex 4.18
   - name: LOOKBACK
     default: "15"
     documentation:
       Number of days orion should lookback at results.
-  - name: LOOKBACK_SIZE
-    default: ""
-    documentation:
-      Number of samples orion should consider for results.
   - name: RUN_ORION
     default: "false"
     documentation:
       Determine if we should run Orion or not.
   - name: ORION_CONFIG
-    default: ""
+    default: "examples/metal-perfscale-cpt-virt-udn-density.yaml"
     documentation:
       Var used to tell the step which workload is calling Orion, like cluster-density, node-density, etc.
-  - name: ACK_FILE
+  - name: LOOKBACK_SIZE
     default: ""
     documentation:
-      Orion ack file name that has a list of acknowledged issues/regressions.
+      Number of samples orion should consider for results.
   - name: COLLAPSE
     default: "false"
     documentation:
@@ -74,7 +74,7 @@ ref:
     default: ""
     documentation:
       Comma separated list of envs that needs to exported in runtime for templated configurations.
-  commands: openshift-qe-orion-commands.sh
+  commands: openshift-qe-orion-virt-udn-density-commands.sh
   timeout: 6h
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
@@ -83,12 +83,9 @@ ref:
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-perfscale-es-creds
     mount_path: /secret/internal
-  - namespace: test-credentials
-    name: quay-qe-elk-secret
-    mount_path: /secret/quay-qe
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   documentation: >-
-    This step runs the perfscale configmap-scale workload in the deployed cluster
+    This step runs the perfscale virt-udn-density workload in the deployed cluster
