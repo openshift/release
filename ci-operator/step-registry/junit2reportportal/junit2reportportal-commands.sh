@@ -38,6 +38,21 @@ then
   fi
   LOGS_PATH="pr-logs/pull/openshift_release/${pr_number}"
 fi
+DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration then .decoration_config.gcs_configuration.bucket else error end' <<< ${JOB_SPEC:-''})"
+PROWCI=''
+PROWWEB=''
+if [[ "$DECK_NAME" = 'test-platform-results' ]]
+then
+  PROWCI="https://prow.ci.openshift.org"
+  PROWWEB="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"
+elif [[ "$DECK_NAME" = 'qe-private-deck' ]]
+then
+  PROWCI="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PROWWEB="https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+else
+  echo "Unknow bucket name: $DECK_NAME"
+  exit 1
+fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR_ORI="${LOCAL_DIR}/ori"
@@ -248,7 +263,7 @@ function generate_metadata() {
                 "value": "prow"
               }
             ],
-            "description": "https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
+            "description": "${PROWCI}/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
             "name": "${JOB_NAME}"
           },
           "property_filter": [
@@ -280,7 +295,7 @@ function generate_results() {
       then
         cat >> "$junit_file" << EOF_JUNIT_SUCCESS
   <testcase classname="$testsuite_name" name="$step_name" time="1">
-    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
 EOF_JUNIT_SUCCESS
       elif [[ "$result" = 'FAILURE' ]]
@@ -289,7 +304,7 @@ EOF_JUNIT_SUCCESS
         cat >> "$junit_file" << EOF_JUNIT_FAILURE
   <testcase classname="$testsuite_name" name="$step_name" time="1">
     <failure message="Step $step_name failed" type="failed"/>
-    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
 EOF_JUNIT_FAILURE
       fi
