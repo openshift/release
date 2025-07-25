@@ -6,6 +6,12 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Using s390x managment cluster kubeconfig if it is present
+# s390x_mgmt-kubeconfig will only be present in case of s390x managment ci jobs
+if [ -f "$SHARED_DIR/s390x_mgmt-kubeconfig" ]; then
+   export KUBECONFIG="$SHARED_DIR/s390x_mgmt-kubeconfig"
+fi
+
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HCP_CLI=""
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then

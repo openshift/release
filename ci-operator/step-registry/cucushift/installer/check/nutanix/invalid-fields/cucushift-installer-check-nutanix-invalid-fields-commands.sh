@@ -174,4 +174,37 @@ fi
 rm -rf "${dir:?}/"
 mkdir "${dir}/"
 
+# set invalid dataDisks
+cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+
+CONFIG="${dir}/install-config.yaml"
+PATCH="${dir}/invalid-dataDisks.yaml.patch"
+
+cat >"${PATCH}" <<EOF
+compute:
+- name: worker
+  platform:
+    nutanix:
+      dataDisks:
+      - deviceProperties:
+          adapterType: SCSI
+          deviceIndex: 1
+          deviceType: Disk
+        storageConfig:
+          diskMode: Standard
+          storageContainer:
+            uuid: 04e10481-071a-4137-b1e9-f0490639cd80
+        diskSize: 1023Mi
+EOF
+yq-go m -x -i "${CONFIG}" "${PATCH}"
+run_install
+if grep "The minimum diskSize is 1Gi bytes" "${dir}"/.openshift_install.log; then
+  echo "Pass: passed to check dataDisks field"
+else
+  echo "Fail: failed to check dataDisks field"
+  check_result=$((check_result + 1))
+fi
+rm -rf "${dir:?}/"
+mkdir "${dir}/"
+
 exit "${check_result}"

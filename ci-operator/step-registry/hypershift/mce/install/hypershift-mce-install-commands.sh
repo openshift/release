@@ -7,6 +7,12 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Using s390x managment cluster kubeconfig if it is present
+# s390x_mgmt-kubeconfig will only be present in case of s390x managment ci jobs
+if [ -f "$SHARED_DIR/s390x_mgmt-kubeconfig" ]; then
+   export KUBECONFIG="$SHARED_DIR/s390x_mgmt-kubeconfig"
+fi
+
 if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
     MCE_VERSION="$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION"
 fi
@@ -14,6 +20,9 @@ fi
 echo "$MCE_VERSION"
 
 _REPO="quay.io/acm-d/mce-custom-registry"
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
+  _REPO="quay.io/acm-d/mce-dev-catalog"
+fi
 if [[ "$DISCONNECTED" == "true" ]]; then
   _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
   # Setup disconnected quay mirror container repo

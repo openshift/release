@@ -63,11 +63,14 @@ tests:
     make test GINKGO_ARGS='--no-color'
   container:
     from: src
+  skip_if_only_changed: ^(renovate.json|.*\.md|tests/kuttl/.*|OWNERS.*|LICENSE.*)$
 - as: golint
   commands: make golint
   container:
     from: src
-- as: manila-operator-build-deploy
+  skip_if_only_changed: ^renovate.json|^README.md
+- always_run: false
+  as: manila-operator-build-deploy
   cluster_claim:
     architecture: amd64
     cloud: vexxhost
@@ -91,6 +94,7 @@ tests:
     pre-commit run -a --show-diff-on-failure
   container:
     from: openstack-operator-ci-pre-commit
+  skip_if_only_changed: ^renovate.json|^README.md
 - as: manila-operator-build-deploy-tempest
   cluster_claim:
     architecture: amd64
@@ -99,6 +103,7 @@ tests:
     product: ocp
     timeout: 1h20m0s
     version: "4.18"
+  skip_if_only_changed: ^(renovate.json|.*\.md|tests/.*|OWNERS.*|LICENSE.*)$
   steps:
     env:
       CEPH_HOSTNETWORK: "false"
@@ -113,6 +118,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
+  skip_if_only_changed: ^(renovate.json|.*\.md|tests/functional/.*|OWNERS.*|LICENSE.*)$
   steps:
     env:
       CEPH_HOSTNETWORK: "false"
