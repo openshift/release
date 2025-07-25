@@ -81,20 +81,48 @@ elif [[ "$TYPE" == "sno" ]]; then
   HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:2][].name")
 fi
 echo "Hosts to be prepared: $HOSTS"
-# IDRAC reset
+
+# IDRAC reset and check for readiness
 if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
   echo "Resetting IDRACs ..."
   for i in $HOSTS; do
     echo "Resetting IDRAC of server $i ..."
     podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --racreset
   done
+  
+  # Wait for all IDRACs to become ready
+  echo "Waiting for IDRACs to become ready..."
   for i in $HOSTS; do
-    if ! podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state; then
-      echo "$i iDRAC is still rebooting"
-      continue
-    fi
+    echo "Checking IDRAC readiness for server $i ..."
+    max_attempts=30  # Maximum number of attempts (adjust as needed)
+    attempt=1
+    sleep_interval=10  # Seconds between attempts
+    
+    while [ $attempt -le $max_attempts ]; do
+      echo "Attempt $attempt/$max_attempts for server $i"
+      
+      if podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state; then
+        echo "✓ IDRAC for server $i is ready"
+        break
+      else
+        if [ $attempt -eq $max_attempts ]; then
+          echo "✗ IDRAC for server $i failed to become ready after $max_attempts attempts"
+          echo "Consider checking the server manually or increasing max_attempts"
+          # Optionally exit here if you want to fail fast
+          # exit 1
+        else
+          echo "IDRAC for server $i is still rebooting, waiting ${sleep_interval}s..."
+          sleep $sleep_interval
+        fi
+      fi
+      
+      ((attempt++))
+    done
   done
+  
+  echo "IDRAC reset and readiness check completed"
 fi
+
 if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
@@ -160,6 +188,8 @@ ssh ${SSH_ARGS} root@${bastion} "
    git branch
    source bootstrap.sh
 "
+# Save jetlag_repo for next Step(s) that may need this info
+echo $jetlag_repo > ${SHARED_DIR}/jetlag_repo
 
 cp ${CLUSTER_PROFILE_DIR}/pull_secret /tmp/pull-secret
 oc registry login --to=/tmp/pull-secret
