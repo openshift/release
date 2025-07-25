@@ -52,7 +52,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -75,6 +75,8 @@ tests:
     - as: install
       cli: latest
       commands: |
+        echo "====> Labeling netobserv namespace to enable cluster monitoring"
+        oc label ns netobserv openshift.io/cluster-monitoring="true"
         oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
       from: src
       resources:
@@ -89,10 +91,12 @@ tests:
         if ! which kubectl; then
           ln -s "$(which oc)" ${HOME}/kubectl
         fi
+        # patch as Downstream to scrape metrics
+        echo "====> Patching CSV to scrape metrics"
+        CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
+        oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p='[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/4/value", "value": "true"}]'
 
-        export CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
-        make set-release-kind-downstream
-        export NAMESPACE=netobserv
+        export NAMESPACE=openshift-netobserv-operator
         PORT_FWD=false make deploy-loki
         oc apply -f /go/src/github.com/netobserv/network-observability-operator/config/samples/flows_v1beta2_flowcollector.yaml
 
@@ -129,6 +133,27 @@ tests:
         done
         if [ "${rc}" == 1 ]; then
           echo "flowcollector did not become Ready after 180 secs!!!"
+          exit $rc
+        fi
+        
+
+        # Query metrics from Prometheus using in-cluster service URL
+        THANOS_URL=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+
+        timeout=0
+        rc=1
+        while [ $timeout -lt 180 ]; do
+          result=$(curl -s -k -H "Authorization: Bearer $(oc create token prometheus-k8s -n openshift-monitoring)" "https://${THANOS_URL}/api/v1/query?query=netobserv_ingest_flows_processed" | jq -r '.data.result[0].value[1]')
+          if [[ -n "$result" && "$result" != "null" ]]; then
+            echo "Metric netobserv_ingest_flows_processed found: $result"
+            rc=0
+            break
+          fi
+          sleep 10
+          timeout=$((timeout+10))
+        done
+        if [ "${rc}" == 1 ]; then
+          echo "Metric netobserv_ingest_flows_processed not found after 180 secs!!!"
           exit $rc
         fi
 
