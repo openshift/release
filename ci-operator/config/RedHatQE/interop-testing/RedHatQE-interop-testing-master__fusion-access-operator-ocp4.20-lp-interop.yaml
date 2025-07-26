@@ -1,0 +1,51 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: fusion-access-operator-ipi-ocp420
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp", "self-managed-lp", "fusion-access-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mbaldess@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+          { "name": "openshift-fusion-access-operator", "source": "certified-operators", "channel": "stable-v1", "install_namespace": "ibm-fusion-access", "target_namespaces": "!install" }
+        ]
+      RE_TRIGGER_ON_FAILURE: "false"
+      USER_TAGS: |
+        scenario fusion-access
+    test:
+    - ref: install-operators
+    - ref: wait
+    workflow: firewatch-ipi-aws
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: fusion-access-operator-ocp4.20-lp-interop
