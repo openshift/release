@@ -37,10 +37,10 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-usgov-ipi-private-sts-f14-logging
+- as: aws-usgov-ipi-private-sts-f999-logging
   capabilities:
   - intranet
-  cron: 34 10 13,27 * *
+  cron: 34 10 29 2 *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -62,18 +62,18 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
     test:
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: gcp-ipi-sno-arm-f14-logging
+- as: gcp-ipi-sno-arm-f999-logging
   capabilities:
   - intranet
-  cron: 5 0 3,19 * *
+  cron: 5 0 29 2 *
   steps:
     cluster_profile: gcp-observability
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -89,14 +89,14 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
-- as: azure-ipi-arm-f14-logging
+- as: azure-ipi-arm-f999-logging
   capabilities:
   - intranet
-  cron: 29 20 5,19 * *
+  cron: 29 20 29 2 *
   steps:
     cluster_profile: azure-observability
     env:
@@ -104,7 +104,6 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       FILTERS_ADDITIONAL: ""
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -120,7 +119,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-azure-ipi
@@ -194,10 +193,10 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: baremetal-lab-agent-install-network-dynamic
-- as: aws-ipi-proxy-sts-mixarch-f14-logging
+- as: aws-ipi-proxy-sts-mixarch-f999-logging
   capabilities:
   - intranet
-  cron: 34 2 16,30 * *
+  cron: 34 2 29 2 *
   steps:
     cluster_profile: aws-observability
     env:
@@ -210,7 +209,6 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
       EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
       OCP_ARCH: amd64
       OPERATORS: |
         [
@@ -228,7 +226,7 @@ tests:
       TEST_TIMEOUT: "15"
     test:
     - ref: ipi-install-heterogeneous
-    - ref: enable-qe-catalogsource-logging
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
