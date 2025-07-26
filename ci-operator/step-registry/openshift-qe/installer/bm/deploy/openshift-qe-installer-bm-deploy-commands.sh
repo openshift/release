@@ -17,7 +17,7 @@ KUBECONFIG_SRC=""
 BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
-LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
@@ -26,6 +26,9 @@ if [[ "$NUM_WORKER_NODES" == "" ]]; then
 fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
+LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
+
+echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -56,6 +59,14 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
 fi
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
+
+# Copy the ssh key to the bastion host
+OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+bastion2=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+ssh ${SSH_ARGS} root@${bastion} "
+   ssh-keygen -R ${bastion2}
+   sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@${bastion2}
+"
 
 # Clean up previous attempts
 cat > /tmp/clean-resources.sh << 'EOF'
