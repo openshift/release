@@ -3,6 +3,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: cli
+  datarouter:
+    name: droute
+    namespace: dno
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -55,6 +59,25 @@ tests:
     - ref: install-operators
     - ref: mtr-deploy-windup
     - ref: mtr-tests-ui
+    - as: datarouter-send
+      commands: |
+        export DATAROUTER_RESULTS="${ARTIFACT_DIR}/*/*.xml"
+        export REPORTPORTAL_HOSTNAME="reportportal-ccit.apps.dno.ocp-hub.prod.psi.redhat.com"
+        export REPORTPORTAL_PROJECT="DR_TEST_PROJECT"
+        export REPORTPORTAL_LAUNCH_NAME="OpenShift CI Test Run"
+        export REPORTPORTAL_LAUNCH_ATTRIBUTES=""
+        export REPORTPORTAL_LAUNCH_DESCRIPTION=""
+        export REPORTPORTAL_APPLY_TFA="true"
+        datarouter-openshift-ci
+      credentials:
+      - namespace: test-credentials
+        name: datarouter-dno-dr-dev
+        mount_path: /datarouter/secrets
+      from: datarouter
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: firewatch-ipi-aws
 - as: mtr-interop-aws-fips
   cron: 0 23 31 2 *
