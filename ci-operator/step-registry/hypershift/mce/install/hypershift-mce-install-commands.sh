@@ -277,6 +277,16 @@ EOF
   oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
 fi
 
+oc apply -f - <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: hypershift-operator-install-flags
+  namespace: local-cluster
+data:
+  installFlagsToAdd: "--platform-monitoring=All --monitoring-dashboards --metrics-set=All"
+EOF
+
 # display HyperShift cli version
 HYPERSHIFT_NAME=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )) && echo "hypershift" || echo "hcp" )
 arch=$(arch)
