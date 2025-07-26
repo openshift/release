@@ -17,7 +17,10 @@ PATCH="${SHARED_DIR}/permission-user.yaml.patch"
 cat > "${PATCH}" << EOF
 platform:
   vsphere:
-    username: "${vcenter_username_minimal_permission}"
-    password: "${vcenter_password_minimal_permission}"
+    vcenters:
+    - datacenters:
+      - DEVQEdatacenter-2
+      user: "${vcenter_username_minimal_permission}"
+      password: "${vcenter_password_minimal_permission}"
 EOF
 yq-go m -x -i "${CONFIG}" "${PATCH}"
