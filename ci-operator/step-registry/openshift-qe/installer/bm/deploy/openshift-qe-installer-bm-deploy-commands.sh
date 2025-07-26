@@ -55,6 +55,19 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
 fi
 
+if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
+  echo -e "hybrid_worker_count: $NUM_HYBRID_WORKER_NODES" >> /tmp/all.yml
+  echo -e "hv_ip_offset: 0" >> /tmp/all.yml
+  echo -e "hv_vm_ip_offset: 36" >> /tmp/all.yml
+  echo -e "hv_inventory: true" >> /tmp/all.yml
+  echo -e "install_tc: false" >> /tmp/hv.yml
+  echo -e "lab: $LAB" >> /tmp/hv.yml
+  echo -e "ssh_public_key_file: ~/.ssh/id_rsa.pub" >> /tmp/hv.yml
+  echo -e "use_bastion_registry: false" >> /tmp/hv.yml
+  echo -e "setup_hv_vm_dhcp: false" >> /tmp/hv.yml
+  echo -e "setup_coredns: true" >> /tmp/hv.yml
+fi
+
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 # Clean up previous attempts
@@ -199,6 +212,10 @@ scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.t
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
 
+if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
+  scp -q ${SSH_ARGS} /tmp/hv.yml root@${bastion}:${jetlag_repo}/ansible/vars/hv.yml
+fi
+
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
@@ -215,6 +232,10 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
    source /tmp/prereqs-updated.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
+   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" ]]; then
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-setup.yml -v | tee /tmp/ansible-hv-setup-$(date +%s)
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-vm-create.yml -v | tee /tmp/ansible-hv-vm-create-$(date +%s)
+   fi
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
