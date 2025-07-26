@@ -606,14 +606,15 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-gcp-user-provisioned-dns
+  as: e2e-gcp-custom-dns
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-qe
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-gcp
+    workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
   optional: true
@@ -1453,6 +1454,16 @@ tests:
     env:
       OUTBOUND_TYPE: NATGatewaySingleZone
     workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- as: e2e-gcp-custom-endpoints
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["GCPCustomAPIEndpoints=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-gcp-custom-endpoints
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.21
