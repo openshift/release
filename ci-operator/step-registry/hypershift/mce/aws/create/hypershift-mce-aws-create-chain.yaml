@@ -32,6 +32,12 @@ chain:
         - name: EXTRA_ARGS
           default: ""
           documentation: "Extra args to pass to the create cluster aws command"
+        - name: OVERRIDE_HO_IMAGE
+          default: ""
+          documentation: |-
+            Override the HyperShift operator image. If the default is an empty string, this will not override. 
+            E.g: quay.io/hypershift/hypershift-operator:latest (connected)
+            E.g: virthost.ostest.test.metalkube.org:6001/hypershift/hypershift-operator:latest (disconnected)
       commands: |-
         set -exuo pipefail
         
@@ -59,7 +65,7 @@ chain:
             extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
           fi
           extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
-          extra_flags+="&& oc apply -f /tmp/hc.yaml"
+          extra_flags+="&& sleep 3600"
           echo "$extra_flags"
         }
 
@@ -73,6 +79,9 @@ chain:
           echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
           oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
           HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
+          if [[ ${OVERRIDE_HO_IMAGE} ]] ; then
+            HO_IMAGE=$(cat "${SHARED_DIR}/hypershift_operator_image")
+          fi
           mkdir /tmp/hs-cli
           brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
           echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
@@ -138,6 +147,11 @@ chain:
         --pull-secret ${PULL_SECRET_PATH} \
         --namespace local-cluster \
         --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} $(support_np_skew)"
+        
+        cat /tmp/hc.yaml
+        sleep 3600
+        
+        cat /tmp/hc.yaml
         
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
           echo "MCE version is less than 2.4"
