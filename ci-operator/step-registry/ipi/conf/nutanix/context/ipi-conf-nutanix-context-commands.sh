@@ -28,6 +28,7 @@ declare prism_element_storage_container
 declare override_rhcos_image
 declare one_net_mode_network_name
 declare awk_ip_program
+declare hive_awk_ip_program
 # shellcheck source=/dev/random
 source "${NUTANIX_AUTH_PATH}"
 
@@ -72,6 +73,7 @@ data="{
 
 subnet_name="${LEASED_RESOURCE}"
 slice_number=${LEASED_RESOURCE: -1}
+echo "slice_number=${slice_number}"
 
 if [[ ! -z "${one_net_mode_network_name:-}" ]]; then
   subnet_name="${one_net_mode_network_name}"
@@ -94,9 +96,11 @@ if [[ -z "${API_VIP}" ]]; then
   fi
   RANDOM_API_VIP_BLOCK=$(( RANDOM % 254 ))
   API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_API_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
+  echo "API_VIP=${API_VIP}"
 
   if [[ ! -z  "${awk_ip_program}" ]]; then
     API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="api" "${awk_ip_program}")
+    echo "API_VIP=${API_VIP}"
   fi
 fi
 
@@ -107,9 +111,11 @@ if [[ -z "${INGRESS_VIP}" ]]; then
   fi
   RANDOM_INGRESS_VIP_BLOCK=$(( RANDOM % 254 ))
   INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_INGRESS_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
+  echo "INGRESS_VIP=${INGRESS_VIP}"
 
   if [[ ! -z  "${awk_ip_program}" ]]; then
     INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="ingress" "${awk_ip_program}")
+    echo "INGRESS_VIP=${INGRESS_VIP}"
   fi
 fi
 
@@ -131,3 +137,28 @@ export API_VIP='${API_VIP}'
 export INGRESS_VIP='${INGRESS_VIP}'
 export OVERRIDE_RHCOS_IMAGE='${override_rhcos_image:-}'
 EOF
+
+if [[ "${HIVE_NUTANIX_RESOURCE}" == "true" ]]; then
+  if [[ -z "${subnet_ip}" || -z "${slice_number}" ]]; then
+    echo "$(date -u --rfc-3399=seconds) - Cannot get subnet_ip or slice_number for VIPs" >&2
+    exit 1
+  fi
+
+  HIVE_API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="api" "${hive_awk_ip_program}")
+  echo "HIVE_API_VIP=${HIVE_API_VIP}"
+  HIVE_INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="ingress" "${hive_awk_ip_program}")
+  echo "HIVE_INGRESS_VIP=${HIVE_INGRESS_VIP}"
+
+  {
+    echo "export HIVE_API_VIP='${HIVE_API_VIP}'"
+    echo "export HIVE_INGRESS_VIP='${HIVE_INGRESS_VIP}'"
+  } >> "${SHARED_DIR}/nutanix_context.sh" || {
+    echo "$(date -u --rfc-3339=seconds) - Failed to write VIPs to nutanix_context.sh" >&2
+    exit 1
+  }
+fi
+
+echo "$(date -u --rfc-3339=seconds) - nutanix_context.sh file created successfully, printing content:"
+cat "${SHARED_DIR}/nutanix_context.sh"
+
+sleep 600 # Wait for debug
