@@ -103,9 +103,13 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   export ROOTFS_NAME="${LEASED_RESOURCE}-rootfs"
   export BOOT_ARTIFACTS_PATH="${LIBVIRT_IMAGE_PATH}"
 
+  ls -l ${BOOT_ARTIFACTS_LOCAL_DIR}
+  echo "=========== adding sleep for 1 hour for debug ==========="
+  sleep 3600
+
   # The name of the kernel artifact depends on the arch
   if [ "$ARCH" == "s390x" ]; then
-    KERNEL="agent.${ARCH}-kernel.img"
+    KERNEL="agent.${ARCH}-vmlinuz"
     
     # Merge the initrds together and rename them so they can be found on the remote host; for some reason, order matters when catting these together
     cat "${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS}" "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD}" > "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}"
