@@ -10,7 +10,6 @@ STS=${STS:-true}
 HOSTED_CP=${HOSTED_CP:-false}
 COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
-CHANNEL_GROUP=${CHANNEL_GROUP}
 MULTI_AZ=${MULTI_AZ:-false}
 EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-"optional"}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
@@ -26,7 +25,6 @@ FIPS=${FIPS:-false}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
@@ -159,19 +157,49 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
-version_cmd="rosa list versions --channel-group ${CHANNEL_GROUP} -o json"
-if [[ "$HOSTED_CP" == "true" ]]; then
-  version_cmd="$version_cmd --hosted-cp"
+if [[ -z "${CHANNEL_GROUPS}" ]]; then
+  echo "Error: CHANNEL_GROUPS variable is empty"
+  exit 1
 fi
-if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
-  # shellcheck disable=SC2089
-  version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
-else
-  version_cmd="$version_cmd | jq -r '.[].raw_id'"
-fi
-versionList=$(eval $version_cmd)
-echo -e "Available cluster versions:\n${versionList}"
+IFS=',' read -r -a CHANNEL_GROUPS_ARRAY <<< "${CHANNEL_GROUPS// /}"
 
+if [[ ${#CHANNEL_GROUPS_ARRAY[@]} -eq 0 ]]; then
+  echo "Error: No valid channel groups found in CHANNEL_GROUPS"
+  exit 1
+fi
+
+CHANNEL_GROUP=""
+
+for GROUP in "${CHANNEL_GROUPS_ARRAY[@]}"; do
+  echo "Checking ${GROUP} channel..."
+  
+  version_cmd="rosa list versions --channel-group ${GROUP} -o json"
+  if [[ "${HOSTED_CP}" == "true" ]]; then
+    version_cmd="${version_cmd} --hosted-cp"
+  fi
+
+  if [[ "${AVAILABLE_UPGRADE}" == "yes" ]]; then
+    versionList=$(eval "${version_cmd}" | jq -r '.[] | select(.available_upgrades!=null) .raw_id')
+  else
+    versionList=$(eval "${version_cmd}" | jq -r '.[].raw_id')
+  fi
+
+  if [[ -n "${versionList}" ]]; then
+    echo "Found versions in ${GROUP} channel"
+    CHANNEL_GROUP="${GROUP}"
+    break
+  else
+    echo "No versions found in ${GROUP} channel"
+  fi
+done
+
+if [[ -z "${CHANNEL_GROUP}" ]]; then
+  echo "Error: No versions found in any of the specified channel groups: ${CHANNEL_GROUPS}"
+  exit 1
+fi
+
+echo "Proceeding with ${CHANNEL_GROUP} channel group"
+echo -e "Available cluster versions:\n${versionList}"
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
 # supplied by CI for the payload to use. This only really works for nightlies. ROSA
 # SRE has a job that polls the release controller and syncs new nightlies every 15 minutes,
@@ -235,14 +263,14 @@ else
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  echo "Requested cluster version not available!"
+  echo "Requested cluster version not available in any of the specified channel groups: ${CHANNEL_GROUPS}"
   exit 1
 fi
 
-# if [[ "$CHANNEL_GROUP" != "stable" ]]; then
-#   OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${CHANNEL_GROUP}"
-# fi
-log "Choosing openshift version ${OPENSHIFT_VERSION}"
+if [[ "$CHANNEL_GROUP" != "stable" ]]; then
+  OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${CHANNEL_GROUP}"
+fi
+log "Choosing OpenShift version ${OPENSHIFT_VERSION}"
 
 # Add USER_TAGS to help with cloud cost and make sure to remove
 # invalid tags so that CLI usage doesn't fail later.
@@ -509,15 +537,15 @@ if [[ "$STS" == "true" ]]; then
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
   roleARNFile="${SHARED_DIR}/account-roles-arns"
-  account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
+  account_installer_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
   account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
   account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
-  if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
+  if [[ -z "${account_installer_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
   fi
-  ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
-  record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
+  ACCOUNT_ROLES_SWITCH="--role-arn ${account_installer_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
+  record_cluster "aws.sts" "role_arn" $account_installer_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
   record_cluster "aws.sts" "worker_role_arn" $account_worker_role_arn
 
@@ -544,14 +572,14 @@ fi
 
 SHARED_VPC_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  SAHRED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
-  SAHRED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
-  SAHRED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
-  SHARED_VPC_SWITCH="--base-domain ${SAHRED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN}"
+  SHARED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
+  SHARED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
+  SHARED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
+  SHARED_VPC_SWITCH="--base-domain ${SHARED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SHARED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SHARED_VPC_ROLE_ARN}"
 
-  record_cluster "aws.sts" "private_hosted_zone_id" ${SAHRED_VPC_HOSTED_ZONE_ID}
-  record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SAHRED_VPC_ROLE_ARN}
-  record_cluster "dns" "base_domain" ${SAHRED_VPC_BASE_DOMAIN}
+  record_cluster "aws.sts" "private_hosted_zone_id" ${SHARED_VPC_HOSTED_ZONE_ID}
+  record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SHARED_VPC_ROLE_ARN}
+  record_cluster "dns" "base_domain" ${SHARED_VPC_BASE_DOMAIN}
 fi
 
 DRY_RUN_SWITCH=""
@@ -602,9 +630,9 @@ echo "  Config cluster autoscaler: ${CONFIGURE_CLUSTER_AUTOSCALER}"
 
 echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  echo "    SAHRED_VPC_HOSTED_ZONE_ID: ${SAHRED_VPC_HOSTED_ZONE_ID}"
-  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
-  echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
+  echo "    SHARED_VPC_HOSTED_ZONE_ID: ${SHARED_VPC_HOSTED_ZONE_ID}"
+  echo "    SHARED_VPC_ROLE_ARN: ${SHARED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
+  echo "    SHARED_VPC_BASE_DOMAIN: ${SHARED_VPC_BASE_DOMAIN}"
 fi
 
 #Record installation start time
