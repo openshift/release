@@ -42,6 +42,13 @@ esac
 export ES_SERVER
 
 pip install .
+
+if [[ "${JOB_TYPE}" == "presubmit" ]]; then
+	JOBTYPE='periodic OR pull'
+else
+	JOBTYPE='periodic'
+fi
+
 export EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [[ ! -z "$UUID" ]]; then
@@ -102,7 +109,7 @@ fi
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${JOBTYPE}" orion cmd --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
