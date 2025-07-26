@@ -78,6 +78,11 @@ if [[ "${AUTH_THROUGH_CERTS}" == "true" ]]; then
   DP_ARGS="--e2e.azure-data-plane-identities-file=${AZURE_DATA_PLANE_IDENTITIES_LOCATION}"
 fi
 
+AZURE_MULTI_ARCH_PARAMS=""
+if [[ "${AZURE_MULTI_ARCH:-}" == "true" ]]; then
+  AZURE_MULTI_ARCH_PARAMS="--e2e.azure-multi-arch=true"
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -94,6 +99,7 @@ hack/ci-test-e2e.sh -test.v \
     ${N2_NP_VERSION_TEST_ARGS:-} \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
+    ${AZURE_MULTI_ARCH_PARAMS:-} \
   --e2e.azure-marketplace-publisher "azureopenshift" \
   --e2e.azure-marketplace-offer "aro4" \
   --e2e.azure-marketplace-sku "aro_417" \
