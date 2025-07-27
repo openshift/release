@@ -26,7 +26,7 @@ cleanup() {
 # Set trap to catch EXIT and run cleanup on any exit code
 trap cleanup EXIT SIGINT
 
-function check_if_yq_exists() {
+function install_yq_if_not_exists() {
     # Install yq manually if its not found in image
     echo "Checking if yq exists"
     cmd_yq="$(yq --version 2>/dev/null || true)"
@@ -41,7 +41,7 @@ function mapTestsForComponentReadiness() {
     if [[ $MAP_TESTS == "true" ]]; then
         results_file="${CLUSTER_PATH}/junit.xml"
         if [ -f $results_file ]; then
-            check_if_yq_exists
+            install_yq_if_not_exists
             echo "Mapping Test Suite Name To: CNV-lp-interop"
             yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
         fi

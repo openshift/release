@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function check_if_yq_exists() {
+function install_yq_if_not_exists() {
     # Install yq manually if its not found in image
     echo "Checking if yq exists"
     cmd_yq="$(yq --version 2>/dev/null || true)"
@@ -20,7 +20,7 @@ function mapTestsForComponentReadiness() {
     if [[ $MAP_TESTS == "true" ]]; then
         results_file="${ARTIFACT_DIR}/junit.functest.xml"
         if [ -f $results_file ]; then
-            check_if_yq_exists
+            install_yq_if_not_exists
             echo "Mapping Test Suite Name To: CNV-lp-interop"
             yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
         fi
