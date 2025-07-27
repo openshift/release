@@ -173,7 +173,8 @@ function install_yq_if_not_exists() {
 
 function mapTestsForComponentReadiness() {
     if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${JUNIT_RESULTS_FILE}"
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
         if [ -f $results_file ]; then
             install_yq_if_not_exists
             echo "Mapping Test Suite Name To: CNV-lp-interop"
@@ -250,6 +251,6 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
 # fi
 
 # Map tests if needed for related use cases
-mapTestsForComponentReadiness
+mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
 
 exit ${rc}

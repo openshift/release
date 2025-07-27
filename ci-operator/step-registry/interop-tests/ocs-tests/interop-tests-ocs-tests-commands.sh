@@ -39,7 +39,8 @@ function install_yq_if_not_exists() {
 
 function mapTestsForComponentReadiness() {
     if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${CLUSTER_PATH}/junit.xml"
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
         if [ -f $results_file ]; then
             install_yq_if_not_exists
             echo "Mapping Test Suite Name To: CNV-lp-interop"
@@ -99,7 +100,7 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   || /bin/true
 
 # Map tests if needed for related use cases
-mapTestsForComponentReadiness
+mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))

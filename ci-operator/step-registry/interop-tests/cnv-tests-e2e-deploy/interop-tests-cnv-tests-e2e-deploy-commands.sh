@@ -18,7 +18,8 @@ function install_yq_if_not_exists() {
 
 function mapTestsForComponentReadiness() {
     if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${ARTIFACT_DIR}/junit.functest.xml"
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
         if [ -f $results_file ]; then
             install_yq_if_not_exists
             echo "Mapping Test Suite Name To: CNV-lp-interop"
@@ -78,6 +79,6 @@ else
 fi
 
 # Map tests if needed for related use cases
-mapTestsForComponentReadiness
+mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
 exit ${exit_code}
