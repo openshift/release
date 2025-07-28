@@ -16,7 +16,7 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-cp ${SECRETS_DIR}/clc/secret-options-yaml ./options.yaml
+cp ${SECRETS_DIR}/clc-interop/secret-options-yaml ./options.yaml
 
 
 # Set the dynamic vars based on provisioned hub cluster.

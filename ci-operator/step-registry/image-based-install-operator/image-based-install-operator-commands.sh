@@ -48,12 +48,12 @@ export SEED_VERSION=$(cat /home/ib-orchestrate-vm/seed-version)
 
 echo "### Configuring dns for ibi cluster on the host"
 export IBI_VM_IP=$(cat /home/ib-orchestrate-vm/ibi-vm-ip)
-echo "address=/api.ibi-cluster.mydomain.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
-echo "address=/.apps.ibi-cluster.mydomain.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
+echo "address=/api.ibi-cluster.redhat.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
+echo "address=/.apps.ibi-cluster.redhat.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
 systemctl reload NetworkManager
 
-nslookup api.ibi-cluster.mydomain.com
-nslookup a.apps.ibi-cluster.mydomain.com
+nslookup api.ibi-cluster.redhat.com
+nslookup a.apps.ibi-cluster.redhat.com
 
 echo "Configured dns successfully"
 
@@ -90,7 +90,7 @@ metadata:
   name: ibi-cluster
   namespace: ibi-cluster
 spec:
-  baseDomain: mydomain.com
+  baseDomain: redhat.com
   clusterInstallRef:
     group: extensions.hive.openshift.io
     kind: ImageClusterInstall

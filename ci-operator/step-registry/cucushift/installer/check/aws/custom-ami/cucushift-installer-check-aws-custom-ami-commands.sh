@@ -65,6 +65,15 @@ ic_control_plane_ami=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.amiID')
 ic_compute_ami=$(yq-go r "${CONFIG}" 'compute[0].platform.aws.amiID')
 echo "AMI in install-config: platform: [${ic_platform_ami}], controlPlane: [${ic_control_plane_ami}], compute: [${ic_compute_ami}]"
 
+if test -f "${SHARED_DIR}/proxy-conf.sh" 
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+# https://issues.redhat.com/browse/OCPBUGS-57348 Cluster manages bootimages despite explicit bootimages in installconfig
+machineset_ami=$(oc get machineset.machine.openshift.io -n openshift-machine-api -A -ojson | jq -r '.items[] | .spec.template.spec.providerSpec.value.ami.id' | sort | uniq)
+controlplanemachineset_ami=$(oc get controlplanemachineset.machine.openshift.io -n openshift-machine-api -A -ojson | jq -r '.items[] | .spec.template."machines_v1beta1_machine_openshift_io".spec.providerSpec.value.ami.id')
+echo "AMI in MachineSet: [${machineset_ami}], CPMS AMI: [${controlplanemachineset_ami}]"
 
 expected_control_plane_ami=""
 expected_compute_ami=""
@@ -86,8 +95,8 @@ if ! is_empty "$ic_compute_ami"; then
 fi
 
 if [[ ${expected_control_plane_ami} != "" ]]; then
-    if [[ "${control_plane_ami}" != "${expected_control_plane_ami}" ]]; then
-        echo "FAIL: Control plane AMI mismatch: current: ${control_plane_ami}, expect: ${expected_control_plane_ami}"
+    if [[ "${control_plane_ami}" != "${expected_control_plane_ami}" ]] || [[ "${controlplanemachineset_ami}" != "${expected_control_plane_ami}" ]]; then
+        echo "FAIL: Control plane AMI mismatch: cluster: ${control_plane_ami}, CPMS: ${controlplanemachineset_ami}, expect: ${expected_control_plane_ami}"
         ret=$((ret+1))
     else
         echo "PASS: Control plane AMI."
@@ -97,8 +106,8 @@ else
 fi
 
 if [[ ${expected_compute_ami} != "" ]]; then
-    if [[ "${compute_ami}" != "${expected_compute_ami}" ]]; then
-        echo "FAIL: Compute AMI mismatch: current: ${compute_ami}, expect: ${expected_compute_ami}"
+    if [[ "${compute_ami}" != "${expected_compute_ami}" ]] || [[ "${machineset_ami}" != "${expected_compute_ami}" ]]; then
+        echo "FAIL: Compute AMI mismatch: cluster: ${compute_ami}, machineset: ${machineset_ami}, expect: ${expected_compute_ami}"
         ret=$((ret+1))
     else
         echo "PASS: Compute AMI."

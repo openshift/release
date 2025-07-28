@@ -2,16 +2,19 @@
 # pylint: disable=E0401, C0413
 
 import re
-import typing
 from typing import Dict
 
 import click
-from google.api_core.exceptions import AlreadyExists, PermissionDenied
+from google.api_core.exceptions import NotFound
 from google.cloud import secretmanager
+from google.cloud.secretmanager import SecretPayload
 from util import (
     PROJECT_ID,
+    check_if_collection_exists,
     create_payload,
     get_secret_name,
+    get_secrets_from_index,
+    update_index_secret,
     validate_collection,
     validate_secret_name,
     validate_secret_source,
@@ -60,6 +63,31 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
     """Create a new secret in the specified collection."""
 
     validate_secret_source(from_file, from_literal)
+
+    if not check_if_collection_exists(collection):
+        raise click.ClickException(
+            f"Collection '{collection}' doesn't exist.  "
+            "To create it, add it to the configuration file in the release repository. "
+            "See: https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/"
+        )
+    client = secretmanager.SecretManagerServiceClient()
+    secret_name = get_secret_name(collection, secret)
+
+    # Check if secret exists in either index or GCP
+    index_secrets = get_secrets_from_index(client, collection)
+    if secret in index_secrets:
+        raise click.ClickException(
+            f"Secret '{secret}' already exists within the collection index."
+        )
+    try:
+        client.get_secret(name=client.secret_path(PROJECT_ID, secret_name))
+        raise click.ClickException(
+            f"Secret '{secret}' already exists in collection '{collection}'."
+        )
+    except NotFound:
+        pass  # Secret doesn't exist in GCP - this is good
+
+    # Collect metadata
     click.echo(
         "To help us track ownership and manage secrets effectively, we need to collect a few pieces of info.\n"
         "If a field does not apply to your case, type 'none' to continue.\n"
@@ -68,12 +96,10 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
     annotations = prompt_for_annotations()
 
     try:
-        client = secretmanager.SecretManagerServiceClient()
-
         gcp_secret = client.create_secret(
             request={
                 "parent": f"projects/{PROJECT_ID}",
-                "secret_id": get_secret_name(collection, secret),
+                "secret_id": secret_name,
                 "secret": {
                     "replication": {"automatic": {}},
                     "labels": labels,
@@ -83,24 +109,18 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
         )
         client.add_secret_version(
             parent=gcp_secret.name,
-            payload={
-                "data": create_payload(from_file, from_literal),
-            },
+            payload=SecretPayload(data=create_payload(from_file, from_literal)),
         )
+        update_index_secret(client, collection, index_secrets + [secret])
         click.echo(f"Secret '{secret}' created")
-    except AlreadyExists:
-        raise click.ClickException(
-            f"Secret '{secret}' already exists in collection '{collection}'."
-        )
-    except PermissionDenied:
-        raise click.ClickException(
-            f"Access denied: You do not have permission to create secrets in collection '{collection}'"
-        )
     except Exception as e:
-        raise click.ClickException(f"Failed to create secret '{secret}': {e}") from e
+        raise click.ClickException(
+            f"Failed to create secret '{secret}': {e}. "
+            f"If the secret is in an inconsistent state, run 'delete -c {collection} -s {secret}', then try again."
+        ) from e
 
 
-def prompt_for_labels() -> typing.Dict[str, str]:
+def prompt_for_labels() -> Dict[str, str]:
     click.echo(
         "Enter team JIRA project associated with this secret (e.g. 'ART' for issues.redhat.com/browse/ART).\n"
         "Test Platform may open tickets in this project to help handle incidents requiring secret rotation."
@@ -159,11 +179,13 @@ def prompt_for_annotation(msg: str) -> str:
         click.echo("Input cannot be empty. Please enter a value or 'N/A'.")
 
 
-def check_annotations_size(annotations: Dict) -> bool:
+def check_annotations_size(annotations: Dict):
     size = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
         for key, value in annotations.items()
     )
     # The total size of annotation keys and values must be less than 16KiB.
     if size > (16 * 1024):
-        raise click.ClickException("Total annotations size exceeds the allowed limit.")
+        raise click.ClickException(
+            "Total annotations size exceeds the allowed limit (16KiB)."
+        )

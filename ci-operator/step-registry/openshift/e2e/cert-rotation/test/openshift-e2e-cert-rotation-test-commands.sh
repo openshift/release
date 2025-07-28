@@ -6,6 +6,9 @@ set -o pipefail
 set -x
 
 echo "************ post cert-rotation test command ************"
+if [[ -f "${CLUSTER_PROFILE_DIR}"/osServicePrincipal.json ]]; then
+    export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+fi
 
 cat <<'EOF' > ${SHARED_DIR}/test-list
 "[sig-cli] Kubectl logs logs should be able to retrieve and filter logs [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
@@ -22,11 +25,11 @@ EOF
 
 # If not running on a bastion host run openshift-tests directly
 if [[ ! -f "${SHARED_DIR}/packet-conf.sh" ]]; then
+    # Set Azure-specific env var
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
     # Add Short Cert Rotation specific test
     echo '"[sig-arch][Late][Jira:\"kube-apiserver\"] [OCPFeatureGate:ShortCertRotation] all certificates should expire in no more than 8 hours [Suite:openshift/conformance/parallel]"' >> ${SHARED_DIR}/test-list
     openshift-tests run \
-        -v 5 \
-        --provider=none \
         --monitor='node-lifecycle,operator-state-analyzer' \
         -f ${SHARED_DIR}/test-list \
         -o "${ARTIFACT_DIR}/e2e.log" \
@@ -55,8 +58,6 @@ for kubeconfig in $(find ${KUBECONFIG} -type f); do
 done
 fi
 source ~/config.sh
-export EXTENSIONS_PAYLOAD_OVERRIDE=${RELEASE_IMAGE_LATEST}
-export EXTENSIONS_PAYLOAD_OVERRIDE_hyperkube=${HYPERKUBE_IMAGE}
 export REGISTRY_AUTH_FILE=~/pull-secret
 openshift-tests run \
     -v 5 \

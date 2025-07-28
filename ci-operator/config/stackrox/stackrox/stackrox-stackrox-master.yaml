@@ -35,7 +35,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.4.8
+    tag: stackrox-ui-test-0.4.9
 releases:
   latest:
     release:
@@ -84,9 +84,8 @@ tests:
       TEST_SUITE: gke-qa-e2e-tests
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
-- as: gke-ui-e2e-tests
-  optional: true
-  run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)
+- always_run: true
+  as: gke-ui-e2e-tests
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -147,7 +146,7 @@ tests:
     workflow: stackrox-stackrox-e2e-job
 - as: gke-sensor-integration-tests
   optional: true
-  skip_if_only_changed: ^ui/
+  run_if_changed: ^sensor/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -202,7 +201,7 @@ tests:
     workflow: stackrox-stackrox-e2e-job
 - as: gke-scanner-v4-install-tests
   optional: true
-  run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
+  run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|operator|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -214,7 +213,7 @@ tests:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-eks-e2e
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - always_run: false
   as: osd-aws-qa-e2e-tests
   optional: true
@@ -222,7 +221,7 @@ tests:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-osd-aws-e2e
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - always_run: false
   as: osd-gcp-qa-e2e-tests
   optional: true

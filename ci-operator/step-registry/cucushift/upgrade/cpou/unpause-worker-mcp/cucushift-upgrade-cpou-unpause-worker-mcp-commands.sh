@@ -90,6 +90,7 @@ for mcp in "${normal_mcp_arr[@]}"
 do
     check_mcp ${mcp} "True"
 done
+
 IFS=" " read -r -a arr <<<"$PAUSED_MCP_NAME"
 for mcp in "${arr[@]}";
 do
@@ -97,11 +98,5 @@ do
     printf "\n"
     unpause ${mcp}
     printf "\n"
-    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-        echo "Found rhel worker, this step is supposed to be used in eus upgrade, skipping mcp checking here, need to check it after rhel worker upgraded..."
-        run_command "oc get machineconfigpools"
-        run_command "oc get node -owide"
-    else
-        check_mcp ${mcp} "True"
-    fi
+    check_mcp ${mcp} "True"
 done

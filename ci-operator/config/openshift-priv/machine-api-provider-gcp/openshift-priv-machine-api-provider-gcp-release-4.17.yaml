@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.17"
   ocp_4.17_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
@@ -10,7 +14,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.17"
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -75,17 +79,19 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: regression-clusterinfra-cucushift-rehearse-gcp-ipi
+- as: regression-clusterinfra-gcp-ipi-mapi
   optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp
     env:
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "5400"
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

@@ -252,14 +252,20 @@ fi
 # connects, on a specific VRF per extra cluster network, to the corresponding agnhost container macvlan network and that extra cluster network  
 deploy_frr_external_container vrf_neighbors
 
+# apply FRR-K8s overrides to enable debug logging
+oc create namespace openshift-frr-k8s
+oc apply -f - <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: env-overrides
+  namespace: openshift-frr-k8s
+data:
+  frrk8s-loglevel: --log-level=debug
+EOF
+
 # enable route advertisement with FRR
 oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
-
-echo "Waiting for namespace 'openshift-frr-k8s' to be created..."
-until $KCLI get namespace "openshift-frr-k8s" &> /dev/null; do
-  sleep 5
-done
-echo "Namespace 'openshift-frr-k8s' has been created."
 
 echo "Waiting for daemonset 'frr-k8s' to be created..."
 until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do

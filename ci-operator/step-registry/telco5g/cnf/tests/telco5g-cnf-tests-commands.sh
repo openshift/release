@@ -156,6 +156,10 @@ sriov "should run pod without RDMA"
 # TESTNAME
 sriov "Configure rdma namespace"
 
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -190,6 +194,10 @@ sriov "should run pod without RDMA"
 # TESTNAME
 sriov "Configure rdma namespace"
 
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -223,6 +231,10 @@ sriov "should run pod without RDMA"
 # tests that are very slow
 # TESTNAME
 sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
 
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
@@ -429,7 +441,7 @@ export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
-    export FEATURES="${FEATURES:-sctp}"
+    export FEATURES="${FEATURES:-sriov sctp}"
 elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
     export FEATURES="${FEATURES:-sriov}"
     export HYPERSHIFT_ENVIRONMENT=true
@@ -504,7 +516,7 @@ fi
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
     oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 fi
 

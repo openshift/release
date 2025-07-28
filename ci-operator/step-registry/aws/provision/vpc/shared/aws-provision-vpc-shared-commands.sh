@@ -14,10 +14,21 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+
+  echo "Using shared AWS account."
+  if [[ ! -f "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    echo "ERROR: The ENABLE_SHARED_VPC is enabled, but the 2nd AWS account credential file \${CLUSTER_PROFILE_DIR}/.awscred_shared_account file does not exit, please check your cluster profile."
+    exit 1
+  fi
+
   CLUSTER_CREATOR_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
   CLUSTER_CREATOR_AWS_ACCOUNT_NO=$(echo $CLUSTER_CREATOR_USER_ARN | awk -F ":" '{print $5}')
-  echo "Using shared AWS account, cluster creator account: ${CLUSTER_CREATOR_AWS_ACCOUNT_NO:0:6}***"
+  echo "Cluster creator account: ${CLUSTER_CREATOR_AWS_ACCOUNT_NO:0:6}***"
+
   export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  SHARED_ACCOUNT_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
+  SHARED_ACCOUNT_AWS_ACCOUNT_NO=$(echo $SHARED_ACCOUNT_USER_ARN | awk -F ":" '{print $5}')
+  echo "Shared account: ${SHARED_ACCOUNT_AWS_ACCOUNT_NO:0:6}***"
 else
   echo "Using regular AWS account."
 fi

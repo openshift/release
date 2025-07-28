@@ -16,9 +16,16 @@ PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
 BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
+if [[ "$NUM_WORKER_NODES" == "" ]]; then
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  export NUM_WORKER_NODES
+fi
+QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
+export QUADS_INSTANCE
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -26,8 +33,6 @@ lab: $LAB
 lab_cloud: $LAB_CLOUD
 cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
-ocp_version: $OCP_VERSION
-ocp_build: $OCP_BUILD
 public_vlan: $PUBLIC_VLAN
 sno_use_lab_dhcp: false
 enable_fips: $FIPS
@@ -43,6 +48,7 @@ setup_bastion_registry: false
 use_bastion_registry: false
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
+payload_url: "${RELEASE_IMAGE_LATEST}"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
@@ -66,33 +72,62 @@ EOF
 cat > /tmp/prereqs.sh << 'EOF'
 echo "Running prereqs.sh"
 podman pull quay.io/quads/badfish:latest
-USER=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sSk $QUADS_INSTANCE  | jq -r ".nodes[0].pm_password")
+OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
+PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
 if [[ "$TYPE" == "mno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
+  HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
 elif [[ "$TYPE" == "sno" ]]; then
-  HOSTS=$(curl -sSk $QUADS_INSTANCE | jq -r ".nodes[1:2][].name")
+  HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:2][].name")
 fi
 echo "Hosts to be prepared: $HOSTS"
-# IDRAC reset
+
+# IDRAC reset and check for readiness
 if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
   echo "Resetting IDRACs ..."
   for i in $HOSTS; do
     echo "Resetting IDRAC of server $i ..."
     podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --racreset
   done
+  
+  # Wait for all IDRACs to become ready
+  echo "Waiting for IDRACs to become ready..."
   for i in $HOSTS; do
-    if ! podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state; then
-      echo "$i iDRAC is still rebooting"
-      continue
-    fi
+    echo "Checking IDRAC readiness for server $i ..."
+    max_attempts=30  # Maximum number of attempts (adjust as needed)
+    attempt=1
+    sleep_interval=10  # Seconds between attempts
+    
+    while [ $attempt -le $max_attempts ]; do
+      echo "Attempt $attempt/$max_attempts for server $i"
+      
+      if podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state; then
+        echo "✓ IDRAC for server $i is ready"
+        break
+      else
+        if [ $attempt -eq $max_attempts ]; then
+          echo "✗ IDRAC for server $i failed to become ready after $max_attempts attempts"
+          echo "Consider checking the server manually or increasing max_attempts"
+          # Optionally exit here if you want to fail fast
+          # exit 1
+        else
+          echo "IDRAC for server $i is still rebooting, waiting ${sleep_interval}s..."
+          sleep $sleep_interval
+        fi
+      fi
+      
+      ((attempt++))
+    done
   done
+  
+  echo "IDRAC reset and readiness check completed"
 fi
+
 if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
     echo "Modifying PXE loader of server $i ..."
-    hammer --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
+    hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
   done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
@@ -133,12 +168,7 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   done
 fi
 EOF
-if [[ $LAB == "performancelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu3.labs.perfscale.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
-elif [[ $LAB == "scalelab" ]]; then
-  export QUADS_INSTANCE="https://quads2.rdu2.scalelab.redhat.com/instack/$LAB_CLOUD\_ocpinventory.json"
-fi
-envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Setup Bastion
 jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
@@ -158,11 +188,17 @@ ssh ${SSH_ARGS} root@${bastion} "
    git branch
    source bootstrap.sh
 "
+# Save jetlag_repo for next Step(s) that may need this info
+echo $jetlag_repo > ${SHARED_DIR}/jetlag_repo
+
+cp ${CLUSTER_PROFILE_DIR}/pull_secret /tmp/pull-secret
+oc registry login --to=/tmp/pull-secret
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
-scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/prereqs-updated.sh root@${bastion}:/tmp/
+
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'

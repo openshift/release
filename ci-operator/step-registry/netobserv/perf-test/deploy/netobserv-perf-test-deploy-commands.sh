@@ -17,7 +17,18 @@ source scripts/netobserv.sh
 deploy_lokistack
 deploy_kafka
 deploy_netobserv
-createFlowCollector "-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
+
+PARAMETERS="-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
+
+if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_SAMPLING:-} ]]; then
+    PARAMETERS+=" EBPFSamplingRate=${MULTISTAGE_PARAM_OVERRIDE_SAMPLING}"
+fi
+
+if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
+    PARAMETERS+=" LokiEnable=${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE}"
+fi
+
+createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
@@ -32,11 +43,15 @@ NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*
 LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
 KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
 opm --help
-if [[ $INSTALLATION_SOURCE == "Internal" ]]; then
-    NOO_BUNDLE_INFO=$(build_info.sh)
-else
-    # Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
-    NOO_BUNDLE_INFO="v0.0.0-sha-main"
+if [[ $INSTALLATION_SOURCE == "Internal" || -n $DOWNSTREAM_IMAGE ]]; then
+    NOO_BUNDLE_INFO=$(scripts/build_info.sh)
+elif [[ $INSTALLATION_SOURCE == "Source" ]]; then
+    if [[ -n $UPSTREAM_IMAGE ]]; then
+        NOO_BUNDLE_INFO=${UPSTREAM_IMAGE##*:}
+    else
+        # Currently hardcoded as main until https://issues.redhat.com/browse/NETOBSERV-2054 is fixed
+        NOO_BUNDLE_INFO="v0.0.0-sha-main"
+    fi
 fi
 
 

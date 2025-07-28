@@ -6,6 +6,7 @@ set -o pipefail
 
 function check_if_hypershift_env () {
     if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+	echo "this is a hypeshift Env"
         IS_HYPERSHIFT_ENV="yes"
     else
         # We must set IS_HYPERSHIFT_ENV="no" otherwise OCP CI will fail because this script sets "set -u".
@@ -78,6 +79,7 @@ function set_proxy () {
 }
 
 function set_users () {
+    echo "set idp htpasswd users"
     # prepare users
     users=""
     htpass_file=/tmp/users.htpasswd
@@ -106,19 +108,32 @@ function set_users () {
     jq $IDP_FIELD' += [{"htpasswd":{"fileData":{"name":"cucushift-htpass-secret"}},"challenge":"true","login":"true","mappingMethod":"claim","name":"cucushift-htpasswd-provider","type":"HTPasswd"}]' "${oauth_file_src}" > "${oauth_file_dst}"
     oc replace -f "${oauth_file_dst}"
 
-    # wait for oauth-openshift to rollout
-    wait_auth=true
+    echo "Wait up to 10 minutes for htpasswd ready"
+    auth_ready=false
+    count=0
     expected_replicas=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.spec.replicas}')
-    while $wait_auth;
+    while [[ $count -lt 40 ]]
     do
         available_replicas=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.status.availableReplicas}')
         new_gen=$(oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.metadata.generation}')
         if [[ $expected_replicas == "$available_replicas" && $((new_gen)) -gt $((gen)) ]]; then
-            wait_auth=false
+            auth_ready=true
+            break
         else
-            sleep 10
-        fi
+            echo "waiting 15s now. elapsed: $(( 15 * $count )) seconds"
+            sleep 15s
+            count=$(( count + 1 ))
+	fi
     done
+
+    if [[ $auth_ready == "false" ]];then
+        echo "Error: the idp-htpasswd is not ready in given time"
+        echo "oc get deployment oauth-openshift -n $OAUTH_NAMESPACE -o jsonpath={.status}"
+        oc get deployment oauth-openshift -n "$OAUTH_NAMESPACE" -o jsonpath='{.status}'
+	echo "oc get pods -n $OAUTH_NAMESPACE"
+        oc get pods -n "$OAUTH_NAMESPACE"
+        exit 1
+    fi
 
     # store users in a shared file
     if [ -f "${SHARED_DIR}/runtime_env" ] ; then

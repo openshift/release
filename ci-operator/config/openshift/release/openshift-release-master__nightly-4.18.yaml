@@ -300,13 +300,12 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-bm-upgrade
+- as: e2e-metal-ipi-ovn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -437,14 +436,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-host-groups
-  cron: '@yearly'
-  steps:
-    cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-ovn-multi-vcenter-csi
   cron: '@weekly'
   steps:
@@ -472,12 +463,6 @@ tests:
   cron: '@weekly'
   steps:
     cluster_profile: vsphere-elastic
-    env:
-      TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
-      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node\|\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] should
-        be able to preserve UDP traffic when server pod cycles for a LoadBalancer
-        service
     observers:
       enable:
       - observers-resource-watch
@@ -625,9 +610,9 @@ tests:
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      PLATFORM_VERSION: "8.4"
+      PLATFORM_VERSION: "8.10"
     observers:
       enable:
       - observers-resource-watch
@@ -637,7 +622,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      PLATFORM_VERSION: "8.4"
+      PLATFORM_VERSION: "8.10"
     observers:
       enable:
       - observers-resource-watch
@@ -822,7 +807,7 @@ tests:
 - as: e2e-telco5g-cnftests
   capabilities:
   - intranet
-  cron: 00 18 */1 * 1-5
+  cron: 00 02 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -882,6 +867,22 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-sno-ztp-cnf
+- as: e2e-telco5g-mno-ztp-cnftests
+  capabilities:
+  - intranet
+  cron: 10 04 */1 * 1-5
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: mno-ztp-cnftests
+      T5CI_VERSION: "4.18"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-mno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
   cron: 0 23 * * 2,5
@@ -1855,6 +1856,16 @@ tests:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
   timeout: 6h0m0s
+- as: e2e-aws-ovn-upgrade-ipsec
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -5,6 +5,12 @@ set -o pipefail
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 PROJECT_DIR="/tmp"
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Create group_vars directory"
 mkdir ${ECO_CI_CD_INVENTORY_PATH}/group_vars
 
@@ -57,7 +63,7 @@ BASTION_IP=$(cat $ECO_CI_CD_INVENTORY_PATH/host_vars/bastion | grep -oP '(?<=ans
 BASTION_USER=$(cat $ECO_CI_CD_INVENTORY_PATH/group_vars/all | grep -oP '(?<=ansible_user: ).*'| sed "s/'//g")
 
 echo "Run cnf-gotests via ssh tunnel"
-ssh -o StrictHostKeyChecking=no $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "cd /tmp/cnf-gotests;./downstream-tests-run.sh || true"
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "cd /tmp/cnf-gotests;./downstream-tests-run.sh || true"
 
 echo "Gather artifacts from bastion"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/downstream_report/*.xml ${ARTIFACT_DIR}/junit_downstream/

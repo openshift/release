@@ -514,7 +514,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to-image with to multi arch" \
     "oc adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:f44f1570d0b88a75034da9109211bb39672bc1a5d063133a50dcda7c12469ca7 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
 
@@ -522,7 +522,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to with to multi arch" \
     "oc adm upgrade --to 4.10.0 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
     # verify not progressing.
@@ -580,6 +580,9 @@ function pre-OCP-60397(){
     # set testing graph
     set_upstream_graph "https://arm64.ocp.releases.ci.openshift.org/graph" || return 1
 
+    # wait for status change
+    sleep 60
+
     # check RetrievedUpdates=True
     verify_retrieved_updates  || return 1
 
@@ -600,8 +603,13 @@ function pre-OCP-60397(){
     "architecture=\"arm64\"" \
     || return 1
 
+    #export pull-secrets from live cluster for skopeo inspect to use
+    run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --confirm --to=/tmp/secret/"
     # verify cvo image still non-hetero
-    verify_nonhetero || return 1
+    verify_output \
+    "cvo image pre-transition is non-hetero" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') --authfile /tmp/secret/.dockerconfigjson | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.v2+json" || return 1
 
     # clear the upgrade
     if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then

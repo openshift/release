@@ -1,8 +1,4 @@
 base_images:
-  elasticsearch-operator-src:
-    name: "5.8"
-    namespace: logging
-    tag: elasticsearch-operator-src
   go_builder:
     name: builder
     namespace: ocp
@@ -18,7 +14,7 @@ base_images:
   logging-vector:
     name: vector
     namespace: logging
-    tag: v0.37.1
+    tag: v0.47.0
   loki-operator:
     name: 5.y
     namespace: logging
@@ -47,11 +43,9 @@ images:
   from: ubi9-minimal
   to: cluster-logging-operator-registry
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
     FROM loki-operator-src AS lo-src
     FROM registry.redhat.io/ubi9/go-toolset:latest
     ADD . /go/src/github.com/openshift/cluster-logging-operator
-    COPY --from=es-src /go/src/github.com/openshift/elasticsearch-operator /go/src/github.com/openshift/elasticsearch-operator
     COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
     WORKDIR /go/src/github.com/openshift/cluster-logging-operator
     USER 0
@@ -64,9 +58,6 @@ images:
     RUN chmod -R 777 /go
     RUN make bin/functional-benchmarker
   inputs:
-    elasticsearch-operator-src:
-      as:
-      - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
     go_builder:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
@@ -93,13 +84,13 @@ promotion:
     namespace: logging
   - additional_images:
       cluster-logging-operator-bundle: cluster-logging-operator-bundle
-    name: "6.3"
+    name: "6.4"
     namespace: logging
 releases:
   latest:
     release:
       channel: stable
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -124,7 +115,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -162,7 +153,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -195,7 +186,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   optional: true
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:

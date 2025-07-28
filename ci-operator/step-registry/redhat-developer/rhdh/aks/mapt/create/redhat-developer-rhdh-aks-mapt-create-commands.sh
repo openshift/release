@@ -23,5 +23,5 @@ mapt azure aks create \
   --vmsize "Standard_D4as_v6" \
   --spot \
   --spot-eviction-tolerance "low" \
-  --spot-excluded-regions "australiaeast" \
+  --spot-excluded-regions "australiaeast,brazilsouth" \
   --enable-app-routing

@@ -64,6 +64,7 @@ function select_baremetal_host_from_pool {
       [[ "$(check_the_host_was_locked "${AUX_HOST}" "${spoke_lock_filename}" "${host_lock_timestamp}")" == "locked" ]] &&
       {
         update_host_and_master_yaml_files "$(dirname ${host})" ;
+        echo -n "yes" >| ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt
         return 0 ;
       }
     fi
@@ -74,6 +75,7 @@ function select_baremetal_host_from_pool {
   echo "For manual clean up, check out /var/run/lock/ztp-baremetal-pool/*.lock folder in your bastion host"
   echo "and remove the lock files that release those baremental host you consider is saved to unlock."
   echo
+  echo -n "no" >| ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt
   exit 1
 }
 

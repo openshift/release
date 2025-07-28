@@ -5,9 +5,11 @@ set -o nounset
 
 output_code=1
 
+CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
+
 counter=0
 while [[ $output_code == 1 ]]; do
-    output=$(oc rsh -n $TEST_NAMESPACE $POD_NAME cat /tmp/test.json)
+    output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
     output_code=$?
     sleep 5
     counter=$((counter+1))
