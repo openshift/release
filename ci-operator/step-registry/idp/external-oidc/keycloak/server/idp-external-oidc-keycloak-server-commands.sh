@@ -292,8 +292,9 @@ export KEYCLOAK_ISSUER="${KEYCLOAK_HOST}/realms/master"
 export KEYCLOAK_TEST_USERS="${users}"
 export KEYCLOAK_CLI_CLIENT_ID="oc-cli-test"
 export CONSOLE_CLIENT_SECRET_VALUE="${CONSOLE_CLIENT_SECRET_VALUE}"
-export KEYCLOAK_CA_BUNDLE_FILE="$SHARED_DIR"/oidcProviders-ca.crt
-export CONSOLE_CLIENT_ID=${CONSOLE_CLIENT_ID}
+export KEYCLOAK_CA_BUNDLE_FILE=$SHARED_DIR/oidcProviders-ca.crt
+# it is also defined in function setup_keycloak
+export CONSOLE_CLIENT_ID="console-test"
 EOF
 
 }
