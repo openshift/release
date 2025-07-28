@@ -1,13 +1,59 @@
 base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
   cli:
     name: "4.20"
     namespace: ocp
     tag: cli
+  fedora:
+    name: fedora
+    namespace: openshift
+    tag: "31"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.21
+images:
+- dockerfile_literal: |
+    FROM base 
+    WORKDIR /tmp/src
+    RUN dnf install -y git &&\
+    git clone https://github.com/openshift-storage-scale/openshift-fusion-access-operator.git .
+  from: base
+  to: git-src
+- dockerfile_literal: |
+    FROM fedora
+    WORKDIR /tmp
+    RUN dnf install -y xorg-x11-server-Xvfb
+  from: fedora
+  to: xvfb-bin
+- dockerfile_literal: |
+    FROM base
+    WORKDIR /tmp/src/console
+    COPY --from=xvfb-bin /usr/bin/xvfb-run /usr/bin/xvfb-run
+    COPY --from=git-src /tmp/src/console .
+    RUN mkdir -p /tmp/artifacts/installer/auth
+  from: base
+  inputs:
+    git-src:
+      as:
+      - git-src
+    xvfb-bin:
+      as:
+      - xvfb-bin
+  to: pre
+- dockerfile_literal: |
+    FROM pre
+    WORKDIR /tmp/src/console
+    RUN dnf install npm xauth -y &&\
+    dnf clean all &&\
+    npm set progress=false &&\
+    npm install --save-dev
+  from: pre
+  to: fusion-access-test-runner
 releases:
   latest:
     candidate:
@@ -40,8 +86,17 @@ tests:
       USER_TAGS: |
         scenario fusion-access
     test:
-    - ref: install-operators
-    - ref: wait
+    - as: test
+      cli: latest
+      commands: |
+        export KUBECONFIG="$SHARED_DIR/kubeconfig" &&\
+        cp "$SHARED_DIR/kubeadmin-password" /tmp/artifacts/installer/auth/kubeadmin-password &&\
+        npm run test-integration
+      from: fusion-access-test-runner
+      resources:
+        requests:
+          cpu: 200m
+          memory: 4Gi
     workflow: firewatch-ipi-aws
   timeout: 6h0m0s
 zz_generated_metadata:
