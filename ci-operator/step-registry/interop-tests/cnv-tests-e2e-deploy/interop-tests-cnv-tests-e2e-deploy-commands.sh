@@ -4,6 +4,30 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function install_yq_if_not_exists() {
+    # Install yq manually if its not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -x "${cmd_yq}" ]; then
+        echo "Installing yq"
+        curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o ./yq && chmod +x ./yq
+    fi
+}
+
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            install_yq_if_not_exists
+            echo "Mapping Test Suite Name To: CNV-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        fi
+    fi
+}
+
 # Set cluster variables
 # CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
 # CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
@@ -50,7 +74,11 @@ set +x
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
-    exit ${exit_code}
 else
     echo "deploy_test succeeded"
 fi
+
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
+
+exit ${exit_code}

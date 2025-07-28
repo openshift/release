@@ -245,6 +245,44 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
   timeout: 5h0m0s
+- as: e2e-gcp-op-1of2
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-1of2
+      dependencies:
+      - env: MCO_OS_IMAGE_URL
+        name: pipeline:custom-os-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h40m0s
+    workflow: ipi-gcp
+  timeout: 4h0m0s
+- as: e2e-gcp-op-2of2
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-2of2
+      dependencies:
+      - env: MCO_OS_IMAGE_URL
+        name: pipeline:custom-os-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h40m0s
+    workflow: ipi-gcp
+  timeout: 4h0m0s
 - as: e2e-gcp-op-ocl
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -352,7 +390,8 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   optional: true
   steps:
