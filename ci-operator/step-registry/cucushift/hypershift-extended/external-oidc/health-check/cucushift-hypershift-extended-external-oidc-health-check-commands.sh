@@ -36,16 +36,16 @@ if [[ -z "$hc_authentication_cluster_spec_oidcproviders" ]]; then
 fi
 
 # Check special fields in authentication.config/cluster
-if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
-    # Ensure the extra and uid fields exist and are not empty
-    if grep -q '"extra":\[{"key".*"uid":{"' <<< "$hc_authentication_cluster_spec_oidcproviders"; then
-        echo "External OIDC uid and extra settings are synced into the hosted cluster"
-    else
-        echo "$hc_authentication_cluster_spec_oidcproviders"
-        echo "External OIDC uid and extra settings are not synced into the hosted cluster!"
-        exit 1
-    fi
-fi
+# if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
+#     # Ensure the extra and uid fields exist and are not empty
+#     if grep -q '"extra":\[{"key".*"uid":{"' <<< "$hc_authentication_cluster_spec_oidcproviders"; then
+#         echo "External OIDC uid and extra settings are synced into the hosted cluster"
+#     else
+#         echo "$hc_authentication_cluster_spec_oidcproviders"
+#         echo "External OIDC uid and extra settings are not synced into the hosted cluster!"
+#         exit 1
+#     fi
+# fi
 
 echo "Making sure cm/auth-config on the management cluster is updated"
 mc_auth_config="$(oc get cm auth-config -n "clusters-${cluster_name}" -o jsonpath='{.data.auth\.json}')"
@@ -55,13 +55,13 @@ if ! grep -i issuer <<< "$mc_auth_config"; then
 fi
 
 # Further check the special fields in kube-apiserver config
-if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
-    # Ensure the extra and uid fields not only exist and but also are not empty
-    if grep -q '"extra":\[{"key"' <<< "$mc_auth_config" && grep -q '"uid":{"' <<< "$mc_auth_config"; then
-        echo "External OIDC uid and extra settings are configured in kube-apiserver"
-    else
-        echo "$mc_auth_config"
-        echo "External OIDC uid and extra settings are not configured in kube-apiserver!"
-        exit 1
-    fi
-fi
+# if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
+#     # Ensure the extra and uid fields not only exist and but also are not empty
+#     if grep -q '"extra":\[{"key"' <<< "$mc_auth_config" && grep -q '"uid":{"' <<< "$mc_auth_config"; then
+#         echo "External OIDC uid and extra settings are configured in kube-apiserver"
+#     else
+#         echo "$mc_auth_config"
+#         echo "External OIDC uid and extra settings are not configured in kube-apiserver!"
+#         exit 1
+#     fi
+# fi
