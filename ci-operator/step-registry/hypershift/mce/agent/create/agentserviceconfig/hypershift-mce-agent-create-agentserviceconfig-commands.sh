@@ -14,6 +14,7 @@ fi
 
 CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
 
+CLUSTER_VERSION="4.19"
 function registry_config() {
   src_image=${1}
   mirrored_image=${2}
