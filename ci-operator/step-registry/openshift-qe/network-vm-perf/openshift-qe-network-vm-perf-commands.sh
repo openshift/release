@@ -61,7 +61,7 @@ else
   WORKLOAD=full-run.yaml ./run.sh
 fi
 
-if [ ${PUBLIC_VLAN} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi
