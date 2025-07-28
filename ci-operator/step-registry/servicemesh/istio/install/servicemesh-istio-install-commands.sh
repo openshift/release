@@ -24,7 +24,7 @@ fi
 
 # cleaning leftovers if exists
 oc delete istio default ${ISTIO_NAMESPACE} || true
-oc delete isticni default ${ISTIO_CNI_NAMESPACE} || true
+oc delete istiocni default ${ISTIO_CNI_NAMESPACE} || true
 oc delete project ${TEMPO_NAMESPACE} || true
 oc delete project ${OTEL_NAMESPACE} || true
 oc delete project ${ISTIO_NAMESPACE} || true

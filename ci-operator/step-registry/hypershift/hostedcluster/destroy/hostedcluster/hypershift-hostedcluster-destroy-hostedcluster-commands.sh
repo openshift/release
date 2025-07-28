@@ -110,7 +110,6 @@ elif [[ "${PLATFORM}" == "powervs" ]]; then
      --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
      --cloud-instance-id ${POWERVS_GUID} \
      --vpc ${POWERVS_VPC} \
-     --power-edge-router true \
      --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
      --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION}
    if [ $? == 0 ]; then

@@ -1,0 +1,146 @@
+base_images:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      cpu: 2000m
+    requests:
+      cpu: 500m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: jump-ci
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    post:
+    - as: 006-unlock-cluster
+      commands: |
+        export CONTAINER_BENCH_SECRET_PATH=/var/run/container-bench-secret
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci run unlock_cluster
+      credentials:
+      - collection: ""
+        mount_path: /var/run/container-bench-secret
+        name: container-bench-secret
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: 001-lock-cluster
+      commands: |
+        export CONTAINER_BENCH_SECRET_PATH=/var/run/container-bench-secret
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci run lock_cluster
+      credentials:
+      - collection: ""
+        mount_path: /var/run/container-bench-secret
+        name: container-bench-secret
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 10h0m0s
+    - as: 002-prepare-jump-ci
+      commands: |
+        export CONTAINER_BENCH_SECRET_PATH=/var/run/container-bench-secret
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci run prepare_jump_ci
+      credentials:
+      - collection: ""
+        mount_path: /var/run/container-bench-secret
+        name: container-bench-secret
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 1h0m0s
+    - as: 003-pre-cleanup
+      commands: |
+        export CONTAINER_BENCH_SECRET_PATH=/var/run/container-bench-secret
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci test pre_cleanup_ci
+      credentials:
+      - collection: ""
+        mount_path: /var/run/container-bench-secret
+        name: container-bench-secret
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: 004-prepare
+      commands: |
+        export CONTAINER_BENCH_SECRET_PATH=/var/run/container-bench-secret
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci test prepare_ci
+      credentials:
+      - collection: ""
+        mount_path: /var/run/container-bench-secret
+        name: container-bench-secret
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 3h0m0s
+    test:
+    - as: 005-test
+      commands: |
+        export CONTAINER_BENCH_SECRET_PATH=/var/run/container-bench-secret
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+        run jump_ci test test_ci
+      credentials:
+      - collection: ""
+        mount_path: /var/run/container-bench-secret
+        name: container-bench-secret
+        namespace: test-credentials
+      from_image:
+        name: topsail-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 23h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-psap
+  repo: topsail
+  variant: cont_bench

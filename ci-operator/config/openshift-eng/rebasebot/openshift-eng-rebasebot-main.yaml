@@ -580,38 +580,6 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: openstack-ironic-lib
-  cron: 40 10 * * Mon,Wed,Fri
-  steps:
-    test:
-    - as: openstack-ironic-lib
-      commands: |
-        rebasebot --source https://github.com/openstack/ironic-lib:master \
-                  --dest openshift/openstack-ironic-lib:main \
-                  --rebase openshift-metal3/openstack-ironic-lib:ironic-bot-master \
-                  --github-app-id 259896 \
-                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
-                  --github-cloner-id 318353 \
-                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
-                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
-                  --git-username ironic-bot \
-                  --git-email metal-platform@redhat.com
-      credentials:
-      - collection: ""
-        mount_path: /secrets/slack-hooks
-        name: metal-platform-slack-hooks
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/ironic-bot
-        name: metal-platform-bot-credentials
-        namespace: test-credentials
-      from: rebasebot
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: kubernetes-autoscaler
   cron: 20 13 * * Mon,Thu
   steps:
@@ -648,8 +616,8 @@ tests:
     - as: kubernetes-nmstate
       commands: |
         rebasebot --source https://github.com/nmstate/kubernetes-nmstate:main \
-                  --dest openshift/kubernetes-nmstate:master \
-                  --rebase openshift-networking/kubernetes-nmstate:rebase-bot-master \
+                  --dest openshift/kubernetes-nmstate:main \
+                  --rebase openshift-networking/kubernetes-nmstate:rebase-bot-main \
                   --github-app-id 352928 \
                   --github-app-key /secrets/metal-net-merge-bot/private-key \
                   --github-cloner-id 352930 \
@@ -657,7 +625,7 @@ tests:
                   --git-username metal-net-bot \
                   --git-email metal-networking@redhat.com \
                   --tag-policy=none \
-                  --post-rebase-hook git:dest/master:hack/ocp-update-bundle-manifests.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:go-deps.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:git.sh
+                  --post-rebase-hook git:dest/main:hack/ocp-update-bundle-manifests.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:go-deps.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:git.sh
       credentials:
       - collection: ""
         mount_path: /secrets/metal-net-merge-bot
@@ -811,6 +779,39 @@ tests:
         rebasebot --source https://github.com/aws/karpenter-provider-aws:$MOST_RECENT_UPSTREAM_RELEASE \
                           --dest openshift/aws-karpenter-provider-aws:main \
                           --rebase openshift/aws-karpenter-provider-aws:rebase-bot-main \
+                          --update-go-modules \
+                          --slack-webhook /secrets/rebasebot/autoscaling-team-bot-spam-slack-incoming-webhook \
+                          --github-app-id 1183368 \
+                          --github-cloner-id 1183368 \
+                          --github-app-key /secrets/rebasebot/autoscaling-team-rebasebot-github-application-key \
+                          --github-cloner-key /secrets/rebasebot/autoscaling-team-rebasebot-github-application-key \
+                          --git-username autoscaling-team-rebase-bot \
+                          --git-email autoscaling-team-rebase-bot@redhat.com \
+                          --bot-emails autoscaling-team-rebase-bot@redhat.com \
+                          --tag-policy=strict
+      credentials:
+      - collection: ""
+        mount_path: /secrets/rebasebot
+        name: autoscaling-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+- as: autoscaling-karpenter
+  cron: 0 12 * * Wed
+  steps:
+    test:
+    - as: autoscaling-karpenter
+      commands: |
+        # kubernetes-sigs/karpenter does not seem to cut z-stream releases in git branches, but the tags point to full releases, so get most recent tag
+        export MOST_RECENT_UPSTREAM_RELEASE=$(git ls-remote --tags --sort='-v:refname' https://github.com/kubernetes-sigs/karpenter | head -n 1 | cut -f 2 | sed 's#refs/tags/##')
+        rebasebot --source https://github.com/kubernetes-sigs/karpenter:$MOST_RECENT_UPSTREAM_RELEASE \
+                          --dest openshift/kubernetes-sigs-karpenter:main \
+                          --rebase openshift/kubernetes-sigs-karpenter:rebase-bot-main \
                           --update-go-modules \
                           --slack-webhook /secrets/rebasebot/autoscaling-team-bot-spam-slack-incoming-webhook \
                           --github-app-id 1183368 \

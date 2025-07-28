@@ -38,6 +38,10 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -i $SHARED_DIR/inventory \
     $SHARED_DIR/delete-sno.yml || true
 
+ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+    -i $SHARED_DIR/inventory \
+    $SHARED_DIR/delete-mno-hosts.yml || true
+
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_ENV ADD_BM_HOST <<< $(cat ${SHARED_DIR}/cluster_name)

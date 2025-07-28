@@ -1,8 +1,5 @@
 #!/bin/bash
 set -o errexit
-set -o nounset
-set -o pipefail
-set -x
 
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")
@@ -23,6 +20,12 @@ export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
+
+console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+export HEALTH_CHECK_URL=https://$console_url
+set -o nounset
+set -o pipefail
+set -x
 
 ./pod-network-chaos/prow_run.sh
 rc=$?

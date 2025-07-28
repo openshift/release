@@ -256,7 +256,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-serial-ovn-ipv4-techpreview
   cluster: build05
   cron: 0 4 * * *
@@ -283,10 +283,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-serial-virtualmedia
   cluster: build05
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -304,13 +305,12 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-bm-upgrade
+- as: e2e-metal-ipi-ovn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -457,9 +457,41 @@ tests:
     workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
   cluster: build05
-  cron: '@daily'
+  cron: 0 */6 * * *
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-two-node-arbiter-ipv6-techpreview
+  cluster: build05
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        ENABLE_ARBITER=true
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-two-node-arbiter-dualstack-techpreview
+  cluster: build05
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        ENABLE_ARBITER=true
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter-techpreview
 - as: e2e-metal-ovn-two-node-fencing
   cluster: build05
@@ -655,8 +687,8 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
-- as: e2e-vsphere-host-groups-ovn
-  cron: '@daily'
+- as: e2e-vsphere-host-groups-ovn-techpreview
+  cron: 0 */6 * * *
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -695,6 +727,15 @@ tests:
       NETWORK_TYPE: multi-tenant
     workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 5h0m0s
+- as: e2e-vsphere-ovn-upi-hybrid-env
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere-upi-hybrid-env
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -966,6 +1007,22 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-sno-ztp-cnf
+- as: e2e-telco5g-mno-ztp-cnftests
+  capabilities:
+  - intranet
+  cron: 10 20 */1 * 1-5
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: mno-ztp-cnftests
+      T5CI_VERSION: "4.20"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-mno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
   cron: 0 23 * * 2,5
@@ -1115,6 +1172,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-gcp-custom-dns
+  interval: 168h
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_PROVISIONED_DNS: "yes"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1817,7 +1886,7 @@ tests:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
   timeout: 6h0m0s
-- as: e2e-aws-ovn-ipsec-upgrade
+- as: e2e-aws-ovn-upgrade-ipsec
   cron: '@daily'
   steps:
     cluster_profile: aws
@@ -1826,7 +1895,27 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
+- as: e2e-aws-ovn-serial-ipsec
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
+  timeout: 6h0m0s
+- as: e2e-short-cert-rotation
+  cron: 0 8 * * Sun
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-cert-rotation-short-aws
+  timeout: 8h0m0s
+- as: e2e-short-cert-rotation-azure
+  cron: 0 8 * * Sun
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-cert-rotation-short-azure
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

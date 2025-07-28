@@ -1,0 +1,52 @@
+build_root:
+  image_stream_tag:
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.24-openshift-4.20
+canonical_go_repository: github.com/openshift/installer-aro-wrapper
+images:
+- dockerfile_path: Dockerfile.aro
+  to: azure-installer-aro-wrapper
+promotion:
+  to:
+  - name: 4.18-priv
+    namespace: ocp-private
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.18-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 8Gi
+tests:
+- as: unit
+  commands: make unit-test-go
+  container:
+    from: src
+- as: validate
+  commands: make validate-go
+  container:
+    from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint-go
+  container:
+    from: src
+- as: vendor
+  commands: go mod vendor && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: (go\.(mod|sum)$)|(^vendor/)
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift-priv
+  repo: installer-aro-wrapper
