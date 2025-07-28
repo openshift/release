@@ -37,10 +37,10 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-arm-f14-logging
+- as: aws-ipi-arm-f999-logging
   capabilities:
   - intranet
-  cron: 6 13 12,26 * *
+  cron: 6 13 29 2 *
   steps:
     cluster_profile: aws-observability
     env:
@@ -48,7 +48,6 @@ tests:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: m6gd.2xlarge
       FILTERS_ADDITIONAL: ""
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -65,14 +64,14 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: azure-ipi-oidc-f14-logging
+- as: azure-ipi-oidc-f999-logging
   capabilities:
   - intranet
-  cron: 28 6 15,29 * *
+  cron: 28 6 29 2 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -81,7 +80,6 @@ tests:
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
       OPERATORS: |
         [
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
@@ -96,14 +94,14 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
-- as: gcp-ipi-fips-f28-logging
+- as: gcp-ipi-fips-f999-logging
   capabilities:
   - intranet
-  cron: 15 18 7 * *
+  cron: 15 18 29 2 *
   steps:
     cluster_profile: gcp-observability
     env:
@@ -111,7 +109,6 @@ tests:
       FILTERS_ADDITIONAL: ""
       FIPS_ENABLED: "true"
       FORCE_SUCCESS_EXIT: "true"
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
       OPERATORS: |
         [
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
@@ -126,7 +123,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
