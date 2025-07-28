@@ -45,7 +45,7 @@ function createEndpointGateway() {
         cat "${log}"   
     fi
 
-    if [[ "$ret" != "0" ]];
+    if [[ "$ret" != "0" ]]; then
         echo "ERROR: fail to create the endpoint gateway ${vpeGatewayName}"
         return 1
     fi
