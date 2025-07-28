@@ -15,7 +15,11 @@ fi
 ALLOWED_REPOS=("openshift-tests-private"
                "verification-tests"
               )
-repo="$(jq -r '.extra_refs[].repo' <<< ${JOB_SPEC:-''})"
+repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
+               elif .refs then .refs.repo
+               else error
+               end
+' <<< ${JOB_SPEC:-''})"
 # shellcheck disable=SC2076
 if ! [[ "${ALLOWED_REPOS[*]}" =~ "$repo" ]]
 then
@@ -33,6 +37,21 @@ then
     exit 1
   fi
   LOGS_PATH="pr-logs/pull/openshift_release/${pr_number}"
+fi
+DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration then .decoration_config.gcs_configuration.bucket else error end' <<< ${JOB_SPEC:-''})"
+PROWCI=''
+PROWWEB=''
+if [[ "$DECK_NAME" = 'test-platform-results' ]]
+then
+  PROWCI="https://prow.ci.openshift.org"
+  PROWWEB="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"
+elif [[ "$DECK_NAME" = 'qe-private-deck' ]]
+then
+  PROWCI="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PROWWEB="https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+else
+  echo "Unknow bucket name: $DECK_NAME"
+  exit 1
 fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
@@ -71,6 +90,7 @@ function generate_attribute_architecture() {
     if [[ "$JOB_NAME" =~ $keyword ]]
     then
       architecture="$keyword"
+      write_attribute architecture "$architecture"
       break
     fi
   done
@@ -78,6 +98,7 @@ function generate_attribute_architecture() {
   then
     release_dir="${LOCAL_DIR_ORI}/release/artifacts"
     for release_file in 'release-images-arm64-latest' \
+                        'release-images-ppc64le-latest' \
                         'release-images-latest'
     do
       release_info_file="$release_dir/$release_file"
@@ -91,10 +112,14 @@ function generate_attribute_architecture() {
         elif [[ "$version_installed" =~ arm64 ]]
         then
           architecture='arm64'
+        elif [[ "$version_installed" =~ ppc64le ]]
+        then
+          architecture='ppc64le'
         else
           architecture='amd64'
         fi
         write_attribute architecture "$architecture"
+        break
       fi
     done
   fi
@@ -185,6 +210,9 @@ function generate_attribute_version_installed() {
     if [[ "$arch" = 'arm64' ]]
     then
       release_file="release-images-arm64-latest"
+    elif [[ "$arch" = 'ppc64le' ]]
+    then
+      release_file="release-images-ppc64le-latest"
     fi
     release_info_file="$release_dir/$release_file"
     if [[ -f "$release_info_file" ]]
@@ -235,7 +263,7 @@ function generate_metadata() {
                 "value": "prow"
               }
             ],
-            "description": "https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
+            "description": "${PROWCI}/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
             "name": "${JOB_NAME}"
           },
           "property_filter": [
@@ -267,7 +295,7 @@ function generate_results() {
       then
         cat >> "$junit_file" << EOF_JUNIT_SUCCESS
   <testcase classname="$testsuite_name" name="$step_name" time="1">
-    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
 EOF_JUNIT_SUCCESS
       elif [[ "$result" = 'FAILURE' ]]
@@ -276,7 +304,7 @@ EOF_JUNIT_SUCCESS
         cat >> "$junit_file" << EOF_JUNIT_FAILURE
   <testcase classname="$testsuite_name" name="$step_name" time="1">
     <failure message="Step $step_name failed" type="failed"/>
-    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
 EOF_JUNIT_FAILURE
       fi

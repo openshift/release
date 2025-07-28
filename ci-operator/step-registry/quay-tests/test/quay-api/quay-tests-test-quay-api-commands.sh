@@ -13,6 +13,7 @@ QUAY_APP_HOSTNAME=${QUAY_ROUTE#*//}
 export CYPRESS_QUAY_ENDPOINT="$QUAY_APP_HOSTNAME"
 export CYPRESS_QUAY_USER="$QUAY_USERNAME"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
+export CYPRESS_QUAY_VERSION="$QUAY_VERSION"
 
 yarn install
 NO_COLOR=1 yarn run cypress run --spec "cypress/e2e/quay_api_testing_all.cy.js" --browser electron --headless --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json > quay_api_testing_report || true
