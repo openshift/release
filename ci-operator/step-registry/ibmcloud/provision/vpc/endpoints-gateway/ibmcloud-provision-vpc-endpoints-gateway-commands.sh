@@ -36,10 +36,23 @@ function createEndpointGateway() {
     echo "Command: $cmd"
     eval "$cmd" &> "${log}"; ret=$?
     cat "${log}"
-    if [[ "$ret" != "0" ]] && grep -q "endpoint gateway already exists for this service" "${log}"; then
-        echo "The endpoint gateway already exists for this service, ignore the error..."
-        return 0
-    fi
+    if [[ "$ret" != "0" ]]; then
+        if grep -q "endpoint gateway already exists for this service" "${log}"; then
+            echo "The endpoint gateway already exists for this service, ignoring the error..."
+            return 0
+        fi
+        
+        echo "Retrying..."
+        sleep 10
+        if ! eval "$cmd" &> "${log}"; then
+            cat "${log}"
+            echo "ERROR: Failed to create the endpoint gateway ${vpeGatewayName}" >&2
+            echo "Current vpc status:"
+            ibmcloud vpc ${vpcID} --output JSON | jq -r .status
+            return 1
+        fi
+    fi   
+    
     waitingStatus ${vpeGatewayName};  ret=$?
     echo "${vpeGatewayName} waiting status: ${ret}"
     run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
