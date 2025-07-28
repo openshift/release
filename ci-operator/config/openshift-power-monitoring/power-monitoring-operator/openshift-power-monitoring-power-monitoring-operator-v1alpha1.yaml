@@ -11,35 +11,15 @@ base_images:
     name: shellcheck
     namespace: ci
     tag: latest
-binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
-images:
-- build_args:
-  - name: TARGETOS
-    value: linux
-  - name: TARGETARCH
-    value: amd64
-  context_dir: .
-  dockerfile_path: Dockerfile
-  to: power-monitoring-operator
-- context_dir: .
-  dockerfile_path: tests/Dockerfile
-  to: power-monitoring-operator-tests-runner
-operator:
-  bundles:
-  - as: power-monitoring-operator-bundle
-    context_dir: .
-    dockerfile_path: bundle.Dockerfile
-  substitutions:
-  - pullspec: quay.io/sustainable_computing_io/kepler-operator:.*
-    with: pipeline:power-monitoring-operator
 releases:
   latest:
     candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.18"
@@ -49,43 +29,26 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: shellcheck
-  commands: find . -type f -path "./hack/*" -name "*.sh" -exec shellcheck -x -S style
-    {} \;
-  container:
-    from: shellcheck
-- as: security
+- as: barmetal-cls-powermonitoring-operator
   steps:
+    cluster_profile: equinix-ocp-metal-qe
     env:
-      PROJECT_NAME: openshift-power-monitoring/power-monitoring-operator
-      SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
-    workflow: openshift-ci-security
-- as: power-monitoring-operator-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  steps:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      CLUSTER_DURATION: "21600"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
     test:
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=15m
-      dependencies:
-      - env: OO_BUNDLE
-        name: power-monitoring-operator-bundle
-      from: operator-sdk
+        oc whoami --show-console
+      from: src
       resources:
         requests:
           cpu: 200m
           memory: 400Mi
-    - ref: openshift-power-monitoring-tests-power-monitoring-operator
-    workflow: generic-claim
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring
