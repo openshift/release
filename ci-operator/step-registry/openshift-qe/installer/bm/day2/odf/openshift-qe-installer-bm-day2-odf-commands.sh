@@ -5,7 +5,7 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
   sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/mno/kubeconfig" > /tmp/kubeconfig
@@ -117,7 +117,7 @@ spec:
         memory: "5Gi"
 EOF
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi

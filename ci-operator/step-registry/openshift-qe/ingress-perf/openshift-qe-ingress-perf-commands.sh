@@ -17,7 +17,7 @@ fi
 
 cat /etc/os-release
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
@@ -61,7 +61,7 @@ cp $folder_name/index_data.json "${SHARED_DIR}"/index_data.json
 cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/ingress-perf-index_data.json
 cp "${SHARED_DIR}"/ingress-perf-index_data.json "${ARTIFACT_DIR}"/ingress-perf-index_data.json
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi

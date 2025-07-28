@@ -11,7 +11,7 @@ cat /etc/os-release
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
@@ -59,4 +59,9 @@ else
   # Only store the results from the full run versus the smoke test.
   export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
   WORKLOAD=full-run.yaml ./run.sh
+fi
+
+if [ ${PUBLIC_VLAN} == "true" ]; then
+  # kill the ssh tunnel so the job completes
+  pkill ssh
 fi

@@ -5,7 +5,7 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
@@ -55,7 +55,7 @@ oc delete projects -l kube-burner-job=init-served-job
 oc delete projects -l kube-burner-job=create-serviceaccounts-job
 oc delete AdminPolicyBasedExternalRoute --all
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi

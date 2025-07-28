@@ -5,7 +5,7 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /secret/address)"
   # Copy over the kubeconfig
@@ -99,7 +99,7 @@ if [ -n "$TUNING_POLICY" ]; then
   oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type=json -p="[{'op': 'add', 'path': '/spec/tuningPolicy', 'value': '$TUNING_POLICY'}]"
 fi
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi

@@ -11,7 +11,7 @@ cat /etc/os-release
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
@@ -57,7 +57,7 @@ WORKLOAD=full-run.yaml ./run.sh
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 mv $folder_name/index_data.json ${SHARED_DIR}/index_data-pod.json
 
-if [ ${BAREMETAL} == "true" ]; then
+if [ ${PUBLIC_VLAN} == "false" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 fi
