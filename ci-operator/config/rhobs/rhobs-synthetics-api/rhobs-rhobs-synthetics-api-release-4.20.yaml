@@ -3,6 +3,9 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  to: unused
 promotion:
   to:
   - disabled: true
@@ -25,6 +28,19 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: build
+  commands: make build
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: lint
+  commands: make lint-ci
+  container:
+    from: src
 zz_generated_metadata:
   branch: release-4.20
   org: rhobs
