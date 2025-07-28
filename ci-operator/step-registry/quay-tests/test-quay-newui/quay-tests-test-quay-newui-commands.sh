@@ -12,7 +12,9 @@ QUAY_PASSWORD="password"
 #Set Kubeconfig:
 cd new-ui-tests 
 skopeo -v
+git-lfs  --version
 oc version
+python3 -V
 terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
