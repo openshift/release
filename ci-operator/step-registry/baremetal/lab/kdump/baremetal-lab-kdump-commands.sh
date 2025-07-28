@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-if [ "${ENABLE_KGUMP:-false}" != "true" ]; then
+if [ "${ENABLE_KDUMP:-false}" != "true" ]; then
   echo "kernel dump is not enabled. Skipping..."
   exit 0
 fi
@@ -20,10 +20,7 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 
 workdir=`mktemp -d`
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
-oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-rm /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "ocp_version: ${ocp_version}"
 
 # generate array with current version + previous one, this is needed for non-GA releases where Butane doesn't support yet the latest version
