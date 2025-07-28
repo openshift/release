@@ -66,18 +66,15 @@ rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$
 
 echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
 
-pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build02_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build02_auth=$(jq -c '.auths."registry.apps.build02.vmc.ci.openshift.org"' ${build02_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build02_auth" '.auths["registry.apps.build02.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
+cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+pull_secret_path=/tmp/pull-secret
 
-echo "${final_pull_secret}" >>/tmp/pull-secrets
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create base-domain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt
 base_domain=$(<"${SHARED_DIR}"/base-domain.txt)
-
-pull_secret=$(<"/tmp/pull-secrets")
+pull_secret=$(jq -c . < "$pull_secret_path")
 
 # Create cluster-name.txt
 echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
@@ -91,11 +88,10 @@ pullSecret: >
   ${pull_secret}
 EOF
 fi
-rm /tmp/pull-secrets
 echo "Installing from initial release $RELEASE_IMAGE_LATEST"
 oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
   --command=openshift-install --to=/tmp
-
+rm ${pull_secret_path}
 version=$(/tmp/openshift-install version | grep 'openshift-install' | awk '{print $2}' | cut -d '.' -f 1,2 --output-delimiter='')
 # Add vSphere credentials if the version is 4.15 or more
 if [[ "${version}" -ge "415" ]]; then
