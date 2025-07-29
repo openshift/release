@@ -125,22 +125,10 @@ EOF
 
 function create_catalog_sources()
 {
-    # Base URI for QE optional operators index image
-    local QE_INDEX_IMAGE_BASE="quay.io/openshift-qe-optional-operators/aosqe-index"
-
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
     kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
-    # Issue: currently kube version in 4.19 and 4.20 are same i.e. 1.32, according to catalogsource image index template
-    #        the index image tags of 4.19 and 4.20 are same, operator testing with 4.20 cluster will be failed
-    # W/A: check cluster version if it is 4.20, then use image tag v4.20 instead 
-    # NOTE: This is temp solution for 4.20 operator testing, need to rollback this change when kube version in 4.20 is updated to 1.33
-    openshift_version=$(oc version -o json | jq -r '.openshiftVersion')
-    if [[ "$openshift_version" == 4.20* ]]; then
-        index_image="${QE_INDEX_IMAGE_BASE}:v4.20"
-    else
-        index_image="${QE_INDEX_IMAGE_BASE}:v${kube_major}.${kube_minor}"
-    fi
+    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
     echo "Create QE catalogsource: $CATALOGSOURCE_NAME"
     echo "Use $index_image in catalogsource/$CATALOGSOURCE_NAME"
@@ -154,9 +142,8 @@ kind: CatalogSource
 metadata:
   name: $CATALOGSOURCE_NAME
   namespace: openshift-marketplace
-  $([[ "$openshift_version" != 4.20* ]] && echo "annotations:
-    olm.catalogImageTemplate: \"${QE_INDEX_IMAGE_BASE}:v{kube_major_version}.{kube_minor_version}\"
-  ")
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
 spec:
   displayName: Production Operators
   grpcPodConfig:
