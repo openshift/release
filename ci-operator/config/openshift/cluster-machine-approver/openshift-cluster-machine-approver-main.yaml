@@ -61,6 +61,27 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: regression-clusterinfra-aws-ipi-all
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_SCENARIOS: Cluster_Infrastructure
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: regression-clusterinfra-gcp-ipi-all
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SCENARIOS: Cluster_Infrastructure
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 7h0m0s
 - as: e2e-azure-operator
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
