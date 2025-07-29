@@ -143,7 +143,7 @@ EOF
 
     # for destroy
     echo "${sp_app_id}" >> "${SHARED_DIR}/azure_sp_id"
-    rm -f ${sp_output}
+    #rm -f ${sp_output}
 
     # ensure that role assignment creation is successful
     echo "Ensure that role ${role_name} assigned successfully"
@@ -156,6 +156,6 @@ EOF
 
     # ensure that new service principal can be login successfully
     echo "Login with new service principal to ensure that new SP works well"
-    cmd="az login --service-principal -u ${sp_app_id} -p ${sp_password} --tenant ${sp_tenant}"
+    cmd="az login --service-principal -u '${sp_app_id}' -p '${sp_password}' --tenant '${sp_tenant}'"
     run_cmd_with_retries "${cmd}" 10 "az login --service-principal"
 done
