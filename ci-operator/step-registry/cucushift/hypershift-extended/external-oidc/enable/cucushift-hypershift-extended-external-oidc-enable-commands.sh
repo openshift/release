@@ -8,6 +8,8 @@ CLI_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-cli/client-id)"
 CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
 CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
 CONSOLE_CLIENT_SECRET_NAME=console-secret
+DAY2_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-cli/day2client-id)"
+DAY2_SECRET_NAME=day2-secret
 
 # Generate the main part of the patch.yaml
 # Note, the value examples (e.g. extra's values) in this patch.yaml may be tested and referenced otherwhere.
@@ -30,6 +32,7 @@ spec:
           audiences:
           - ${CLI_CLIENT_ID}
           - ${CONSOLE_CLIENT_ID}
+          - ${DAY2_CLIENT_ID} 
           issuerURL: ${ISSUER_URL}
         name: microsoft-entra-id
         oidcClients:
@@ -38,6 +41,11 @@ spec:
             name: ${CONSOLE_CLIENT_SECRET_NAME}
           componentName: console
           componentNamespace: openshift-console
+        - clientID: ${DAY2_CLIENT_ID}  # TODO: conditionally for ARO or OCP version?
+          clientSecret:
+            name: ${DAY2_SECRET_NAME}
+          componentName: foo
+          componentNamespace: bar
 EOF
 
 # Conditionally append the CLI OIDC client part
@@ -87,3 +95,8 @@ rm -f /tmp/hosted_cluster_pull_secret
 
 echo "Creating the console client secret"
 oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
+
+# Add an empty secret with the annotation to make sure the secret is not copied to the hosted cluster.
+# It will be populated by the day2 operator in the hosted cluster.
+oc create secret generic "$DAY2_SECRET_NAME" -n clusters
+oc annotate secret "$DAY2_SECRET_NAME" -n clusters hypershift.openshift.io/hosted-cluster-sourced=true
