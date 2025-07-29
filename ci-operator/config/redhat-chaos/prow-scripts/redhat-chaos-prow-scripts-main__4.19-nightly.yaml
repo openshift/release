@@ -610,13 +610,13 @@ tests:
     - chain: redhat-chaos-krkn-hub-node-tests
     workflow: redhat-chaos-installer-aws-compact
   timeout: 6h0m0s
-- always_run: false
-  as: krkn-hub-tests-ibmcloud
+- as: krkn-hub-tests-ibmcloud
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     env:
       CHURN: "true"
+      DISABLE_SSL_VERIFICATION: "True"
       EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
@@ -630,56 +630,6 @@ tests:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
   timeout: 6h0m0s
-- always_run: false
-  as: krkn-hub-node-tests-ibmcloud
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe
-    env:
-      CHURN: "true"
-      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
-      KUBE_CHECK: "false"
-      TELEMETRY_GROUP: prow-ocp-4.19
-    observers:
-      enable:
-      - redhat-chaos-cerberus
-      - openshift-qe-cluster-density-v2-observer
-    test:
-    - ref: redhat-chaos-start-krkn
-    - chain: redhat-chaos-krkn-hub-control-plane-tests
-    - chain: redhat-chaos-krkn-hub-worker-node-tests
-    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
-  timeout: 6h0m0s
-- always_run: false
-  as: krkn-hub-ibm-cloud-node-tests-compact
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe
-    env:
-      CHURN: "true"
-      COMPUTE_NODE_TYPE: bx2-4x16
-      DISABLE_SSL_VERIFICATION: "True"
-      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
-      GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
-      KUBE_CHECK: "false"
-      SET_ENV_BY_PLATFORM: custom
-      SIZE_VARIANT: compact
-      TELEMETRY_GROUP: prow-ocp-4.19
-      WAIT_DURATION: "600"
-      WORKERS: "3"
-    observers:
-      enable:
-      - redhat-chaos-cerberus
-      - openshift-qe-cluster-density-v2-observer
-    test:
-    - ref: ibmcloud-provision-blockstorage
-    - ref: redhat-chaos-start-krkn
-    - ref: redhat-chaos-node-disruptions-master-outage
-    - ref: redhat-chaos-node-disruptions-worker-outage
-    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
 - always_run: false
   as: krkn-hub-ibm-cloud-node-tests-large
   steps:
@@ -705,9 +655,10 @@ tests:
     test:
     - ref: ibmcloud-provision-blockstorage
     - ref: redhat-chaos-start-krkn
-    - ref: redhat-chaos-node-disruptions-master-outage
-    - ref: redhat-chaos-node-disruptions-worker-outage
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
