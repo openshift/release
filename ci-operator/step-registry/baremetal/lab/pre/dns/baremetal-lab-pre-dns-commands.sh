@@ -18,7 +18,7 @@ BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 # shellcheck disable=SC1090
 . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
 # shellcheck disable=SC2154
-if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ]; then
+if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ] || [ ${#api_int} -eq 0 ]; then
   echo "Unable to parse VIPs"
   exit 1
 fi
@@ -35,7 +35,7 @@ fi
 
 if [ "${ipv6_enabled:-}" == "true" ]; then
   # shellcheck disable=SC2154
-  if [ ${#api_vip_v6} -eq 0 ] || [ ${#ingress_vip_v6} -eq 0 ]; then
+  if [ ${#api_vip_v6} -eq 0 ] || [ ${#ingress_vip_v6} -eq 0 ] || [ ${#api_int_v6} -eq 0 ]; then
     echo "Unable to parse IPv6 VIPs"
     exit 1
   fi
