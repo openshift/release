@@ -85,12 +85,12 @@ rm -f /tmp/hosted_cluster_pull_secret
 #     fi
 # fi
 
-if [[ "$IS_ARO" == "false" ]]; then
-  echo "Creating the console client secret"
-  oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
-else
-  # Add an empty secret with the annotation to make sure the secret is not copied to the hosted cluster.
-  # It will be populated by the day2 operator in the hosted cluster.
+if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
+  echo "Creating an empty secret for the console client"
+  # The secret will be populated by the day2 operator in the hosted cluster.
   oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters
   oc annotate secret "$CONSOLE_CLIENT_SECRET_NAME" -n clusters hypershift.openshift.io/hosted-cluster-sourced=true
+else
+  echo "Creating the console client secret"
+  oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
 fi
