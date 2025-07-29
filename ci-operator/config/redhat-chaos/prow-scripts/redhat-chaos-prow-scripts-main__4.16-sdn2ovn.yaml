@@ -1,0 +1,127 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  krkn:
+    name: krkn
+    namespace: chaos
+    tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+  prow-scripts.prow:
+    name: prow-scripts
+    namespace: chaos
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-416
+- dockerfile_path: Dockerfile
+  from: krkn
+  to: prow-scripts
+- dockerfile_literal: |-
+    FROM prow-scripts.prow
+    RUN ls
+  from: prow-scripts.prow
+  to: prow-scripts-416-sdn2ovn
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: chaos-aws-during-limited-live-sdn2ovn-migration
+  cron: 0 4 11 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "24"
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      GC: "false"
+      IF_CHECK_NETWORK_TYPE: "true"
+      IF_CREATE_WORKLOAD_NODE: "true"
+      ITERATION_MULTIPLIER_ENV: "11"
+      ITERATIONS: "3"
+      MAX_UNAVAILABLE: "3"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-4.16
+      ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-application-outages-console-observer
+      - redhat-chaos-pod-network-chaos-observer
+    test:
+    - ref: openshift-qe-connectivity-check
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - chain: openshift-qe-sdn-ovn-migration
+    workflow: redhat-chaos-installer-aws-sdn
+  timeout: 8h0m0s
+- as: chaos-aws-after-limited-live-sdn2ovn-migration
+  cron: 0 4 6 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "24"
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      GC: "false"
+      IF_CREATE_WORKLOAD_NODE: "true"
+      ITERATION_MULTIPLIER_ENV: "11"
+      MAX_UNAVAILABLE: "3"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-4.16
+      ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-connectivity-check
+    - ref: openshift-qe-cluster-density-v2
+    - chain: openshift-qe-sdn-ovn-migration
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-pod-scenarios
+    - ref: redhat-chaos-pod-network-chaos
+    - chain: redhat-chaos-hog-scenarios
+    workflow: redhat-chaos-installer-aws-sdn
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: 4.16-sdn2ovn

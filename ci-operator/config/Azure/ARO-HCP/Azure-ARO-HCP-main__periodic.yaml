@@ -1,9 +1,9 @@
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.23
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_literal: |
     FROM src
@@ -37,11 +37,26 @@ tests:
     - chain: aro-hcp-provision-teardown-cluster
     test:
     - chain: aro-hcp-provision-create-functional-cluster
+- as: create-aro-hcp-in-stage
+  cron: '@daily'
+  steps:
+    env:
+      CLUSTER_NAME: periodic-stage-cluster
+      CUSTOMER_RG_NAME: periodic-stage-customer-rg
+      LOCATION: uksouth
+      SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - chain: aro-hcp-provision-create-functional-cluster
 - as: integration-e2e-parallel
   cron: '@daily'
   steps:
     env:
+      ARO_HCP_SUITE_NAME: integration/parallel
       CUSTOMER_SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+      LOCATION: uksouth
     post:
     - ref: aro-hcp-provision-aro-hcp-gather-extra
     test:

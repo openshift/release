@@ -6,10 +6,11 @@ import yaml
 CONFIG = {
 
     'aws-quota-slice': {
-        'us-east-1': 35,
-        'us-east-2': 30,
-        'us-west-1': 30,
-        'us-west-2': 30,
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-1-qe-quota-slice': {
         'us-east-1': 10,
@@ -21,6 +22,18 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-3-quota-slice': {
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
+    },
+    'aws-4-quota-slice': {
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
+    },
+    'aws-5-quota-slice': {
         'us-east-1': 50,
         'us-east-2': 35,
         'us-west-1': 35,
@@ -73,8 +86,8 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-edge-zones-quota-slice': {
-        'us-east-1': 5,
-        'us-west-2': 5
+        'us-east-1': 10,
+        'us-west-2': 10,
     },
     'aws-splat-quota-slice': {
         'us-east-1': 5,
@@ -220,8 +233,11 @@ CONFIG = {
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 25,
     },
+    'azure-confidential-qe-quota-slice': {
+        'eastus': 6,
+    },
     'equinix-ocp-metal-quota-slice': {
-        'default': 110,
+        'default': 120,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -340,6 +356,7 @@ CONFIG = {
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
+    'vsphere-elastic-poc-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -598,6 +615,9 @@ for i in [871,991,1165,1154,1148,1140]:
 
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
+
+for i in range(0,2):
+    CONFIG['vsphere-elastic-poc-quota-slice']['vsphere-elastic-poc-{}'.format(i)] = 1
 
 for i in range(0,80):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1

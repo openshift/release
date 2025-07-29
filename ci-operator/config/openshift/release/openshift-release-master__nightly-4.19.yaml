@@ -300,13 +300,12 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-bm-upgrade
+- as: e2e-metal-ipi-ovn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -667,10 +666,12 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
-- as: e2e-vsphere-host-groups-ovn
+- as: e2e-vsphere-host-groups-ovn-techpreview
   cron: '@daily'
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -1117,6 +1118,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-gcp-custom-dns
+  interval: 168h
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_PROVISIONED_DNS: "yes"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:

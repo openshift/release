@@ -349,6 +349,11 @@ EOF
     fi
     cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
+    if [ "W${DEBUG}W" == "WtrueW" ] || [ "W${DEBUG}W" == "WTrueW" ] ; then
+        echo "Sleep 2 hour, so we can login the cluster"
+        sleep 2h
+    fi
+
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
