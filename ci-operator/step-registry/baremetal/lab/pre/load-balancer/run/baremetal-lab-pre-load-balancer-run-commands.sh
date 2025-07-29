@@ -111,18 +111,23 @@ if [ "${#api_ip_v6}" -eq 0 ]; then
   exit 1
 fi
 
-api_int_ip=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
+if [ x"${DISCONNECTED}" != x"true" ]; then
+  api_int_ip=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
   /sbin/ip -o -4 a list eth2 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
-if [ "${#api_int_ip}" -eq 0 ]; then
-  echo "No IPv4 Address has been set for internal api-int, failing"
-  exit 1
-fi
+  if [ "${#api_int_ip}" -eq 0 ]; then
+    echo "No IPv4 Address has been set for internal api-int, failing"
+    exit 1
+  fi
 
-api_int_ip_v6=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n \
-  /sbin/ip -o -6 a list eth2 | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
-if [ "${#api_int_ip_v6}" -eq 0 ]; then
-  echo "No global IPv6 Address has been set for internal IPv6 api-int, failing"
-  exit 1
+  api_int_ip_v6=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n \
+    /sbin/ip -o -6 a list eth2 | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
+    if [ "${#api_int_ip_v6}" -eq 0 ]; then
+      echo "No global IPv6 Address has been set for internal IPv6 api-int, failing"
+      exit 1
+    fi
+else
+  api_int_ip="$api_ip"
+  api_int_ip_v6="$api_ip_v6"
 fi
 
 printf "ingress_vip: %s\napi_vip: %s\ningress_vip_v6: %s\napi_vip_v6: %s\napi_int: %s\napi_int_v6: %s" "$api_ip" "$api_ip" "$api_ip_v6" "$api_ip_v6" "$api_int_ip" "$api_int_ip_v6" > "$BUILD_DIR/external_vips.yaml"
