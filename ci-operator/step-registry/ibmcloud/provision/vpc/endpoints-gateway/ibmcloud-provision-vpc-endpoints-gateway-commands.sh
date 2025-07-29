@@ -48,7 +48,7 @@ function createEndpointGateway() {
             cat "${log}"
             echo "ERROR: Failed to create the endpoint gateway ${vpeGatewayName}" >&2
             echo "Current vpc status:"
-            ibmcloud vpc ${vpcID} --output JSON | jq -r .status
+            ibmcloud is vpc ${vpcID} --output JSON | jq -r .status
             return 1
         fi
     fi   
@@ -70,7 +70,7 @@ function waitingVPCAvaliable() {
     do 
         sleep 10
         counter=$(expr $counter + 1)
-        status=$(ibmcloud is vpc $vpcID --output JSON | jq -r ."status")
+        status=$(ibmcloud is vpc ${vpcID} --output JSON | jq -r ."status")
         if [[ "${status}" == "available" ]]; then
             return 0
         fi
