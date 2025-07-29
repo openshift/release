@@ -103,8 +103,6 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   export ROOTFS_NAME="${LEASED_RESOURCE}-rootfs"
   export BOOT_ARTIFACTS_PATH="${LIBVIRT_IMAGE_PATH}"
 
-  ls -l ${BOOT_ARTIFACTS_LOCAL_DIR}
-
   # The name of the kernel artifact depends on the arch
   if [ "$ARCH" == "s390x" ]; then
     KERNEL="agent.${ARCH}-vmlinuz"
