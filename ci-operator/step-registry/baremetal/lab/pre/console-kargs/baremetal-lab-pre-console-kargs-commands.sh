@@ -22,7 +22,11 @@ function join_by_semicolon() {
 
 echo "Rendering the ignition hook from butane..."
 
-base_url="http://${INTERNAL_NET_IP}/$(<"${SHARED_DIR}/cluster_name")"
+if [[ "${ipv4_enabled:-true}" == "false" ]] && [[ "${ipv6_enabled:-false}" == "true" ]]; then
+  base_url="http://[${INTERNAL_NET_IPV6}]/$(<"${SHARED_DIR}/cluster_name")"
+else
+  base_url="http://${INTERNAL_NET_IP}/$(<"${SHARED_DIR}/cluster_name")"
+fi
 
 # We use a different console-hook ignition file for each node to allow the configuration of heterogeneous nodes
 # (i.e., nodes from different vendors)
