@@ -551,7 +551,7 @@ then
 fi
 
 # Patch in older RHCOS to current 4.20 payload
-echo "SDODSON Patching rhcos version back to a version without Kubelet 1.33"
+echo "SDODSON Patching rhcos-10.1"
 # Apply the changes
 oc apply -f- <<EOF
 apiVersion: v1
@@ -563,7 +563,7 @@ items:
       machineconfiguration.openshift.io/role: worker
     name: os-layer-custom-worker
   spec:
-    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:2ea08b5d4790448ea2041d6308893a79cee99b5a2337e7fddb2b889a356a3f32
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev:4.20-10.1-node-image
 - apiVersion: machineconfiguration.openshift.io/v1
   kind: MachineConfig
   metadata:
@@ -571,7 +571,7 @@ items:
       machineconfiguration.openshift.io/role: master
     name: os-layer-custom-master
   spec:
-    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:2ea08b5d4790448ea2041d6308893a79cee99b5a2337e7fddb2b889a356a3f32
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev:4.20-10.1-node-image
 kind: List
 metadata:
   resourceVersion: ""
