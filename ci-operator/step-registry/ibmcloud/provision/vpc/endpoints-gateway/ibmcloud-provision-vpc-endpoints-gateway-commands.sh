@@ -43,7 +43,7 @@ function createEndpointGateway() {
         fi
         
         echo "Retrying..."
-        > "${log}"
+        echo "" &> "${log}"
         if ! waitingVPCAvaliable ${vpcID} || ! eval "$cmd" &> "${log}"; then
             cat "${log}"
             echo "ERROR: Failed to create the endpoint gateway ${vpeGatewayName}" >&2
