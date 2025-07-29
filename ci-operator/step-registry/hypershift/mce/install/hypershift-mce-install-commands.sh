@@ -14,6 +14,9 @@ fi
 echo "$MCE_VERSION"
 
 _REPO="quay.io/acm-d/mce-custom-registry"
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
+  _REPO="quay.io/acm-d/mce-dev-catalog"
+fi
 if [[ "$DISCONNECTED" == "true" ]]; then
   _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
   # Setup disconnected quay mirror container repo
