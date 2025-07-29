@@ -76,7 +76,9 @@ function configure_external_oidc () {
 
     OIDC_PROVIDERS_UPPER_FIELD=$(echo '{}' | jq "$OIDC_PROVIDERS_UPPER_FIELD = $(< $SHARED_DIR/oidcProviders.json)")
     [ "$IS_HYPERSHIFT_ENV" == "no" ] && OIDC_PROVIDERS_UPPER_FIELD=$(jq '.spec.webhookTokenAuthenticator = null' <<< "$OIDC_PROVIDERS_UPPER_FIELD")
-    oc create -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml -n "$MIDDLE_NAMESPACE"
+    if [[ "$INSTALLED_CO" =~ "Console" ]] ; then
+        oc create -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml -n "$MIDDLE_NAMESPACE"
+    fi
 
     # This step can be applied in both OCP CI jobs and HyperShift hosted cluster CI jobs.
     # Note: for HyperShift hosted cluster CI jobs, oidcProviders must be configured in day-1. The corresponding workflow is
@@ -131,11 +133,20 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     fi
 fi
 
+INSTALLED_CO=$(oc get clusterversion/version -o=jsonpath='{.status.capabilities.enabledCapabilities}')
+
+if [[ "$INSTALLED_CO" =~ "Console" ]] ; then
 # Main script execution with error handling
-if [ ! -f "$SHARED_DIR"/oidcProviders.json ] || [ ! -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml ]; then
-    echo "The oidcProviders.json and oidcProviders-secret-configmap.yaml fiels must be provided by a previous step!"
-    exit 1
+    if [ ! -f "$SHARED_DIR"/oidcProviders.json ] || [ ! -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml ]; then
+        echo "The oidcProviders.json and oidcProviders-secret-configmap.yaml fiels must be provided by a previous step!"
+        exit 1
+    fi
+else
+    if [ ! -f "$SHARED_DIR"/oidcProviders.json ] ; then
+        echo "The oidcProviders.json fiel must be provided by a previous step!"
+    fi
 fi
+
 set_proxy || handle_error "set_proxy"
 check_if_hypershift_env || handle_error "check_if_hypershift_env"
 set_common_variables || handle_error "set_common_variables"

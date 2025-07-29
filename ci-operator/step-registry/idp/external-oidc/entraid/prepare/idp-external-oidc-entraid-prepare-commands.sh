@@ -9,8 +9,21 @@ CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
 CONSOLE_CLIENT_SECRET_VALUE="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
 CONSOLE_CLIENT_SECRET_NAME=console-secret
 
+
+if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+    echo "setting the proxy"
+    echo "source ${SHARED_DIR}/proxy-conf.sh"
+    source "${SHARED_DIR}/proxy-conf.sh"
+else
+    echo "no proxy setting."
+fi
+
+INSTALLED_CO=$(oc get clusterversion/version -o=jsonpath='{.status.capabilities.enabledCapabilities}')
+
 # Prepare the entra id oidc provider file
-cat > "$SHARED_DIR"/oidcProviders.json << EOF
+# Skip console client configuration if console component is not installed
+if [[ "$INSTALLED_CO" =~ "Console" ]] ; then
+    cat > "$SHARED_DIR"/oidcProviders.json << EOF
 {
   "oidcProviders": [
     {
@@ -34,13 +47,23 @@ cat > "$SHARED_DIR"/oidcProviders.json << EOF
   "type": "OIDC"
 }
 EOF
-
-if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
-    echo "setting the proxy"
-    echo "source ${SHARED_DIR}/proxy-conf.sh"
-    source "${SHARED_DIR}/proxy-conf.sh"
+    oc create secret generic $CONSOLE_CLIENT_SECRET_NAME --from-literal=clientSecret=$CONSOLE_CLIENT_SECRET_VALUE --dry-run=client -o yaml > "$SHARED_DIR"/oidcProviders-secret-configmap.yaml
 else
-    echo "no proxy setting."
+    cat > "$SHARED_DIR"/oidcProviders.json << EOF
+{
+  "oidcProviders": [
+    {
+      "claimMappings": {
+        "groups": {"claim": "groups", "prefix": "oidc-groups-test:"},
+        "username": {"claim": "email", "prefixPolicy": "Prefix", "prefix": {"prefixString": "oidc-user-test:"}}
+      },
+      "issuer": {
+        "issuerURL": "$ISSUER_URL", "audiences": ["$CLI_CLIENT_ID"]
+      },
+      "name": "microsoft-entra-id"
+    }
+  ],
+  "type": "OIDC"
+}
+EOF
 fi
-
-oc create secret generic $CONSOLE_CLIENT_SECRET_NAME --from-literal=clientSecret=$CONSOLE_CLIENT_SECRET_VALUE --dry-run=client -o yaml > "$SHARED_DIR"/oidcProviders-secret-configmap.yaml
