@@ -53,8 +53,8 @@ function createEndpointGateway() {
             fi
         fi   
         
-        #check the endpoint-gateway status
-        if [[ "$ret" == "0"]]; then
+        #check the endpoint-gateway status when created or has an existed
+        if [[ "$ret" == "0" ]]; then
             waitingStatus ${vpeGatewayName};  ret=$?
             echo "${vpeGatewayName} waiting status: ${ret}"
             run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
