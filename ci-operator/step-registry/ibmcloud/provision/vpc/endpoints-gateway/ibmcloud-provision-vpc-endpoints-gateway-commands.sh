@@ -73,6 +73,8 @@ function waitingVPCAvaliable() {
         status=$(ibmcloud is vpc ${vpcID} --output JSON | jq -r ."status")
         if [[ "${status}" == "available" ]]; then
             return 0
+        else
+            echo "Unexpected VPC status: ${status}, waiting..."
         fi
     done
     return 1
