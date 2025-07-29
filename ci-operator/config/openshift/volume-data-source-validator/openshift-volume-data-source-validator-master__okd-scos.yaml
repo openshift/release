@@ -3,41 +3,41 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  origin_scos-4.20_base-stream9:
+    name: scos-4.20
+    namespace: origin
+    tag: base-stream9
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
 canonical_go_repository: github.com/kubernetes-csi/volume-data-source-validator
 images:
-- dockerfile_path: Dockerfile.openshift
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.openshift
+  from: origin_scos-4.20_base-stream9
   inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: volume-data-source-validator
 promotion:
   to:
-  - name: "4.20"
-    namespace: ocp
+  - name: scos-4.20
+    namespace: origin
 releases:
-  initial:
-    integration:
-      name: "4.20"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
-      namespace: ocp
+      name: scos-4.20
+      namespace: origin
 resources:
   '*':
     limits:
@@ -59,3 +59,4 @@ zz_generated_metadata:
   branch: master
   org: openshift
   repo: volume-data-source-validator
+  variant: okd-scos
