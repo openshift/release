@@ -3,10 +3,18 @@ base_images:
     name: flowlogs-pipeline
     namespace: netobserv
     tag: ci
+  netobserv-cli-src:
+    name: netobserv-cli-src
+    namespace: netobserv
+    tag: ci
   netobserv-perfscale:
     name: netobserv-perfscale
     namespace: ci
     tag: latest
+  network-observability-cli:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
   network-observability-console-plugin:
     name: network-observability-console-plugin
     namespace: netobserv
@@ -98,6 +106,17 @@ tests:
     - chain: netobserv-perf-test-post-workload
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
+- as: netobserv-cli-tests
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      NETOBSERV_AGENT_IMAGE: pipeline:netobserv-ebpf-agent
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: netobserv-cli-tests
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: netobserv
