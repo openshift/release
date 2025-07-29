@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
   ocp_builder_rhel-9-base-openshift-4.19:
     name: builder
     namespace: ocp
@@ -7,6 +11,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -24,18 +36,23 @@ images:
     RUN dnf install -y skopeo git && dnf clean all
   from: src
   to: kueue-operator-src
-promotion:
-  to:
-  - name: "4.20"
-    namespace: ocp
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.20"
-  namespace: ocp
 tests:
 - as: test
   commands: make test
@@ -66,6 +83,62 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- as: test-e2e-4-17
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  optional: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-0-11
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-4-18
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-0-11
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-4-19
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.19"
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-0-11
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
 zz_generated_metadata:
   branch: main
   org: openshift

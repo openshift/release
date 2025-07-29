@@ -305,13 +305,12 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-bm-upgrade
+- as: e2e-metal-ipi-ovn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -449,6 +448,36 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-agent-ovn-two-node-arbiter
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-agent-ovn-two-node-arbiter-ipv6
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-agent-ovn-two-node-arbiter-dualstack
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
@@ -692,6 +721,8 @@ tests:
   cron: 0 */6 * * *
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch

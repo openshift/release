@@ -159,6 +159,30 @@ function cnv::reimport_datavolumes() {
   oc get pvc -n "${dvnamespace}"
 }
 
+function install_yq_if_not_exists() {
+    # Install yq manually if its not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -x "${cmd_yq}" ]; then
+        echo "Installing yq"
+        curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o ./yq && chmod +x ./yq
+    fi
+}
+
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            install_yq_if_not_exists
+            echo "Mapping Test Suite Name To: CNV-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        fi
+    fi
+}
+
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
 
@@ -225,5 +249,8 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
 #         | sed --regexp-extended 's#</?testsuites([^>]+)?>##g' \
 #         | xmllint --format - > "${JUNIT_RESULTS_FILE}"
 # fi
+
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
 
 exit ${rc}

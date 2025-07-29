@@ -53,6 +53,7 @@ ansible-playbook ./playbooks/cnf/deploy-run-cnf-tests-script.yaml \
         oo_install_ns=metallb-system \
         cnf_test_dir=$PROJECT_DIR/ \
         cnf_tests_skip=$CNF_TESTS_SKIP \
+        cnf_test_perf_test_profile=$CNF_TESTS_PERF_PROFILE \
         cnftests_git_dest=cnf-features-deploy"
 
 echo "Set bastion ssh configuration"

@@ -46,5 +46,10 @@ echo "The Quay hostname is $quay_route"
 quay_hostname=${quay_route#*//}
 echo "The Quay hostname is $quay_hostname"
 export CYPRESS_QUAY_ENDPOINT=$quay_hostname
+
+echo "The quay version is ${QUAY_VERSION}"
+export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
+
 NO_COLOR=1 yarn run smoke || true
+
 
