@@ -126,7 +126,7 @@ promotion:
   to:
   - additional_images:
       serverless-operator-src: src
-    name: release-1.35.1
+    name: knative-1.35
     namespace: knative
 releases:
   latest:
@@ -141,7 +141,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: kitchensink-e2e-aws-413
+- always_run: false
+  as: kitchensink-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -152,6 +153,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -215,7 +227,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: kitchensink-upgrade-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: kitchensink-upgrade
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -226,6 +240,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -289,7 +314,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: mesh-e2e-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: mesh-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -300,6 +327,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -364,7 +402,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: mesh-upgrade-aws-413
+- always_run: false
+  as: mesh-upgrade
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -375,6 +414,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -438,7 +488,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: operator-e2e-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: operator-e2e
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -448,6 +500,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -511,7 +574,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-soak-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: test-soak
   optional: true
   run_if_changed: test/soak
   steps:
@@ -523,6 +588,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -587,7 +663,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: test-upgrade-aws-413
+- always_run: false
+  as: test-upgrade
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -597,6 +674,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -658,9 +746,11 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 1h30m0s
     workflow: ipi-aws
-- as: ui-e2e-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: ui-e2e
   optional: true
   run_if_changed: test/ui
   steps:
@@ -672,6 +762,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -735,7 +836,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: upstream-e2e-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: upstream-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -746,6 +849,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -809,7 +923,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: upstream-e2e-kafka-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: upstream-e2e-kafka
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -820,6 +936,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: serverless-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -883,6 +1010,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-1.35
   org: openshift-knative

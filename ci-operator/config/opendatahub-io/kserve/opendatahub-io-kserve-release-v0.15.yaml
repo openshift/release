@@ -66,7 +66,7 @@ releases:
     release:
       architecture: multi
       channel: stable
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -151,6 +151,34 @@ tests:
     - as: e2e-path-based-routing
       cli: latest
       commands: ./test/scripts/openshift-ci/run-e2e-tests.sh path_based_routing
+      dependencies:
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: SKLEARN_IMAGE
+        name: sklearn-serving-runtime
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: e2e-llm-inference-service
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-llm-inference-service
+      cli: latest
+      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh llm-inference-service
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller

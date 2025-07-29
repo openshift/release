@@ -73,6 +73,7 @@ function cleanup_prior() {
     # Delete the current TGW VPC Connection from the static transit gateway
     echo "Clean up transit gateway - VPC connection"
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
+    POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
     echo ":started searching for gateway... output expected:"
     for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg name "multi-arch-x-px-${POWERVS_REGION}-1-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $name) | .id')
     do
