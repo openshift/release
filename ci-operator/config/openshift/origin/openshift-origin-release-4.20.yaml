@@ -108,8 +108,15 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: ipi-gcp
   steps:
-    cluster_profile: gcp
-    workflow: ipi-gcp
+    cluster_profile: gcp #or gcp-qe? where to find this list?
+    # workflow: ipi-gcp #--> yesterday, worked
+    # workflow: cucushift-installer-rehearse-gcp-ipi-disconnected # --> will provision and deprovison env?
+    test:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-provision
+    - chain: cucushift-installer-reportportal-marker
+    - ref: wait #wait for how long?
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-deprovision
+    - chain: junit2reportportal
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
