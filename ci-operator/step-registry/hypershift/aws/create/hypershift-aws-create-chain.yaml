@@ -39,6 +39,9 @@ chain:
     - name: ENABLE_ICSP
       default: "false"
       documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: PUBLIC_ONLY
+      default: "false"
+      documentation: "If true, only public subnets are created (requires release version 4.16 or higher)"
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
@@ -123,6 +126,10 @@ chain:
       
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
+      fi
+
+      if [[ $PUBLIC_ONLY == "true" ]]; then
+        COMMAND+=(--public-only)
       fi
       
       if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
