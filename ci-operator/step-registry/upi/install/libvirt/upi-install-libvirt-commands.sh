@@ -104,8 +104,6 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   export BOOT_ARTIFACTS_PATH="${LIBVIRT_IMAGE_PATH}"
 
   ls -l ${BOOT_ARTIFACTS_LOCAL_DIR}
-  echo "=========== adding sleep for 1 hour for debug ==========="
-  sleep 3600
 
   # The name of the kernel artifact depends on the arch
   if [ "$ARCH" == "s390x" ]; then
