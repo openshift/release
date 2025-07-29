@@ -7,7 +7,7 @@ ISSUER_URL="$(</var/run/hypershift-ext-oidc-app-cli/issuer-url)"
 CLI_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-cli/client-id)"
 CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
 CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
-CONSOLE_CLIENT_SECRET_NAME=console-secret
+CONSOLE_CLIENT_SECRET_NAME=extAuthId-console-openshift-console
 
 # Generate the main part of the patch.yaml
 # Note, the value examples (e.g. extra's values) in this patch.yaml may be tested and referenced otherwhere.
@@ -85,7 +85,7 @@ rm -f /tmp/hosted_cluster_pull_secret
 #     fi
 # fi
 
-if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
+if [[ "${HYPERSHIFT_MANAGED_SERVICE:-}" == "ARO-HCP" ]]; then
   echo "Creating an empty secret for the console client"
   # The secret will be populated by the day2 operator in the hosted cluster.
   oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters

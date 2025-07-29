@@ -11,10 +11,11 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
-CONSOLE_CLIENT_SECRET_NAME=console-secret
-
 # The name must match the name of the empty secret created
 # in step cucushift-hypershift-extended-external-oidc-enable.
+CONSOLE_CLIENT_SECRET_NAME=extAuthId-console-openshift-console
+
+
 oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n openshift-config \
     --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET" \
     --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
