@@ -34,6 +34,7 @@ function createEndpointGateway() {
     echo "ibmcloud is endpoint-gateway-delete ${vpeGatewayName} --vpc ${vpcID} -f || true" >>"${SHARED_DIR}/ibmcloud_remove_resources_by_cli.sh"
     cmd="ibmcloud is endpoint-gateway-create --vpc ${vpcID} --sg ${sgID} --new-reserved-ip '{\"subnet\":{\"id\": \"${subnetID}\"}}' --target ${targetCRN} --name ${vpeGatewayName}"
     echo "Command: $cmd"
+    set -x
     while [ $counter -lt 5 ]
     do
         sleep 10
@@ -43,21 +44,29 @@ function createEndpointGateway() {
         if [[ "$ret" != "0" ]]; then
             if grep -q "endpoint gateway already exists for this service" "${log}"; then
                 echo "The endpoint gateway already exists for this service, ignoring the error..."
+                #continue check the status of the endpoint gateway.
+                ret=0 
             elif ! waitingVPCAvaliable ${vpcID} ; then
-                echo "Unexpected VPC status, current vpc status:"
+                echo "Unexpected VPC status, current VPC status:"
                 ibmcloud is vpc ${vpcID} --output JSON | jq -r .status
                 return 1
             fi
         fi   
-            
-        waitingStatus ${vpeGatewayName};  ret=$?
-        echo "${vpeGatewayName} waiting status: ${ret}"
-        run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
-        if [[ "${ret}" == 0 ]]; then
-            return 0
+        
+        #check the endpoint-gateway status
+        if [[ "$ret" == "0"]]; then
+            waitingStatus ${vpeGatewayName};  ret=$?
+            echo "${vpeGatewayName} waiting status: ${ret}"
+            run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
+            if [[ "${ret}" == 0 ]]; then
+                return 0
+            else
+                echo "ERROR: fail to create the endpoint gateway ${vpeGatewayName} on vpc" 
+                return 1
+            fi
         fi
     done
-    
+    set +x
     echo "ERROR: fail to create the endpoint gateway ${vpeGatewayName} on vpc"
     return 1
 }
