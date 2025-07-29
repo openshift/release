@@ -29,39 +29,37 @@ function findTarget() {
 }
 
 function createEndpointGateway() {
-    local vpcID="$1" sgID="$2" subnetID="$3" targetCRN="$4" vpeGatewayName="$5" ret log cmd
+    local vpcID="$1" sgID="$2" subnetID="$3" targetCRN="$4" vpeGatewayName="$5" ret log cmd counter=0
     log=$(mktemp)
     echo "ibmcloud is endpoint-gateway-delete ${vpeGatewayName} --vpc ${vpcID} -f || true" >>"${SHARED_DIR}/ibmcloud_remove_resources_by_cli.sh"
     cmd="ibmcloud is endpoint-gateway-create --vpc ${vpcID} --sg ${sgID} --new-reserved-ip '{\"subnet\":{\"id\": \"${subnetID}\"}}' --target ${targetCRN} --name ${vpeGatewayName}"
     echo "Command: $cmd"
-    eval "$cmd" &> "${log}"; ret=$?
-    cat "${log}"
-    if [[ "$ret" != "0" ]]; then
-        if grep -q "endpoint gateway already exists for this service" "${log}"; then
-            echo "The endpoint gateway already exists for this service, ignoring the error..."
+    while [ $counter -lt 5 ]
+    do
+        sleep 10
+        counter=$(expr $counter + 1)
+        eval "$cmd" &> "${log}"; ret=$?
+        cat "${log}"
+        if [[ "$ret" != "0" ]]; then
+            if grep -q "endpoint gateway already exists for this service" "${log}"; then
+                echo "The endpoint gateway already exists for this service, ignoring the error..."
+            elif ! waitingVPCAvaliable ${vpcID} ; then
+                echo "Unexpected VPC status, current vpc status:"
+                ibmcloud is vpc ${vpcID} --output JSON | jq -r .status
+                return 1
+            fi
+        fi   
+            
+        waitingStatus ${vpeGatewayName};  ret=$?
+        echo "${vpeGatewayName} waiting status: ${ret}"
+        run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
+        if [[ "${ret}" == 0 ]]; then
             return 0
         fi
-        
-        echo "Retrying..."
-        echo "" &> "${log}"
-        if ! waitingVPCAvaliable ${vpcID} || ! eval "$cmd" &> "${log}"; then
-            cat "${log}"
-            echo "ERROR: Failed to create the endpoint gateway ${vpeGatewayName}" >&2
-            echo "Current vpc status:"
-            ibmcloud is vpc ${vpcID} --output JSON | jq -r .status
-            return 1
-        fi
-    fi   
+    done
     
-    waitingStatus ${vpeGatewayName};  ret=$?
-    echo "${vpeGatewayName} waiting status: ${ret}"
-    run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
-
-    if [[ "${ret}" != 0 ]]; then
-        echo "ERROR: fail to create the endpoint gateway ${vpeGatewayName} on vpc"
-        return 1
-    fi
-    return 0
+    echo "ERROR: fail to create the endpoint gateway ${vpeGatewayName} on vpc"
+    return 1
 }
 
 function waitingVPCAvaliable() {
