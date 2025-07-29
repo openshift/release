@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.20"
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.18"
+    name: "4.20"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: unset GOFLAGS && make manager && make targetallocator && make
@@ -62,26 +62,41 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: opentelemetry-e2e-tests
+- always_run: false
+  as: security-sast-otel
   steps:
-    cluster_profile: gcp-observability
+    env:
+      PROJECT_NAME: opentelemetry-operator
+      SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
+    workflow: openshift-ci-security
+- as: opentelemetry-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  steps:
     env:
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"}
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"}
         ]
-      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-openshift/must-gather tests/e2e-otel/*aws*
+      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-openshift/must-gather
     test:
     - as: install
       cli: latest
@@ -100,9 +115,9 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-upstream
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: upstream-ocp-4.18-amd64-gcp
+  variant: upstream-ocp-4.20-amd64-aws
