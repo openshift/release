@@ -161,7 +161,7 @@ create_power_vms() {
 
   # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
   export IBMCLOUD_TRACE=true
-
+  # Debug Log please delete
   echo "$(date) Creating VSI in PowerVS instance"
   ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix --replicant-affinity-policy none
 
