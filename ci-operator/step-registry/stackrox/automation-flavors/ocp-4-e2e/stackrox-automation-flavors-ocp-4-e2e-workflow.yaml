@@ -6,6 +6,12 @@ workflow:
     - ref: stackrox-stackrox-begin
     - as: ocp-4-create
       commands: |
+        if [[ -e "${SHARED_DIR:-}/kubeconfig" ]]; then
+          echo "Found ${SHARED_DIR:-}/kubeconfig"
+          oc get nodes || true
+          echo "Abort running openshift-4 ${OCP_VERSION} automation"
+          exit 0
+        fi
         echo "Running openshift-4 ${OCP_VERSION} automation"
         /usr/bin/openshift-ci.sh create openshift-4 "${OCP_VERSION}"
       credentials:
