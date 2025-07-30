@@ -38,7 +38,31 @@ function pull_artifacts() {
 EOF
 }
 
+function pull_artifacts_day2() {
+  gnu_arch=$(echo "${1}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
+  kernel=$(/tmp/openshift-install coreos print-stream-json | jq -r ".architectures.${gnu_arch}.artifacts.metal.formats.pxe.kernel.location")
+  initramfs=$(/tmp/openshift-install coreos print-stream-json | jq -r ".architectures.${gnu_arch}.artifacts.metal.formats.pxe.initramfs.location")
+  rootfs=$(/tmp/openshift-install coreos print-stream-json | jq -r ".architectures.${gnu_arch}.artifacts.metal.formats.pxe.rootfs.location")
+
+  echo "Pulling the kernel, initramfs and rootfs in the auxiliary host"
+  timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+    "$(<"${SHARED_DIR}/cluster_name")" "$kernel" "$initramfs" "$rootfs" "${gnu_arch}" << 'EOF'
+    set -o nounset
+    set -o errexit
+    set -o pipefail
+    arch=${5}
+    wget -O "/opt/dnsmasq/tftpboot/${1}/vmlinuz_${arch}_2" "${2}"
+    wget -O "/opt/dnsmasq/tftpboot/${1}/initramfs_${arch}_2.img" "${3}"
+    wget -O "/opt/html/${1}/rootfs-${arch}_2.img" "${4}"
+EOF
+}
+
 pull_artifacts "${architecture}"
+
 if [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
-  pull_artifacts "${ADDITIONAL_WORKER_ARCHITECTURE}"
+  if [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    pull_artifacts_day2 "${ADDITIONAL_WORKER_ARCHITECTURE}"
+  else
+    pull_artifacts "${ADDITIONAL_WORKER_ARCHITECTURE}"
+  fi
 fi
