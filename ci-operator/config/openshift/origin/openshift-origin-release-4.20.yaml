@@ -87,34 +87,12 @@ resources:
       cpu: "3"
       memory: 8Gi
 tests:
-- as: unit
-  commands: GOTEST_FLAGS='-p 8' hack/test-go.sh
-  container:
-    from: src
-    memory_backed_volume:
-      size: 4Gi
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-- as: verify
-  commands: |
-    make verify -k --warn-undefined-variables
-  container:
-    from: bin
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-- as: verify-deps
-  commands: |
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: src
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-- as: ipi-gcp
+- as: test-image-disconnected
   steps:
     cluster_profile: gcp
-    post:
-    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-provision
     test:
     - ref: wait
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
