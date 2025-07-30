@@ -61,6 +61,7 @@ oc config use-context "$ext_oidc_context"
 # Save external oidc kubeconfig for the later qe test suite using 
 oc config view --flatten --raw > "$SHARED_DIR"/external-oidc-user.kubeconfig
 oc whoami
+# TODO: Uncomment this when OCPBUGS-57736 is fixed.
 # if [ -f "${SHARED_DIR}/nested_kubeconfig" ] && oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
 #     USER_INFO_JSON=$(oc auth whoami -o jsonpath='{.status.userInfo}')
 #     # The values in the grep patterns are configured otherwhere and tested as checkpoints here

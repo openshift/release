@@ -35,6 +35,7 @@ if [[ -z "$hc_authentication_cluster_spec_oidcproviders" ]]; then
     exit 1
 fi
 
+# TODO: Uncomment this when OCPBUGS-57736 is fixed.
 # Check special fields in authentication.config/cluster
 # if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
 #     # Ensure the extra and uid fields exist and are not empty
@@ -54,6 +55,7 @@ if ! grep -i issuer <<< "$mc_auth_config"; then
     exit 1
 fi
 
+# TODO: Uncomment this when OCPBUGS-57736 is fixed.
 # Further check the special fields in kube-apiserver config
 # if oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' --kubeconfig "${SHARED_DIR}"/nested_kubeconfig | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
 #     # Ensure the extra and uid fields not only exist and but also are not empty

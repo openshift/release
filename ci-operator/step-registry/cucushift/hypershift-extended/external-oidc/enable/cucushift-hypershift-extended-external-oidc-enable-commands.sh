@@ -26,6 +26,14 @@ spec:
             prefixPolicy: Prefix
             prefix:
               prefixString: 'oidc-user-test:'
+          # TODO: Uncomment this when OCPBUGS-57736 is fixed.
+          # extra:
+          # - key: extratest.openshift.com/bar
+          #   valueExpression: '"extra-test-mark"'
+          # - key: extratest.openshift.com/foo
+          #   valueExpression: claims.email
+          # uid:
+          #   expression: '"testuid-" + claims.sub + "-uidtest"'
         issuer:
           audiences:
           - ${CLI_CLIENT_ID}
@@ -69,6 +77,7 @@ HOSTED_CLUSTER_VERSION=$(oc image info -a /tmp/hosted_cluster_pull_secret $HOSTE
 echo "The hosted cluster minor version is: $HOSTED_CLUSTER_VERSION"
 rm -f /tmp/hosted_cluster_pull_secret
 
+# TODO: Uncomment this when OCPBUGS-57736 is fixed.
 # echo "Checking External OIDC uid and extra settings ..."
 # echo "First, checking ExternalOIDCWithUIDAndExtraClaimMappings featuregate ..."
 # if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.18)}") == "1"  ]]; then
