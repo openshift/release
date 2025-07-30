@@ -14,6 +14,16 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-appstudio-infra-deployments-main-appstudio-e2e-tests
+    reporter_config:
+      slack:
+        channel: '#app-studio-ci-reports'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :greatsuccess: {{ else
+          }} :anger_meow: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     rerun_command: /test appstudio-e2e-tests
     skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
     spec:

@@ -16,6 +16,17 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-kn-plugin-event-release-1.18-419-e2e
+    reporter_config:
+      slack:
+        channel: '#knative-client'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+          :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+          logs> :volcano: {{end}}'
     rerun_command: /test 419-e2e
     skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
     spec:
