@@ -63,6 +63,7 @@ mkdir --parents "$LOCAL_DIR" "$LOCAL_DIR_ORI" "$LOCAL_DIR_RST"
 
 function download_logs() {
   logfile_name="${ARTIFACT_DIR}/rsync.log"
+  export PATH="$PATH:/opt/google-cloud-sdk/bin"
   gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml|build-log.txt|skip_overall_if_fail)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
   gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
@@ -323,13 +324,13 @@ EOF_JUNIT_FAILURE
 }
 
 function droute_send() {
-  which droute && droute version
-  droute send --url="$(< /var/run/datarouter/dataroute)" \
-              --username="$(< /var/run/datarouter/username)" \
-              --password="$(< /var/run/datarouter/password)" \
-              --metadata="$DATAROUTER_JSON" \
-              --results="${LOCAL_DIR_RST}/*" \
-              --wait
+  /droute version
+  /droute send --url="https://datarouter.ccitredhat.com" \
+               --username="$(< /var/run/datarouter/username)" \
+               --password="$(< /var/run/datarouter/password)" \
+               --metadata="$DATAROUTER_JSON" \
+               --results="${LOCAL_DIR_RST}/*" \
+               --wait
 }
 
 download_logs
