@@ -57,6 +57,15 @@ tests:
     - ref: mtr-tests-ui
     - as: datarouter-send
       commands: |
+        # Create a fake JUnit XML file for testing
+        cat > "${ARTIFACT_DIR}/test-results.xml" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="OpenShift-CI-Test" tests="2" failures="0" errors="0" time="5.123">
+          <testcase name="test_example_pass" classname="ExampleTest" time="2.5"/>
+          <testcase name="test_another_pass" classname="ExampleTest" time="2.623"/>
+        </testsuite>
+        EOF
+        
         export DATAROUTER_RESULTS="${ARTIFACT_DIR}/*.xml"
         export REPORTPORTAL_HOSTNAME="reportportal-ccit.apps.dno.ocp-hub.prod.psi.redhat.com"
         export REPORTPORTAL_PROJECT="DR_TEST_PROJECT"
