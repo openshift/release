@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 set -o pipefail
-set -x
 
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 PROJECT_DIR="/tmp"
@@ -33,52 +32,15 @@ if [[ -f "${SHARED_DIR}/set_ocp_net_vars.sh" ]]; then
     source "${SHARED_DIR}/set_ocp_net_vars.sh"
 fi
 
-echo "Set compute-nto specific environment variables"
-ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_COMPUTE_NTO_ENABLED=true ${ECO_GOTESTS_ENV_VARS}"
-
-# shellcheck disable=SC2154
-if [[ "${ECO_GOTEST_BMC_ACCESS}" = "true" ]]; then
-  ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_USER=$(grep -oP "(?<=bmc_user: ).*" "${SHARED_DIR}/all" | sed "s/'//g")"
-  ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_PASS=$(grep -oP "(?<=bmc_password: ).*" "${SHARED_DIR}/all" | sed "s/'//g")"
-
-  # Handle BMC address extraction from all worker files
-  BMC_ADDRESSES=""
-  for worker_file in "${SHARED_DIR}"/worker*; do
-    if [[ -f "${worker_file}" ]]; then
-      worker_name=$(basename "${worker_file}")
-      BMC_ADDRESS=$(grep -oP "(?<=bmc_address: ).*" "${worker_file}" | sed "s/'//g" || echo "")
-      if [[ -n "${BMC_ADDRESS}" ]]; then
-        if [[ -n "${BMC_ADDRESSES}" ]]; then
-          BMC_ADDRESSES="${BMC_ADDRESSES},${BMC_ADDRESS}"
-        else
-          BMC_ADDRESSES="${BMC_ADDRESS}"
-        fi
-        echo "BMC address found in ${worker_name}: ${BMC_ADDRESS}"
-      else
-        echo "Warning: bmc_address not found in ${worker_name}"
-      fi
-    fi
-  done
-
-  if [[ -n "${BMC_ADDRESSES}" ]]; then
-    ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_NAMES=${BMC_ADDRESSES}"
-    echo "All BMC addresses: ${BMC_ADDRESSES}"
-  else
-    echo "Warning: No BMC addresses found in any worker files"
-    ECO_GOTESTS_ENV_VARS+=" -e ECO_CNF_CORE_NET_BMC_HOST_NAMES="
-  fi
-fi
-
-echo "Show compute-nto eco-gotests environment variables"
-echo "${ECO_GOTESTS_ENV_VARS}"
-
 echo "Setup compute-nto test script"
 cd /eco-ci-cd
 
 # shellcheck disable=SC2154
+set -x
 ansible-playbook ./playbooks/compute/deploy-nto-gotest.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "cluster_name=${CLUSTER_NAME} \
     kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+set +x
 
 echo "Run NTO gotests via SSH (playbook creates files on bastion, not locally)"
 
@@ -90,12 +52,30 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
 echo "Run compute-nto eco-gotests via ssh tunnel"
-ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/gotest && ./run_gotests.sh || true"
+timeout -s 9 2h ssh \
+  -o ServerAliveInterval=60 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=no \
+  "${BASTION_USER}@${BASTION_IP}" -i ${PROJECT_DIR}/temp_ssh_key bash -s -- << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+echo
+echo "--------------------------------------------------"
+echo "Running gotests script: /tmp/gotest/run_gotests.sh"
+echo "--------------------------------------------------"
+cat /tmp/gotest/run_gotests.sh
+echo "--------------------------------------------------"
+echo
+cd /tmp/gotest && ./run_gotests.sh || true
+EOF
+set +x
 
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154
 mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests/"
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/" || echo "No XML reports found on bastion"
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${PROJECT_DIR}/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/" || echo "No XML reports found on bastion"
 rm -rf "${PROJECT_DIR}/temp_ssh_key"
 
 echo "Create junit-named copies in ARTIFACT_DIR for reporter compatibility"
