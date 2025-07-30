@@ -1,0 +1,47 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Containerfile
+  to: nvidia-ci
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: nvidia-gpu-operator-bare-metal-e2e-25-3-x
+  steps:
+    env:
+      NVIDIAGPU_CLEANUP: "true"
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v25.3
+      TEST_FEATURES: nvidiagpu
+    test:
+    - as: gpu-operator-e2e
+      commands: |
+        export KUBECONFIG=/var/run/nvidia-ci/kubeconfig
+        make run-tests
+      credentials:
+      - collection: ""
+        mount_path: /var/run/nvidia-ci
+        name: nvidia-ci
+        namespace: test-credentials
+      env:
+      - name: NVIDIAGPU_SUBSCRIPTION_CHANNEL
+      - name: NVIDIAGPU_CLEANUP
+      - name: TEST_FEATURES
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: bare-metal
