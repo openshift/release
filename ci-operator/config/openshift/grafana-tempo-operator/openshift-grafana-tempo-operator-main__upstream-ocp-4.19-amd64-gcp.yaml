@@ -41,23 +41,9 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: security-sast-tempo
-  steps:
-    env:
-      PROJECT_NAME: tempo-operator
-    workflow: openshift-ci-security
 - as: tempo-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.19"
   steps:
+    cluster_profile: gcp-observability
     env:
       OPERATORS: |
         [
@@ -84,9 +70,9 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-upstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: upstream-ocp-4.19-amd64-aws
+  variant: upstream-ocp-4.19-amd64-gcp
