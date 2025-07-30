@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -35,7 +39,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: machine-config-operator
 releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.20"
   latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  target:
     candidate:
       product: ocp
       stream: nightly
@@ -172,6 +187,31 @@ tests:
         FEATURE_SET=TechPreviewNoUpgrade
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-ocl
+  interval: 168h
+  steps:
+    cluster_profile: aws-3
+    env:
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: mco-conf-day2-enable-ocl
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-upgrade-ocl
+  interval: 168h
+  steps:
+    cluster_profile: aws-3
+    env:
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+      TEST_TYPE: upgrade-conformance
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: mco-conf-day2-enable-ocl
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-upgrade
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.20
