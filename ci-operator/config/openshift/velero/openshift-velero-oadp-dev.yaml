@@ -7,10 +7,12 @@ images:
 - additional_architectures:
   - arm64
   dockerfile_path: Dockerfile.ubi
-  to: velero-plugin-for-gcp
+  to: velero
 promotion:
   to:
-  - name: velero-plugin-for-gcp
+  - additional_images:
+      velero: velero
+    name: velero
     namespace: konveyor
 releases:
   latest:
@@ -26,17 +28,29 @@ resources:
       memory: 200Mi
 tests:
 - as: unit-test
-  optional: true
+  run_if_changed: (\.sh|\.go|config/.*|cmd/.*|assets/.*|internal/.*|Dockerfile.*|Makefile.*)$
   steps:
     test:
     - as: unit
-      commands: go mod vendor && go test -v ./...
+      commands: PATH="/go/bin:$PATH" make -f Makefile.prow ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: lint
+  run_if_changed: .*\.go$
+  steps:
+    test:
+    - as: lint
+      commands: |
+        PATH="/go/bin:$PATH" make -f Makefile.prow lint
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
 zz_generated_metadata:
-  branch: konveyor-dev
+  branch: oadp-dev
   org: openshift
-  repo: velero-plugin-for-gcp
+  repo: velero
