@@ -29,7 +29,7 @@ echo "ocp_version: ${ocp_version}"
 butane_version_list=("${ocp_version}.0" "$(echo ${ocp_version} | awk -F. -v OFS=. '{$NF -= 1 ; print}').0")
 echo "butane_version_list:" "${butane_version_list[@]}"
 
-declare -a roles=("master" "worker")
+declare -a roles=("master")
 ret_code=1
 
 for butane_version in "${butane_version_list[@]}"; do
@@ -51,8 +51,8 @@ boot_device:
   layout: $(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
   mirror: 
     devices: 
-      - /dev/sda
-      - /dev/sdb
+      - $(echo -n "${architecture:-amd64}" | sed 's/arm64/\/dev\/nvme0n1/;s/amd64/\/dev\/sda/')
+      - $(echo -n "${architecture:-amd64}" | sed 's/arm64/\/dev\/nvme1n1/;s/amd64/\/dev\/sdb/')
 openshift:
   fips: false 
 EOF

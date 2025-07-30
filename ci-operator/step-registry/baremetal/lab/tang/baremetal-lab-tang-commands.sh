@@ -39,7 +39,7 @@ echo "butane_version_list:" "${butane_version_list[@]}"
 
 TANG_SERVER_KEY=$(ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "podman exec -it tang tang-show-keys 7500")
 
-declare -a roles=("master" "worker")
+declare -a roles=("master")
 ret_code=1
 
 for butane_version in "${butane_version_list[@]}"; do
