@@ -256,19 +256,27 @@ function install_required_tools() {
       exit 1
     fi
   done
+
+  mkdir -p /tmp/bin
+  PATH=${PATH}:/tmp/bin
+  export PATH
+
   echo "Installing yq-v4"
   # Install yq manually if its not found in installer image
   cmd_yq="$(which yq-v4 2>/dev/null || true)"
-  mkdir -p /tmp/bin
   if [ ! -x "${cmd_yq}" ]; then
     curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
       -o /tmp/bin/yq-v4 && chmod +x /tmp/bin/yq-v4
   fi
-  PATH=${PATH}:/tmp/bin
-  export PATH
+
+  echo "Installing PowerVS-DHCP-report"
+  DHCP_TAR="PowerVS-DHCP-report-v1.3-linux-amd64.tar.gz"
+  curl --location --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR}
+  (cd /tmp/; tar xzvf ${DHCP_TAR}; mv PowerVS-DHCP-report /tmp/bin/)
 
   hash jq || exit 1
   hash yq-v4 || exit 1
+  hash PowerVS-DHCP-report || exit 1
 }
 
 function init_ibmcloud() {
@@ -332,7 +340,8 @@ function init_ibmcloud() {
   #  ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn'
   # does not always return a match!  This also is likely to fail:
   #  ibmcloud pi workspace list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
-  SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
+  #SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
+  SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[] | select(.type|contains("resource-instance")) | .crn')"
   if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
     echo "Error: SERVICE_INSTANCE_CRN is empty!"
     exit 1
@@ -391,32 +400,6 @@ function check_resources() {
   fi
 }
 
-function delete_network() {
-  NETWORK_NAME=$1
-  echo "delete_network(${NETWORK_NAME})"
-
-  (
-    while read UUID
-    do
-      echo ibmcloud pi subnet delete ${UUID}
-      ibmcloud pi subnet delete ${UUID}
-    done
-  ) < <(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
-
-  for (( TRIES=0; TRIES<20; TRIES++ ))
-  do
-    LINES=$(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
-    echo "LINES=${LINES}"
-    if (( LINES == 0 ))
-    then
-      return 0
-    fi
-    sleep 15s
-  done
-
-  return 1
-}
-
 function destroy_resources() {
   #
   # Create a fake cluster metadata file
@@ -427,7 +410,7 @@ function destroy_resources() {
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
 
-  if [ -n "${PERSISTENT_TG}" ]; then
+  if [ -n "${PERSISTENT_TG:-}" ]; then
     jq -r -c --arg PERSISTENT_TG "${PERSISTENT_TG}" '. | .powervs.tgName = $PERSISTENT_TG' "/tmp/ocp-test/metadata.json"
   fi
 
@@ -484,7 +467,7 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  if [ -n "${PERSISTENT_TG}" ]
+  if [ -n "${PERSISTENT_TG:-}" ]
   then
     GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_TG}'")) | .id')
   else
@@ -547,7 +530,7 @@ function dump_resources() {
 (
   echo "8<--------8<--------8<--------8<-------- VPC 8<--------8<--------8<--------8<--------"
 
-  if [ -n "${PERSISTENT_VPC}" ]
+  if [ -n "${PERSISTENT_VPC:-}" ]
   then
     VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_VPC}'")) | .id')
   else
@@ -563,30 +546,16 @@ function dump_resources() {
 )
 
   echo "8<--------8<--------8<--------8<-------- DHCP networks 8<--------8<--------8<--------8<--------"
-
-  BEARER_TOKEN=$(curl --silent -X POST "https://iam.cloud.ibm.com/identity/token" -H "content-type: application/x-www-form-urlencoded" -H "accept: application/json" -d "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${IBMCLOUD_API_KEY}" | jq -r .access_token)
-  export BEARER_TOKEN
-  [ -z "${BEARER_TOKEN}" ] && exit 1
-  [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-  echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | "\(.id) - \(.network.name)"'
-  if [ $? -gt 0 ]
-  then
-    echo "DHCP_NETWORKS_RESULT=${DHCP_NETWORKS_RESULT}"
-  fi
-
-  echo "8<--------8<--------8<--------8<-------- DHCP network information 8<--------8<--------8<--------8<--------"
-
-  while read DHCP_UUID
-  do
-    DHCP_UUID_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${DHCP_UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-    echo "${DHCP_UUID_RESULT}" | jq -r '.'
-    if [ $? -gt 0 ]
+  (
+    if [ -n "$(jq -r '.powervs.serviceInstanceGUID' "${dir}/metadata.json")" ]
     then
-      echo "DHCP_UUID_RESULT=${DHCP_UUID_RESULT}"
+      echo "Running PowerVS-DHCP-report (serviceInstanceGUID) (check artifact directory for output)"
+      PowerVS-DHCP-report -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -shouldDebug false -serviceInstanceGUID "$(jq -r '.powervs.serviceInstanceGUID' "${dir}/metadata.json")" > "${ARTIFACT_DIR}/PowerVS-DHCP-report.txt"
+    else
+      echo "Running PowerVS-DHCP-report (infraID) (check artifact directory for output)"
+      PowerVS-DHCP-report -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -shouldDebug false -infraID "${INFRA_ID}" > "${ARTIFACT_DIR}/PowerVS-DHCP-report.txt"
     fi
-
-  done < <( echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id' )
+  )
 
 (
   echo "8<--------8<--------8<--------8<-------- DNS records 8<--------8<--------8<--------8<--------"
@@ -615,7 +584,6 @@ function dump_resources() {
 )
 
   echo "8<--------8<--------8<--------8<-------- oc get clusterversion 8<--------8<--------8<--------8<--------"
-
   (
     DEBUG=true
 
@@ -761,12 +729,26 @@ POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
 VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
-PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
-PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep TGNAME)" ]; then
+  PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep VPCNAME)" ]; then
+  PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
+ARCH=$(yq-v4 eval '.ARCH' "${SHARED_DIR}/powervs-conf.yaml")
+BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervs-conf.yaml")
+LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervs-conf.yaml")
 
+echo "ARCH=${ARCH}"
+echo "BRANCH=${BRANCH}"
+echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+echo "VPCREGION=${VPCREGION}"
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
-echo "PERSISTENT_TG=${PERSISTENT_TG}"
-echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
+echo "PERSISTENT_TG=${PERSISTENT_TG:-}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC:-}"
+
+# NOTE: If you want to test against a certain release, then do something like:
+# if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 == 19)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret

@@ -49,7 +49,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/root/.krew/bin:$PATH
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/usr/local/krew/bin:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 github_token=$(cat "/var/run/vault/tests-private-account/token-git")
@@ -85,6 +85,10 @@ which extended-platform-tests
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+if [ -f "${SHARED_DIR}/runtime_env" ]; then
+    source "${SHARED_DIR}/runtime_env"
 fi
 
 # restore external oidc cache dir for oc
@@ -226,7 +230,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
+equinix-edge-enablement|equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -344,7 +348,9 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
-    extended-platform-tests run all --dry-run | \
+    echo "SHARD_ARGS=\"${SHARD_ARGS}\""
+
+    extended-platform-tests run all --dry-run ${SHARD_ARGS:-} | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"

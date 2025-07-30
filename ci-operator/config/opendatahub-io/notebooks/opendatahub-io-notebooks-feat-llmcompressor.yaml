@@ -1,0 +1,53 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.14
+images:
+- context_dir: .
+  dockerfile_path: jupyter/pytorch+llmcompressor/ubi9-python-3.11/Dockerfile.cuda
+  to: jupyter-llmcompressor-ubi9-python-3.11
+- context_dir: .
+  dockerfile_path: runtimes/pytorch+llmcompressor/ubi9-python-3.11/Dockerfile.cuda
+  to: runtime-llmcompressor-ubi9-python-3.11
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      ephemeral-storage: 120Gi
+      memory: 2Gi
+tests:
+- as: notebook-jupyter-llmcompressor-ubi9-python-3-11-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-llmcompressor-ubi9-python-3.11
+    env:
+      IMAGE_REPO: llmcompressor-workbench
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-llmcompressor-ubi9-python-3-11-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: runtime-llmcompressor-ubi9-python-3.11
+    env:
+      IMAGE_REPO: llmcompressor-pipeline-runtime
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: feat-llmcompressor
+  org: opendatahub-io
+  repo: notebooks

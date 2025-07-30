@@ -1,0 +1,103 @@
+base_images:
+  lifecycle-agent-operator:
+    name: "4.16"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle:
+    name: "4.16"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  tests:
+    name: "4.16"
+    namespace: ocp
+    tag: tests
+releases:
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 10m
+      memory: 100Mi
+tests:
+- as: image-based-upgrade-e2e-serial-conformance
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.16"
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.15"
+      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.16
+      SEED_IMAGE_TAG_FORMAT: e2e
+    workflow: openshift-image-based-upgrade-e2e
+  timeout: 4h0m0s
+- as: image-based-upgrade-e2e-serial-conformance-baseline
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      CREATE_CLUSTER_ONLY: "true"
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.16"
+      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.16
+      SEED_IMAGE_TAG_FORMAT: e2e
+      TEST_CLUSTER: seed
+      TEST_SKIPS: NTO should SNO installation does not finish due to wait for non-existing
+        machine-config
+    workflow: openshift-image-based-upgrade-e2e-baseline
+  timeout: 4h0m0s
+- as: image-based-upgrade-e2e-parallel-conformance
+  interval: 24h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      CONFORMANCE_SUITE: openshift/conformance/parallel
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.16"
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.15"
+      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.16
+      SEED_IMAGE_TAG_FORMAT: e2e
+    workflow: openshift-image-based-upgrade-e2e
+  timeout: 4h0m0s
+- as: image-based-upgrade-e2e-parallel-conformance-baseline
+  interval: 24h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      TESTS_PULL_REF: pipeline:tests
+    env:
+      CONFORMANCE_SUITE: openshift/conformance/parallel
+      CREATE_CLUSTER_ONLY: "true"
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.16"
+      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.16
+      SEED_IMAGE_TAG_FORMAT: e2e
+      TEST_CLUSTER: seed
+      TEST_SKIPS: NTO should SNO installation does not finish due to wait for non-existing
+        machine-config
+    workflow: openshift-image-based-upgrade-e2e-baseline
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-kni
+  repo: lifecycle-agent
+  variant: nightly-4.16-upgrade-from-stable-4.15

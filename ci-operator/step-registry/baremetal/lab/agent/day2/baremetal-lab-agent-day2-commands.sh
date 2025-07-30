@@ -141,11 +141,11 @@ case "${BOOT_MODE}" in
   /tmp/oc adm node-image create --pxe --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/node.*-vmlinuz* \
    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/vmlinuz_${arch}_2"
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/node.*-initrd* \
    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${arch}_2.img"
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/node.*-rootfs* \
    "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${arch}_2.img"
 ;;
 *)

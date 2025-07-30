@@ -10,6 +10,29 @@ echo "************ baremetalds single-node setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# Get dev-scripts logs and other configuration
+finished()
+{
+  # Make sure we always execute all of this, so we gather logs and installer status, even when
+  # install fails.
+  set +o pipefail
+  set +o errexit
+
+  echo "Fetching kubeconfig, other credentials..."
+  scp "${SSHOPTS[@]}" "root@${IP}:/home/sno/build/ibip/auth/kubeconfig" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/home/sno/build/ibip/auth/kubeadmin-password" "${SHARED_DIR}/"
+
+  # ESI nodes are all using the same IP with different ports (which is forwarded to 8213)
+  PROXYPORT="8213"
+
+  echo "Adding proxy-url in kubeconfig"
+  sed -i "/- cluster/ a\    proxy-url: http://$IP:$PROXYPORT/" "${SHARED_DIR}"/kubeconfig
+
+  echo "Restarting proxy container"
+  ssh "${SSHOPTS[@]}" "root@${IP}" "podman restart external-squid"
+}
+trap finished EXIT TERM
+
 echo "Creating Ansible inventory file"
 cat > "${SHARED_DIR}/inventory" <<-EOF
 

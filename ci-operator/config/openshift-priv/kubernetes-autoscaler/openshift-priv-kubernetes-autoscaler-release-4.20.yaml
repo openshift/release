@@ -7,10 +7,6 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.18_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
-    tag: base-rhel9
   ocp_4.19_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
@@ -19,14 +15,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.18
+    tag: rhel-9-release-golang-1.23-openshift-4.19
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.18"
+    tag: "4.20"
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
@@ -44,16 +40,17 @@ images:
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.18_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
   to: vertical-pod-autoscaler
 promotion:
   to:
-  - name: 4.20-priv
+  - disabled: true
+    name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -118,7 +115,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest

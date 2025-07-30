@@ -67,37 +67,6 @@ tests:
     - ref: install-operators
     - ref: keycloak-qe-rhsso-tests
     workflow: firewatch-ipi-aws
-- as: rhsso-interop-aws-fips
-  cron: 0 0 11 6 *
-  steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      FIPS_ENABLED: "true"
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-            [
-              {"step": "keycloak-qe-rhsso-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "keycloak-qe-rhsso-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "RHSSO", "group": {"name": "lp-tests", "priority": 2},"jira_additional_labels": ["rhsso","!default","interop-tests"],"jira_assignee":"ikhomyn@redhat.com"}
-            ]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/ibm-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","rhsso-lp","fips"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ikhomyn@redhat.com
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
-      OCP_PROJECT_NAME: keycloak
-      OPERATORS: |
-        [
-            {"name": "rhsso-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "keycloak", "operator_group": "rhsso-operator-group", "target_namespaces": "keycloak"}
-        ]
-      USER_TAGS: |
-        scenario rhsso
-    test:
-    - ref: install-operators
-    - ref: keycloak-qe-rhsso-tests
-    workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main
   org: rhbk

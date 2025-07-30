@@ -21,6 +21,34 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
+#Support Libvirt Hypershift Cluster
+cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+hypershift_pods=$(! oc -n hypershift get pods| grep operator >/dev/null ||oc -n hypershift get pods| grep operator |wc -l)
+if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then
+        echo "Executing cluster-density-v2 in hypershift cluster"
+        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+                echo "Set http proxy for hypershift cluster"
+                . $SHARED_DIR/proxy-conf.sh
+        fi
+        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+fi
+
+# Managment Kubeconfig for ROSA-HCP
+# Set this variable only for HCP clusters on AWS
+CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
+if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; then
+    if [[ -f "${SHARED_DIR}/hs-mc.kubeconfig" ]]; then
+        # Check if the cluster is accessible from prow environment, 
+        # Set this variable only if accessible
+        MC_CLUSTER_INFRA=$(oc --kubeconfig="${SHARED_DIR}/hs-mc.kubeconfig" get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+        if [[ $MC_CLUSTER_INFRA == "AWS" ]]; then
+            export MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+            export ES_INDEX=ripsaw-kube-burner
+        fi
+    fi
+fi
+
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
@@ -43,13 +71,30 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+
+if [[ -n "${USER_METADATA}" ]]; then
+    USER_METADATA=$(echo "$USER_METADATA" | xargs)
+    IFS=',' read -r -a env_array <<< "$USER_METADATA"
+    true > user-metadata.yaml
+    for env_pair in "${env_array[@]}"; do
+      env_pair=$(echo "$env_pair" | xargs)
+      env_key=$(echo "$env_pair" | cut -d'=' -f1)
+      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+      echo "$env_key: \"$env_value\"" >> user-metadata.yaml
+    done
+    EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+fi
 export EXTRA_FLAGS
+export ADDITIONAL_PARAMS
 
 rm -f ${SHARED_DIR}/index.json
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+
+cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
+cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
 
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then

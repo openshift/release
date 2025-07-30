@@ -11,7 +11,7 @@ export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
 export KUBECONFIG="/home/jenkins/.kube/config"
-export OADP_TEST_FOCUS="--ginkgo.focus=${OADP_TEST_FOCUS}"
+export OADP_TEST_FOCUS="--focus=${OADP_TEST_FOCUS}"
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -72,6 +72,11 @@ if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
 fi
 
 # Run OADP tests with the focus
+if [[ "$OADP_TEST_FOCUS" == "--focus=ALL_TESTS" ]]; then
+  echo "Running all tests in oadp-e2e-qe"
+  OADP_TEST_FOCUS=""
+fi
+# export NUM_OF_OADP_INSTANCES=3
 export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
 (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)

@@ -66,14 +66,13 @@ presubmits:
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci-operator.openshift.io/variant: altinfra
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-altinfra-e2e-aws-custom-security-groups
     optional: true
     rerun_command: /test altinfra-e2e-aws-custom-security-groups
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -229,7 +228,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.16-altinfra-e2e-aws-ovn-fips
     optional: true
     rerun_command: /test altinfra-e2e-aws-ovn-fips
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -300,7 +298,7 @@ presubmits:
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci-operator.openshift.io/variant: altinfra
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -377,14 +375,13 @@ presubmits:
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci-operator.openshift.io/variant: altinfra
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-altinfra-e2e-aws-ovn-localzones
     optional: true
     rerun_command: /test altinfra-e2e-aws-ovn-localzones
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -455,7 +452,7 @@ presubmits:
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci-operator.openshift.io/variant: altinfra
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -763,7 +760,7 @@ presubmits:
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci-operator.openshift.io/variant: altinfra
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -847,7 +844,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.16-altinfra-e2e-aws-ovn-single-node
     optional: true
     rerun_command: /test altinfra-e2e-aws-ovn-single-node
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -925,7 +921,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.16-altinfra-e2e-aws-ovn-wavelengthzones
     optional: true
     rerun_command: /test altinfra-e2e-aws-ovn-wavelengthzones
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -4380,7 +4375,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
@@ -5519,7 +5514,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -5527,6 +5522,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-e2e-metal-assisted
@@ -5985,8 +5981,8 @@ presubmits:
     decoration_config:
       timeout: 6h0m0s
     labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-sno
+      ci-operator.openshift.io/cloud: equinix-edge-enablement
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-e2e-metal-single-node-live-iso
@@ -6744,6 +6740,15 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-e2e-vsphere-ovn
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Presubmit job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn
     run_if_changed: vsphere
     spec:
@@ -6819,6 +6824,15 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-e2e-vsphere-ovn-upi
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Presubmit job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test e2e-vsphere-ovn-upi
     run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
     spec:
@@ -7107,7 +7121,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn-zones-techpreview,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
@@ -7416,6 +7430,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-okd-scos-e2e-vsphere-ovn
     optional: true
+    reporter_config:
+      slack:
+        channel: '#forum-ocp-splat-alerts'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+          {{ else }} :red_jenkins_circle: {{ end }} Presubmit job *{{.Spec.Job}}*
+          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
     rerun_command: /test okd-scos-e2e-vsphere-ovn
     spec:
       containers:
@@ -7476,7 +7499,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-e2e-vsphere-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
@@ -7490,7 +7513,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.16-okd-scos-images
-    optional: true
     rerun_command: /test okd-scos-images
     spec:
       containers:

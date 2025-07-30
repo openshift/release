@@ -29,10 +29,59 @@ function run_command() {
     eval "${CMD}"
 }
 
+#"oc-mirror --v2 version" return "v0.0.0-unknown" in < ocp 4.18
+#oc major version is same with the oc-mirror major version,
+#use oc version to check the oc-mirror version
+function isPreVersion() {
+  local required_ocp_version="$1"
+  local isPre version
+  #version=$(${oc_mirror_bin} version --output json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["clientVersion"]["gitVersion"])' | cut -d '.' -f1,2)
+  version=$(oc version -o json |  python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["clientVersion"]["gitVersion"])' | cut -d '.' -f1,2)
+  echo "get oc version: ${version}"
+  isPre=0
+  if [ -n "${version}" ] && [ "$(printf '%s\n' "${required_ocp_version}" "${version}" | sort --version-sort | head -n1)" = "${required_ocp_version}" ]; then
+    isPre=1
+  fi
+  return $isPre
+}
+
+function check_signed() {
+    local digest algorithm hash_value response try max_retries payload="${1}"
+    if [[ "${payload}" =~ "@sha256:" ]]; then
+        digest="$(echo "${payload}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${payload}" -o json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["digest"])')"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
+    algorithm="$(echo "${digest}" | cut -f1 -d:)"
+    hash_value="$(echo "${digest}" | cut -f2 -d:)"
+    try=0
+    max_retries=3
+    response=0
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        (( try += 1 ))
+        sleep 60
+    done
+    if (( response == 200 )); then
+        echo "${payload} is signed" && return 0
+    else
+        echo "Seem like ${payload} is not signed" && return 1
+    fi
+}
+
 # private mirror registry host
 # <public_dns>:<port>
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
+
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
+
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 # target release
@@ -55,7 +104,7 @@ new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
-
+oc registry login --to "${new_pull_secret}"
 
 # This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
 #if ! whoami &> /dev/null; then
@@ -85,13 +134,6 @@ cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.lo
 #        fi
 #    fi
 #done
-#Because user does not have permission to update subgid and subuid file, so use another workaround.
-ocp_version=$(oc adm release info ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
-if ((ocp_minor_version > 17)); then
-    echo "export TEST_E2E=true to workaournd OCPBUGS-43986"
-    export TEST_E2E=true
-fi
 
 oc_mirror_bin="oc-mirror"
 run_command "'${oc_mirror_bin}' version --output=yaml"
@@ -114,8 +156,14 @@ cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
 
 unset REGISTRY_AUTH_PREFERENCE
 
+mirrorCmd="${oc_mirror_bin} -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
+
+# ref OCPBUGS-56009
+if ! isPreVersion "4.19" && ! check_signed "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ; then
+    mirrorCmd="${mirrorCmd} --ignore-release-signature"
+fi
 # execute the oc-mirror command
-run_command "'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
+run_command "${mirrorCmd}"
 
 # Save output from oc-mirror
 result_folder="${oc_mirror_dir}/working-dir"

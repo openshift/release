@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=101
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
+
 REGION="${LEASED_RESOURCE}"
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
@@ -30,12 +38,6 @@ for cluster_lb in $(cat $CLUSTER_LB_LIST); do
 done
 
 
-#No public Route 53 DNS records that matches the baseDomain for the cluster
-if [[ -z ${BASE_DOMAIN} ]]; then
-  echo "Error: BASE_DOMAIN is not set, exit."
-  exit 1
-fi
-
 PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
 
 if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
@@ -49,7 +51,7 @@ if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
         echo "PASS: no public Route 53 DNS records that matches this cluster"
     fi
 else
-    echo "Error: no valid PUBLIC_ZONE_ID found for this base domain ${BASE_DOMAIN}, skip the public DNS checking"
+    echo "WARN: no valid PUBLIC_ZONE_ID found for this base domain ${BASE_DOMAIN}, skip the public DNS checking"
 fi
 
 exit $ret

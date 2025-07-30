@@ -17,16 +17,18 @@ YQ="/tmp/yq"
 curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
 chmod +x ${YQ}
 
-# Dynamically get CNV catalog image that was provided to the job via gangway API
+# Dynamically get CNV catalog image and channel that were provided to the job via gangway API
 CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
   ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value')
+CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
+  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
 
 if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
-  then
+then
   CNV_RELEASE_CHANNEL=stable
-elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
-  then
-  CNV_RELEASE_CHANNEL=stable
+elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
+then
+  CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
 else
   CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
   CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
@@ -171,3 +173,24 @@ oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=
 
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
 oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
+
+
+if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "Azure" ];
+then
+  # Pin cpuModel to Broadwell in case of Azure cluster, to avoid discrepancies between the cluster nodes
+  PATCH_COMMAND="oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{\"op\": \"add\", \"path\": \"/spec/defaultCPUModel\", \"value\": \"Broadwell\"}]'"
+  MAX_RETRIES=5
+  for ((i=1; i<=MAX_RETRIES; i++)); do
+    echo "Attempt $i of $MAX_RETRIES..."
+    if eval $PATCH_COMMAND; then
+      echo "Patch succeeded."
+      exit 0
+    else
+      echo "Patch failed. Retrying in 2 seconds..."
+      sleep 2
+    fi
+  done
+
+  echo "Patch failed after $MAX_RETRIES attempts."
+  exit 1
+fi

@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
@@ -50,7 +54,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -71,7 +75,7 @@ tests:
   timeout: 5h30m0s
 - as: e2e-aws-console
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -85,8 +89,13 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
+- as: e2e-hypershift-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

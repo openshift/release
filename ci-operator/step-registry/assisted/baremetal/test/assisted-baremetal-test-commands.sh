@@ -3,139 +3,223 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
-echo "************ baremetalds assisted test command ************"
-
-echo "TEST_TYPE: ${TEST_TYPE}"
-echo "TEST_SUITE: ${TEST_SUITE}"
-echo "CUSTOM_TEST_LIST: ${CUSTOM_TEST_LIST}"
-echo "EXTENSIVE_TEST_LIST: ${EXTENSIVE_TEST_LIST}"
-echo "MINIMAL_TEST_LIST: ${MINIMAL_TEST_LIST}"
-echo "TEST_PROVIDER: ${TEST_PROVIDER}"
-echo "TEST_SKIPS: ${TEST_SKIPS}"
+echo "************ assisted baremetal test command ************"
 
 if [ "${TEST_TYPE:-list}" == "none" ]; then
-    echo "No need to run tests"
+    echo "TEST_TYPE is 'none', skipping test execution."
     exit 0
 fi
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
+if [[ ! -f "$ANSIBLE_CONFIG" ]]; then
+    echo "Ansible config not found at: ${ANSIBLE_CONFIG}" >&2
+    exit 1
+fi
+export ANSIBLE_CONFIG
 
-collect_artifacts() {
-    echo "### Fetching results"
-    ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
-}
-trap collect_artifacts EXIT TERM
+ANSIBLE_INVENTORY="${SHARED_DIR}/inventory"
+if [[ ! -f "$ANSIBLE_INVENTORY" ]]; then
+    echo "Ansible inventory not found at: ${ANSIBLE_INVENTORY}" >&2
+    exit 1
+fi
+export ANSIBLE_INVENTORY
 
-# Tests execution
-set +e
+echo "--- Running with the following parameters ---"
+echo "TEST_TYPE: ${TEST_TYPE}"
+echo "TEST_SUITE: ${TEST_SUITE}"
+echo "CUSTOM_TEST_LIST: ${CUSTOM_TEST_LIST:-not set}"
+echo "EXTENSIVE_TEST_LIST: ${EXTENSIVE_TEST_LIST:-not set}"
+echo "MINIMAL_TEST_LIST: ${MINIMAL_TEST_LIST:-not set}"
+echo "TEST_PROVIDER: ${TEST_PROVIDER}"
+echo "TEST_SKIPS: ${TEST_SKIPS:-not set}"
+echo "-------------------------------------------"
 
-echo "### Prepare test environment"
+PLAYBOOK_DIR="build/ansible"
+mkdir -p "${PLAYBOOK_DIR}"
+cd "${PLAYBOOK_DIR}"
 
-test_list_file="test-list"
-test_skips_file="test-skips"
-test_env_file="test-env"
+MAIN_PLAYBOOK="multi-conf-test.yml"
+SINGLE_TEST_TASKS="_run_single_test.yml"
 
+cat > "${MAIN_PLAYBOOK}" <<-EOF
+- name: Run OpenShift conformance tests across all clusters
+  hosts: primary
+  gather_facts: yes
+  vars:
+    test_type:               "{{ lookup('env','TEST_TYPE')           | default('minimal') }}"
+    test_suite:              "{{ lookup('env','TEST_SUITE')          | default('openshift/conformance/parallel') }}"
+    custom_test_list:        "{{ lookup('env','CUSTOM_TEST_LIST')    | default('') }}"
+    minimal_test_list:       "{{ lookup('env','MINIMAL_TEST_LIST')   | default('') }}"
+    extensive_test_list:     "{{ lookup('env','EXTENSIVE_TEST_LIST') | default('') }}"
+    test_provider:           "{{ lookup('env','TEST_PROVIDER')       | default('baremetal') }}"
+    test_skips:              "{{ lookup('env','TEST_SKIPS')          | default('') }}"
+    local_artifact_dir:      "{{ lookup('env','ARTIFACT_DIR')        | default('') }}"
+    remote_artifact_base_dir: "/tmp/artifacts"
+    test_list_file:          "/tmp/test-list"
+    test_skips_file:         "/tmp/test-skips"
+    filtered_list_file:      "/tmp/test-list-filtered"
+    pull_secret_file:        "/root/pull-secret"
 
-case "${TEST_TYPE}" in
-    suite)
-        ;; # The test list will be set using openshift-tests
-    custom)
-        if [ "${CUSTOM_TEST_LIST:-''}" == "" ]; then
-            echo >&2 "CUSTOM_TEST_LIST" must be specified
-            exit 1
-        fi
-        ;;
-    minimal)
-        echo "using minimal test list" 
-        CUSTOM_TEST_LIST="${MINIMAL_TEST_LIST}"
-        ;;
-    extensive)
-        echo "using extensive test list" 
-        CUSTOM_TEST_LIST="${EXTENSIVE_TEST_LIST}"
-        ;;
-    *)
-        echo >&2 "Unsupported TEST_TYPE: ${TEST_TYPE}"
-        exit 1
-        ;;
-esac
+  tasks:
+    - name: Find all kubeconfig files
+      ansible.builtin.find:
+        paths: "{{ ansible_env.KUBECONFIG }}"
+        file_type: file
+      register: kubeconfigs
 
+    - name: Fail if no kubeconfig files are found
+      ansible.builtin.fail:
+        msg: "No kubeconfig files found under {{ ansible_env.KUBECONFIG }}"
+      when: kubeconfigs.matched == 0
 
-echo "${CUSTOM_TEST_LIST:-""}" > "${ARTIFACT_DIR}/${test_list_file}"
-echo "${TEST_SKIPS:-""}" > "${ARTIFACT_DIR}/${test_skips_file}"
-cat << EOF > "${ARTIFACT_DIR}/${test_env_file}"
-openshift_tests_image="${OPENSHIFT_TESTS_IMAGE}"
-test_type="${TEST_TYPE:-"fixed"}"
-test_suite="${TEST_SUITE:-"openshift/conformance/parallel"}"
-test_provider="${TEST_PROVIDER:-"baremetal"}"
-test_list_file="/tmp/${test_list_file}"
-test_skips_file="/tmp/${test_skips_file}"
+    - name: Run full test process for each kubeconfig found
+      ansible.builtin.include_tasks: ${SINGLE_TEST_TASKS}
+      loop: "{{ kubeconfigs.files }}"
+      loop_control:
+        loop_var: kubeconfig_item
 EOF
 
-timeout --kill-after 10m 120m scp "${SSHOPTS[@]}"   \
-    "${ARTIFACT_DIR}/${test_list_file}"             \
-    "${ARTIFACT_DIR}/${test_skips_file}"            \
-    "${ARTIFACT_DIR}/${test_env_file}"              \
-    "root@${IP}:/tmp"
+cat > "${SINGLE_TEST_TASKS}" <<-EOF
+---
+- name: Process kubeconfig {{ kubeconfig_item.path | basename }}
+  block:
+    - name: Set iteration-specific variables for {{ kubeconfig_item.path | basename }}
+      ansible.builtin.set_fact:
+        kubeconfig_file: "{{ kubeconfig_item.path }}"
+        kubeconfig_basename: "{{ kubeconfig_item.path | basename }}"
+        remote_artifact_dir_run: "{{ remote_artifact_base_dir }}/{{ kubeconfig_item.path | basename }}"
 
-echo "### Running tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" "bash -s" << "EOF"
-    set -x
+    - name: Test run for {{ kubeconfig_basename }}
+      block:
+        - name: "Lookup conformance-tests image from cluster {{ kubeconfig_basename }}"
+          ansible.builtin.command:
+            cmd: >
+              oc --kubeconfig {{ kubeconfig_file }}
+                 adm release info --image-for=tests
+          register: tests_image
+          changed_when: false
 
-    source /tmp/test-env
+        - name: "Set tests image fact"
+          ansible.builtin.set_fact:
+            openshift_tests_image: "{{ tests_image.stdout }}"
 
-    test_list_filtered_file="/tmp/test-list-filtered"
+        - name: "Pull tests image using pull-secret"
+          ansible.builtin.command:
+            cmd: >
+              podman pull --authfile {{ pull_secret_file }} {{ openshift_tests_image }}
+          register: pulled_image
+          changed_when: false
 
-    function get_baremetal_test_list() {
-        podman run --network host --rm -i \
-            -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
-            openshift-tests run "${test_suite}" \
-            --dry-run \
-            --provider "{\"type\": \"${test_provider}\"}"
-    }
+        - name: "Prepare static test-list (unless suite)"
+          when: test_type != 'suite'
+          ansible.builtin.copy:
+            dest: "{{ test_list_file }}"
+            content: >-
+              {%- if test_type == 'minimal' -%}
+              {{ minimal_test_list }}
+              {%- elif test_type == 'extensive' -%}
+              {{ extensive_test_list }}
+              {%- else -%}
+              {{ custom_test_list }}
+              {%- endif -%}
 
-    function run_tests() {
-        podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v "${KUBECONFIG}:/tmp/kubeconfig" "${openshift_tests_image}" \
-            openshift-tests run -o "/tmp/artifacts/e2e_${name}.log" --junit-dir /tmp/artifacts/reports --file "${test_list_filtered_file}"
-    }
-    
-    # prepending each printed line with a timestamp
-    exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
+        - name: "Fail if custom tests requested but no list provided"
+          when: test_type == 'custom' and custom_test_list == ''
+          ansible.builtin.fail:
+            msg: "CUSTOM_TEST_LIST must be set when TEST_TYPE=custom"
 
-    for kubeconfig in $(find "${KUBECONFIG}" -type f); do
-        export KUBECONFIG="${kubeconfig}"
-        name=$(basename "${kubeconfig}")
+        - name: "Generate suite list via dry-run"
+          when: test_type == 'suite'
+          ansible.builtin.command:
+            cmd: >
+              podman run --network host --rm -i
+                --authfile {{ pull_secret_file }}
+                -e KUBECONFIG={{ kubeconfig_file }}
+                -v {{ kubeconfig_file }}:{{ kubeconfig_file }}
+                {{ openshift_tests_image }}
+                openshift-tests run {{ test_suite }}
+                --dry-run
+                --provider "{\"type\":\"{{ test_provider }}\"}"
+          register: suite_list
 
-        if [ "${test_type}" == "suite" ]; then
-            get_baremetal_test_list > "${test_list_file}"
-        fi
+        - name: "Write suite list to test-list"
+          when: test_type == 'suite'
+          ansible.builtin.copy:
+            dest: "{{ test_list_file }}"
+            content: "{{ suite_list.stdout }}"
 
-        cat "${test_list_file}" | grep -v -F -f "${test_skips_file}" > "${test_list_filtered_file}"
+        - name: "Write test-skips file"
+          ansible.builtin.copy:
+            dest: "{{ test_skips_file }}"
+            content: "{{ test_skips }}"
 
-        stderr=$(run_tests 2>&1)
-        exit_code=$?
-        
-        # TODO: remove this part once we fully handle the problem described at
-        # https://issues.redhat.com/browse/MGMT-15555.
-        # After 'openshift-tests' finishes validating the tests, it checks
-        # the extra monitoring tests, so the following line only excludes those
-        # kind of failures (rather than excluding all runs where the monitoring
-        # tests have failed).
-        if [[ "${stderr}" == *"failed due to a MonitorTest failure" ]]; then
-            continue
-        fi
+        - name: "Filter out skipped tests"
+          ansible.builtin.command:
+            cmd: >
+              grep -v -F -f {{ test_skips_file }} {{ test_list_file }}
+          register: filtered
+          changed_when: false
 
-        if [[ ${exit_code} -ne 0 ]]; then
-            exit ${exit_code}
-        fi
-    done
+        - name: "Write filtered test list"
+          ansible.builtin.copy:
+            dest: "{{ filtered_list_file }}"
+            content: "{{ filtered.stdout }}"
+
+        - name: "Ensure remote artifact dir exists for this run"
+          ansible.builtin.file:
+            path: "{{ remote_artifact_dir_run }}"
+            state: directory
+            mode: '0755'
+
+        - name: "Launch conformance tests for {{ kubeconfig_basename }}"
+          ansible.builtin.shell: |
+            podman run --network host --rm -i \
+              --authfile {{ pull_secret_file }} \
+              -e KUBECONFIG={{ kubeconfig_file }} \
+              -v {{ kubeconfig_file }}:{{ kubeconfig_file }} \
+              -v /tmp:/tmp \
+              {{ openshift_tests_image }} \
+              openshift-tests run \
+                -o "{{ remote_artifact_dir_run }}/e2e.log" \
+                --junit-dir "{{ remote_artifact_dir_run }}/reports" \
+                --file {{ filtered_list_file }}
+          register: test_result
+          failed_when: >
+            (test_result.rc | default(0) | int) != 0 and
+            'failed due to a MonitorTest failure' not in (test_result.stderr | default(''))
+
+  always:
+    - name: "Collect artifacts for {{ kubeconfig_basename }}"
+      block:
+        - name: Check if remote artifact directory was created
+          ansible.builtin.stat:
+            path: "{{ remote_artifact_dir_run }}"
+          register: artifact_dir_stat_run
+
+        - name: Proceed with artifact collection if directory exists
+          when: artifact_dir_stat_run.stat.exists and artifact_dir_stat_run.stat.isdir
+          block:
+            - name: Tar up remote artifacts for this run
+              ansible.builtin.archive:
+                path: "{{ remote_artifact_dir_run }}"
+                dest: "/tmp/artifacts_{{ kubeconfig_basename }}.tar.gz"
+                format: gz
+
+            - name: Fetch the artifact tarball for this run
+              ansible.builtin.fetch:
+                src: "/tmp/artifacts_{{ kubeconfig_basename }}.tar.gz"
+                dest: "{{ local_artifact_dir }}/"
+                flat: yes
+
+            - name: Unpack artifacts locally into a dedicated folder
+              delegate_to: localhost
+              ansible.builtin.unarchive:
+                src: "{{ local_artifact_dir }}/artifacts_{{ kubeconfig_basename }}.tar.gz"
+                dest: "{{ local_artifact_dir }}/{{ kubeconfig_basename }}/"
+                remote_src: yes
+      ignore_errors: yes
 EOF
 
-exit_code=$?
-
-set -e
-echo "### Done! (${exit_code})"
-exit $exit_code
+echo "Executing Ansible playbook..."
+ansible-playbook "${MAIN_PLAYBOOK}" -i "${ANSIBLE_INVENTORY}"

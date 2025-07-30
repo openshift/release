@@ -230,3 +230,4 @@ echo "$(date) ISO Download url is ready"
 # Download hosted cluster kubeconfig
 echo "$(date) Create hosted cluster kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/nested_kubeconfig
+echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"

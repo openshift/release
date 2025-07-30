@@ -100,6 +100,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
+DISKS=""
 set +o errexit
 # After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
@@ -111,6 +112,13 @@ VERSION=$(oc adm release info ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.m
 
 set -o errexit
 
+# Ensure at least 3 control planes for vSphere. Single node is not supported.
+CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS:-3}
+if [ "${CONTROL_PLANE_REPLICAS}" -lt 3 ]; then
+  echo "CONTROL_PLANE_REPLICAS must be at least 3 for vSphere"
+  exit 1
+fi
+
 Z_VERSION=1000
 
 if [ ! -z ${VERSION} ]; then
@@ -118,6 +126,15 @@ if [ ! -z ${VERSION} ]; then
   echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
 else
   echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+fi
+
+if [ -n "${ADDITIONAL_DISK}" ]; then
+  echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
+  DISKS="platform:
+    vsphere:
+      additionalDisks:
+      - diskSizeGB: 20
+        name: Disk1"
 fi
 
 if [ ${Z_VERSION} -gt 9 ]; then
@@ -146,9 +163,11 @@ else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
+  ${DISKS}
 compute:
 - name: worker
-  replicas: ${COMPUTE_NODE_REPLICAS}"
+  replicas: ${COMPUTE_NODE_REPLICAS}
+  ${DISKS}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
@@ -256,7 +275,12 @@ if [ ${Z_VERSION} -gt 9 ]; then
       fi
       if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-        cat ${PULL_THROUGH_CACHE_CONFIG} >>${CONFIG}
+        if [ "${Z_VERSION}" -lt 14 ]; then
+          echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
+          cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${CONFIG}
+        else
+          cat ${PULL_THROUGH_CACHE_CONFIG} >>${CONFIG}
+        fi
       else
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
       fi

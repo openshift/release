@@ -114,6 +114,14 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -139,6 +147,18 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
 
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
@@ -166,6 +186,18 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
 EOF
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
@@ -182,11 +214,48 @@ EOF
 fi
 }
 
+function create_tests_temp_skip_list_20 {
+# List of temporarly skipped tests for 4.20
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
 
 function is_bm_node {
     node=$1
 
-    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
+    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]] ; then
         # Define thresholds
         CPU_THRESHOLD=79
         MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
@@ -352,7 +421,7 @@ checkout_submodules(){
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
 # Set go version
-if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+if [[ "$T5CI_VERSION" == "4.12" ]]; then
     source $HOME/golang-1.19
 elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
     source $HOME/golang-1.20
@@ -371,14 +440,14 @@ export HYPERSHIFT_ENVIRONMENT=false
 export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
-if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-performance sriov sctp}"
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
+    export FEATURES="${FEATURES:-sriov sctp}"
 elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
     export FEATURES="${FEATURES:-sriov}"
     export HYPERSHIFT_ENVIRONMENT=true
     export FEATURES_ENVIRONMENT=hypershift-ci
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni knmstate}"
 fi
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
@@ -411,9 +480,9 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.18" ]] || [[ "$T5CI_VERSION" == "4.19" ]]; then
+if [[ "$T5CI_VERSION" == "4.20" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.17"
+    export CNF_TESTS_IMAGE="cnf-tests:4.19"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
@@ -435,7 +504,7 @@ fi
 pushd $CNF_REPO_DIR
 echo "******** Checking out pull request for repository cnf-features-deploy if exists"
 check_for_pr "openshift-kni" "cnf-features-deploy"
-if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.13" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
+if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
@@ -459,7 +528,7 @@ if [[ "$CNF_BRANCH" == *"4."* ]]; then
     skip_function_name="create_tests_temp_skip_list_${function_version}"
 else
     # In case of master branch
-    skip_function_name=create_tests_temp_skip_list_18
+    skip_function_name=create_tests_temp_skip_list_20
 fi
 if declare -f "$skip_function_name" > /dev/null; then
     echo "Executing $skip_function_name for skipping tests"
@@ -475,7 +544,7 @@ if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
 elif [[ "$CNF_BRANCH" == *"4.14"* ]]; then
     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 else
-    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
@@ -483,7 +552,7 @@ export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
 
 skip_tests=$(get_skip_tests)
 
-if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
     echo "******** For non-SNO jobs, get worker nodes"
     worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
     --selector='!node-role.kubernetes.io/master' -o name)
@@ -505,7 +574,7 @@ if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
     fi
 fi
 
-if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
     echo "******** For SNO jobs, get master nodes"
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     export ROLE_WORKER_CNF="master"
@@ -533,7 +602,7 @@ if [[ ${val_status} -ne 0 ]]; then
     status=${val_status}
 fi
 
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
     echo "Wait until number of nodes matches number of machines"
     # Wait until number of nodes matches number of machines
     # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh

@@ -109,6 +109,39 @@ function check_node_status {
     return 0
 }
 
+# This function checks the KMS encryption configuration based on the mgmt kubeconfig
+# only for aws platform
+function check_kms_encryption_config {
+  if [[ $HYPERSHIFT_DISK_ENCRYPTION == "true" ]] ; then
+      if [[ -f "${SHARED_DIR}/aws_kms_key_arn" ]] ; then
+          KMS_KEY_ARN=$(cat "${SHARED_DIR}/aws_kms_key_arn")
+          if [[ -z $KMS_KEY_ARN ]]; then
+              echo "KMS key ARN is not set"
+              return 1
+          fi
+
+          HYPERSHIFT_NAMESPACE=$(oc get hostedclusters --ignore-not-found -A '-o=jsonpath={.items[0].metadata.namespace}')
+          if [ -z "$HYPERSHIFT_NAMESPACE" ]; then
+              echo "Could not find HostedCluster, which is not valid."
+              return 1
+          fi
+
+          # check nodepool spec
+          key_arn=$(oc get nodepool -n $HYPERSHIFT_NAMESPACE --ignore-not-found -A '-o=jsonpath={.items[0].spec.platform.aws.rootVolume.encryptionKey}')
+          if [[ $key_arn != "$KMS_KEY_ARN" ]]; then
+              echo "KMS key ARN is not set correctly in nodepool spec"
+              return 1
+          fi
+          echo "DEBUG: KMS key ARN is set correctly in nodepool spec: $key_arn"
+      else
+          echo "ERROR: KMS key ARN file not found"
+          return 1
+      fi
+  fi
+
+  return 0
+}
+
 ###Main###
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -134,6 +167,8 @@ if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   if oc get ns openshift; then
       print_clusterversion
   fi
+
+  check_kms_encryption_config || exit 1
   retry check_control_plane_pod_status || exit 1
 fi
 

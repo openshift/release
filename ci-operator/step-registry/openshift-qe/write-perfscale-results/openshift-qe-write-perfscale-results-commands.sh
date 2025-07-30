@@ -27,7 +27,7 @@ echo "$sa_email"
 
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
-git clone https://github.com/openshift-qe/ocp-qe-perfscale-ci.git -b write-scale-ci-results
+git clone https://github.com/openshift-eng/ocp-qe-perfscale-ci.git -b write-scale-ci-results
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 

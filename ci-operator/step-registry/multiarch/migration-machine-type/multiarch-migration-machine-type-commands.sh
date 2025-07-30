@@ -6,6 +6,17 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+trap 'FRC=$?; createMTOJunit; debug' EXIT TERM
+
+# Print failed machines, node information for debug purpose
+function debug() {
+    if (( FRC != 0 )); then
+        echo -e "Describing abnormal machines...\n"
+        oc -n openshift-machine-api get machines.machine.openshift.io --no-headers | awk '$2 != "Running" {print $1}' | while read machine; do echo -e "\n#####oc describe machines ${machine}#####\n$(oc -n openshift-machine-api describe machines.machine.openshift.io ${machine})"; done
+        echo -e "Describing abnormal nodes...\n"
+        oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
+    fi
+}
 # Generate the Junit for multiarch machine type migration
 function createMTOJunit() {
     echo "Generating the Junit for multiarch test"
@@ -411,6 +422,70 @@ EOF
      )
 EOF
 )" | oc create -f -
+    echo "Wait for ${MIGRATION_INFRA_MACHINE_TYPE} infra nodes up"
+    wait_for_ready_replicas "openshift-machine-api" "machinesets.machine.openshift.io" ${migration_infra_name}
+    echo "Scale down the pre infra nodes"
+    oc -n openshift-machine-api scale machineset/"${pre_infra_name}" --replicas=0
+  fi
+;;
+*gcp*)
+  echo "Extracting gcp boot image..."
+  workers_rhcos_image_project=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
+    yq-v4 ".data.stream
+      | eval(.).architectures.${MIGRATION_ARCHITECTURE}.images.gcp.project")
+  workers_rhcos_image_name=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
+    yq-v4 ".data.stream
+      | eval(.).architectures.${MIGRATION_ARCHITECTURE}.images.gcp.name")
+  GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+  export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
+  GCP_SERVICE_ACCOUNT=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
+  if ! gcloud auth list | grep -E "\*\s+${GCP_SERVICE_ACCOUNT}"
+  then
+    gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+    gcloud config set project "${GOOGLE_PROJECT_ID}"
+  fi
+  # Get available zones for migration machine type
+  mapfile -t AVAILABLE_ZONES < <(gcloud compute machine-types list \
+    --project="${GOOGLE_PROJECT_ID}" \
+    --filter="zone:(${REGION}) AND name=${MIGRATION_CP_MACHINE_TYPE}" \
+    --format="value(zone)")
+  # Get available zones for region
+  mapfile -t SUPPORTED_ZONES < <(gcloud compute zones list \
+    --project="${GOOGLE_PROJECT_ID}" \
+    --filter="region:(${REGION})" \
+    --format="value(name)")
+  # Generate availability zones based on these 2 criteria
+  mapfile -t ZONES < <(echo "${SUPPORTED_ZONES[@]}" "${AVAILABLE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
+  FAILURE_DOMAINS=$(printf ',{"zone":"%s"}' "${ZONES[@]}")
+  FAILURE_DOMAINS="[${FAILURE_DOMAINS:1}]"
+  echo "The available zones are: $FAILURE_DOMAINS"
+  if [[ -n "${MIGRATION_CP_MACHINE_TYPE}" ]]; then
+    echo "Start migrating control plane to ${MIGRATION_CP_MACHINE_TYPE} ..."
+    oc -n openshift-machine-api get -o yaml controlplanemachineset.machine.openshift.io cluster | yq-v4 "$(cat <<EOF
+     .spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.disks[0].image = "projects/$workers_rhcos_image_project/global/images/$workers_rhcos_image_name"
+     | .spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.machineType = "${MIGRATION_CP_MACHINE_TYPE}"
+     | .spec.template.machines_v1beta1_machine_openshift_io.failureDomains.gcp = $FAILURE_DOMAINS
+EOF
+)" | oc apply -oyaml -f -
+    wait_for_ready_replicas "openshift-machine-api" "controlplanemachineset.machine.openshift.io" "cluster"
+  fi
+  if [[ -n "${MIGRATION_INFRA_MACHINE_TYPE}" ]]; then
+    pre_infra_name=$(oc get machineset -n openshift-machine-api -o yaml | yq-v4 '.items[] | select(.spec.template.spec.metadata.labels["node-role.kubernetes.io/infra"] == "") | .metadata.name')
+    migration_infra_name="${pre_infra_name}-migration"
+    echo "Create a new infra machineset with ${MIGRATION_INFRA_MACHINE_TYPE}"
+    oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
+     .items |= map(select(.spec.template.spec.metadata.labels["node-role.kubernetes.io/infra"] == "")
+     | .metadata.name = "${migration_infra_name}"
+     | .spec.template.spec.providerSpec.value.disks[0].image = "projects/${workers_rhcos_image_project}/global/images/${workers_rhcos_image_name}"
+     | .spec.template.spec.providerSpec.value.machineType = "${MIGRATION_INFRA_MACHINE_TYPE}"
+     | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+     | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+     | del(.status)
+     | del(.metadata.selfLink)
+     | del(.metadata.uid)
+     )
+EOF
+)" | oc create -oyaml -f -
     echo "Wait for ${MIGRATION_INFRA_MACHINE_TYPE} infra nodes up"
     wait_for_ready_replicas "openshift-machine-api" "machinesets.machine.openshift.io" ${migration_infra_name}
     echo "Scale down the pre infra nodes"

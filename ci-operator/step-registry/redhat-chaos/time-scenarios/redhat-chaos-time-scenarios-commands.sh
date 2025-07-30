@@ -1,5 +1,8 @@
 #!/bin/bash
 set -o errexit
+
+console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+export HEALTH_CHECK_URL=https://$console_url
 set -o nounset
 set -o pipefail
 set -x
@@ -29,6 +32,9 @@ export ENABLE_ALERTS=False
 
 ./time-scenarios/prow_run.sh
 rc=$?
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 
 echo "Finished running time scenario"
 echo "Return code: $rc"

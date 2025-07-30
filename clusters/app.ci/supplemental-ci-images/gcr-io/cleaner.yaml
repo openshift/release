@@ -1,0 +1,51 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  namespace: gcr-io
+  name: cleaner
+spec:
+  source:
+    type: Git
+    git:
+      uri: 'https://github.com/kubernetes-sigs/boskos'
+      ref: master
+    contextDir: ''
+  strategy:
+    type: Source
+    dockerStrategy:
+      pullSecret:
+        name: qci
+      dockerfilePath: images/default/Dockerfile
+      buildArgs:
+        - name: cmd
+          value: cleaner
+        - name: go_version
+          value: 1.23.4
+        - name: DOCKER_TAG
+          value: latest
+  output:
+    to:
+      kind: 'DockerImage'
+      name: 'quay.io/openshift/ci:ci_cleaner_latest'
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trigger-cleaner-build
+  namespace: gcr-io
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            - start-build
+            - cleaner
+            command:
+            - oc
+            image: registry.redhat.io/openshift4/ose-cli
+            name: ose-cli
+          restartPolicy: Never
+          serviceAccount: builder
+  schedule: '30 1 1,15 * *'

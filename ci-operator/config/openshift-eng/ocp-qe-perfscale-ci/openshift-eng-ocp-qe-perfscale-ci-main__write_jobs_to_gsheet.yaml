@@ -1,0 +1,57 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: write-jobs-to-google-sheet-sprintly
+  cron: 0 0 */21 * *
+  steps:
+    test:
+    - ref: openshift-qe-write-jobs-to-gsheet
+- as: get-orion-results-cdv2
+  capabilities:
+  - intranet
+  cron: 0 0 * * 1
+  restrict_network_access: false
+  steps:
+    env:
+      CONFIG: examples/readout-control-plane-cdv2.yaml
+      ES_BENCHMARK_INDEX: ospst-ripsaw-kube-burner*
+      ES_METADATA_INDEX: ospst-perf-scale-ci-*
+      ES_TYPE: internal
+      RUN_ORION: "true"
+      VERSION: "4.18"
+    test:
+    - ref: openshift-qe-orion
+- as: get-orion-results-nd
+  capabilities:
+  - intranet
+  cron: 0 0 * * 1
+  restrict_network_access: false
+  steps:
+    env:
+      CONFIG: examples/readout-control-plane-node-density.yaml
+      ES_BENCHMARK_INDEX: ospst-ripsaw-kube-burner*
+      ES_METADATA_INDEX: ospst-perf-scale-ci-*
+      ES_TYPE: internal
+      RUN_ORION: "true"
+      VERSION: "4.18"
+    test:
+    - ref: openshift-qe-orion
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: write_jobs_to_gsheet

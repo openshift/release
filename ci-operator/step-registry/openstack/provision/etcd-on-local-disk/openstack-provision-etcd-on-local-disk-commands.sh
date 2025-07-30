@@ -24,6 +24,26 @@ function wait_for_machineconfig_done() {
   oc wait clusteroperators --timeout=30m --all --for=condition=Progressing=false
 }
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+openshift_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+
+# Deploying on OpenStack with rootVolume and etcd on local disk 
+# is not supported on OpenShift versions lower than 4.13
+if [[ $(jq -n "$openshift_version < 4.13") == "true" ]]; then
+  info "This procedure is not supported on OpenShift versions lower than 4.13... Skipping."
+  exit 0
+fi
+
 if [[ "${ETCD_ON_LOCAL_DISK}" == "true" ]] && [[ "${USE_RAMFS}" == "true" ]]; then
     info "ERROR: ETCD_ON_LOCAL_DISK is set to true and USE_RAMFS is set to true, the configuration is conflicting"
     exit 1
@@ -51,17 +71,6 @@ for flavor in $FLAVORS; do
 	exit 1
     fi
 done
-
-# For disconnected or otherwise unreachable environments, we want to
-# have steps use an HTTP(S) proxy to reach the API server. This proxy
-# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
-# environment variables, as well as their lowercase equivalents (note
-# that libcurl doesn't recognize the uppercase variables).
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-	# shellcheck disable=SC1090
-	source "${SHARED_DIR}/proxy-conf.sh"
-fi
 
 info 'INFO: Waiting up to 30m for clusteroperators to finish progressing...'
 oc wait clusteroperators --timeout=30m --all --for=condition=Progressing=false

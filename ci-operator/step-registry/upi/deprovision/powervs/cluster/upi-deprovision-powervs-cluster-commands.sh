@@ -9,6 +9,9 @@ NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 export VPC_REGION
 
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+export IBMCLOUD_HOME_FOLDER
+
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
 
@@ -82,10 +85,10 @@ function login_ibmcloud() {
 function download_automation_code() {
     echo "Downloading the head for ocp-upi-powervs"
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/ocp-power-automation/ocp4-upi-powervs/archive/refs/heads/main.tar.gz \
+        && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/terraform-1.76.2-updates.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
-        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
     echo "Down ... Downloading the head for ocp-upi-powervs"
 }
 
@@ -100,91 +103,79 @@ function download_terraform_binary() {
 }
 
 # Cleanup prior runs
-# VPC: Load Balancers, images, vm instances
-# PowerVS: images, pvm instances
+# VPC: Load Balancers, vm instances
+# PowerVS: pvm instances
 # Not Covered:
 #   COS: bucket, objects
 function cleanup_prior() {
-    echo "Cleaning up prior runs for lease"
-    WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
-    export VPC_NAME
+    if [ ! -f "${SHARED_DIR}/WORKSPACE_NAME" ]
+    then
+        echo "Cleaning up prior runs for lease"
+        WORKSPACE_NAME="$(cat ${SHARED_DIR}/WORKSPACE_NAME)"
+        VPC_NAME="${WORKSPACE_NAME}-vpc"
+        export VPC_NAME
+        POWERVS_REGION=$(< "${SHARED_DIR}/POWERVS_REGION")
+        export POWERVS_REGION
 
-    # PowerVS Instances
-    echo "Cleaning up target PowerVS workspace"
-    for CRN in $(ibmcloud pi workspace ls 2> /dev/null | grep "${WORKSPACE_NAME}" | awk '{print $1}' || true)
-    do
-        echo "Targetting power cloud instance"
-        ibmcloud pi workspace target "${CRN}"
-
-        echo "Deleting the PVM Instances"
-        for INSTANCE_ID in $(ibmcloud pi instance ls --json | jq -r '.pvmInstances[].id')
+        # PowerVS Instances
+        echo "Cleaning up target PowerVS workspace"
+        for CRN in $(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-p-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
         do
-            echo "Deleting PVM Instance ${INSTANCE_ID}"
-            retry "ibmcloud pi instance delete ${INSTANCE_ID} --delete-data-volumes"
-            sleep 5
+            echo "Targetting power cloud instance"
+            ibmcloud pi workspace target "${CRN}"
+
+            echo "Deleting the PVM Instances"
+            for INSTANCE_ID in $(ibmcloud pi instance ls --json | jq -r '.pvmInstances[].id')
+            do
+                echo "Deleting PVM Instance ${INSTANCE_ID}"
+                retry "ibmcloud pi instance delete ${INSTANCE_ID} --delete-data-volumes"
+                sleep 5
+            done
+            sleep 60
+
+            # Dev: functions don't work inline with xargs
+            echo "Delete network non-'ocp-net' on PowerVS region"
+            ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
+            echo "Done deleting non-'ocp-net' on PowerVS"
+
+            echo "[STATUS:Done] Deleting the contents in ${CRN}"
         done
-        sleep 60
 
-        echo "Deleting the Images"
-        for IMAGE_ID in $(ibmcloud pi image ls --json | jq -r '.images[] | select(.name | contains("CentOS-Stream-9")| not).imageID')
-        do
-            echo "Deleting Images ${IMAGE_ID}"
-            retry "ibmcloud pi image delete ${IMAGE_ID}"
-            sleep 5
-        done
-        sleep 60
-
-        # Dev: functions don't work inline with xargs
-        echo "Delete network non-'ocp-net' on PowerVS region"
-        ibmcloud pi subnet ls --json | jq -r '[.networks[] | select(.name | contains("ocp-net") | not)] | .[]?.networkID' | xargs --no-run-if-empty -I {} ibmcloud pi subnet delete {} || true
-        echo "Done deleting non-'ocp-net' on PowerVS"
-
-        echo "[STATUS:Done] Deleting the contents in ${CRN}"
-    done
-
-    # VPC Instances
-    # VPC LBs
         # VPC Instances
-    # VPC LBs 
-    WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
-    VPC_NAME="${WORKSPACE_NAME}-vpc"
+        # VPC LBs
+            # VPC Instances
+        # VPC LBs 
+        WORKSPACE_NAME="multi-arch-comp-${LEASED_RESOURCE}-1"
+        VPC_NAME="${WORKSPACE_NAME}-vpc"
 
-    echo "Target region - ${VPC_REGION}"
-    ibmcloud target -r "${VPC_REGION}" -g "$(< ${SHARED_DIR}/RESOURCE_GROUP)"
+        echo "Target region - ${VPC_REGION}"
+        ibmcloud target -r "${VPC_REGION}" -g "$(< ${SHARED_DIR}/RESOURCE_GROUP)"
 
-    echo "Cleaning up the VPC Load Balancers"
-    for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
-    do
-        echo "Subnet: ${SUB}"
-        # Searches the VSIs and LBs to delete them
-        for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[]?.name')
+        echo "Cleaning up the VPC Load Balancers"
+        for SUB in $(ibmcloud is subnets --output json 2>&1 | jq --arg vpc "${VPC_NAME}" -r '.[] | select(.vpc.name | contains($vpc)).id')
         do
-            ibmcloud is instance-delete "${VSI}" --force || true
+            echo "Subnet: ${SUB}"
+            # Searches the VSIs and LBs to delete them
+            for VSI in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[]?.name')
+            do
+                ibmcloud is instance-delete "${VSI}" --force || true
+            done
+
+            echo "Deleting LB in ${SUB}"
+            for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+            do
+                ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+            done
+            sleep 120
         done
 
-        echo "Deleting LB in ${SUB}"
-        for LB in $(ibmcloud is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
-        do
-            ibmcloud is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
-        done
-        sleep 120
-    done
-
-    echo "Cleaning up the Security Groups"
-    ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "$(< ${SHARED_DIR}/RESOURCE_GROUP)" --output json \
-        | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
-        | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
-        || true
-
-    # VPC Images
-    # TODO: FIXME add filtering by date.... ?
-    for RESOURCE_TGT in $(ibmcloud is images --owner-type user --resource-group-name "$(< ${SHARED_DIR}/RESOURCE_GROUP)" --output json | jq -r '.[].id')
-    do
-        ibmcloud is image-delete "${RESOURCE_TGT}" -f
-    done
-
-    echo "Done cleaning up prior runs"
+        echo "Cleaning up the Security Groups"
+        ibmcloud is security-groups --vpc "${VPC_NAME}" --resource-group-name "$(< ${SHARED_DIR}/RESOURCE_GROUP)" --output json \
+            | jq -r '[.[] | select(.name | contains("ocp-sec-group"))] | .[]?.name' \
+            | xargs --no-run-if-empty -I {} ibmcloud is security-group-delete {} --vpc "${VPC_NAME}" --force\
+            || true
+        echo "Done cleaning up prior runs"
+    fi
 }
 
 # Destroy the cluster based on the set configuration / tfvars
@@ -195,6 +186,9 @@ function destroy_upi_cluster() {
     cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa.pub
     chmod 0600 "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa
 
+    cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
+    echo "Copied the pull secret"
+
     # Loads the tfvars if it exists in the shared directory
     if [ ! -f "${SHARED_DIR}"/var-multi-arch-upi.tfvars ]
     then
@@ -203,7 +197,7 @@ function destroy_upi_cluster() {
     fi
 
     cp "${SHARED_DIR}"/var-multi-arch-upi.tfvars "${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars 
-    echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars
+    echo "UPI TFVARS copied: ${IBMCLOUD_HOME}"/ocp4-upi-powervs/var-multi-arch-upi.tfvars
 
     # Loads the tfstate if it exists in the shared directory
     if [ ! -f "${SHARED_DIR}"/terraform.tfstate ]
@@ -212,14 +206,31 @@ function destroy_upi_cluster() {
         exit 0
     fi
 
-    cp "${SHARED_DIR}"/terraform.tfstate "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
-
     # Destroys the current installation for this run
-    cd "${IBMCLOUD_HOME}"/ocp4-upi-powervs && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform init && \
-        "${IBMCLOUD_HOME}"/ocp-install-dir/terraform destroy -auto-approve \
-            -var-file "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/var-multi-arch-upi.tfvars \
-            -state "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/terraform.tfstate
+    echo "Running init"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ init -upgrade -no-color
+    echo "Running destroy"
+    OUTPUT="yes"
+    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ destroy \
+        -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
+        -state="${SHARED_DIR}"/terraform.tfstate \
+        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                while read LINE
+                do
+                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT=""
+                    fi
+                    if [ ! -z "${OUTPUT}" ]
+                    then
+                        echo "${LINE}"
+                    fi
+                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                    then
+                    OUTPUT="yes"
+                    fi
+                done
+    echo "Finished Running"
 }
 
 ############################################################

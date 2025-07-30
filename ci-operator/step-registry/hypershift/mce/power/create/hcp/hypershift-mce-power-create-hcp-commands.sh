@@ -199,3 +199,4 @@ ls /tmp/hc-manifests/manifest_* | awk ' { print " -f " $1 } ' | xargs oc apply
 
 oc wait --timeout=15m --for=condition=Available --namespace=${CLUSTERS_NAMESPACE} hostedcluster/${HOSTED_CLUSTER_NAME}
 echo "$(date) Agent cluster is available"
+echo "${HOSTED_CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

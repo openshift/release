@@ -19,6 +19,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: openstack-installer
+  operator-sdk-mto:
+    name: operator-sdk-mto
+    namespace: origin
+    tag: main
   tests-private-postupg:
     name: tests-private
     namespace: ci
@@ -57,31 +61,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-arm-mixarch-f28-day2-64k-pagesize
-  cron: 4 3 5 * *
+- as: aws-ipi-byo-iam-profile-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 38 1 4 * *
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "64k-pages", "mcp_node_num": "1", "mcp_node_label":
-        "node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64"}]'
-      MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
-      MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
-      OCP_ARCH: arm64
-    test:
-    - chain: ipi-install-heterogeneous-day2-kerneltype
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-byo-iam-profile-arm-f28
-  cron: 52 21 26 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
@@ -90,6 +77,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-profile
 - as: aws-ipi-byo-iam-role-efs-fips-amd-f28-custom-cert
+  capabilities:
+  - intranet
   cron: 51 1 26 * *
   steps:
     cluster_profile: aws-qe
@@ -103,6 +92,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role-efs
 - as: aws-ipi-byo-kms-etcd-encryption-fips-amd-f28
+  capabilities:
+  - intranet
   cron: 45 15 21 * *
   steps:
     cluster_profile: aws-qe
@@ -113,6 +104,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
 - as: aws-ipi-byo-route53-compact-cloudfront-arm-f28
+  capabilities:
+  - intranet
   cron: 25 16 25 * *
   steps:
     cluster_profile: aws-qe
@@ -126,6 +119,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53-registry-s3-cloudfront
 - as: aws-ipi-imdsv2-arm-f28
+  capabilities:
+  - intranet
   cron: 16 7 8 * *
   steps:
     cluster_profile: aws-qe
@@ -137,19 +132,24 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
-- as: aws-ipi-ingress-lbtype-classic-arm-f28
-  cron: 11 2 6 * *
+- as: aws-ipi-ingress-lbtype-classic-subnets-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 26 1 27 * *
   steps:
     cluster_profile: aws-qe
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-classic
+    workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-classic-subnets-day2
 - as: aws-ipi-ingress-lbtype-nlb-arm-f28
+  capabilities:
+  - intranet
   cron: 55 2 8 * *
   steps:
     cluster_profile: aws-qe
@@ -161,56 +161,72 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
-- as: aws-ipi-mini-perm-arm-f28
-  cron: 58 8 4 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
-- as: aws-ipi-ovn-ipsec-arm-mixarch-f28
-  cron: 41 1 2 * *
+- as: aws-ipi-ovn-ipsec-mini-perm-arm-mixarch-f28
+  capabilities:
+  - intranet
+  cron: 59 19 12 * *
   steps:
     cluster_profile: aws-qe
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-ipsec-arm-mixarch-day2-f28
-  cron: 42 1 16 * *
+- as: aws-ipi-ovn-ipv4-subnet-arm-f28
+  capabilities:
+  - intranet
+  cron: 16 11 24 * *
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
-      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - chain: openshift-upgrade-qe-test-heterogeneous
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipv4-subnet
+- as: aws-ipi-priv-sts-basecap-none-mini-perm-arm-f14
+  capabilities:
+  - intranet
+  cron: 35 1 11,25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+        Ingress
+      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-66839
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST: CloudCredential CloudCredential+Ingress
+        MachineAPI+CloudCredential
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE: CloudCredential CloudCredential+Ingress
+        MachineAPI+CloudCredential
+      EXPECTED_CAPABILITIES_IN_MANIFEST: CloudControllerManager CloudCredential CloudCredential+CloudControllerManager
+        CloudCredential+Ingress Ingress MachineAPI MachineAPI+CloudCredential
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      UPGRADE_CCO_MANUAL_MODE: oidc
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-private-cco-manual-security-token-service
 - as: aws-ipi-proxy-sts-arm-f28
+  capabilities:
+  - intranet
   cron: 5 22 7 * *
   steps:
     cluster_profile: aws-qe
@@ -224,9 +240,11 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-ipi-public-ipv4-pool-arm-f28
+  capabilities:
+  - intranet
   cron: 26 7 25 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -239,6 +257,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool
 - as: aws-ipi-sno-etcd-encryption-basecap-none-arm-f28
+  capabilities:
+  - intranet
   cron: 25 22 23 * *
   steps:
     cluster_profile: aws-qe
@@ -255,6 +275,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-sno-etcd-encryption
 - as: aws-ipi-sno-lvms-arm-f28
+  capabilities:
+  - intranet
   cron: 12 7 25 * *
   steps:
     cluster_profile: aws-qe
@@ -262,7 +284,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
       OCP_ARCH: arm64
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&
@@ -270,6 +292,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: aws-ipi-usertags-custom-sg-fips-amd-f28
+  capabilities:
+  - intranet
   cron: 1 17 15 * *
   steps:
     cluster_profile: aws-qe
@@ -281,6 +305,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: aws-upi-basecap-none-arm-f28
+  capabilities:
+  - intranet
   cron: 24 22 6 * *
   steps:
     cluster_profile: aws-qe
@@ -297,6 +323,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-basecap-vset-additionalcap-arm-f28
+  capabilities:
+  - intranet
   cron: 10 17 18 * *
   steps:
     cluster_profile: azure-qe
@@ -309,6 +337,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset-additionalcaps
 - as: azure-ipi-basecap-vset-arm-f28
+  capabilities:
+  - intranet
   cron: 38 11 5 * *
   steps:
     cluster_profile: azure-qe
@@ -316,28 +346,36 @@ tests:
       ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_OTA_TEST: OCP-73352
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
 - as: azure-ipi-des-mini-perm-arm-f28
+  capabilities:
+  - intranet
   cron: 3 8 24 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_DES_DEFAULT_MACHINE: "true"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
 - as: azure-ipi-fullyprivate-internal-registry-arm-f28
+  capabilities:
+  - intranet
   cron: 21 22 4 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.0.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.0.1.0/24
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -345,10 +383,15 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-internal-registry
 - as: azure-ipi-fullyprivate-proxy-arm-f28
+  capabilities:
+  - intranet
   cron: 36 11 22 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.2.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_OTA_TEST: "true"
@@ -356,7 +399,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-proxy-arm-f28
+  capabilities:
+  - intranet
+  cron: 12 2 25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
 - as: azure-ipi-ingress-controller-arm-mixarch-f28
+  capabilities:
+  - intranet
   cron: 38 6 14 * *
   steps:
     cluster_profile: azure-qe
@@ -373,10 +431,15 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
 - as: azure-ipi-mixed-apiserver-internal-arm-f28
+  capabilities:
+  - intranet
   cron: 53 18 25 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_SUBNET_PREFIX: 10.1.1.0/24
+      AZURE_CONTROL_PLANE_SUBNET_PREFIX: 10.1.0.0/24
+      AZURE_VNET_ADDRESS_PREFIXES: 10.1.0.0/16
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -384,6 +447,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-publish-mixed-apiserver-internal
 - as: azure-ipi-mixed-ingress-internal-arm-f28
+  capabilities:
+  - intranet
   cron: 47 19 7 * *
   steps:
     cluster_profile: azure-qe
@@ -395,6 +460,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-publish-mixed-ingress-internal
 - as: azure-ipi-mto-arm-mixarch-f28
+  capabilities:
+  - intranet
   cron: 3 18 17 * *
   steps:
     cluster_profile: azure-qe
@@ -412,18 +479,24 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-oidc-mini-perm-arm-f28
+  capabilities:
+  - intranet
   cron: 5 2 5 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
 - as: azure-ipi-ovn-etcd-encryption-compact-arm-f28
+  capabilities:
+  - intranet
   cron: 44 4 11 * *
   steps:
     cluster_profile: azure-qe
@@ -435,25 +508,10 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-etcd-encryption
-- as: azure-ipi-ovn-ipsec-arm-mixarch-day2-f28
-  cron: 55 11 9 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
-      ADDITIONAL_WORKERS: "1"
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
-    test:
-    - chain: openshift-upgrade-qe-test-heterogeneous
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
-- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f28
-  cron: 1 12 9 * *
+- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-canary-f28
+  capabilities:
+  - intranet
+  cron: 5 17 5 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -461,9 +519,11 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
-    - chain: openshift-upgrade-qe-test
+    - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
 - as: azure-ipi-private-spec-net-type-spec-perm-arm-f28
+  capabilities:
+  - intranet
   cron: 10 7 1 * *
   steps:
     cluster_profile: azure-qe
@@ -477,7 +537,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-private-networking-type-minimal-permission
+- as: azure-ipi-vnet-ovn-ipv4-subnet-arm-f28
+  capabilities:
+  - intranet
+  cron: 18 13 6 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork-ovn-ipv4-subnet
 - as: azure-ipi-sno-etcd-encryption-arm-f28
+  capabilities:
+  - intranet
   cron: 27 16 3 * *
   steps:
     cluster_profile: azure-qe
@@ -490,6 +565,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-sno-etcd-encryption
 - as: azure-ipi-ultrassd-disks-fips-amd-f28
+  capabilities:
+  - intranet
   cron: 51 7 22 * *
   steps:
     cluster_profile: azure-qe
@@ -501,6 +578,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-ultrassd-disk
 - as: azure-ipi-usertags-sa-encryption-arm-f28
+  capabilities:
+  - intranet
   cron: 5 2 12 * *
   steps:
     cluster_profile: azure-qe
@@ -512,10 +591,13 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
 - as: azure-upi-mini-perm-arm-f28
+  capabilities:
+  - intranet
   cron: 34 2 21 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       BOOTSTRAP_NODE_TYPE: Standard_D4ps_v5
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
@@ -524,27 +606,9 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
-- as: baremetal-compact-agent-ipv4-dhcp-day2-amd-mixarch-f28
-  cluster: build05
-  cron: 49 18 16 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKERS: "1"
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      DISCONNECTED: "false"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-dynamic-day2
 - as: baremetal-ipi-ovn-ipv4-fips-vmedia-amd-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 8 21 12 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -559,7 +623,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-ipi-ovn-ipv4-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 25 16 10 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -574,7 +639,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi
 - as: baremetal-ipi-ovn-ipv4-basecap-none-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 33 14 2 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -591,7 +657,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi
 - as: baremetal-ipi-ovn-ipv4-external-lb-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 52 14 7 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -605,8 +672,24 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-ipi-external-lb
+- as: baremetal-ipi-ovn-ipv4-vmedia-amd-f7
+  capabilities:
+  - intranet
+  cron: 11 20 7,14,21,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-upi-ovn-ipv4-disconnected-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 34 13 13 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -618,8 +701,9 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: baremetal-lab-upi-install-disconnected
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28
-  cron: 16 8 28 * *
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+  cluster: build05
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -632,7 +716,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetal-upi-ovn-dual-stack-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 16 17 24 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -645,7 +730,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi-dual-stack
 - as: baremetal-upi-ovn-ipv4-arm-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 11 15 9 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -657,8 +743,10 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
-- as: gcp-ipi-basecap-none-additionalcaps-arm-f28
-  cron: 8 3 3 * *
+- as: gcp-ipi-basecap-none-additionalcaps-arm-canary-f28
+  capabilities:
+  - intranet
+  cron: 27 17 12 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -667,17 +755,50 @@ tests:
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:
-    - chain: openshift-upgrade-qe-test
+    - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-gcp-ipi-capability-additionalcaps
 - as: gcp-ipi-c3-metal-private-amd-f999
+  capabilities:
+  - intranet
   cron: 8 8 29 2 *
   steps:
     cluster_profile: gcp-qe-c3-metal
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-c3-metal-private
-- as: gcp-ipi-compact-filestore-csi-arm-f28
-  cron: 3 12 23 * *
+- as: gcp-ipi-compact-filestore-csi-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 54 8 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.18
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
+- as: gcp-ipi-disk-encryption-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 53 7 25 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-disk-encryption
+- as: gcp-ipi-labels-tags-filestore-csi-arm-f28
+  capabilities:
+  - intranet
+  cron: 0 3 20 * *
   steps:
     cluster_profile: gcp-qe
     dependency_overrides:
@@ -685,32 +806,27 @@ tests:
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
-      SIZE_VARIANT: compact
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-disk-encryption-arm-f28
-  cron: 24 10 30 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      COMPUTE_NODE_TYPE: t2a-standard-4
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-disk-encryption
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
 - as: gcp-ipi-oidc-mini-perm-rt-fips-amd-f28
+  capabilities:
+  - intranet
   cron: 2 14 23 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       RT_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity-minimal-permission
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: gcp-ipi-ovn-ipsec-arm-mixarch-f28
+  capabilities:
+  - intranet
   cron: 34 2 10 * *
   steps:
     cluster_profile: gcp-qe
@@ -726,48 +842,63 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: gcp-ipi-proxy-etcd-encryption-arm-f28
-  cron: 4 21 19 * *
+- as: gcp-ipi-proxy-etcd-encryption-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 15 1 14 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
-- as: gcp-ipi-proxy-oidc-arm-f28
-  cron: 57 15 27 * *
+- as: gcp-ipi-proxy-oidc-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 31 0 6 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
-- as: gcp-ipi-proxy-private-arm-f28
-  cron: 37 2 13 * *
+- as: gcp-ipi-proxy-private-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 54 13 27 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-sno-etcd-encryption-arm-f28
-  cron: 12 2 6 * *
+- as: gcp-ipi-sno-etcd-encryption-mini-perm-arm-f28
+  capabilities:
+  - intranet
+  cron: 3 19 24 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
 - as: gcp-ipi-xpn-mini-perm-arm-f28
+  capabilities:
+  - intranet
   cron: 38 18 19 * *
   steps:
     cluster_profile: gcp-qe
@@ -780,6 +911,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission
 - as: gcp-ipi-xpn-mini-perm-byo-hosted-zone-arm-f28
+  capabilities:
+  - intranet
   cron: 23 3 3 * *
   steps:
     cluster_profile: gcp-qe
@@ -790,6 +923,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
 - as: gcp-ipi-xpn-oidc-arm-f28
+  capabilities:
+  - intranet
   cron: 24 16 16 * *
   steps:
     cluster_profile: gcp-qe
@@ -801,6 +936,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
 - as: gcp-ipi-xpn-private-arm-f28
+  capabilities:
+  - intranet
   cron: 44 10 11 * *
   steps:
     cluster_profile: gcp-qe
@@ -811,6 +948,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-private
 - as: gcp-upi-arm-f28
+  capabilities:
+  - intranet
   cron: 13 22 16 * *
   steps:
     cluster_profile: gcp-qe
@@ -824,6 +963,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-upi
 - as: gcp-upi-private-xpn-ingress-glb-arm-f28
+  capabilities:
+  - intranet
   cron: 2 1 6 * *
   steps:
     cluster_profile: gcp-qe

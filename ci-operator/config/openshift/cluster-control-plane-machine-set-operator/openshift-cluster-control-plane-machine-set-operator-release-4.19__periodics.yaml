@@ -1,4 +1,8 @@
 base_images:
+  cluster-control-plane-machine-set-tests:
+    name: "4.19"
+    namespace: ocp
+    tag: cluster-control-plane-machine-set-tests
   ocp_4.19_base-rhel9:
     name: "4.19"
     namespace: ocp
@@ -11,6 +15,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: openstack-installer
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -46,17 +54,21 @@ tests:
 - as: e2e-aws
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    observers:
+      enable:
+      - observers-resource-watch
     test:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: ipi-aws
+  timeout: 6h0m0s
 - as: e2e-aws-arm
   interval: 24h
   steps:
@@ -64,46 +76,54 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     test:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: ipi-aws
+  timeout: 6h0m0s
 - as: e2e-azure
   interval: 24h
   steps:
     cluster_profile: azure4
+    observers:
+      enable:
+      - observers-resource-watch
     test:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: ipi-azure
+  timeout: 6h0m0s
 - as: e2e-gcp
   interval: 24h
   steps:
     cluster_profile: gcp
+    observers:
+      enable:
+      - observers-resource-watch
     test:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: ipi-gcp
+  timeout: 6h0m0s
 - as: e2e-openstack
   interval: 24h
   steps:
@@ -113,12 +133,134 @@ tests:
       commands: |
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- as: e2e-aws-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+  timeout: 6h0m0s
+- as: e2e-aws-arm-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+  timeout: 6h0m0s
+- as: e2e-azure-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-azure
+  timeout: 6h0m0s
+- as: e2e-gcp-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+  timeout: 6h0m0s
+- as: e2e-openstack-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        make e2e-periodic
+      from: cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- as: e2e-vsphere-periodic
+  interval: 24h
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-periodic-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

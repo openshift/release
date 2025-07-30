@@ -1,8 +1,5 @@
 #!/bin/bash
 set -o errexit
-set -o nounset
-set -o pipefail
-set -x
 
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")
@@ -23,7 +20,16 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
+console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+export HEALTH_CHECK_URL=https://$console_url
+set -o nounset
+set -o pipefail
+set -x
+
 ./container-scenarios/prow_run.sh
 rc=$?
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running container scenarios"
 echo "Return code: $rc"

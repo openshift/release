@@ -1,8 +1,12 @@
 base_images:
-  lca-operator:
+  lifecycle-agent-operator:
     name: "4.15"
     namespace: ocp-kni
     tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle:
+    name: "4.15"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
   tests:
     name: "4.15"
     namespace: ocp
@@ -19,16 +23,17 @@ resources:
       memory: 100Mi
 tests:
 - as: seedgen-aws-ocp-4-15
-  cluster: build02
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
-      LCA_PULL_REF: pipeline:lca-operator
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
     env:
-      LCA_PULL_REF_OVERRIDE: quay.io/openshift-kni/lifecycle-agent-operator:4.15
       OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.15"
+      OO_BUNDLE_OVERRIDE: quay.io/openshift-kni/lifecycle-agent-operator-bundle:4.15
+      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.15
       SEED_FLOATING_TAG: "4.15"
       SEED_IMAGE_TAG_FORMAT: nightly
     workflow: openshift-image-based-upgrade-seed-create

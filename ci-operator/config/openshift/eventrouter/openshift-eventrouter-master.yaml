@@ -1,34 +1,38 @@
 base_images:
-  base:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.17
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.17
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
 images:
-- from: ubi9-minimal
+- build_args:
+  - name: BUILD_VERSION
+    value: v0.5.0
+  from: ubi9-minimal
   inputs:
-    base:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.redhat.io/ubi9/go-toolset:latest
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: logging-eventrouter
 promotion:
   to:
   - name: 6.y
     namespace: logging
+  - namespace: logging
+    tag: v0.5.0
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.17"
+    release:
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     limits:

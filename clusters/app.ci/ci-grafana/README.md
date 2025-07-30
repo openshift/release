@@ -1,7 +1,6 @@
 # CI-Grafana
 
 This folder contains the manifests for Grafana managed by [grafana-operator](https://github.com/grafana-operator/grafana-operator).
-The grafana-operator is installed via [Operator Hub](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/operatorhub) into `namespace/ci-grafana` and managed by operator-lifecycle-manager (OLM).
 
 ## Dashboards
 

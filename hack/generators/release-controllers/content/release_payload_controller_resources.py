@@ -227,7 +227,7 @@ def _deployment_resources(gendoc):
                                 "resources": {
                                     "limits": {
                                         "cpu": "500m",
-                                        "memory": "4Gi"
+                                        "memory": "8Gi"
                                     },
                                     "requests": {
                                         "cpu": "250m",

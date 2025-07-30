@@ -24,9 +24,9 @@ promotion:
 releases:
   latest:
     release:
-      architecture: amd64
-      channel: fast
-      version: "4.14"
+      architecture: multi
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -95,9 +95,12 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-notebook-controller-e2e
   steps:
-    cluster_profile: gcp-opendatahub
+    cluster_profile: aws-opendatahub
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.2-multi
     test:
     - as: e2e
       cli: latest
@@ -115,7 +118,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-gcp
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: v1.9-branch
   org: opendatahub-io

@@ -26,7 +26,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -304,7 +304,7 @@ tests:
 - as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
@@ -313,7 +313,7 @@ tests:
 - as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn
 - as: e2e-azure
   optional: true
@@ -343,7 +343,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 - as: e2e-azure-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
@@ -366,7 +366,7 @@ tests:
 - as: e2e-aws-csi
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-csi
 - as: e2e-vsphere
   optional: true
@@ -422,7 +422,7 @@ tests:
     workflow: baremetalds-e2e
 - as: configmap-scale
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-fips
   steps:
@@ -439,7 +439,7 @@ tests:
 - as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
 - as: e2e-openstack
   optional: true
@@ -463,15 +463,15 @@ tests:
     workflow: openshift-e2e-openstack-csi-manila
 - as: e2e-aws-ovn-cgroupsv2
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-cgroupsv2
 - as: e2e-aws-ovn-runc
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-runc
 - as: e2e-aws-crun-wasm
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-crun-wasm
 - always_run: false
   as: perfscale-control-plane-6nodes
@@ -491,6 +491,18 @@ tests:
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
+- always_run: false
+  as: e2e-external-aws-ccm
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

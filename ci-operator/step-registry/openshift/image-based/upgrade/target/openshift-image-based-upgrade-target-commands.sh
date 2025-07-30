@@ -24,6 +24,8 @@ TARGET_VERSION=$(cat ${SHARED_DIR}/target_version)
 TARGET_IMAGE=$(cat ${SHARED_DIR}/target_image)
 SEED_IMAGE_TAG=$(cat ${SHARED_DIR}/seed_tag)
 
+target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
+
 echo "${TARGET_VM_NAME}" > "${SHARED_DIR}/target_vm_name"
 
 echo "Creating upgrade script..."
@@ -35,8 +37,9 @@ export PULL_SECRET=\$(<${PULL_SECRET_FILE})
 export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export TARGET_VM_NAME="${TARGET_VM_NAME}"
 export TARGET_VERSION="${TARGET_VERSION}"
+export TARGET_LCA_REF="${TARGET_LCA_REF}"
 export RELEASE_IMAGE="${TARGET_IMAGE}"
-export LCA_IMAGE="${LCA_PULL_REF}"
+export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
 export SEED_VERSION="${SEED_VERSION}"
 export UPGRADE_TIMEOUT="60m"
 export REGISTRY_AUTH_FILE="${PULL_SECRET_FILE}"
@@ -55,11 +58,24 @@ set_openshift_clients() {
   rm -rf ./tools
 }
 
+# Sets the docker config.json file from the PULL_SECRET_FILE, as it is used by
+# operator-sdk to pull the pipeline's operator bundle image. More recent
+# versions of the operator-sdk use the REGISTRY_AUTH_FILE environment variable,
+# until then we can use the docker config file.
+#
+# https://github.com/operator-framework/operator-registry/blob/6c602841934d6e154e38c0574cc140471dc063e6/pkg/image/containerdregistry/resolver.go#L105-L115
+# https://github.com/operator-framework/operator-registry/blob/5e23ef594a41e6c8ce843d48b22715319c684dff/pkg/image/containerdregistry/resolver.go#L45-L47
+set_docker_config_file() {
+  mkdir -p \${HOME}/.docker/ && cp ${PULL_SECRET_FILE} \${HOME}/.docker/config.json
+}
+
 set_openshift_clients \${RELEASE_IMAGE}
+
+set_docker_config_file
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
-echo "Making a target cluster..."
+echo "Making a target cluster... target LCA: ${TARGET_LCA_REF}"
 make target
 
 echo "Upgrading target cluster from ${TARGET_VERSION} to ${SEED_VERSION} using ${SEED_IMAGE}:${SEED_IMAGE_TAG}..."
@@ -70,7 +86,7 @@ t_upgrade_duration=\$SECONDS
 
 echo "Image based upgrade took \${t_upgrade_duration} seconds"
 
-export KUBECONFIG="${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig"
+export KUBECONFIG="${target_kubeconfig}"
 
 set_openshift_clients \$(oc adm release info -ojson |jq -r .image)
 
@@ -101,7 +117,7 @@ oc delete -f oadp-operator.yaml
 oc delete crd cloudstorages.oadp.openshift.io dataprotectionapplications.oadp.openshift.io
 
 echo "Removing Lifecycle Agent operator..."
-make -C lifecycle-agent undeploy
+make -C lifecycle-agent bundle-clean
 EOF
 
 chmod +x ${SHARED_DIR}/upgrade_from_seed.sh

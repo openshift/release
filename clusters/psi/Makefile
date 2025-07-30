@@ -19,7 +19,7 @@ token_version ?= $(shell yq -r '.nonExpiringToken.currentVersion' ../../hack/_to
 
 $(serviceaccounts):
 	oc --context ${CLUSTER} apply -f ../app.ci/assets/admin_$@_rbac.yaml --as system:admin
-	$(timeout_cmd) 60 ./create_kubeconfig.sh "$(TMPDIR)/sa.$@.app.ci.config" ${CLUSTER} $@ ci ${API_SERVER_URL} $@-token-version-$(token_version)
+	$(timeout_cmd) 60 ./../../hack/create_kubeconfig.sh "$(TMPDIR)/sa.$@.app.ci.config" ${CLUSTER} $@ ci ${API_SERVER_URL} $@-token-version-$(token_version)
 	oc --context mpp create secret generic -n ocp-test-platform--runtime-int $@-credentials --from-file=sa.$@.app.ci.config=$(TMPDIR)/sa.$@.app.ci.config --dry-run=client -o json | oc --context mpp apply -f - 
 
 apply_credentials: $(serviceaccounts)

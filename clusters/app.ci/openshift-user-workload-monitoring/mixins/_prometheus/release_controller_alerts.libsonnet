@@ -12,9 +12,9 @@
               severity: 'critical',
             },
             annotations: {
-              message: '{{ $labels.deployment }} has been down for 5 minutes.'
+              message: '{{ $labels.deployment }} has been down for 5 minutes.',
             },
-          }
+          },
         ],
       },
       {
@@ -28,9 +28,9 @@
               team: 'crt',
             },
             annotations: {
-              message: 'Release-controller has reported errors in bugzilla verification.'
+              message: 'Release-controller has reported errors in bugzilla verification.',
             },
-          }
+          },
         ],
       },
       {
@@ -44,9 +44,26 @@
               team: 'crt',
             },
             annotations: {
-              message: 'Release-controller has reported errors in jira verification.'
+              message: 'Release-controller has reported errors in jira verification.',
             },
-          }
+          },
+        ],
+      },
+      {
+        name: 'release-upgrade-graph-save-error',
+        rules: [
+          {
+            alert: 'releaseControllerReleaseUpgradeGraphSaveError',
+            expr: 'release_controller_release_upgrade_graph_save_error >= 1',
+            'for': '15m',
+            labels: {
+              severity: 'critical',
+              team: 'crt',
+            },
+            annotations: {
+              message: 'Unable to save the {{ $labels.exported_namespace }}/{{ $labels.name }} secret.',
+            },
+          },
         ],
       },
     ],

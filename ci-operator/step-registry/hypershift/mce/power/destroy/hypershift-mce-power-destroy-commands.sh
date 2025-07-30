@@ -176,14 +176,26 @@ delete_x86_vms() {
   done
 }
 
+delete_security_groups() {
+  RULE_ID=$(cat "${SHARED_DIR}/rule_id")
+  SECURITY_GROUP_ID=$(ibmcloud is load-balancer "${LB_NAME}" --output JSON | jq -r '.security_groups[].id')
+  ibmcloud is security-group-rule-delete ${SECURITY_GROUP_ID} ${RULE_ID} -f
+}
+
+delete_lb() {
+  # Clean up the security groups associated with the LB
+  delete_security_groups
+  # Delete Load Balancer
+  ibmcloud is load-balancer-delete ${LB_NAME} -f
+}
+
 main() {
   delete_power_vms
   cleanup_other_resources
   if [ ${IS_HETEROGENEOUS} == "yes" ]; then
     LB_NAME="lb-${HOSTED_CLUSTER_NAME}"
     delete_x86_vms
-    # Delete Load Balancer
-    ibmcloud is load-balancer-delete ${LB_NAME} -f
+    delete_lb
   fi
 }
 

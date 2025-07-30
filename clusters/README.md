@@ -10,7 +10,7 @@ This folder includes the resources for installation and configuration of [CI-clu
 
 ## Best practice for applyConfig
 
-* All the openshift/k8s assets are static and checked into the repo except sensitive information, e.g., github token. [`applyConfig`](https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig) will resolve secrets by auto-populating environment variables for templates.
+* All the openshift/k8s assets are static and checked into the repo except sensitive information, e.g., github token. [`applyConfig`](https://github.com/openshift/ci-tools/tree/main/cmd/applyconfig) will resolve secrets by auto-populating environment variables for templates.
 
     We use [bitwarden](https://bitwarden.com/) to store sensitive information. Running bash script _locally_, e.g., [populate-secrets-from-bitwarden.sh](../ci-operator/populate-secrets-from-bitwarden.sh) will create secrets in the cluster the current `oc-cli` logs into. All openshift/k8s assets can then use secrets for referring the sensitive information.
 

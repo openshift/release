@@ -1,0 +1,72 @@
+ref:
+  as: openshift-svt-storage-csi-intree-driver
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "v2.3.1"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is true, which means the workload with delete and recreate a set number of namespaces
+  - name: EXTRA_FLAGS
+    default: "--churn-duration=20m --timeout=5h"
+    documentation: |-
+      Default is Churn Duration for 20 minutes
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "false"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: ITERATIONS
+    default: "9"
+    documentation: |-
+      The number of iterations per worker nodes to create
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: "/secret/perfscale-es"
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: ES_INDEX
+    default: "perfscale-storage-csi-index"
+    documentation: |-
+       ES index name
+  commands: openshift-svt-storage-csi-intree-driver-commands.sh
+  timeout: 8h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  - namespace: test-credentials
+    name: ocp-perfscale-horreum-poc
+    mount_path: /horreum-secret
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/perfscale-es
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-gcp-sa
+    mount_path: /secret/ga-gsheet      
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale network mixed scenario workload in the deployed cluster

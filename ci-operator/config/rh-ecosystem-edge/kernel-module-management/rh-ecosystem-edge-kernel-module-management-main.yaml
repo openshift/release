@@ -2,11 +2,7 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.54.2
+    tag: rhel-9-golang-1.23-openshift-4.19
   operator-sdk:
     name: "4.16"
     namespace: origin
@@ -16,7 +12,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.23-openshift-4.19
 images:
 - build_args:
   - name: TARGET
@@ -119,7 +115,8 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -C "${PULL_PULL_SHA}" -P "${PULL_NUMBER}" -B "${PULL_HEAD_REF}" -N "${PULL_BASE_SHA}"
       credentials:
-      - mount_path: /var/run/secrets
+      - collection: ""
+        mount_path: /var/run/secrets
         name: codecov-token
         namespace: test-credentials
       from: src
@@ -137,7 +134,8 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -B "${PULL_BASE_REF}" -C "${PULL_BASE_SHA}"
       credentials:
-      - mount_path: /var/run/secrets
+      - collection: ""
+        mount_path: /var/run/secrets
         name: codecov-token
         namespace: test-credentials
       from: src
@@ -150,10 +148,12 @@ tests:
     clone: true
     from: go-builder
 - as: lint
-  commands: ci/prow/lint
+  commands: |
+    unset GOFLAGS
+    ci/prow/lint
   container:
     clone: true
-    from: golangci-lint
+    from: go-builder
 - as: check-commits-count
   commands: ci/prow/check-commits-count
   container:
@@ -187,7 +187,7 @@ tests:
       cli: latest
       commands: |
         oc create namespace openshift-kmm
-        operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
+        operator-sdk run bundle -n openshift-kmm --timeout 5m0s "$OO_BUNDLE"
         oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller
       dependencies:
       - env: OO_BUNDLE
@@ -249,7 +249,6 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  optional: true
   steps:
     test:
     - as: run-test
@@ -264,8 +263,29 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: operator-hub-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: ./ci/prow/operator-hub-upgrade
+      dependencies:
+      - env: OO_HUB_BUNDLE
+        name: hub-operator-bundle
+      from: src-grpcurl
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
 - as: security
-  optional: true
   steps:
     env:
       PROJECT_NAME: kmm

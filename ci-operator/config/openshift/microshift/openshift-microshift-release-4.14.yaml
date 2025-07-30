@@ -1,3 +1,8 @@
+base_images:
+  microshift-ci-brew:
+    name: brew
+    namespace: microshift
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -92,7 +97,7 @@ tests:
 - as: metal-periodic-test
   run_if_changed: (.*periodic.*|^test/bin/.*)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5.metal
@@ -108,7 +113,7 @@ tests:
 - as: ocp-conformance-nightly
   cron: 0 13 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       BRANCH: release-4.14
       EC2_AMI: ami-0d5b3039c1132e1b2
@@ -121,6 +126,15 @@ tests:
       MICROSHIFT_ARCH: x86_64
       MICROSHIFT_OS: rhel-9.2
     workflow: openshift-microshift-clusterbot
+- as: e2e-aws-nvidia-device-plugin-nightly
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: g4dn.xlarge
+      MICROSHIFT_OS: rhel-9.2
+      SUITE: nvidia-device-plugin
+    workflow: openshift-microshift-e2e-bare-metal-tests
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

@@ -65,10 +65,14 @@ function update_global_auth () {
   openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
   openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
 
+  stage_auth_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
+  stage_auth_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
+  stage_registry_auth=`echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0`
+
   reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
   reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
   brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
-  jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
 
  # run_command "cat ${new_dockerconfig} | jq"
 
@@ -94,7 +98,7 @@ function update_global_auth () {
 
 # create ICSP for connected env.
 function create_icsp_connected () {
-    cat <<EOF | oc create -f -
+    cat <<EOF | oc apply -f -
     apiVersion: operator.openshift.io/v1alpha1
     kind: ImageContentSourcePolicy
     metadata:
@@ -243,15 +247,16 @@ EOF
 }
 
 # from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+# since OCP4.18, OLMv1 is a new capability: OperatorLifecycleManagerV1
 function check_olm_capability(){
-    # check if OLM capability is added 
+    # check if OLMv0 capability is added 
     knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
-    if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
-        echo "knownCapabilities contains OperatorLifecycleManager"
-        # check if OLM capability enabled
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager\"," ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManagerv0"
+        # check if OLMv0 capability enabled
         enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
-          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
-              echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager\"," ]]; then
+              echo "OperatorLifecycleManagerv0 capability is not enabled, skip the following tests..."
               exit 0
           fi
     fi
@@ -259,7 +264,7 @@ function check_olm_capability(){
 
 set_proxy
 run_command "oc whoami"
-run_command "oc version -o yaml"
+run_command "which oc && oc version -o yaml"
 update_global_auth
 sleep 5
 create_icsp_connected

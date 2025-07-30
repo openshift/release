@@ -18,7 +18,7 @@ export AWS_ACCOUNT_ID
 export OCM_TOKEN
 export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 
-RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
+RUN_COMMAND="uv run openshift_cli_installer/cli.py \
             --action create \
             --clusters-install-data-directory $CLUSTER_DATA_DIR \
             --ocm-token=$OCM_TOKEN \

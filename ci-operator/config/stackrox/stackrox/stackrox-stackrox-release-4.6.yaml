@@ -2,15 +2,15 @@ base_images:
   aks:
     name: automation-flavors
     namespace: stackrox
-    tag: aks-latest
+    tag: aks-stable
   aro:
     name: automation-flavors
     namespace: stackrox
-    tag: aro-latest
+    tag: aro-stable
   eks:
     name: automation-flavors
     namespace: stackrox
-    tag: eks-latest
+    tag: eks-stable
   ibmcloudz:
     name: automation-flavors
     namespace: stackrox
@@ -18,15 +18,15 @@ base_images:
   osd:
     name: automation-flavors
     namespace: stackrox
-    tag: osd-latest
+    tag: osd-stable
   rosa:
     name: automation-flavors
     namespace: stackrox
-    tag: rosa-latest
+    tag: rosa-stable
   rosa-hcp:
     name: automation-flavors
     namespace: stackrox
-    tag: rosa-latest
+    tag: rosa-stable
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -56,12 +56,6 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
   timeout: 5h0m0s
-- as: ui-component-tests
-  optional: true
-  run_if_changed: ^ui/
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: gke-ui-e2e-tests
   optional: true
   run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)/
@@ -196,14 +190,6 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aks-e2e
   timeout: 5h0m0s
-- always_run: false
-  as: gke-perf-scale-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-    workflow: stackrox-stackrox-e2e-job
-  timeout: 5h0m0s
 - as: merge-shell-unit-tests
   postsubmit: true
   steps:
@@ -300,6 +286,28 @@ tests:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aro-e2e
+  timeout: 5h0m0s
+- as: merge-aks-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-aks-e2e
+  timeout: 5h0m0s
+- as: merge-rosa-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-rosa-e2e
+  timeout: 5h0m0s
+- as: merge-rosa-hcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: rosa-qa-e2e-tests
+    workflow: stackrox-automation-flavors-rosa-hcp-e2e
   timeout: 5h0m0s
 - always_run: false
   as: powervs-qa-e2e-tests
