@@ -227,8 +227,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-op
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op
+  optional: true
   steps:
     cluster_profile: gcp-3
     test:
@@ -245,6 +246,42 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
   timeout: 5h0m0s
+- as: e2e-gcp-op-1of2
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-1of2
+      dependencies:
+      - env: MCO_OS_IMAGE_URL
+        name: pipeline:custom-os-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h40m0s
+    workflow: ipi-gcp
+  timeout: 4h0m0s
+- as: e2e-gcp-op-2of2
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-2of2
+      dependencies:
+      - env: MCO_OS_IMAGE_URL
+        name: pipeline:custom-os-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h40m0s
+    workflow: ipi-gcp
+  timeout: 4h0m0s
 - as: e2e-gcp-op-ocl
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -262,9 +299,9 @@ tests:
           cpu: 100m
       timeout: 2h30m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-techpreview
+- always_run: false
+  as: e2e-gcp-op-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
@@ -652,6 +689,23 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
+- as: e2e-aws-mco-disruptive
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-mco-disruptive
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp-3
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-priv

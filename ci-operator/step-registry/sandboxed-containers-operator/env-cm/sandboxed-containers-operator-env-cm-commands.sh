@@ -90,6 +90,10 @@ spec:
     - mirrors:
         - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
       source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
+      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
+
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -121,6 +125,9 @@ spec:
     - mirrors:
         - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
       source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
+      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet

@@ -9,9 +9,29 @@ kind: Config
 metadata:
   name: cluster
 spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
   managementState: Managed
   replicas: 2
   routes:
   - hostname: registry.build05.ci.openshift.org
     name: registry-build05-ci-openshift-org
     secretName: public-route-tls
+  topologySpreadConstraints:
+  - labelSelector:
+      matchLabels:
+        docker-registry: default
+    maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+  - labelSelector:
+      matchLabels:
+        docker-registry: default
+    maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
