@@ -2,22 +2,17 @@
 
 set -euo pipefail
 
-CLUSTER_NAME="$(oc get hc -A -o jsonpath='{.items[0].metadata.name}')"
-export CLUSTER_NAME
-if [[ -z "$CLUSTER_NAME" ]]; then
+cluster_name="$(oc get hc -A -o jsonpath='{.items[0].metadata.name}')"
+if [[ -z "$cluster_name" ]]; then
     echo "Unable to find the hosted cluster's name"
     exit 1
 fi
 
-# Wait for the HC to be Available
-timeout 25m bash -c "
-  until [[ \$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.version.history[?(@.state!=\"\")].state}') = Available ]]; do
-      sleep 15
-  done
-"
+echo "Waiting for the HC to be Available"
+oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${cluster_name}"
 
-echo "Getting kubeconfig of the hosted cluster"
-hypershift create kubeconfig --namespace=clusters --name="${CLUSTER_NAME}" > "${SHARED_DIR}"/nested_kubeconfig
+echo "Cluster became available, creating kubeconfig"
+hypershift create kubeconfig --namespace=clusters --name="${cluster_name}" > "${SHARED_DIR}"/nested_kubeconfig
 
 CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
 # The name must match the name of the empty secret created
