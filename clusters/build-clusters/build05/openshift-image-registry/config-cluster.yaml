@@ -16,8 +16,19 @@ spec:
           - matchExpressions:
               - key: node-role.kubernetes.io/infra
                 operator: Exists
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: docker-registry
+                  operator: In
+                  values:
+                  - default
+            topologyKey: kubernetes.io/hostname
+          weight: 100
   managementState: Managed
-  replicas: 2
+  replicas: 4
   routes:
   - hostname: registry.build05.ci.openshift.org
     name: registry-build05-ci-openshift-org
@@ -28,7 +39,7 @@ spec:
         docker-registry: default
     maxSkew: 1
     topologyKey: kubernetes.io/hostname
-    whenUnsatisfiable: DoNotSchedule
+    whenUnsatisfiable: ScheduleAnyway
   - labelSelector:
       matchLabels:
         docker-registry: default
