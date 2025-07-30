@@ -9,7 +9,7 @@ if [[ -z "$cluster_name" ]]; then
 fi
 
 echo "Waiting for the HC to be Available"
-oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${cluster_name}"
+oc wait --timeout=15m --for=condition=Available --namespace=clusters "hostedcluster/${cluster_name}"
 
 # Workaround for limitations of console operator, see OCPSTRAT-2173.
 echo "Waiting for the console operator to be degraded"
