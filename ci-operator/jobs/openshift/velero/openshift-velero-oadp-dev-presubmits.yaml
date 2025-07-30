@@ -1,11 +1,11 @@
 presubmits:
-  openshift/openshift-velero-plugin:
+  openshift/velero:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build01
+    - ^oadp-dev$
+    - ^oadp-dev-
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -14,7 +14,7 @@ presubmits:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-velero-plugin-master-images
+    name: pull-ci-openshift-velero-oadp-dev-images
     rerun_command: /test images
     spec:
       containers:
@@ -23,6 +23,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=velero
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,11 +58,74 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^oadp-dev$
+    - ^oadp-dev-
+    cluster: build05
+    context: ci/prow/lint
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-velero-oadp-dev-lint
+    rerun_command: /test lint
+    run_if_changed: .*\.go$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=lint
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^oadp-dev$
+    - ^oadp-dev-
+    cluster: build05
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
@@ -69,8 +133,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-velero-plugin-master-unit-test
+    name: pull-ci-openshift-velero-oadp-dev-unit-test
     rerun_command: /test unit-test
+    run_if_changed: (\.sh|\.go|config/.*|cmd/.*|assets/.*|internal/.*|Dockerfile.*|Makefile.*)$
     spec:
       containers:
       - args:

@@ -1,30 +1,28 @@
-postsubmits:
-  openshift/oadp-operator:
+presubmits:
+  openshift/velero-plugin-for-microsoft-azure:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
+    - ^oadp-dev$
+    - ^oadp-dev-
     cluster: build10
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       capability/arm64: arm64
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-oadp-operator-master-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-velero-plugin-for-microsoft-azure-oadp-dev-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=oadp-must-gather
-        - --target=oadp-operator
         command:
         - ci-operator
         image: ci-operator:latest
@@ -43,9 +41,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -57,31 +52,34 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build02
+    - ^oadp-dev$
+    - ^oadp-dev-
+    cluster: build05
+    context: ci/prow/unit-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-oadp-operator-master-unit-test-post
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-velero-plugin-for-microsoft-azure-oadp-dev-unit-test
+    optional: true
+    rerun_command: /test unit-test
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-test-post
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=unit-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -91,6 +89,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -105,6 +106,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -114,3 +118,4 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)
