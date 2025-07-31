@@ -52,6 +52,8 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 set -x
 
+sleep 1h
+
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
