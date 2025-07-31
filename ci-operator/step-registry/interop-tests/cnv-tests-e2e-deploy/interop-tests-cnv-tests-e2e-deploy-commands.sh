@@ -5,10 +5,12 @@ set -o errexit
 set -o pipefail
 
 function install_yq_if_not_exists() {
-    # Install yq manually if its not found in image
+    # Install yq manually if not found in image
     echo "Checking if yq exists"
     cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -x "${cmd_yq}" ]; then
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
         echo "Installing yq"
         curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
          -o ./yq && chmod +x ./yq
@@ -52,8 +54,6 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 set -x
 
-sleep 1h
-
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
@@ -74,13 +74,15 @@ make deploy_test || exit_code=$?
 
 set +x
 
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
+
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
+    exit ${exit_code}
 else
     echo "deploy_test succeeded"
 fi
 
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
-exit ${exit_code}
+
