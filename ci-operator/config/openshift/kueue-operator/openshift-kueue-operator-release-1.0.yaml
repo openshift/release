@@ -12,9 +12,13 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
   operator-sdk:
-    name: "4.17"
+    name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -34,6 +38,7 @@ images:
 - dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
   from: src
   to: kueue-operator-src
 - dockerfile_literal: |
@@ -48,6 +53,12 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -127,6 +138,50 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
+- as: test-e2e-disconnected
+  minimum_interval: 96h
+  steps:
+    cluster_profile: gcp
+    env:
+      CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.19
+      CATSRC_NAME: redhat-operators
+      MIRROR_OPERATORS: "true"
+    post:
+    - as: kueue-must-gather-disconnected
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        export MUST_GATHER_IMAGE
+        echo "Running must-gather to gather diagnostics..."
+        mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
+        oc adm must-gather --image=${MUST_GATHER_IMAGE} --dest-dir=${ARTIFACT_DIR:-must-gather}/must-gather
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: kueue-cleanup-disconnected
+      cli: latest
+      commands: make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    test:
+    - chain: cert-manager-install
+    - chain: kueue-operator-disconnected
+    - as: e2e-kueue
+      cli: latest
+      commands: |
+        export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        make test-e2e
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 zz_generated_metadata:
   branch: release-1.0
   org: openshift
