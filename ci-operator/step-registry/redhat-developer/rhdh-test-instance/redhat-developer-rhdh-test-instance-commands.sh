@@ -134,7 +134,7 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
         echo "Parsed arguments: $install_type $rhdh_version"
         echo "Time duration: $time"
         
-        source ./install.sh "$install_type" "$rhdh_version"
+        source ./deploy.sh "$install_type" "$rhdh_version"
     else
         echo "❌ Error: Unable to trigger deployment command format is incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h"
         echo "Example: /test deploy helm 1.7 3h"
