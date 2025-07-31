@@ -36,6 +36,8 @@ echo "  RT_KERNEL=${RT_KERNEL}"
 echo "  HUGEPAGES_DEFAULT_SIZE=${HUGEPAGES_DEFAULT_SIZE}"
 echo "  HUGEPAGES_PAGES=${HUGEPAGES_PAGES}"
 echo "  IGNORE_CGROUPS_VERSION=${IGNORE_CGROUPS_VERSION}"
+echo "  HIGH_POWER_CONSUMPTION=${HIGH_POWER_CONSUMPTION}"
+echo "  PER_POD_POWER_MANAGEMENT=${PER_POD_POWER_MANAGEMENT}"
 
 echo "Configure compute and NTO cluster settings"
 cd /eco-ci-cd/
@@ -45,6 +47,8 @@ EXTRA_VARS="kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/ku
 EXTRA_VARS="${EXTRA_VARS} container_runtime=${CONTAINER_RUNTIME}"
 EXTRA_VARS="${EXTRA_VARS} rt_kernel=${RT_KERNEL}"
 EXTRA_VARS="${EXTRA_VARS} ignore_cgroups_version=${IGNORE_CGROUPS_VERSION}"
+EXTRA_VARS="${EXTRA_VARS} high_power_consumption=${HIGH_POWER_CONSUMPTION}"
+EXTRA_VARS="${EXTRA_VARS} per_pod_power_management=${PER_POD_POWER_MANAGEMENT}"
 EXTRA_VARS="${EXTRA_VARS} artifacts_folder=${ARTIFACT_DIR}"
 
 # Handle hugepages configuration
