@@ -30,6 +30,7 @@ RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 CLUSTER_AUTOSCALER_ARGS=""
 if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     CLUSTER_AUTOSCALER_ARGS="--enable-cluster-autoscaler"
+    CLUSTER_AUTOSCALER_ARGS+=" --cluster-autoscaler-profile balance-similar-node-groups=true"
 fi
 
 if [[ "${AKS_CLUSTER_AUTOSCALER_MIN_NODES:-}" != "" ]]; then
