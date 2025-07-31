@@ -407,7 +407,6 @@ function build_upi_cluster() {
 
 trap 'error_handler $? $LINENO' ERR
 
-
 report_build
 setup_home
 setup_ibmcloud_cli
@@ -420,4 +419,3 @@ fix_user_permissions
 build_upi_cluster
 
 echo "Successfully created the PowerVS cluster"
-exit 0
