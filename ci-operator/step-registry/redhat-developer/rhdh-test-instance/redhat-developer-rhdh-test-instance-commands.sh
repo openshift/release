@@ -21,10 +21,14 @@ git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
 git checkout "$RELEASE_BRANCH_NAME" || exit
 
+git config --global user.name "rhdh-test-instance-qe"
+git config --global user.email "rhdh-test-instance-qe@redhat.com"
+
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
+    git merge origin/$RELEASE_BRANCH_NAME --no-edit
 fi
 
 # Export secrets, skipping non-secret files
