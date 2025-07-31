@@ -42,6 +42,9 @@ cp "${SHARED_DIR}/conformance-skip.txt" "${ARTIFACT_DIR}/conformance-skip.txt"
 # Disable workload partitioning for annotated pods to avoid throttling.
 ssh "${INSTANCE_PREFIX}" "sudo sed -i 's/resources/#&/g' /etc/crio/crio.conf.d/11-microshift-ovn.conf"
 ssh "${INSTANCE_PREFIX}" "sudo systemctl daemon-reload"
+# Disable ovs cpu affinity to avoid throttling.
+ssh "${INSTANCE_PREFIX}" "sudo rm -f /etc/systemd/system/ovs-vswitchd.service.d/microshift-cpuaffinity.conf"
+ssh "${INSTANCE_PREFIX}" "sudo rm -f /etc/systemd/system/ovsdb-server.service.d/microshift-cpuaffinity.conf"
 # Just for safety, restart everything from scratch.
 ssh "${INSTANCE_PREFIX}" "echo 1 | sudo microshift-cleanup-data --all --keep-images"
 ssh "${INSTANCE_PREFIX}" "sudo systemctl restart crio"
