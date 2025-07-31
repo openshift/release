@@ -17,18 +17,19 @@ workflow:
       ETCD_ENCRYPTION: "true"
       STORAGE_ENCRYPTION: "true"
     pre:
-    - ref: aws-provision-vpc-shared
-    - ref: aws-provision-kms-key
-    - chain: aws-provision-bastionhost
-    - ref: rosa-cluster-prefix
-    - chain: rosa-cluster-provision
-    - ref: osd-ccs-conf-idp-htpasswd-multi-users
-    - ref: rosa-cluster-wait-ready-nodes
+      - ref: aws-provision-vpc-shared
+      - ref: aws-provision-kms-key
+      - chain: aws-provision-bastionhost
+      - ref: rosa-cluster-prefix
+      - chain: rosa-cluster-provision
+      - ref: osd-ccs-conf-idp-htpasswd-multi-users
+      - ref: rosa-cluster-wait-ready-nodes
     post:
-    - chain: rosa-cluster-deprovision
-    - ref: aws-deprovision-kms-key
-    - ref: aws-deprovision-s3buckets
-    - ref: aws-deprovision-stacks
+      - chain: rosa-cluster-deprovision
+      - ref: aws-deprovision-kms-key
+      - ref: aws-deprovision-s3buckets
+      - ref: aws-deprovision-stacks
+      - ref: junit2reportportal
   documentation: |-
     This workflow installs a rosa non-sts cluster configured to use byo vpc, kms, proxy. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     After finish testing, the cluster will be deprovsioned.
