@@ -74,6 +74,7 @@ HOSTED_CLUSTER_RELEASE=$(yq-v4 'select(.kind == "HostedCluster") | .spec.release
 HOSTED_CLUSTER_NAME=$(yq-v4 'select(.kind == "HostedCluster") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
 yq-v4 "select(.metadata.name == \"$HOSTED_CLUSTER_NAME-pull-secret\") | .data.\".dockerconfigjson\"" "${SHARED_DIR}"/hypershift_create_cluster_render.yaml | base64 -d > /tmp/hosted_cluster_pull_secret
 HOSTED_CLUSTER_VERSION=$(oc image info -a /tmp/hosted_cluster_pull_secret $HOSTED_CLUSTER_RELEASE | grep -o 'io.openshift.release=.*' | grep -Eo '=4\.[0-9]+' | grep -Eo '[^=]+')
+echo "$HOSTED_CLUSTER_VERSION" > "${SHARED_DIR}"/hosted_cluster_version
 echo "The hosted cluster minor version is: $HOSTED_CLUSTER_VERSION"
 rm -f /tmp/hosted_cluster_pull_secret
 

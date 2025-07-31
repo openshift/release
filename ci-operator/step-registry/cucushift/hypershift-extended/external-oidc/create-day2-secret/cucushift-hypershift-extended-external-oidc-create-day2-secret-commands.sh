@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euxo pipefail
+
+if [[ ! -f "${SHARED_DIR}/hosted_cluster_version" ]]; then
+    echo "File ${SHARED_DIR}/hosted_cluster_version not available"
+    exit 1
+fi
+
+HOSTED_CLUSTER_VERSION=$(<"${SHARED_DIR}/hosted_cluster_version")
+if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") != "1" ]]; then
+    echo "Skipping day2 secret creation for OCP <=4.19 clusters"
+    exit 0
+fi
 
 cluster_name="$(oc get hc -A -o jsonpath='{.items[0].metadata.name}')"
 if [[ -z "$cluster_name" ]]; then
     echo "Unable to find the hosted cluster's name"
     exit 1
-fi
-
-HOSTED_CLUSTER_VERSION="$(oc get -n clusters hostedcluster/"${cluster_name}" -o jsonpath='{.status.version.history[0].version}' | grep -Eo '4\.[0-9]+')"
-if [[ -z "$HOSTED_CLUSTER_VERSION" ]]; then
-    echo "Unable to find the hosted cluster's version"
-    exit 1
-fi
-
-if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") != "1" ]]; then
-    echo "Skipping day2 secret creation for OCP <=4.19 clusters"
-    exit 0
 fi
 
 echo "Waiting for the HC to be Available"
@@ -36,6 +36,7 @@ done
 echo "Cluster became available, creating kubeconfig"
 hypershift create kubeconfig --namespace=clusters --name="${cluster_name}" > "${SHARED_DIR}"/nested_kubeconfig
 
+set +x
 CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
 # The name must match the name of the empty secret created
 # in step cucushift-hypershift-extended-external-oidc-enable.
