@@ -13,6 +13,17 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-controller-main-govulncheck
     optional: true
+    reporter_config:
+      slack:
+        channel: '#team-crt'
+        job_states_to_report:
+        - success
+        - error
+        - failure
+        report_template: '{{ if eq .Status.State "success" }} :check: {{ else }} :warning:
+          {{ end }}Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+          logs> {{ if eq .Status.State "success" }} :check: {{ else }} :warning: {{
+          end }}'
     rerun_command: /test govulncheck
     spec:
       containers:
