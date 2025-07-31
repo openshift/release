@@ -31,25 +31,15 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-              [
-                {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Product to Product Test Failure", "jira_project": "SRVKP", "group": {"name": "p2p-tests", "priority": 2}, "jira_additional_labels": ["!default"], "jira_epic": "!default"}
-              ],
-          "success_rules": [{"jira_epic": "INTEROP-7595", "jira_additional_labels": ["!default"]}]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","ipi-aws-p2p","pipelines-serverless-p2p"]'
-      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
-      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
-      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
-      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      OPERATOR1_CONFIG: name=advanced-cluster-management;namespace=ocm;channel=release-2.13
+      COMPUTE_NODE_TYPE: c5n.metal
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "!default", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+        ]
     test:
-    - ref: operator-install
-    - ref: p2p-additional-labels
-    workflow: firewatch-ipi-aws
+    - ref: install-operators
+    - ref: p2p-acm-cnv-poc
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: rhpit
