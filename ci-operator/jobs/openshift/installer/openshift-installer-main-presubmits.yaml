@@ -7821,6 +7821,35 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
+    context: ci/prow/shellcheck
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-main-shellcheck
+    rerun_command: /test shellcheck
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/shellcheck.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_shellcheck_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test shellcheck
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     labels:
@@ -8036,3 +8065,32 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/yaml-lint
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-release-main-yaml-lint
+    rerun_command: /test yaml-lint
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/yaml-lint.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_yamllint_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test yaml-lint
