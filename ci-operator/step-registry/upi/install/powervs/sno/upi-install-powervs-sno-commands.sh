@@ -483,11 +483,16 @@ download_installer() {
       root_path="https://mirror.openshift.com/pub/openshift-v4/ppc64le/clients"
       install_path="\${root_path}/ocp/latest-\${OCP_VERSION}/\${install_tar_file}"
       rc_install_path="\${root_path}/ocp/candidate-\${OCP_VERSION}/\${install_tar_file}"
+      latest_install_path="\${root_path}/ocp/latest/\${install_tar_file}"
       echo "Download GA release"
       curl -s \${install_path} -o \${install_tar_file}
       if grep -q "File not found" "./\${install_tar_file}" ; then
           echo "Download RC release"
           curl -s \${rc_install_path} -o \${install_tar_file}
+      fi  
+      if grep -q "File not found" "./\${install_tar_file}" ; then
+          echo "Download the latest release"
+          curl -s \${latest_install_path} -o \${install_tar_file}
       fi
       if grep -q "File not found" "./\${install_tar_file}" ; then
           echo "could not down load \${install_tar_file}"
