@@ -129,23 +129,10 @@ function generate_attribute_architecture() {
 
 function generate_attribute_cloud_provider() {
   cloud_provider="unknown"
-  for keyword in 'alibaba' \
-                 'aws' \
-                 'azure' \
-                 'baremetal' \
-                 'gcp' \
-                 'ibmcloud' \
-                 'libvirt' \
-                 'nutanix' \
-                 'openstack' \
-                 'vsphere'
-  do
-    if [[ "$JOB_NAME_SAFE" =~ $keyword ]]
-    then
-      cloud_provider="$keyword"
-      break
-    fi
-  done
+  if [[ "$JOB_NAME_SAFE" =~ alibaba|aws|azure|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere ]]
+  then
+    cloud_provider="${BASH_REMATCH[0]}"
+  fi
   write_attribute cloud_provider "$cloud_provider"
 }
 
