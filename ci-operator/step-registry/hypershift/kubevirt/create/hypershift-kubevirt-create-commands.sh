@@ -216,9 +216,23 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
+    --cluster-cidr 10.136.0.0/14 --render --render-sensitive > /tmp/hc.yaml"
 fi
 
+sed -i '/kind: NodePool/{
+n
+a\
+  annotations:\
+    hypershift.openshift.io/kubevirt-vm-jsonpatch: |\
+      [\
+        {\
+          "op": "remove",\
+          "path": "/spec/template/metadata/annotations/kubevirt.io~1allow-pod-bridge-network-live-migration"\
+        }\
+      ]
+}' /tmp/hc.yaml
+
+oc apply -f /tmp/hc.yaml
 
 if [[ -n ${MCE} ]] ; then
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
