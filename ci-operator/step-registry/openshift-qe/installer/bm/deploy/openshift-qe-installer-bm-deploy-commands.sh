@@ -28,8 +28,6 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
-HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/hypervisor_nic_interface")
-export HV_NIC_INTERFACE
 
 
 cat <<EOF >>/tmp/all.yml
@@ -61,7 +59,10 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
-cat <<EOF >>/tmp/all.yml
+  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/hypervisor_nic_interface")
+  export HV_NIC_INTERFACE
+
+  cat <<EOF >>/tmp/all.yml
 hybrid_worker_count: $NUM_HYBRID_WORKER_NODES
 hv_ip_offset: 0
 hv_vm_ip_offset: 36
@@ -71,7 +72,7 @@ standard_cluster_dns_count: 0
 hv_ssh_pass: $LOGIN
 hypervisor_nic_interface_idx: $HV_NIC_INTERFACE
 EOF
-cat <<EOF >>/tmp/hv.yml
+  cat <<EOF >>/tmp/hv.yml
 install_tc: false
 lab: $LAB
 ssh_public_key_file: ~/.ssh/id_rsa.pub
