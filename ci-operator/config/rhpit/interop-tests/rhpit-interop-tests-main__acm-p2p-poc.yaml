@@ -3,15 +3,11 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
-  ocp-addons-operators-cli:
-    name: ocp-addons-operators-cli
-    namespace: ci
-    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
 releases:
   latest:
     release:
@@ -19,11 +15,9 @@ releases:
       version: "4.20"
 resources:
   '*':
-    limits:
-      memory: 8Gi
     requests:
-      cpu: "1"
-      memory: 4Gi
+      cpu: 200m
+      memory: 400Mi
 tests:
 - as: acm-cnv-ipi-aws-420-rc
   cron: 0 23 31 2 *
@@ -32,6 +26,12 @@ tests:
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: c5n.metal
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/p2p-msi.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.17-p2p","ipi-aws-p2p","pipelines-serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
+      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "!default", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
@@ -39,7 +39,7 @@ tests:
     test:
     - ref: install-operators
     - ref: p2p-acm-cnv-poc
-    workflow: ipi-aws
+    workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main
   org: rhpit
