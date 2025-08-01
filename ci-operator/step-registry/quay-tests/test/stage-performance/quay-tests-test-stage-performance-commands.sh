@@ -155,6 +155,9 @@ spec:
           requests:
             cpu: "1"
             memory: "512Mi"
+            ephemeral-storage: "10Gi"
+          limits:
+            ephemeral-storage: "20Gi"  
         imagePullPolicy: Always
       restartPolicy: Never
   backoffLimit: 0
