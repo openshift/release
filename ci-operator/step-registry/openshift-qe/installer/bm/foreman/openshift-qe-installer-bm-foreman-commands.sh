@@ -25,7 +25,7 @@ PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
 for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   hammer --verify-ssl false -u $LAB_CLOUD -p $PSWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
   sleep 10
-  badfish --reboot-only -H mgmt-$i -u $USER -p $PSWD
+  podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
 done
 EOF
 envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-deploy.sh > /tmp/foreman-deploy_updated-$LAB_CLOUD.sh

@@ -14,11 +14,11 @@ fi
 
 ALLOWED_REPOS=("openshift-tests-private"
                "verification-tests"
+               "oadp-qe-automation"
               )
-repo="$(jq -r 'fromjson |
-               if .refs then .refs.repo
-               elif .extra_refs then .extra_refs[0].repo
-               else thisIsNotaValidRepoName
+repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
+               elif .refs then .refs.repo
+               else error
                end
 ' <<< ${JOB_SPEC:-''})"
 # shellcheck disable=SC2076
@@ -39,6 +39,21 @@ then
   fi
   LOGS_PATH="pr-logs/pull/openshift_release/${pr_number}"
 fi
+DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration then .decoration_config.gcs_configuration.bucket else error end' <<< ${JOB_SPEC:-''})"
+PROWCI=''
+PROWWEB=''
+if [[ "$DECK_NAME" = 'test-platform-results' ]]
+then
+  PROWCI="https://prow.ci.openshift.org"
+  PROWWEB="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"
+elif [[ "$DECK_NAME" = 'qe-private-deck' ]]
+then
+  PROWCI="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PROWWEB="https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+else
+  echo "Unknow bucket name: $DECK_NAME"
+  exit 1
+fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR_ORI="${LOCAL_DIR}/ori"
@@ -48,6 +63,7 @@ mkdir --parents "$LOCAL_DIR" "$LOCAL_DIR_ORI" "$LOCAL_DIR_RST"
 
 function download_logs() {
   logfile_name="${ARTIFACT_DIR}/rsync.log"
+  export PATH="$PATH:/opt/google-cloud-sdk/bin"
   gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml|build-log.txt|skip_overall_if_fail)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
   gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
@@ -113,23 +129,10 @@ function generate_attribute_architecture() {
 
 function generate_attribute_cloud_provider() {
   cloud_provider="unknown"
-  for keyword in 'alibaba' \
-                 'aws' \
-                 'azure' \
-                 'baremetal' \
-                 'gcp' \
-                 'ibmcloud' \
-                 'libvirt' \
-                 'nutanix' \
-                 'openstack' \
-                 'vsphere'
-  do
-    if [[ "$JOB_NAME_SAFE" =~ $keyword ]]
-    then
-      cloud_provider="$keyword"
-      break
-    fi
-  done
+  if [[ "$JOB_NAME_SAFE" =~ alibaba|aws|azure|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere ]]
+  then
+    cloud_provider="${BASH_REMATCH[0]}"
+  fi
   write_attribute cloud_provider "$cloud_provider"
 }
 
@@ -249,7 +252,7 @@ function generate_metadata() {
                 "value": "prow"
               }
             ],
-            "description": "https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
+            "description": "${PROWCI}/view/gs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}",
             "name": "${JOB_NAME}"
           },
           "property_filter": [
@@ -281,7 +284,7 @@ function generate_results() {
       then
         cat >> "$junit_file" << EOF_JUNIT_SUCCESS
   <testcase classname="$testsuite_name" name="$step_name" time="1">
-    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
 EOF_JUNIT_SUCCESS
       elif [[ "$result" = 'FAILURE' ]]
@@ -290,7 +293,7 @@ EOF_JUNIT_SUCCESS
         cat >> "$junit_file" << EOF_JUNIT_FAILURE
   <testcase classname="$testsuite_name" name="$step_name" time="1">
     <failure message="Step $step_name failed" type="failed"/>
-    <system-out>https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
   </testcase>
 EOF_JUNIT_FAILURE
       fi
@@ -308,13 +311,13 @@ EOF_JUNIT_FAILURE
 }
 
 function droute_send() {
-  which droute && droute version
-  droute send --url="$(< /var/run/datarouter/dataroute)" \
-              --username="$(< /var/run/datarouter/username)" \
-              --password="$(< /var/run/datarouter/password)" \
-              --metadata="$DATAROUTER_JSON" \
-              --results="${LOCAL_DIR_RST}/*" \
-              --wait
+  /droute version
+  /droute send --url="https://datarouter.ccitredhat.com" \
+               --username="$(< /var/run/datarouter/username)" \
+               --password="$(< /var/run/datarouter/password)" \
+               --metadata="$DATAROUTER_JSON" \
+               --results="${LOCAL_DIR_RST}/*" \
+               --wait
 }
 
 download_logs

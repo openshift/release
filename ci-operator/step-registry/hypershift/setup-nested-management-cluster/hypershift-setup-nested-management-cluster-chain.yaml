@@ -45,6 +45,7 @@ chain:
       
       echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
       bin/hypershift create cluster aws \
+        --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
@@ -52,6 +53,8 @@ chain:
         --region=us-east-1 \
         --infra-id=${CLUSTER_NAME} \
         --base-domain=${DOMAIN} \
+        --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
+        --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
         --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
         --zones=${HYPERSHIFT_ZONES} \
         --service-cidr=172.29.0.0/16 \

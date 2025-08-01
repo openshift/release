@@ -256,7 +256,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-serial-ovn-ipv4-techpreview
   cluster: build05
   cron: 0 4 * * *
@@ -283,10 +283,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-serial-virtualmedia
   cluster: build05
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -304,13 +305,12 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-bm-upgrade
+- as: e2e-metal-ipi-ovn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -449,6 +449,36 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
+- as: e2e-agent-ovn-two-node-arbiter
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-agent-ovn-two-node-arbiter-ipv6
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-agent-ovn-two-node-arbiter-dualstack
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
+        FEATURE_SET="TechPreviewNoUpgrade"
+    workflow: baremetalds-two-node-arbiter
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
   cron: '@daily'
@@ -505,6 +535,12 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
+- as: e2e-metal-ovn-two-node-arbiter-workload-partitioning
+  cluster: build05
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-workload-partitioning
 - as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
   cluster: build05
   cron: 0 2 * * 1
@@ -691,6 +727,8 @@ tests:
   cron: 0 */6 * * *
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
