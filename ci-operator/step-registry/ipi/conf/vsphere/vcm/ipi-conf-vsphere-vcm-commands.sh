@@ -130,11 +130,31 @@ fi
 
 if [ -n "${ADDITIONAL_DISK}" ]; then
   echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
-  DISKS="platform:
+  CP_DISKS="platform:
     vsphere:
       dataDisks:
-      - sizeGiB: 20
+      - sizeGiB: 50
         name: Disk1"
+  W_DISKS="platform:
+    vsphere:
+      dataDisks:
+      - sizeGiB: 50
+        name: Disk1"
+  if [ "${DISK_SETUP}" == "true" ]; then;
+    echo "$(date -u --rfc-3339=seconds) - configuring disk setup"
+    CP_DISKS="${CP_DISKS}
+  diskSetup:
+  - type: user-defined
+    userDefined:
+      platformDiskID: Disk1
+      mountPath: /var/lib/containers"
+    W_DISKS="${W_DISKS}
+  diskSetup:
+  - type: user-defined
+    userDefined:
+      platformDiskID: Disk1
+      mountPath: /var/lib/containers"
+  fi
 fi
 
 if [ ${Z_VERSION} -gt 9 ]; then
@@ -163,11 +183,11 @@ else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
-  ${DISKS}
+  ${CP_DISKS}
 compute:
 - name: worker
   replicas: ${COMPUTE_NODE_REPLICAS}
-  ${DISKS}"
+  ${W_DISKS}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
