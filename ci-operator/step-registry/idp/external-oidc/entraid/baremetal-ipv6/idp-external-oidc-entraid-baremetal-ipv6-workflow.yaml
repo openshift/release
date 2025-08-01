@@ -1,0 +1,19 @@
+workflow:
+  as: idp-external-oidc-entraid-baremetal-ipv6
+  steps:
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: cucushift-installer-rehearse-baremetalds-ipi-ofcir-provision
+      - chain: idp-external-oidc-entraid
+      - ref: cucushift-installer-reportportal-marker
+    post:
+      - ref: wait
+      - ref: idp-external-oidc-entraid-console-app-redirect-uri-remove
+      - chain: cucushift-installer-rehearse-baremetalds-ipi-ofcir-deprovision
+      - ref: send-results-to-reportportal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+  documentation: |-
+    This workflow creates and later destroy cluster on ipv6 baremetal using entraid entexternal OIDC.

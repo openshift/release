@@ -39,5 +39,9 @@ while ! az storage blob lease acquire --container-name "$LOCK_CONTAINER_NAME" --
     sleep 60
 done
 
-eval "az ad app update --id $CONSOLE_CLIENT_ID --web-redirect-uris $CONSOLE_REDIRECT_URIS $CONSOLE_CALLBACK_URI"
+if [[ $CONSOLE_REDIRECT_URIS == *"$CONSOLE_CALLBACK_URI"* ]]; then
+    echo "$CONSOLE_CALLBACK_URI has been added into redirect uris" 
+else
+    eval "az ad app update --id $CONSOLE_CLIENT_ID --web-redirect-uris $CONSOLE_REDIRECT_URIS $CONSOLE_CALLBACK_URI"
+fi
 az ad app show --id "$CONSOLE_CLIENT_ID" --query 'web.redirectUris' -o tsv
