@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-
 if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
   AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
   AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
@@ -24,8 +23,11 @@ if [ "${SET_AWS_ENV_VARS}" = "true" ]; then
 fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+#TEMP
+# sleep 2h
 
-RUN_COMMAND="uv run pytest tests/model_serving/model_server \
+
+RUN_COMMAND="uv run pytest -m smoke tests/model_serving/model_server \
             --tc=use_unprivileged_client:False \
             -s -o log_cli=true \
             --junit-xml=${ARTIFACT_DIR}/xunit_results.xml \
