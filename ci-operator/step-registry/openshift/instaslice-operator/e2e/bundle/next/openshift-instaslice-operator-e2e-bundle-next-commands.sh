@@ -26,10 +26,6 @@ echo "   just installed"
 
 export PATH="${TOOLS_DIR}:${PATH}"
 
-echo "Deploying instaslice-operator and executing e2e test suite"
-just create-related-images
-just deploy-cert-manager-ocp
-just deploy-nfd-ocp 
-just deploy-nvidia-ocp 
+echo "Deploying instaslice-operator and executing e2e test suite" 
 oc apply -f deploy/03_instaslice_operator.cr.yaml
 just test-e2e
