@@ -42,18 +42,65 @@ function label_vsphere_nodes() {
   echo "$(date -u --rfc-3339=seconds) - Adding labels to vsphere nodes for builds that do not have upstream ccm changes..."
   NODES=$(oc get nodes -o name --kubeconfig="${CLUSTER_KUBECONFIG}")
   for node in ${NODES}; do
-    echo "Checking ${node}"
+    echo "$(date -u --rfc-3339=seconds) - Checking ${node}"
     LABEL_FOUND=$(oc get ${node} -o json | jq -r '.metadata.labels | has("node.openshift.io/platform-type")')
     if [ "${LABEL_FOUND}" == "false" ]; then
-      echo "Adding 'node.openshift.io/platform-type=vsphere' label"
-      oc label "${node}" "node.openshift.io/platform-type"=vsphere
+      echo "$(date -u --rfc-3339=seconds) - Adding 'node.openshift.io/platform-type=vsphere' label"
+      oc label "${node}" "node.openshift.io/platform-type"=vsphere --kubeconfig="${CLUSTER_KUBECONFIG}"
     fi
   done
 }
 
+# Enable storage operator / capability.  If operator is already enabled, this function will log no changes made and operator is ready.
+function enable_storage_operator() {
+  echo "$(date -u --rfc-3339=seconds) - Enabling storage capability (operator)..."
+  oc patch clusterversion/version --type merge -p '{"spec":{"capabilities":{"additionalEnabledCapabilities":["Storage"]}}}' --kubeconfig="${CLUSTER_KUBECONFIG}"
+
+  # Wait for operator to be ready before progressing
+  echo "$(date -u --rfc-3339=seconds) - Waiting for operator to be ready"
+  while true; do
+    OPERATOR_STATUS="$(oc get co storage --kubeconfig=${CLUSTER_KUBECONFIG} -o json --ignore-not-found)"
+    # When first activating the operator, `oc get co` will not return storage operator.  When it does start installing it, it may also have no status set.
+    if [[ ${OPERATOR_STATUS} != "" && "$(echo ${OPERATOR_STATUS} | jq -r '.status.conditions != null')" == "true" ]]; then
+      IS_READY=$(echo ${OPERATOR_STATUS} | jq -r '(.status.conditions[] | select(.type == "Available") | .status == "True") and (.status.conditions[] | select(.type == "Degraded") | .status == "False") and (.status.conditions[] | select(.type == "Progressing") | .status == "False")')
+      if [ "${IS_READY}" == "true" ]; then
+        echo "$(date -u --rfc-3339=seconds) - Storage is ready"
+        break
+      fi
+    fi
+    sleep 5
+  done
+}
+
+# Wait for the VM node to become ready
+function wait_for_node_ready() {
+  echo "$(date -u --rfc-3339=seconds) - Waiting for node ${VM_NAME} to become Ready"
+  oc wait --for=condition=Ready=True node ${VM_NAME} --timeout=10m
+  if [[ $? -ne 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Node did not become ready"
+    exit 1
+  fi
+}
+
+# Wait for all cluster operators to become ready
+function wait_for_co_ready() {
+  echo "$(date -u --rfc-3339=seconds) - Waiting for cluster operators to become Ready / stable"
+  oc adm wait-for-stable-cluster --minimum-stable-period=10s --timeout=10m
+  if [[ $? -ne 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - All operators did not finish becoming Ready / stable"
+    exit 1
+  fi
+}
+
+
 # We are going to apply the 'node.openshift.io/platform-type=vsphere' label to all existing nodes as a workaround while waiting for upstream CCM changes
 # When upstream changes are merged downstream, the function will output that no nodes were updated.
 label_vsphere_nodes
+
+# Enable storage operator now that the labels are in place
+if [ "${ENABLE_HYBRID_STORAGE}" == "true" ]; then
+  enable_storage_operator
+fi
 
 # Patch test cluster to have CIDR for non-vSphere node
 oc patch infrastructure cluster --type json -p "${INFRA_PATCH}" --kubeconfig=${CLUSTER_KUBECONFIG}
@@ -92,3 +139,9 @@ approve_csrs
 
 # Remove provider taint
 oc adm taint nodes ${VM_NAME} node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"
+
+# Wait for node to be ready to prevent any interruption during the e2e tests
+wait_for_node_ready
+
+# Wait for all CO to be stable
+wait_for_co_ready
