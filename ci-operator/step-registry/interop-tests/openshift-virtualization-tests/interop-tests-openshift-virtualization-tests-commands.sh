@@ -167,8 +167,10 @@ function install_yq_if_not_exists() {
         echo "yq version: $cmd_yq"
     else
         echo "Installing yq"
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
         curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o ./yq && chmod +x ./yq
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
     fi
 }
 
