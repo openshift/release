@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "************ telco5g cnf-tests commands ************"
+echo "************ telco verfication functional tests commands ************"
 
 # Environment Variables required for running the test
 export KUBECONFIG="${SHARED_DIR}"/kubeconfig
@@ -32,10 +32,77 @@ git clone "${TELCO_CI_REPO}" "${SHARED_DIR}"/repos/telco-ci
 # install ansible modules
 ansible-galaxy collection install -r "${SHARED_DIR}"/repos/telco-ci/ansible-requirements.yaml
 
-# applying Performance Profile into the cluster
+#Find Baremetal worker nodes
+function is_bm_node () {
+    node=$1
+
+    CPU_THRESHOLD=79
+    MEM_THRESHOLD=80 # in Gi (80 GB)
+
+    echo "Check if node ${node} is baremetal or virtual"
+
+    # Get CPU and memory capacity of the nodes
+    cpu=$(oc get ${node} -o jsonpath='{.status.capacity.cpu}')
+    memory=$(oc get ${node} -o jsonpath='{.status.capacity.memory}')
+
+    # Handle both Ki and Mi memory units
+    if [[ ${memory} == *Ki ]]; then
+        memory=${memory%Ki}
+        memory=$((memory / 1024 / 1024 ))  # Convert Ki to Gi
+    elif [[ ${memory} == *Mi ]]; then
+        memory=${memory%Mi}
+        memory=$((memory / 1024 ))  # Convert Mi to Gi
+    else
+        echo "Warning: Unknown memory unit for ${memory}"
+        memory=0
+    fi
+
+    if [[ ${cpu} -gt ${CPU_THRESHOLD} && ${memory} -gt ${MEM_THRESHOLD} ]]; then
+        echo "Node ${node} is a baremetal node"
+        return 0
+    else
+       echo "Node ${node} is a virtual node"
+       return 1
+    fi
+}
+
+# Label Baremetal worker nodes as worker-cnf
+worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
+    --selector='!node-role.kubernetes.io/master' -o name)
+if [ -z "${worker_nodes}" ]; then
+    echo "No worker nodes found"
+    exit 1
+fi
+test_nodes=""
+for node in ${worker_nodes}; do
+    if is_bm_node ${node}; then
+        test_nodes="${test_nodes} ${node}"
+    fi
+done
+if [ -z "${test_nodes}" ]; then
+    echo "No baremetal nodes found"
+    exit 1
+fi
+echo "Baremetal nodes found: ${test_nodes}"
+
+
+# Label baremetal nodes with worker-cnf role
+echo "************ Labeling baremetal nodes with worker-cnf role ************"
+for node in ${test_nodes}; do
+    echo "Labeling ${node} with node-role.kubernetes.io/worker-cnf"
+    oc label ${node} node-role.kubernetes.io/worker-cnf="" --overwrite
+done
+
+
+## Print the nodes in the cluster
+oc get nodes
+
+
+# Create worker-cnf mcp and applying Performance Profile into the cluster
 echo "************ Applying Performance Profile ************"
 export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/telco-ci/ansible.cfg
-ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/llc_performance_profile.yml -e kubeconfig="${SHARED_DIR}"/mgmt-kubeconfig -c local
+ls -l "${SHARED_DIR}"
+ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/llc.yaml -e kubeconfig="${SHARED_DIR}"/kubeconfig -c local
 
 # checking to see if a release branch is needed or main
 if awk "BEGIN {exit !($T5CI_VERSION < 4.20)}"; then
@@ -63,6 +130,11 @@ fi
 echo "Go version: $(go version)"
 export GOPATH="${HOME}"/go
 export GOBIN="${GOPATH}"/bin
+export IMAGE_REGISTRY=quay.io/openshift-kni/
+export CNF_TESTS_IMAGE=cnf-tests:latest
+
+## Print the nodes in the cluster
+oc get nodes
 
 # Deploy and install ginkgo
 GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@latest
