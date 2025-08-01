@@ -160,7 +160,7 @@ mirrorCmd="${oc_mirror_bin} -c ${image_set_config} docker://${target_release_ima
 
 # ref OCPBUGS-56009
 if ! isPreVersion "4.19" && ! check_signed "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ; then
-    mirrorCmd="${mirrorCmd} --ignore-release-signature"
+    mirrorCmd="${mirrorCmd} --ignore-release-signature --parallel-layers 10 --parallel-images 1 --log-level debug"
 fi
 # execute the oc-mirror command
 run_command "${mirrorCmd}"
