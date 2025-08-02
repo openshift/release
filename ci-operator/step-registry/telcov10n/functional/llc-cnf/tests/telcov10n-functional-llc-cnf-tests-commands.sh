@@ -42,8 +42,8 @@ function is_bm_node () {
     echo "Check if node ${node} is baremetal or virtual"
 
     # Get CPU and memory capacity of the nodes
-    cpu=$(oc get node ${node} -o jsonpath='{.status.capacity.cpu}')
-    memory=$(oc get node ${node} -o jsonpath='{.status.capacity.memory}')
+    cpu=$(oc get ${node} -o jsonpath='{.status.capacity.cpu}')
+    memory=$(oc get ${node} -o jsonpath='{.status.capacity.memory}')
 
     memory=${memory%Mi}
     memory=$((memory / 1024 ))
