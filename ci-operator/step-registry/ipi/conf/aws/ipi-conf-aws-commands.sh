@@ -213,6 +213,12 @@ else
   echo "zones already set in install-config.yaml, skipped"
 fi
 
+if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
+  if [[ "${BUILD_ID: -1}" == '0' && "${JOB_NAME}" == *'pull-ci-openshift-origin-main-e2e-aws'* && "${JOB_NAME}" != *'microshift'* ]]; then
+    CI_NAT_REPLACE='true'
+  fi
+fi
+
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 echo "Using compute node replicas: ${worker_replicas}"
