@@ -33,36 +33,6 @@ function mount_virtual_media() {
   return 0
 }
 
-function oinst() {
-  /tmp/openshift-install --dir="${INSTALL_DIR}" --log-level=debug "${@}" 2>&1 | grep\
-   --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-}
-
-function get_ready_nodes_count() {
-  oc get nodes \
-    -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
-    grep -c -E ",True$"
-}
-
-function update_image_registry() {
-  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
-  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
-      echo "knownCapabilities contains ImageRegistry"
-      # check if ImageRegistry capability enabled
-      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
-        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
-            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
-            return 0
-        fi
-  fi
-  while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
-                 --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
-    echo "Sleeping before retrying to patch the image registry config..."
-    sleep 60
-  done
-}
-
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -72,108 +42,15 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-mkdir -p "${INSTALL_DIR}"
-
-echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=openshift-install --to=/tmp
-
-# We change the payload image to the one in the mirror registry only when the mirroring happens.
-# For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
-# To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
-if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
-  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
-fi
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
-[ -f "${SHARED_DIR}/install-config.yaml" ] || echo "{}" >> "${SHARED_DIR}/install-config.yaml"
-yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-apiVersion: v1
-baseDomain: ${BASE_DOMAIN}
-metadata:
-  name: ${CLUSTER_NAME}
-controlPlane:
-   architecture: ${architecture}
-   hyperthreading: Enabled
-   name: master
-   replicas: ${masters}
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
-"
-
-echo "[INFO] Looking for patches to the install-config.yaml..."
-
-shopt -s nullglob
-for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
-do
-  if test -f "${f}"
-  then
-      echo "[INFO] Applying patch file: $f"
-      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
-  fi
-done
-
-echo "[INFO] Looking for patches to the agent-config.yaml..."
-
-shopt -s nullglob
-for f in "${SHARED_DIR}"/*_patch_agent_config.yaml;
-do
-  if test -f "${f}"
-  then
-      echo "[INFO] Applying patch file: $f"
-      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/agent-config.yaml" "$f"
-  fi
-done
-
-cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
-cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
-
-# From now on, we assume no more patches to the install-config.yaml are needed.
-# Also, we assume that the agent-config.yaml is already in place in the SHARED_DIR.
-# We can create the installation dir with the install-config.yaml and agent-config.yaml.
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
-
-### TODO check if we can support the following
-### Create manifests
-#echo "Creating manifests..."
-#oinst agent create cluster-manifests
-
-### Inject customized manifests
-#echo -e "\nThe following manifests will be included at installation time:"
-#find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
-#while IFS= read -r -d '' item
-#do
-#  manifest="$(basename "${item}")"
-#  cp "${item}" "${INSTALL_DIR}/cluster-manifests/${manifest##manifest_}"
-#done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
-gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
-
-if [ "${FIPS_ENABLED:-false}" = "true" ]; then
-    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
-fi
 
 case "${BOOT_MODE}" in
 "iso")
   ### Create ISO image
-  echo -e "\nCreating image..."
-  oinst agent create image
-  ### Copy the image to the auxiliary host
-  echo -e "\nCopying the ISO image into the bastion host..."
-  if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
-    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:/opt/html/agent.$gnu_arch-rootfs.img"
-  fi
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
-  echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
-  # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
@@ -184,10 +61,10 @@ case "${BOOT_MODE}" in
     fi
     if [ "${transfer_protocol_type}" == "cifs" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-      iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
+      iso_path="${IP_ADDRESS}/isos/agent-ove.x86_64.iso"
     else
       # Assuming HTTP or HTTPS
-      iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
+      iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove.x86_64.iso"
     fi
     mount_virtual_media "${host}" "${iso_path}"
   done
@@ -216,20 +93,6 @@ case "${BOOT_MODE}" in
   exit 1
 esac
 
-export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
-
-echo -e "\nPreparing files for next steps in SHARED_DIR..."
-cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
-cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
-
-# Copy coreos stream file so the observer pod can check if the correct live image was booted
-echo -e "\nGenerating coreOS stream file..."
-
-# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
-oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}/coreos-stream.json" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/coreos-stream.json"
-
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -246,37 +109,12 @@ done
 
 wait
 
-date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
-sleep 900
-echo "Launching 'wait-for bootstrap-complete' installation step....."
-# The installer uses the rendezvous IP for checking the bootstrap phase.
-# The rendezvous IP is in the internal net in our lab.
-# Let's use a proxy here as the internal net is not routable from the container running the installer.
-http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
-  oinst agent wait-for bootstrap-complete 2>&1 &
-if ! wait $!; then
-  # Used by observer pod
-  touch "${SHARED_DIR}/failure"
-  # TODO: gather logs??
-  echo "ERROR: Bootstrap failed. Aborting execution."
-  exit 1
-fi
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    touch /var/builds/${CLUSTER_NAME}/preserve
 
-echo -e "\nLaunching 'wait-for install-complete' installation step....."
-http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
-  oinst agent wait-for install-complete &
-if ! wait "$!"; then
-  echo "ERROR: Installation failed. Aborting execution."
-  # Used by observer pod
-  touch "${SHARED_DIR}/failure"
-  # TODO: gather logs??
-  exit 1
-fi
-update_image_registry
-
-# Used by observer pod
-touch  "${SHARED_DIR}/success"
-
-echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+echo "BASE_DOMAIN ${BASE_DOMAIN}"
+echo "CLUSTER_NAME ${CLUSTER_NAME}"
+#echo -e "\nForcing 2.5hours delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
+sleep 4h
+cp "/tmp/kubeconfig" "${SHARED_DIR}/"
+cp "/tmp/kubeadmin-password" "${SHARED_DIR}/"
