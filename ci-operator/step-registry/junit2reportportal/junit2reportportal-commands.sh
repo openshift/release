@@ -84,23 +84,15 @@ function write_attribute() {
 
 function generate_attribute_architecture() {
   architecture="unknown"
-  for keyword in 'amd64' \
-                 'arm64' \
-                 'multi' \
-                 'ppc64le'
-  do
-    if [[ "$JOB_NAME" =~ $keyword ]]
-    then
-      architecture="$keyword"
-      write_attribute architecture "$architecture"
-      break
-    fi
-  done
-  if [[ "$architecture" = 'unknown' ]]
+  if [[ "$JOB_NAME" =~ amd64|arm64|multi|ppc64le|s390x ]]
   then
+    architecture="${BASH_REMATCH[0]}"
+    write_attribute architecture "$architecture"
+  else
     release_dir="${LOCAL_DIR_ORI}/release/artifacts"
     for release_file in 'release-images-arm64-latest' \
                         'release-images-ppc64le-latest' \
+                        'release-images-s390x-latest' \
                         'release-images-latest'
     do
       release_info_file="$release_dir/$release_file"
@@ -108,15 +100,9 @@ function generate_attribute_architecture() {
       then
         version_installed="$(jq -r '.metadata.name' "$release_info_file")"
         write_attribute version_installed "$version_installed"
-        if [[ "$version_installed" =~ multi ]]
+        if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
         then
-          architecture='multi'
-        elif [[ "$version_installed" =~ arm64 ]]
-        then
-          architecture='arm64'
-        elif [[ "$version_installed" =~ ppc64le ]]
-        then
-          architecture='ppc64le'
+          architecture="${BASH_REMATCH[0]}"
         else
           architecture='amd64'
         fi
