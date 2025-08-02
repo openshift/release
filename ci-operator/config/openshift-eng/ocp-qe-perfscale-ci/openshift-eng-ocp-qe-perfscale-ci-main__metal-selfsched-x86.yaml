@@ -5,10 +5,9 @@ build_root:
     tag: latest
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.17"
+    release:
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -22,10 +21,31 @@ tests:
   restrict_network_access: false
   steps:
     cluster_profile: metal-perfscale-selfsched
-    post:
-    - ref: openshift-qe-installer-bm-self-sched-terminate
+    workflow: openshift-qe-installer-bm-self-sched
+- always_run: false
+  as: self-sched-jetlag
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-selfsched
+    env:
+      PRE_PXE_LOADER: "false"
+      TYPE: sno
+    workflow: openshift-qe-installer-bm-self-sched-deploy
+- always_run: false
+  as: self-sched-node-density
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-selfsched
+    env:
+      PRE_PXE_LOADER: "false"
+      TYPE: sno
     test:
-    - ref: openshift-qe-installer-bm-self-sched
+    - chain: openshift-qe-node-density
+    workflow: openshift-qe-installer-bm-self-sched-deploy
 zz_generated_metadata:
   branch: main
   org: openshift-eng
