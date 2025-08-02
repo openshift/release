@@ -96,7 +96,7 @@ elif [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
 fi
 
-if [[ "$JOB_NAME" == *"telcov10n-functional-llc-cnf-tests"* ]]; then
+if [[ "$JOB_NAME" == *"telcov10n-functional-llc-cnf"* ]]; then
     # For QE AMD jobs
     INTERNAL=true
     INTERNAL_ONLY=true
