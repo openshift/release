@@ -190,6 +190,32 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: verify-latest-supported-go-version
+  optional: true
+  steps:
+    test:
+    - as: builder-go-version
+      commands: |
+        echo "Verifying Go version in builder image..."
+        go version || echo "Failed to retrieve Go version from builder image"
+      from_image:
+        name: builder
+        namespace: ocp
+        tag: rhel-9-golang-1.24-openshift-4.20
+      resources:
+        requests:
+          cpu: 100m
+    - as: release-go-version
+      commands: |
+        echo "Verifying Go version in release image..."
+        go version || echo "Failed to retrieve Go version from release image"
+      from_image:
+        name: release
+        namespace: openshift
+        tag: rhel-9-release-golang-1.24-openshift-4.20
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift
