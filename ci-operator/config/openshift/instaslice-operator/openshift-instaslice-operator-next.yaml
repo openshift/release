@@ -1,14 +1,10 @@
 base_images:
-  cli:
-    name: "4.20"
-    namespace: ocp
-    tag: cli
   ocp_builder_rhel-9-golang-1.23-openshift-4.18:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.18
   operator-sdk:
-    name: "4.17"
+    name: "4.18"
     namespace: origin
     tag: operator-sdk
   redhat-base-ubi9:
@@ -26,18 +22,6 @@ images:
     RUN dnf install -y skopeo git jq && dnf clean all
   from: src
   to: instaslice-base-src
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y skopeo git && dnf clean all
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-with-oc-and-kubectl
 - dockerfile_path: Dockerfile.ocp
   from: redhat-base-ubi9
   inputs:
@@ -160,16 +144,7 @@ tests:
     - ref: ipi-conf-gcp-gpu-on-host-maintenance
     - chain: ipi-install
     test:
-    - as: setup
-      cli: latest
-      commands: "just create-related-images\njust deploy-cert-manager-ocp\njust deploy-nfd-ocp
-        \njust deploy-nvidia-ocp\noc create namespace das-operator || true\noc label
-        ns das-operator openshift.io/cluster-monitoring=true --overwrite\n"
-      from: src-with-oc-and-kubectl
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
+    - ref: openshift-instaslice-operator-e2e-bundle-setup
     - as: run-sdk
       cli: latest
       commands: |

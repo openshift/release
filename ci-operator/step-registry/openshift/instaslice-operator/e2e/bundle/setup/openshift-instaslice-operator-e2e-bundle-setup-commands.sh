@@ -26,6 +26,10 @@ echo "   just installed"
 
 export PATH="${TOOLS_DIR}:${PATH}"
 
-echo "Executing e2e test suite"
-oc apply -f deploy/03_instaslice_operator.cr.yaml
-just test-e2e
+echo "Deploying pre-req operators"
+just create-related-images
+oc create namespace das-operator || true
+oc label ns das-operator openshift.io/cluster-monitoring=true --overwrite
+just deploy-cert-manager-ocp
+just deploy-nfd-ocp 
+just deploy-nvidia-ocp
