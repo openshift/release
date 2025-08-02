@@ -17,7 +17,6 @@ support_np_skew() {
     extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
   fi
   extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
-  extra_flags+="&& oc apply -f /tmp/hc.yaml"
   echo "$extra_flags"
 }
 
@@ -74,7 +73,7 @@ fi
 case "${IP_STACK}" in
   "v4v6")
     # --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112
-    EXTRA_ARGS+="--default-dual"
+    EXTRA_ARGS+=" --default-dual"
     ;;
   "v6")
     EXTRA_ARGS+="--cluster-cidr fd03::/48 --service-cidr fd04::/112 "
@@ -107,7 +106,10 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
-  --release-image ${RELEASE_IMAGE} $(support_np_skew)"
+  --release-image ${RELEASE_IMAGE} --render-sensitive --render > /tmp/hc.yaml"
+
+cat /tmp/hc.yaml
+sleep 3600
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
