@@ -10,6 +10,7 @@ STAGE_USERNAME=$(cat /var/run/stagequayqe/username)
 STAGE_PASSWORD=$(cat /var/run/stagequayqe/password)
 QUAY_OAUTH_TOKEN=$(cat /var/run/stagequayqe/oauth)
 
+
 ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
@@ -113,7 +114,7 @@ spec:
     spec:
       containers:
       - name: python
-        image: quay.io/quay-qetest/quay-load:latest
+        image: quay.io/quay-qetest/quay-load:stage
         securityContext:
           privileged: true
         env:
@@ -132,7 +133,7 @@ spec:
           - name: ES_INDEX
             value: "quay-vegeta"
           - name: PUSH_PULL_IMAGE
-            value: "quay.io/quay-qetest/quay-load:latest"
+            value: "quay.io/quay-qetest/quay-load:stage"
           - name: PUSH_PULL_ES_INDEX
             value: "quay-push-pull"
           - name: PUSH_PULL_NUMBERS
@@ -154,6 +155,9 @@ spec:
           requests:
             cpu: "1"
             memory: "512Mi"
+            ephemeral-storage: "10Gi"
+          limits:
+            ephemeral-storage: "20Gi"  
         imagePullPolicy: Always
       restartPolicy: Never
   backoffLimit: 0
