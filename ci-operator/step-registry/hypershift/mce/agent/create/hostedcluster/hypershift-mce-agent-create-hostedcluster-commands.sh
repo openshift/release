@@ -72,7 +72,7 @@ fi
 case "${IP_STACK}" in
   "v4v6")
     # --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112
-    EXTRA_ARGS+="--default-dual"
+    EXTRA_ARGS+=" --default-dual"
     ;;
   "v6")
     EXTRA_ARGS+="--cluster-cidr fd03::/48 --service-cidr fd04::/112 "
