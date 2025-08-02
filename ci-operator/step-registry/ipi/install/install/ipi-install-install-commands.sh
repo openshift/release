@@ -753,6 +753,11 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
+if [[ -f "${SHARED_DIR}"/99-openshift-nodes-swap-memory-enabled.yaml ]]; then
+    echo "Enable swap memeroy on nodes during installation"
+    cp "${SHARED_DIR}"/99-openshift-nodes-swap-memory-enabled.yaml "${dir}/openshift/"
+fi
+
 # Collect bootstrap logs for all azure clusters
 case "${CLUSTER_TYPE}" in
 azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true ;;
