@@ -8,41 +8,23 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: daily-6nodes
+- as: daily-virt-6nodes
   capabilities:
   - intranet
+  cron: 0 0 * * *
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      CONFIG: config/standard-scalelab.yml
-      INFRA: "true"
-      RUN_CERBERUS: "false"
-    test:
-    - ref: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-data-path-tests
-    - chain: openshift-qe-node-density
-    - chain: openshift-qe-node-density-heavy
-    workflow: openshift-qe-installer-bm-deploy
-  timeout: 8h0m0s
-- always_run: false
-  as: daily-virt-6nodes
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
+      CNV_VERSION: "4.20"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       VM: "true"
@@ -77,6 +59,30 @@ tests:
     workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
+  as: virt-density-6nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      CNV_VERSION: "4.20"
+      EXTRA_MG_ARGS: --image=registry.redhat.io/container-native-virtualization/cnv-must-gather-rhel9:v4.19.0
+        -- /usr/bin/gather
+      INFRA: "true"
+      VMI_READY_THRESHOLD: "180"
+      VMS_PER_NODE: "200"
+    post:
+    - ref: gather-must-gather
+    test:
+    - chain: openshift-qe-node-density-heavy
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-cnv
+    - ref: openshift-qe-virt-density
+    workflow: openshift-qe-installer-bm-deploy
+  timeout: 8h0m0s
+- always_run: false
   as: node-density-heavy-6nodes
   capabilities:
   - intranet
@@ -85,7 +91,6 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      KUBE_BURNER_VERSION: 1.2.9
       RUN_CERBERUS: "false"
     test:
     - chain: openshift-qe-node-density-heavy
@@ -108,7 +113,7 @@ tests:
     - ref: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-bm-deploy
-  timeout: 8h0m0s
+  timeout: 7h55m0s
 - always_run: false
   as: web-burner-node-density-6nodes
   capabilities:
@@ -118,7 +123,6 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      KUBE_BURNER_VERSION: 1.2.9
       PUBLIC_VLAN: "false"
     test:
     - ref: openshift-qe-installer-bm-ping
@@ -149,4 +153,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: metal-4.18-nightly-x86
+  variant: metal-4.20-nightly-x86
