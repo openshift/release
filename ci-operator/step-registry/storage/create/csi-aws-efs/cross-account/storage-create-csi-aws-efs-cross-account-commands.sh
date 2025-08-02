@@ -121,6 +121,15 @@ done
 
 # STEP. Configure a region-wide Mount Target for EFS in account B
 AWS_ACCOUNT_B_PRIVATE_SUBNET_IDS=$(sed -e "s/[][]//g" -e "s/','/ /g" -e "s/'//g" "${SHARED_DIR}/private_subnet_ids")
+if [[ ${ENABLE_SINGLE_ZONE} == "true" ]]; then
+  SINGLE_ZONE=$(oc get node -l node-role.kubernetes.io/worker \
+    -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')
+  AWS_ACCOUNT_B_PRIVATE_SUBNET_IDS=$(aws ec2 describe-subnets \
+  --filters "Name=availability-zone,Values=$SINGLE_ZONE" "Name=vpc-id,Values=$AWS_ACCOUNT_B_VPC_ID" \
+  --query "Subnets[*].SubnetId" \
+  --output text)
+fi
+
 for SUBNET in $AWS_ACCOUNT_B_PRIVATE_SUBNET_IDS; do \
     MOUNT_TARGET=$(aws efs create-mount-target --file-system-id "$CROSS_ACCOUNT_FS_ID" \
        --subnet-id "$SUBNET" \
@@ -190,7 +199,7 @@ for subnet in $SUBNETS; do
   # If no IGW, it's private
   if [ "$HAS_IGW" == "no" ]; then
     aws ec2 create-route --route-table-id "${ROUTE_TABLE_ID}" --destination-cidr-block "${AWS_ACCOUNT_B_VPC_CIDR}" --vpc-peering-connection-id "${PEER_REQUEST_ID}"
-    logger "INFO" "Created route for ${SUBNET} to peering-connection in account A"
+    logger "INFO" "Created route for ${subnet} to peering-connection in account A"
   fi
 done
 
@@ -306,7 +315,9 @@ fi
 aws iam attach-role-policy \
   --role-name "${CLUSTER_NAME}"-master-role \
   --policy-arn arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess
+logger "INFO" "Cluster master role is ${CLUSTER_NAME}-master-role"
 logger "INFO" "Attach the AmazonElasticFileSystemClientFullAccesse Policy to the cluster master role in account A"
+
 
 # STEP. Create a secret with awsRoleArn as the key and ACCOUNT_B_ROLE_ARN as the value, add secret access permission for the aws-efs-csi-driver-controller-sa
 oc create -n "${EFS_CSI_DRIVER_OPERATOR_INSTALLED_NAMESPACE}" secret generic efs-csi-cross-account --from-literal=awsRoleArn="${ACCOUNT_B_ROLE_ARN}"
@@ -331,6 +342,32 @@ parameters:
   csi.storage.k8s.io/provisioner-secret-namespace: ${EFS_CSI_DRIVER_OPERATOR_INSTALLED_NAMESPACE}
 volumeBindingMode: Immediate
 EOF
+
+# Add allowedTopologies for single zone configuration
+if [[ ${ENABLE_SINGLE_ZONE} == "true" ]]; then
+  cat <<EOF > "${SHARED_DIR}"/efs-sc.yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: "${CROSS_ACCOUNT_FS_ID}"
+  directoryPerms: "700"
+  gidRangeStart: "1000"
+  gidRangeEnd: "2000"
+  basePath: "/account-a-data"
+  csi.storage.k8s.io/provisioner-secret-name: efs-csi-cross-account
+  csi.storage.k8s.io/provisioner-secret-namespace: ${EFS_CSI_DRIVER_OPERATOR_INSTALLED_NAMESPACE}
+volumeBindingMode: WaitForFirstConsumer
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone
+    values:
+    - ${SINGLE_ZONE}
+EOF
+fi
 
 logger "INFO" "Using storageclass ${SHARED_DIR}/efs-sc.yaml"
 cat "${SHARED_DIR}"/efs-sc.yaml
