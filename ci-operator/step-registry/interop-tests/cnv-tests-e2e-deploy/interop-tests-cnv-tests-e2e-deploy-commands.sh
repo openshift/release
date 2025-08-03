@@ -77,7 +77,7 @@ make deploy_test || exit_code=$?
 set +x
 
 # Map tests if needed for related use cases
-mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
+# mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
