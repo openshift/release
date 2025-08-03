@@ -37,3 +37,4 @@ else
     echo "No images found that were created more than 2 weeks ago."
 fi
 gcloud compute instances delete ${instance_name} --zone=${ZONE}
+
