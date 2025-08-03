@@ -63,7 +63,7 @@ cat > gather_logs.yaml <<-EOF
         args:
           chdir: /home/assisted
         when: kubeconfig.stat.exists
-
+  
       - name: Extract capi logs
         ansible.builtin.shell: |
           source /root/config.sh
@@ -153,6 +153,7 @@ cat > gather_logs.yaml <<-EOF
           dest: "{{ lookup('env', 'ARTIFACT_DIR') }}"
           mode: pull
       ignore_errors: yes
+
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
