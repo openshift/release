@@ -143,7 +143,7 @@ EOF
 
     # for destroy
     echo "${sp_app_id}" >> "${SHARED_DIR}/azure_sp_id"
-    rm -f ${sp_output}
+    #rm -f ${sp_output}
 
     # ensure that role assignment creation is successful
     echo "Ensure that role ${role_name} assigned successfully"
