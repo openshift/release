@@ -174,6 +174,11 @@ function generate_attribute_install_method() {
     fi
   done
   write_attribute install_method "$install_method"
+
+  if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
+  then
+    write_attribute install_method_catalog "classic"
+  fi
 }
 
 function generate_attribute_profilename() {
@@ -311,17 +316,16 @@ function generate_results() {
     failures_num="0"
   fi
   cat >"${junit_file}" <<EOF
-  <?xml version="1.0" encoding="UTF-8"?>
-  <testsuite name="${testsuite_name}" failures="${failures_num}" errors="0" skipped="0" tests="1">
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${testsuite_name}" failures="${failures_num}" errors="0" skipped="0" tests="1">
     <testcase classname="${testsuite_name}" name="${testsuite_name}" time="1">
       <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/build-log.txt</system-out>
     </testcase>
-  </testsuite>
+</testsuite>
 EOF
   if [[ "$failures_num" == "1" ]]; then
     sed -i '/testcase classname/a \      <failure message="Installation failed" type="failed"/>' "${junit_file}"
   fi
-
 
   cp "$junit_file" "${ARTIFACT_DIR}"
   find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
