@@ -5,6 +5,11 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 
+cat <<EOF > /tmp/10-disable-telemetry.yaml
+telemetry:
+  status: Disabled
+EOF
+
 cat <<EOF > /tmp/prepare.sh
 #!/bin/bash
 set -xeuo pipefail
@@ -17,6 +22,9 @@ download_microshift_scripts
 ci_copy_secrets "${CACHE_REGION}"
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+
+sudo mkdir -p /etc/microshift/config.d
+sudo cp /tmp/10-disable-telemetry.yaml /etc/microshift/config.d/10-disable-telemetry.yaml
 EOF
 chmod +x /tmp/prepare.sh
 
@@ -26,6 +34,7 @@ tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 scp \
   "${SHARED_DIR}/ci-functions.sh" \
   /tmp/prepare.sh \
+  /tmp/10-disable-telemetry.yaml \
   /var/run/rhsm/subscription-manager-org \
   /var/run/rhsm/subscription-manager-act-key \
   /var/run/microshift-dev-access-keys/aws_access_key_id \
