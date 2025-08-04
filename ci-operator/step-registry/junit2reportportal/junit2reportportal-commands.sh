@@ -308,9 +308,13 @@ function generate_results() {
 #  sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$junit_file"
 #  sed -i "1 a <testsuite name=\"$testsuite_name\" failures=\"$failure_count\" errors=\"0\" skipped=\"0\" tests=\"$(wc -w <<< $step_dirs)\">" "$junit_file"
 #  sed -i '$ a </testsuite>' "$junit_file"
+#  cp "$junit_file" "${ARTIFACT_DIR}"
 
-  testsuite_name='Installer'
-  junit_file="$LOCAL_DIR_RST/junit_test-installer.xml"
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
+
+  testsuite_name='Installation'
+  # using the same junit filename as the one generated in must-gather step to overwirte installation results
+  junit_file="$LOCAL_DIR_RST/junit_install.xml"
   failures_num="1"
   if [[ "$INSTALL_RESULT" == "succeed" ]]; then
     failures_num="0"
@@ -326,9 +330,6 @@ EOF
   if [[ "$failures_num" == "1" ]]; then
     sed -i '/testcase classname/a \      <failure message="Installation failed" type="failed"/>' "${junit_file}"
   fi
-
-  cp "$junit_file" "${ARTIFACT_DIR}"
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
 
   ls -alR "$LOCAL_DIR"
 }
