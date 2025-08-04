@@ -151,6 +151,27 @@ run_command "${cmd}" || exit 1
 rm pull-secret
 popd
 
+cat <<EOF > "${cr_yaml_d}"/efs-credentials-request.yaml
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: openshift-aws-efs-csi-driver
+  namespace: openshift-cloud-credential-operator
+spec:
+  secretRef:
+    name: aws-efs-cloud-credentials
+    namespace: openshift-cluster-csi-drivers
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: AWSProviderSpec
+    statementEntries:
+    - effect: Allow
+      action:
+      - elasticfilesystem:*
+      resource: "*"
+  # STS fields will be set by the operator
+EOF
+
 echo "CR manifest files:"
 ls "$cr_yaml_d"
 
