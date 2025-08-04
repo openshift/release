@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,14 +12,14 @@ releases:
   latest:
     release:
       channel: candidate
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: acm-cnv-ipi-aws-419-rc
+- as: acm-cnv-ipi-aws-420-rc
   cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
@@ -35,9 +35,13 @@ tests:
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "!default", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+          {"name": "kubevirt-hyperconverged", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-cnv", "target_namespaces": "openshift-cnv"},
+          {"name": "mtv-operator", "source": "redhat-operators", "channel": "release-v2.8", "install_namespace": "openhsift-mtv", "target_namespaces": "openshift-mtv"}
         ]
     test:
+    - chain: cucushift-installer-check-cluster-health
     - ref: install-operators
+    - ref: interop-tests-deploy-odf
     - ref: p2p-acm-cnv-poc
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
