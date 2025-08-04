@@ -28,21 +28,16 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   to: jenkins-agent-base
-promotion:
-  to:
-  - disabled: true
-    name: "4.18"
-    namespace: ocp
 releases:
-  initial:
-    integration:
-      name: "4.18"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
       name: "4.18"
       namespace: ocp
+  openshift-4-15:
+    release:
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -77,6 +72,31 @@ tests:
   skip_if_only_changed: \.tekton/.*|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    test:
+    - ref: jenkins-client-plugin-tests
+    workflow: ipi-aws
+- as: e2e-aws-4-15
+  skip_if_only_changed: \.tekton/.*|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:openshift-4-15
+    workflow: openshift-e2e-aws
+- as: e2e-aws-jenkins-sync-plugin-4-15
+  skip_if_only_changed: \.tekton/.*|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:openshift-4-15
+    test:
+    - ref: jenkins-sync-plugin-e2e
+    workflow: ipi-aws
+- as: e2e-aws-jenkins-client-plugin-4-15
+  skip_if_only_changed: \.tekton/.*|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:openshift-4-15
     test:
     - ref: jenkins-client-plugin-tests
     workflow: ipi-aws
