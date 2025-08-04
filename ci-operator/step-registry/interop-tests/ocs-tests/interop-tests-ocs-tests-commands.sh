@@ -27,13 +27,17 @@ cleanup() {
 trap cleanup EXIT SIGINT
 
 function install_yq_if_not_exists() {
-    # Install yq manually if its not found in image
+    # Install yq manually if not found in image
     echo "Checking if yq exists"
     cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -x "${cmd_yq}" ]; then
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
         echo "Installing yq"
-        curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o ./yq && chmod +x ./yq
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
     fi
 }
 
@@ -99,12 +103,13 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
   || /bin/true
 
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
+
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""

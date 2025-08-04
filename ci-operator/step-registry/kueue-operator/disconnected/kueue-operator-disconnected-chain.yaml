@@ -1,0 +1,29 @@
+chain:
+  as: kueue-operator-disconnected
+  steps:
+  - ref: kueue-operator-disconnected-compute
+  - ref: kueue-operator-disconnected-install
+  - as: run-sdk
+    commands: |      
+      # Configure authentication for mirror registry by reusing saved auth
+      export HOME="${HOME:-/tmp/home}"
+      export XDG_RUNTIME_DIR="${HOME}/run"
+      mkdir -p "${XDG_RUNTIME_DIR}/containers"
+      
+      if test -f "${SHARED_DIR}/containers-auth.json"; then
+          echo "Reusing authentication file from catalog step..."
+          cp "${SHARED_DIR}/containers-auth.json" "${XDG_RUNTIME_DIR}/containers/auth.json"
+          echo "Authentication configured successfully"
+      fi
+      
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      export REGISTRY_AUTH_FILE="${XDG_RUNTIME_DIR}/containers/auth.json"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator --skip-tls-verify --verbose --security-context-config restricted "$BUNDLE_IMAGE"
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  documentation: |-
+    Install the kueue Operator for Red Hat OpenShift from the mirrored registry.

@@ -160,13 +160,17 @@ function cnv::reimport_datavolumes() {
 }
 
 function install_yq_if_not_exists() {
-    # Install yq manually if its not found in image
+    # Install yq manually if not found in image
     echo "Checking if yq exists"
     cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -x "${cmd_yq}" ]; then
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
         echo "Installing yq"
-        curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o ./yq && chmod +x ./yq
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
     fi
 }
 
