@@ -186,7 +186,9 @@ cat << EOF > ~/ocp-install.yml
       timeout: 300
 
   - name: Remove last run
-    shell: kcli delete plan --yes ${PLAN_NAME}
+    shell: |
+        kcli delete plan --yes ${PLAN_NAME}
+        kcli delete plan --yes ${CLUSTER_NAME}
     ignore_errors: yes
 
   - name: Remove lock file
