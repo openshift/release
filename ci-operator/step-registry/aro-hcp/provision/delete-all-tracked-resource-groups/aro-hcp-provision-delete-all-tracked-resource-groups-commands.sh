@@ -20,6 +20,6 @@ for file in "${SHARED_DIR}"/tracked-resource-group_*; do
         resource_group_name=${full_filename#tracked-resource-group_}
 
         # Delete each resource group
-        az group delete --subscription "${SUBSCRIPTION}" --yes --name "${resource_group_name}"
+        az group delete --subscription "${SUBSCRIPTION}" --yes --name "${resource_group_name}" || true
     fi
 done
