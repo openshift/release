@@ -180,6 +180,11 @@ echo -e "Available cluster versions:\n${versionList}"
 if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
   PAYLOAD_TAG=$(echo $ORIGINAL_RELEASE_IMAGE_LATEST | cut -d':' -f2)
 
+  version_cmd="rosa list versions --channel-group nightly -o json"
+  if [[ "${HOSTED_CP}" == "true" ]]; then
+    version_cmd="${version_cmd} --hosted-cp"
+  fi
+
   DELAY=60
   MAX_DELAY=360
   TIME_LIMIT=3600
