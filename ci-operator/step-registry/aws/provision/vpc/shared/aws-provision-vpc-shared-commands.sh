@@ -757,6 +757,16 @@ if [[ "${ADDITIONAL_SUBNETS_COUNT}" -gt 0 ]]; then
   aws_add_param_to_json "AdditionalSubnetsCount" ${ADDITIONAL_SUBNETS_COUNT} "$vpc_params"
 fi
 
+# Enable support for AWS EFS CSI driver in single-zone, cross-account configuration.
+# This condition is used by the chain: storage-conf-csi-optional-aws-efs-cross-account.
+# It ensures that both the cluster and the shared VPC subnet are in the same availability zone.
+if [[ ${EFS_ENABLE_SINGLE_ZONE} == "true" ]] && [[ "${ZONES_COUNT}" -eq 1 ]]; then
+  if [[ -s "${SHARED_DIR}/install-config.yaml" ]]; then
+    ZONES_LIST="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'controlPlane.platform.aws.zones[0]' 2>/dev/null)"
+    echo "Getting single zone ZONES_LIST=\"${ZONES_LIST}\" from install-config"
+  fi
+fi
+
 if [[ ${ZONES_LIST} != "" ]]; then
   zones_list_count=$(echo "$ZONES_LIST" | awk -F',' '{ print NF }')
   if [[ "${zones_list_count}" != "${ZONES_COUNT}" ]]; then
