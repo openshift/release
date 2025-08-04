@@ -11,7 +11,7 @@ function cerberus_cleanup() {
 
   curl_status=$(curl -X GET http://0.0.0.0:8080)
   echo "killing cerberus observer"
-  kill -15 ${cerberus_pid}
+  kill ${cerberus_pid}
   
   # c_status=$(cat /tmp/cerberus_status)
   date
@@ -31,7 +31,13 @@ function cerberus_cleanup() {
   oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
   output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
   echo "pod rsh $output"
-  exit 0
+
+  status_bool=$(echo $output | grep '"cerberus":' | sed 's/.*: //; s/[{},]//g')
+
+  echo "$status_bool staus bool "
+
+  replaced_str=$(echo $status_bool | sed "s/True/0/g" | sed "s/False/1/g" )
+  exit $((replaced_str))
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 
