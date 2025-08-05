@@ -96,6 +96,13 @@ elif [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
 fi
 
+if [[ "$JOB_NAME" == *"telcov10n-functional-llc-cnf"* ]]; then
+    # For QE AMD jobs
+    INTERNAL=true
+    INTERNAL_ONLY=true
+    ADDITIONAL_ARG=" -e amd"
+fi
+
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
 - name: Grab and run kcli to install openshift cluster
@@ -179,7 +186,9 @@ cat << EOF > ~/ocp-install.yml
       timeout: 300
 
   - name: Remove last run
-    shell: kcli delete plan --yes ${PLAN_NAME}
+    shell: |
+        kcli delete plan --yes ${PLAN_NAME}
+        kcli delete plan --yes ${CLUSTER_NAME}
     ignore_errors: yes
 
   - name: Remove lock file

@@ -30,7 +30,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.63.4
+    tag: v1.64.8
   nested-environment-builder:
     name: nested-environment-builder
     namespace: ci
@@ -83,10 +83,6 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
@@ -123,9 +119,6 @@ images:
     ocp_4.20_installer-kube-apiserver-artifacts:
       as:
       - registry.ci.openshift.org/ocp/4.20:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
@@ -141,9 +134,9 @@ images:
     ocp_4.17_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.17:hyperkube
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   inputs:
@@ -159,9 +152,9 @@ images:
     ocp_4.17_installer-kube-apiserver-artifacts:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   inputs:
@@ -177,9 +170,9 @@ images:
     ocp_4.17_installer-kube-apiserver-artifacts:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   inputs:
@@ -201,9 +194,6 @@ images:
     ocp_4.20_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.20:hyperkube
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
@@ -603,7 +593,7 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_GATES: '["GCPClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
     workflow: openshift-e2e-gcp-custom-dns
@@ -940,10 +930,12 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
+- as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -983,6 +975,18 @@ tests:
     env:
       ADDITIONAL_DISK: "true"
       FEATURE_GATES: '["VSphereMultiDisk=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-disk-setup
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      DISK_SETUP: "true"
+      FEATURE_GATES: '[VSphereMultiDisk=true,MultiDiskSetup=true]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
@@ -1034,9 +1038,15 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
+        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
+      BASELINE_CAPABILITY_SET: None
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
+      PERSISTENT_MONITORING: "false"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+      TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 6h0m0s
 - always_run: false
