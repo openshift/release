@@ -26,6 +26,8 @@ KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 IP_JUMPHOST=128.168.131.205
 CLUSTER_VARS_PATH="/root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning/cluster-vars"
 SSH_KEY_PATH="/tmp/id_rsa"
+cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
+chmod 400 $SSH_KEY_PATH
 SSH_ARGS=" -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
 
 # Define SSH command just like Power script
@@ -45,8 +47,6 @@ EOF
 )
 
 # setup ssh key
-cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
-chmod 400 $SSH_KEY_PATH
 
 # Run the SSH command
 ssh $SSH_ARGS  root@$IP_JUMPHOST "$SSH_CMD" > "$KUBECONFIG_FILE"

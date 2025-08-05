@@ -16,12 +16,12 @@ PRIVATE_KEY_FILE="${SECRET_DIR}/IPI_SSH_KEY"
 SSH_KEY_PATH="/tmp/id_rsa"
 OUTPUT_FILE="/tmp/deletedcluster-logs"
 IP_JUMPHOST=128.168.131.205
+cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
+chmod 400 $SSH_KEY_PATH
 SSH_ARGS=" -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
 
 
 # setup ssh key
-cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
-chmod 400 $SSH_KEY_PATH
 
 # Define SSH command just like Power script
 SSH_CMD=$(cat <<EOF
