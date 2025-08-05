@@ -37,6 +37,7 @@ export PULL_SECRET=\$(<${PULL_SECRET_FILE})
 export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export TARGET_VM_NAME="${TARGET_VM_NAME}"
 export TARGET_VERSION="${TARGET_VERSION}"
+export TARGET_LCA_REF="${TARGET_LCA_REF}"
 export RELEASE_IMAGE="${TARGET_IMAGE}"
 export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
 export SEED_VERSION="${SEED_VERSION}"
@@ -74,7 +75,7 @@ set_docker_config_file
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
-echo "Making a target cluster..."
+echo "Making a target cluster... target LCA: ${TARGET_LCA_REF}"
 make target
 
 echo "Upgrading target cluster from ${TARGET_VERSION} to ${SEED_VERSION} using ${SEED_IMAGE}:${SEED_IMAGE_TAG}..."
