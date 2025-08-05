@@ -24,24 +24,25 @@ function cerberus_cleanup() {
   date
   ls 
   oc get ns
-
-  oc get pods -n $TEST_NAMESPACE
   jobs -l
-
+  
   oc cluster-info
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$curl_status'}' >> test.json
-  
-  CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
 
-  oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
-  output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
-  echo "pod rsh $output"
+  pods=$(oc get pods -n $TEST_NAMESPACE --no-headers)
+  if [[ -n $pods ]]; then 
 
-  status_bool=$(echo $output | grep '"cerberus":' | sed 's/.*: //; s/[{},]//g')
+    CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
 
-  echo "$status_bool staus bool "
+    oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
+    output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
+    echo "pod rsh $output"
+    status_bool=$(echo $output | grep '"cerberus":' | sed 's/.*: //; s/[{},]//g')
+
+    echo "$status_bool staus bool "
+  fi
 
   replaced_str=$(echo $curl_status | sed "s/True/0/g" | sed "s/False/1/g" )
   exit $((replaced_str))
