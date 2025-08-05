@@ -9,11 +9,18 @@ ls
 
 function cerberus_cleanup() {
 
-  curl_status=$(curl -X GET http://0.0.0.0:8080)
+  curl_status=$(curl -X GET http://0.0.0.0:8080 2>/dev/null || cat /tmp/cerberus_status 2>/dev/null)
   echo "killing cerberus observer"
   kill ${cerberus_pid}
-  
-  # c_status=$(cat /tmp/cerberus_status)
+
+  if [[ -z $curl_status ]]; then
+    if [ ! -f "${KUBECONFIG}" ]; then
+      # Setting status to true because kubeconfig never was set and cerberus didn't run
+      curl_status=True
+    else 
+      curl_status=False
+    fi
+  fi
   date
   ls 
   oc get ns
@@ -36,7 +43,7 @@ function cerberus_cleanup() {
 
   echo "$status_bool staus bool "
 
-  replaced_str=$(echo $status_bool | sed "s/True/0/g" | sed "s/False/1/g" )
+  replaced_str=$(echo $curl_status | sed "s/True/0/g" | sed "s/False/1/g" )
   exit $((replaced_str))
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
