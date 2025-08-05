@@ -4,9 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Fix UID issue (from Telco QE Team)
-~/fix_uid.sh
-
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
@@ -54,9 +51,9 @@ bastion="${bastion}"
 
 ssh root@${bastion} "
   echo 'Hostname: \$(hostname)'
-  rm -rf RHOSO
-  git clone https://github.com/masco/RHOSO.git
-  cd RHOSO/ansible
+  rm -rf JetBrew
+  git clone https://github.com/redhat-performance/JetBrew.git
+  cd JetBrew/ansible
   scp root@${jumphost}:/tmp/rhoso_all.yml group_vars/all.yml
   ansible-playbook -vvv main.yml 2>&1 | tee log
 "
