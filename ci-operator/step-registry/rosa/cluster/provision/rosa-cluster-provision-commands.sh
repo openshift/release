@@ -37,6 +37,14 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
+build_version_cmd() {
+  local channel="$1"
+  version_cmd="rosa list versions --channel-group ${channel} -o json"
+  if [[ "${HOSTED_CP}" == "true" ]]; then
+    version_cmd="${version_cmd} --hosted-cp"
+  fi
+}
+
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
 function record_cluster() {
@@ -165,10 +173,7 @@ fi
 if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
   PAYLOAD_TAG=$(echo $ORIGINAL_RELEASE_IMAGE_LATEST | cut -d':' -f2)
 
-  version_cmd="rosa list versions --channel-group nightly -o json"
-  if [[ "${HOSTED_CP}" == "true" ]]; then
-    version_cmd="${version_cmd} --hosted-cp"
-  fi
+  build_version_cmd "nightly"
 
   DELAY=60
   MAX_DELAY=360
@@ -219,10 +224,7 @@ CHANNEL_GROUP=""
 for GROUP in "${CHANNEL_GROUP_ARRAY[@]}"; do
   log "Checking ${GROUP} channel..."
 
-  version_cmd="rosa list versions --channel-group ${GROUP} -o json"
-  if [[ "${HOSTED_CP}" == "true" ]]; then
-    version_cmd="${version_cmd} --hosted-cp"
-  fi
+  build_version_cmd "${GROUP}"
 
   if [[ "${AVAILABLE_UPGRADE}" == "yes" ]]; then
     version_list=$(eval "${version_cmd}" | jq -r '.[] | select(.available_upgrades!=null) .raw_id')
