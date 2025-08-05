@@ -114,11 +114,14 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+        #!/bin/bash
+        curl https://patch-diff.githubusercontent.com/raw/openshift/cert-manager-operator/pull/302.diff > pr.diff
+        git apply pr.diff
       from: src
       resources:
         requests:
           cpu: 100m
+    - ref: wait
     workflow: optional-operators-ci-operator-sdk-generic-claim
 - as: e2e-operator-tech-preview
   optional: true
@@ -135,11 +138,15 @@ tests:
     - as: test
       cli: latest
       commands: |
+        #!/bin/bash
+        curl https://patch-diff.githubusercontent.com/raw/openshift/cert-manager-operator/pull/302.diff > pr.diff
+        git apply pr.diff
         E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
+    - ref: wait
     workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
   branch: master
