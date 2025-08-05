@@ -112,11 +112,8 @@ run_command "mkdir /tmp/images"
 cat <<EOF > /tmp/image-set.yaml
 
 kind: ImageSetConfiguration
-apiVersion: mirror.openshift.io/v1alpha2
+apiVersion: mirror.openshift.io/v2alpha1
 archiveSize: 30
-storageConfig:
-  local:
-    path: /tmp/images
 mirror:
   operators:
   - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.17
@@ -124,21 +121,25 @@ mirror:
     - name: lightspeed-operator
       channels:
       - name: stable
+  additionalImages:
+  - name: registry.redhat.io/rhel9/postgresql-16@sha256:6d2cab6cb6366b26fcf4591fe22aa5e8212a3836c34c896bb65977a8e50d658b
 EOF
 
     run_command "cd /tmp"
     run_command "curl -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
-    run_command "./oc-mirror --config=/tmp/image-set.yaml docker://${MIRROR_REGISTRY_HOST} --continue-on-error --ignore-history --source-skip-tls --dest-skip-tls || true"
-    run_command "cp oc-mirror-workspace/results-*/mapping.txt ."
+    run_command "./oc-mirror --config=/tmp/image-set.yaml --workspace file://oc-mirror-workspace docker://${MIRROR_REGISTRY_HOST} --image-timeout 60m0s --src-tls-verify false --dest-tls-verify false --retry-times 3 --v2 || true"
+    # run_command "cp oc-mirror-workspace/results-*/mapping.txt ."
     #run_command "sed -e 's|registry.redhat.io|registry.stage.redhat.io|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/tempo|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/otel|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/jaeger|brew.registry.redhat.io/rh-osbs/iib|g' mapping.txt > mapping-stage.txt"
-    run_command "oc image mirror -a ${REG_CREDS} -f mapping.txt --insecure --filter-by-os='.*'"
+    # run_command "oc image mirror -a ${REG_CREDS} -f mapping.txt --insecure --filter-by-os='.*'"
 
     # print and apply generated ICSP and catalog source
-    run_command "cat oc-mirror-workspace/results-*/imageContentSourcePolicy.yaml"
-    run_command "cat oc-mirror-workspace/results-*/catalogSource*"
-    run_command "oc apply -f ./oc-mirror-workspace/results-*/"
+    run_command "cat oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4.17.yaml"
+    run_command "cat oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml*"
+    # Applying the catalogsource and imagedigestmirrorset but avoiding applying clustercatalog
+    run_command "oc apply -f ./oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4.17.yaml"
+    run_command "oc apply -f ./oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml"
 
-    CATALOG_SOURCE="cs-redhat-operator-index"
+    CATALOG_SOURCE="cs-redhat-operator-index-v4.17"
     local -i counter=0
     local status=""
     while [ $counter -lt 600 ]; do
