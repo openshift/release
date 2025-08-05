@@ -76,14 +76,10 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
     # Check if secret exists in either index or GCP
     index_secrets = get_secrets_from_index(client, collection)
     if secret in index_secrets:
-        raise click.ClickException(
-            f"Secret '{secret}' already exists within the collection index."
-        )
+        raise click.ClickException(f"Secret named '{secret}' already exists.")
     try:
         client.get_secret(name=client.secret_path(PROJECT_ID, secret_name))
-        raise click.ClickException(
-            f"Secret '{secret}' already exists in collection '{collection}'."
-        )
+        raise click.ClickException(f"Secret named '{secret}' already exists.")
     except NotFound:
         pass  # Secret doesn't exist in GCP - this is good
 
