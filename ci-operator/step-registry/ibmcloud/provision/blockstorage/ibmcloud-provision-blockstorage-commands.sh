@@ -28,6 +28,18 @@ function update_volume() {
     volume_id=$(ibmcloud is instance $1 --output json | jq -r '.volume_attachments[0].volume.id')
     ibmcloud is volume-update $volume_id  --profile $STORAGE_PROFILE
 
+    echo "Waiting for volume $volume_id to become available..."
+    while true; do
+        status=$(ibmcloud is vol $volume_id --output json | jq -r .status)
+        echo "Volume status: $status"
+        if [ "$status" = "available" ]; then
+            echo "Volume $volume_id is now available"
+            break
+        fi
+        echo "Waiting 30 seconds before checking again..."
+        sleep 30
+    done
+
     ibmcloud is volume $volume_id
 }
 
