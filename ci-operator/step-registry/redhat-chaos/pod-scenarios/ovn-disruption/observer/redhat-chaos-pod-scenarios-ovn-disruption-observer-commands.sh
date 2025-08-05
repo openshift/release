@@ -41,7 +41,7 @@ echo "Finding and labeling ovnkube-node pods on worker nodes..."
 
 # Get the namespace and pod names for ovnkube-node pods on worker nodes
 for node in $worker_nodes; do
-  oc get pods -A -l app=ovnkube-node -o wide | grep "$node" | while read namespace name ready status restarts age ip node rest; do
+  oc get pods -A -l app=ovnkube-node -o wide | grep "$node" | awk '{print $1, $2}' | while read namespace name; do
     echo "Labeling pod $name in namespace $namespace (on worker node $node) as ovnkube-node-worker"
     oc label pod $name -n $namespace ovnkube-node-worker=true --overwrite
   done
