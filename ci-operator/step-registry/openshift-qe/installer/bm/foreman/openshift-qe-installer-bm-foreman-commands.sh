@@ -15,6 +15,8 @@ LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
+LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
+export LOGIN
 
 # 1. Set the corresponding host on the lab Foreman instance
 # 2. Use badfish to set the boot interface and bounce the box
@@ -24,7 +26,21 @@ OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
 USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
 PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
 for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
-  hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PSWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "Grub2 UEFI" --build 1
+  echo "Processing host: $i"
+
+  # Determine boot mode using badfish
+  echo "Checking boot mode for host $i..."
+  BOOT_MODE=$(podman run quay.io/quads/badfish:latest --get-bios-attribute --attribute BootMode -H mgmt-$i -u $USER -p $PSWD -o json 2>&1 | jq -r .CurrentValue)
+
+  # Set PXE loader based on boot mode
+  if [ "$BOOT_MODE" = "Bios" ]; then
+    PXE_LOADER="PXELinux BIOS"
+    echo "Boot mode is BIOS, using PXELinux BIOS loader"
+  else
+    PXE_LOADER="Grub2 UEFI"
+    echo "Boot mode is UEFI, using Grub2 UEFI loader"
+  fi
+  hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PSWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "$PXE_LOADER" --build 1
   sleep 10
   podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman
   podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
@@ -37,15 +53,24 @@ cat > /tmp/foreman-wait.sh << 'EOF'
 echo 'Running foreman-wait.sh'
 OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
 for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
-  while ! nc -z $i 22; do
-    echo "Trying SSH port on host $i ..."
-    sleep 60
+  # Wait for SSH to be available and check hostname
+  while true; do
+    echo "Trying SSH connection to host $i ..."
+
+    # Try to connect with sshpass and check hostname
+    if sshpass -p "$LOGIN" ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@$i 'hostname' 2>/dev/null; then
+      echo "SSH connection successful on host $i"
+      break
+    else
+      echo "SSH not ready on host $i, waiting..."
+      sleep 60
+    fi
   done
   ssh-keygen -R $i 2>/dev/null || true
   ssh-keyscan $i >> ~/.ssh/known_hosts
 done
 EOF
-envsubst '${NUM_NODES},${LAB_CLOUD},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated-$LAB_CLOUD.sh
+envsubst '${NUM_NODES},${LOGIN},${LAB_CLOUD},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated-$LAB_CLOUD.sh
 
 scp -q ${SSH_ARGS} /tmp/foreman-deploy_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/foreman-wait_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
