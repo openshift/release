@@ -65,6 +65,7 @@ go mod tidy
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class- &&\
   oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd" storageclass.kubernetes.io/is-default-class=true &&\
+  OADP_TEST_FOCUS=""
   export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
   export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
@@ -78,6 +79,7 @@ if [[ "$OADP_TEST_FOCUS" == "--focus=ALL_TESTS" ]]; then
 fi
 # export NUM_OF_OADP_INSTANCES=3
 export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
+export TESTS_FOLDER="/alabama/cspi/e2e" &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
 (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
 
