@@ -53,6 +53,16 @@ function add_data_volume() {
     
     echo "Attaching volume $1-data-volume to instance $1"
     ibmcloud is instance-volume-attachment-add data-attachment $1 $1-data-volume --auto-delete true
+    
+    echo "Waiting for volume attachment to complete..."
+    while true; do
+        attachment_status=$(ibmcloud is instance-volume-attachments $1 --output json 2>/dev/null | jq -r '.[] | select(.volume.name == "'$1'-data-volume") | .status // empty' 2>/dev/null)
+        if [ "$attachment_status" = "attached" ]; then
+            echo "Volume $1-data-volume is now attached to instance $1"
+            break
+        fi
+        sleep 30
+    done
 }
 
 ibmcloud_login
