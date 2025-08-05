@@ -66,11 +66,6 @@ EOF
 # Mirror operator and test images to the Mirror registry. Create Catalog sources and Image Content Source Policy.
 function mirror_catalog_icsp() {
     run_command 'oc patch operatorhub cluster -p '\''{"spec": {"disableAllDefaultSources": true}}'\'' --type=merge'
-    run_command 'oc patch clustercatalog openshift-certified-operators -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
-    run_command 'oc patch clustercatalog openshift-redhat-operators -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
-    run_command 'oc patch clustercatalog openshift-redhat-marketplace -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
-    run_command 'oc patch clustercatalog openshift-community-operators -p '\''{"spec": {"availabilityMode": "Unavailable"}}'\'' --type=merge'
-    run_command 'oc get clustercatalog'
     registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
 
     optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
@@ -136,10 +131,10 @@ EOF
     run_command "cat oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4.17.yaml"
     run_command "cat oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml*"
     # Applying the catalogsource and imagedigestmirrorset but avoiding applying clustercatalog
-    run_command "oc apply -f ./oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4.17.yaml"
+    run_command "oc apply -f ./oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4-17.yaml"
     run_command "oc apply -f ./oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml"
 
-    CATALOG_SOURCE="cs-redhat-operator-index-v4.17"
+    CATALOG_SOURCE="cs-redhat-operator-index-v4-17"
     local -i counter=0
     local status=""
     while [ $counter -lt 600 ]; do
