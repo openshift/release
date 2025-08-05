@@ -22,7 +22,7 @@ oc create -f - <<EOF
         spec:
             localClusterName: local-cluster
 EOF
-oc wait  MultiClusterHub -n ocm multiclusterhub --for=condition=Available --timeout=15m
+oc wait  MultiClusterHub -n ocm multiclusterhub --for=condition=Available --timeout=30m
 oc create -f - <<EOF
         kind: HyperConverged
         apiVersion: hco.kubevirt.io/v1beta1
@@ -34,5 +34,5 @@ oc create -f - <<EOF
         spec: {}
 EOF
 
-oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m
 sleep 7200
