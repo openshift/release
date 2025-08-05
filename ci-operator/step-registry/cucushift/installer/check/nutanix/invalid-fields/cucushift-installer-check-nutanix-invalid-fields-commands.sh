@@ -207,4 +207,33 @@ fi
 rm -rf "${dir:?}/"
 mkdir "${dir}/"
 
+# set invalid GPUs
+cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+CONFIG="${dir}/install-config.yaml"
+PATCH="${dir}/invalid-GPUs.yaml.patch"
+
+cat >"${PATCH}" <<EOF
+compute:
+- name: worker
+  platform:
+    nutanix:
+      gpus:
+        - type: InvalidType
+          deviceID: 7864
+        - type: Name
+          name: "Invalid Name"
+        - type: DeviceID
+          deviceID: 9999
+EOF
+yq-go m -x -i "${CONFIG}" "${PATCH}"
+run_install
+if grep 'invalid gpu identifier type, the valid values: \\"DeviceID\\", \\"Name\\"' "${dir}"/.openshift_install.log && grep 'platform.nutanix.gpus.name: Invalid value: \\"Invalid Name\\"' "${dir}"/.openshift_install.log && grep 'platform.nutanix.gpus.deviceID: Invalid value: 9999' "${dir}"/.openshift_install.log; then
+  echo "Pass: passed to check GPUs field"
+else
+  echo "Fail: failed to check GPUs field"
+  check_result=$((check_result + 1))
+fi
+rm -rf "${dir:?}/"
+mkdir "${dir}/"
+
 exit "${check_result}"
