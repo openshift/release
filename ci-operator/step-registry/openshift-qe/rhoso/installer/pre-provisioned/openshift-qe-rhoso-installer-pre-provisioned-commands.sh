@@ -54,9 +54,9 @@ bastion="${bastion}"
 
 ssh root@${bastion} "
   echo 'Hostname: \$(hostname)'
-  rm -rf RHOSO
-  git clone https://github.com/masco/RHOSO.git
-  cd RHOSO/ansible
+  rm -rf JetBrew
+  git clone https://github.com/redhat-performance/JetBrew.git
+  cd JetBrew/ansible
   scp root@${jumphost}:/tmp/rhoso_all.yml group_vars/all.yml
   ansible-playbook -vvv main.yml 2>&1 | tee log
 "
