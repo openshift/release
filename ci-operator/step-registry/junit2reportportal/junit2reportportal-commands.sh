@@ -37,7 +37,13 @@ then
     echo "Expected pull number not found, exit 1"
     exit 1
   fi
-  LOGS_PATH="pr-logs/pull/openshift_release/${pr_number}"
+  pr_repo="$(jq -r '.refs.repo' <<< $JOB_SPEC)"
+  if [[ -z "$pr_repo" ]]
+  then
+    echo "Expected repo name not found, exit 2"
+    exit 2
+  fi
+  LOGS_PATH="pr-logs/pull/openshift_${pr_repo}/${pr_number}"
 fi
 DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration then .decoration_config.gcs_configuration.bucket else error end' <<< ${JOB_SPEC:-''})"
 PROWCI=''
