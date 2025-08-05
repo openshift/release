@@ -22,7 +22,7 @@ oc create -f - <<EOF
         spec:
             localClusterName: local-cluster
 EOF
-oc wait  MultiClusterHub -n ocm multiclusterhub --for=condition=Available --timeout=30m
+oc -n ocm wait --for=jsonpath='{.status.phase}'=Running mch/multiclusterhub --timeout 15m
 oc create -f - <<EOF
         kind: HyperConverged
         apiVersion: hco.kubevirt.io/v1beta1
