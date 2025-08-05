@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -153,6 +157,383 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
+- as: e2e-aws-techpreview
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    pre:
+    - chain: ipi-aws-pre
+    - ref: insights-live
+    test:
+    - as: api-insights-tests
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.20
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- as: e2e-azure-techpreview
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    pre:
+    - chain: ipi-azure-pre
+    - ref: insights-live
+    test:
+    - as: api-insights-tests
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.20
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
+- as: e2e-vsphere-techpreview
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    pre:
+    - chain: ipi-vsphere-pre
+    - ref: insights-live
+    test:
+    - as: api-insights-tests
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.20
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-vsphere
+- as: gcp-insights-runtime-extractor-tests
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp-3
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: api-insights-tests
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.20
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: aws-insights-runtime-extractor-tests
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-aws-pre
+    - ref: insights-live
+    test:
+    - as: api-insights-tests
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.20
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- as: azure-insights-runtime-extractor-tests
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: azure4
+    pre:
+    - chain: ipi-azure-pre
+    - ref: insights-live
+    test:
+    - as: api-insights-tests
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.20
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
+- as: vsphere-insights-runtime-extractor-tests
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    pre:
+    - chain: ipi-vsphere-pre
+    - ref: insights-live
+    test:
+    - as: api-insights-tests
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.20
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/ocm-access/
+        name: insights-ocm-token
+        namespace: test-credentials
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-vsphere
 - as: insights-operator-e2e-tests-slow-tests
   cron: 0 0 * * 6
   steps:
