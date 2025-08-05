@@ -6,7 +6,7 @@ set -o pipefail
 set -E
 
 export PATH=${PATH}:/cli
-gnu_architecture=$(sed 's/amd64/x86_64/;s/arm64/aarch64/' <<< "${architecture:-amd64}")
+gnu_architecture=$(sed 's/amd64/x86_64/' <<< "${architecture:-amd64}")
 
 pushd deploy/operator
 
@@ -14,6 +14,8 @@ CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d
 OS_IMAGES=$(yq '[.[] | select(.openshift_version == '"$CLUSTER_VERSION"')]' ../../data/default_os_images.json)
 ASSISTED_NAMESPACE="multicluster-engine"
 STORAGE_CLASS_NAME=$(oc get storageclass -o=jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
+
+echo "${OS_IMAGES}"
 
 ASSISTED_MIRROR_CM="
 apiVersion: v1
