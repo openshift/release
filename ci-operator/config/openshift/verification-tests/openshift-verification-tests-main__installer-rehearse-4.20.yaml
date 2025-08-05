@@ -58,6 +58,18 @@ tests:
     - chain: aws-provision-bastionhost
     test:
     - ref: cucushift-installer-wait
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_COMPUTE_MULTIDISK_MOUNT_PATH: /var/lib/containers
+      AZURE_COMPUTE_MULTIDISK_TYPE: user-defined
+      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_GATES: '[''AzureMultiDisk=true'', ''MultiDiskSetup=true'']'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: cucushift-installer-rehearse-azure-ipi-multidisk
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
