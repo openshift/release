@@ -49,8 +49,4 @@ fi
 
 echo "$RUN_COMMAND"
 
-if [ "${STOP_ON_FAILURE}" = "false" ]; then
-  eval "$RUN_COMMAND" || true
-else
-  eval "$RUN_COMMAND"
-fi
+${RUN_COMMAND}
