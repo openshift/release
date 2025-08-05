@@ -31,7 +31,7 @@ function cerberus_cleanup() {
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$curl_status'}' >> test.json
 
-  pods=$(oc get pods -n $TEST_NAMESPACE --no-headers)
+  pods=$(oc get pods -n $TEST_NAMESPACE --no-headers 2>/dev/null)
   if [[ -n $pods ]]; then 
 
     CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
