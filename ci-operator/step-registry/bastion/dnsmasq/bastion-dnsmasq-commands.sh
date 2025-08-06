@@ -77,9 +77,14 @@ run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/custom-d
 #Set the custom DNS configuration and start dnsmasq
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo mv /tmp/custom-dns.conf /etc/dnsmasq.d/"
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo chown root:root /etc/dnsmasq.d/custom-dns.conf && sudo restorecon -v /etc/dnsmasq.d/custom-dns.conf"
+nameserver=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "${ssh_key}" ${bastion_user}@${bastion_dns} "grep 'nameserver' /etc/resolv.conf" | awk '{print $2}')
+run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e 'no-resolv\nserver=${nameserver}' | sudo tee -a /etc/dnsmasq.conf"
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl unmask dnsmasq && sudo systemctl enable dnsmasq && sudo systemctl start dnsmasq"
 
 #Set dnsmasq as the first DNS server
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee -a /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved && resolvectl"
+#run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee -a /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved && resolvectl"
+run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[main]\ndns=dnsmasq' | sudo tee -a /etc/NetworkManager/NetworkManager.conf && sudo systemctl reload NetworkManager.service"
 
 echo "Custom DNS records were configured on the bastion host."
+echo "debug"
+sleep 3600
