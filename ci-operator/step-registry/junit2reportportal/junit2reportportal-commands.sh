@@ -2,9 +2,6 @@
 
 set -o pipefail
 
-# the exit code of this step is not expected to be caught from the overall test suite in ReportPortal. Excluding it
-touch "${ARTIFACT_DIR}/skip_overall_if_fail"
-
 set -x
 if [[ "${NO_REPORTPORTAL,,}" = 'true' ]]
 then
@@ -17,25 +14,28 @@ then
   exit 0
 fi
 
-ALLOWED_REPOS=("openshift-tests-private"
-               "verification-tests"
-               "oadp-qe-automation"
-               "rosa"
+ALLOWED_REPOS=("openshift/openshift-tests-private"
+               "openshift/rosa"
+               "openshift/verification-tests"
+               "oadp-qe/oadp-qe-automation"
               )
+org="$(jq -r 'if .extra_refs then .extra_refs[0].org
+              elif .refs then .refs.org
+              else error
+              end' <<< ${JOB_SPEC})"
 repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
                elif .refs then .refs.repo
                else error
-               end
-' <<< ${JOB_SPEC:-''})"
+               end' <<< ${JOB_SPEC})"
 # shellcheck disable=SC2076
-if ! [[ "${ALLOWED_REPOS[*]}" =~ "$repo" ]]
+if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repo: $repo"
+    echo "Skip repository: $org/$repo"
     exit 0
 fi
 
 LOGS_PATH="logs"
-if [[ "$(jq -r '.type' <<< ${JOB_SPEC:-''})" = "presubmit" ]]
+if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = "presubmit" ]]
 then
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
@@ -43,17 +43,21 @@ then
     echo "Expected pull number not found, exit 1"
     exit 1
   fi
+  pr_org="$(jq -r '.refs.org' <<< $JOB_SPEC)"
   pr_repo="$(jq -r '.refs.repo' <<< $JOB_SPEC)"
-  if [[ -z "$pr_repo" ]]
+  if [[ -z "$pr_org" ]] || [[ -z "$pr_repo" ]]
   then
-    echo "Expected repo name not found, exit 2"
+    echo "Expected org/repo name not found, exit 2"
     exit 2
   fi
-  LOGS_PATH="pr-logs/pull/openshift_${pr_repo}/${pr_number}"
+  LOGS_PATH="pr-logs/pull/${pr_org}_${pr_repo}/${pr_number}"
 fi
-DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration then .decoration_config.gcs_configuration.bucket else error end' <<< ${JOB_SPEC:-''})"
 PROWCI=''
 PROWWEB=''
+DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration
+                    then .decoration_config.gcs_configuration.bucket
+                    else error
+                    end' <<< ${JOB_SPEC})"
 if [[ "$DECK_NAME" = 'test-platform-results' ]]
 then
   PROWCI="https://prow.ci.openshift.org"
@@ -64,7 +68,7 @@ then
   PROWWEB="https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
 else
   echo "Unknow bucket name: $DECK_NAME"
-  exit 1
+  exit 3
 fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
@@ -159,18 +163,10 @@ function generate_attribute_install() {
 
 function generate_attribute_install_method() {
   install_method="unknown"
-  for keyword in 'agent' \
-                 'hypershift' \
-                 'ipi' \
-                 'rosa' \
-                 'upi'
-  do
-    if [[ "$JOB_NAME_SAFE" =~ $keyword ]]
-    then
-      install_method="$keyword"
-      break
-    fi
-  done
+  if [[ "$JOB_NAME_SAFE" =~ agent|hypershift|ipi|rosa|upi ]]
+  then
+    install_method="${BASH_REMATCH[0]}"
+  fi
   write_attribute install_method "$install_method"
 
   if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
