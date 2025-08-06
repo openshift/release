@@ -104,7 +104,7 @@ EOF
 
 set -x
 oc wait --timeout=5m --for=condition=ReconcileCompleted AgentServiceConfig agent
-oc wait --timeout=5m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
+oc wait --timeout=15m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
 oc wait --timeout=15m --for=condition=Ready pod -l app=assisted-image-service -n "${ASSISTED_NAMESPACE}"
 
 echo "Enabling configuration of BMH resources outside of openshift-machine-api namespace"
