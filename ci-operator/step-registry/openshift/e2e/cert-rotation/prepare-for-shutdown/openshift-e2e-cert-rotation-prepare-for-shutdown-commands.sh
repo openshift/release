@@ -186,11 +186,13 @@ function wait-for-kubeapiserver-to-start-progressing {
 }
 
 if [ ! -f /tmp/pod-restart-workarounds.sh ]; then
+  export KUBECONFIG=/tmp/lb-ext.kubeconfig
+  ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+
   cat << 'EOZ' > /tmp/pod-restart-workarounds.sh
   set +e
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
-  ocp_minor_version=$(oc --request-timeout=5s version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+  until oc --request-timeout=5s get nodes; do sleep 30; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
 
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-42001
   # Restart OVN / Multus before proceeding
