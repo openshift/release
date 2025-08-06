@@ -34,20 +34,28 @@ tests:
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
-- as: control-plane-24nodes
-  cron: '@weekly'
+- as: control-plane-6nodes
+  cron: 0 0 * * 1
   steps:
-    allow_skip_on_success: true
     cluster_profile: aws-perfscale-okd
     env:
-      ADDITIONAL_WORKER_NODES: "21"
+      ADDITIONAL_WORKER_NODES: "3"
       BASE_DOMAIN: perfscale.devcluster.openshift.com
-      ES_SECRETS_PATH: /prod-secret
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      IGNORE_JOB_ITERATIONS: "true"
+      ITERATION_MULTIPLIER_ENV: "15"
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "false"
+      VERSION: "4.19"
       ZONES_COUNT: "3"
     test:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
 - always_run: false
   as: compact-cp-3nodes
   steps:

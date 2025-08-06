@@ -185,11 +185,15 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
   tasks:
 
   - name: Remove last run for ${CLUSTER_NAME}_ci
-    shell: kcli delete plan --yes ${CLUSTER_NAME}_ci
+    shell: |
+        kcli delete plan --yes ${CLUSTER_NAME}_ci
+        kcli delete plan --yes ${CLUSTER_NAME}
     ignore_errors: yes
 
   - name: Remove last run for ${ADD_BM_HOST:-empty}_ci
-    shell: kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
+    shell: |
+        kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
+        kcli delete plan --yes ${ADD_BM_HOST:-empty}
     ignore_errors: yes
 
 EOF
@@ -253,9 +257,9 @@ else
     SNO_CLUSTER_API_PORT="6443"
 fi
 
-if [[ "$T5CI_VERSION" == "4.19" ]] || [[ "$T5CI_VERSION" == "4.20" ]]; then
-    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
-    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
+if [[ "$T5CI_VERSION" == "4.20" ]] || [[ "$T5CI_VERSION" == "4.21" ]]; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.19"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.19"
 fi
 
 cat << EOF > ~/fetch-kubeconfig.yml

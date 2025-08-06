@@ -12,10 +12,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+  from_repository: true
 canonical_go_repository: github.com/openshift/bond-cni
 images:
 - dockerfile_path: Dockerfile.openshift
@@ -51,6 +48,13 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

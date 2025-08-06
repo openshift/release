@@ -128,8 +128,8 @@ function filter_test_by_network() {
             networktag='@network-ovnkubernetes'
             ;;
         other)
-            networktag=''
-            ;;
+	    networktag='@other-cni'
+	    ;;
         *)
             echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
             ;;
@@ -378,7 +378,6 @@ function summarize_test_results() {
     combinedxml="${ARTIFACT_DIR}/junit_cucushift-e2e-combined.xml"
     jrm "$combinedxml" $xmlfiles || exit 0
     rm -f $xmlfiles
-    set -x
 
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
     if [ -f "$combinedxml" ] ; then
@@ -434,7 +433,7 @@ EOF
 
     if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
-        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
+        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | grep -v -E 'grep .*/artifacts' | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
         for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done

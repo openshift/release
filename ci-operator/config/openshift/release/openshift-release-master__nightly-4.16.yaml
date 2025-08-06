@@ -232,13 +232,12 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-bm-upgrade
+- as: e2e-metal-ipi-ovn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -284,7 +283,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere-sdn
-  interval: 168h
+  cron: 40 9 * * 1
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -294,7 +293,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-sdn
 - as: e2e-vsphere-ovn-techpreview
-  interval: 168h
+  cron: 13 2 * * 6
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -316,7 +315,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
-  interval: 168h
+  cron: 12 11 * * 0
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -327,7 +326,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-static-ovn
-  interval: 168h
+  cron: 14 1 * * 3
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -336,7 +335,7 @@ tests:
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-externallb-ovn
-  interval: 168h
+  cron: 46 15 * * 5
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -344,7 +343,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
-  interval: 168h
+  cron: 51 1 * * 0
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -355,7 +354,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-techpreview-serial
-  interval: 168h
+  cron: 42 11 * * 4
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -365,7 +364,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
-  interval: 168h
+  cron: 0 19 * * 1
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -376,7 +375,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
-  interval: 168h
+  cron: 35 1 * * 3
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -387,7 +386,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-ovn-csi
-  interval: 168h
+  cron: 15 13 * * 2
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -398,12 +397,12 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-ovn-zones
-  interval: 168h
+  cron: 28 18 * * 3
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
-  interval: 168h
+  cron: 55 9 * * 3
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -411,7 +410,7 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-external-vsphere-ccm
-  cron: '@weekly'
+  cron: 15 7 * * 3
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -715,39 +714,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-telco5g
-  capabilities:
-  - intranet
-  cron: 00 02 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=false
-        CNF_ORIGIN_TESTS=true
-      T5CI_JOB_TYPE: origintests
-      T5CI_VERSION: "4.16"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-origin
-- as: e2e-telco5g-cnftests
-  capabilities:
-  - intranet
-  cron: 00 02 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.16"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-cnf
-  timeout: 6h0m0s
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
@@ -762,38 +728,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-ptp
-- as: e2e-telco5g-hcp-cnftests
-  capabilities:
-  - intranet
-  cron: 00 02 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.16"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-hcp-cnf
-- as: e2e-telco5g-sno-ztp-cnftests
-  capabilities:
-  - intranet
-  cron: 00 01 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-ztp-cnftests
-      T5CI_VERSION: "4.16"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
   cron: 0 23 * * 0,3
@@ -961,7 +895,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-etcd-scaling
 - as: e2e-vsphere-ovn-etcd-scaling
-  interval: 168h
+  cron: 35 13 * * 6
   steps:
     cluster_profile: vsphere-elastic
     observers:
