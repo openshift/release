@@ -105,27 +105,15 @@ function generate_attribute_architecture() {
     architecture="${BASH_REMATCH[0]}"
     write_attribute architecture "$architecture"
   else
-    release_dir="${LOCAL_DIR_ORI}/release/artifacts"
-    for release_file in 'release-images-arm64-latest' \
-                        'release-images-ppc64le-latest' \
-                        'release-images-s390x-latest' \
-                        'release-images-latest'
-    do
-      release_info_file="$release_dir/$release_file"
-      if [[ -f "$release_info_file" ]]
-      then
-        version_installed="$(jq -r '.metadata.name' "$release_info_file")"
-        write_attribute version_installed "$version_installed"
-        if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
-        then
-          architecture="${BASH_REMATCH[0]}"
-        else
-          architecture='amd64'
-        fi
-        write_attribute architecture "$architecture"
-        break
-      fi
-    done
+    generate_attribute_version_installed
+    version_installed="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="version_installed").value' "$DATAROUTER_JSON")"
+    if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
+    then
+      architecture="${BASH_REMATCH[0]}"
+    else
+      architecture='amd64'
+    fi
+    write_attribute architecture "$architecture"
   fi
 }
 
@@ -192,21 +180,31 @@ function generate_attribute_version_installed() {
   if [[ -z "$version_installed" ]]
   then
     release_dir="${LOCAL_DIR_ORI}/release/artifacts"
-    release_file="release-images-latest"
+    release_info_file="$release_dir/release-images-latest"
     arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
-    if [[ "$arch" = 'arm64' ]]
+    if [[ -z "$arch" ]]
     then
-      release_file="release-images-arm64-latest"
-    elif [[ "$arch" = 'ppc64le' ]]
-    then
-      release_file="release-images-ppc64le-latest"
+      for release_file in 'release-images-arm64-latest' \
+                          'release-images-ppc64le-latest' \
+                          'release-images-s390x-latest'
+      do
+        release_info_file="$release_dir/$release_file"
+        if [[ -f "$release_info_file" ]]
+        then
+          break
+        fi
+      done
+    else
+      if [[ "$arch" =~ arm64|ppc64le|s390x ]]
+      then
+        release_info_file="$release_dir/release-images-${arch}-latest"
+      fi
     fi
-    release_info_file="$release_dir/$release_file"
     if [[ -f "$release_info_file" ]]
     then
       version_installed="$(jq -r '.metadata.name' "$release_info_file")"
+      write_attribute version_installed "$version_installed"
     fi
-    write_attribute version_installed "$version_installed"
   fi
 }
 
