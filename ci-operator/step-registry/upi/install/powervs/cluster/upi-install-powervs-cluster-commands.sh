@@ -346,11 +346,7 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
-    while true
-    do
-        echo "sleep $(date)"
-        sleep 10s
-    done
+    echo "Running apply"
     "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
         -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
         -state="${SHARED_DIR}"/terraform.tfstate \
@@ -370,9 +366,9 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
-    echo "Running apply"
     echo "Finished Running"
-    echo "Extracting the terraformm output from the state file"
+
+    echo "Extracting the terraform output from the state file"
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
@@ -424,3 +420,4 @@ fix_user_permissions
 build_upi_cluster
 
 echo "Successfully created the PowerVS cluster"
+echo 0
