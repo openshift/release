@@ -6,9 +6,14 @@ set -o pipefail
 touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
 set -x
+if [[ "${NO_REPORTPORTAL,,}" = 'true' ]]
+then
+  echo "Skip, as user choose not to send results to ReportPortal for job: ${JOB_NAME}"
+  exit 0
+fi
 if ! (env | grep -q JOB_SPEC)
 then
-  echo "No JOB_SPEC. Skip"
+  echo "Skip, as no JOB_SPEC defined and we rely on it heavily"
   exit 0
 fi
 
