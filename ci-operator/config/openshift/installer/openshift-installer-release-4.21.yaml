@@ -592,7 +592,7 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
+      FEATURE_GATES: '["GCPClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
     workflow: openshift-e2e-gcp-custom-dns
@@ -929,10 +929,12 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
+- as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -972,6 +974,18 @@ tests:
     env:
       ADDITIONAL_DISK: "true"
       FEATURE_GATES: '["VSphereMultiDisk=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-disk-setup
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      DISK_SETUP: "true"
+      FEATURE_GATES: '[VSphereMultiDisk=true,MultiDiskSetup=true]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
@@ -1023,9 +1037,15 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
+        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
+      BASELINE_CAPABILITY_SET: None
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
+      PERSISTENT_MONITORING: "false"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+      TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 6h0m0s
 - always_run: false
@@ -1401,6 +1421,13 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-gcp-ovn
   timeout: 6h0m0s
+- as: e2e-gcp-xpn-dedicated-dns-project
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-xpn-dedicated-dns-project
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
@@ -1442,7 +1469,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      FEATURE_GATES: '["GCPCustomAPIEndpoints=true"]'
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-custom-endpoints
   timeout: 6h0m0s
