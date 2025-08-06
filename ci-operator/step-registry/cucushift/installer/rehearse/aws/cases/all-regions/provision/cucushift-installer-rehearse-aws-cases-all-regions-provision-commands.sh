@@ -289,8 +289,8 @@ EOF
 
   if [[ ${ENABLE_ZONES} == "yes" ]]; then
     local azs
-    # 排除ap-east-2a，只使用ap-east-2b和ap-east-2c
-    azs=$(jq -r '.AvailabilityZones[] | select(.ZoneType=="availability-zone" and .ZoneName!="ap-east-2a") | .ZoneName' "$(get_zones_json ${region})")
+    # 排除ap-east-2a和ap-east-2c，只使用ap-east-2b
+    azs=$(jq -r '.AvailabilityZones[] | select(.ZoneType=="availability-zone" and .ZoneName!="ap-east-2a" and .ZoneName!="ap-east-2c") | .ZoneName' "$(get_zones_json ${region})")
     for az in ${azs}; do
       export az
       yq-v4 eval -i '.controlPlane.platform.aws.zones += [env(az)]' "${config}"
