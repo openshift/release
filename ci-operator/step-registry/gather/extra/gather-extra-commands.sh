@@ -221,10 +221,11 @@ function gather_network() {
 
   local podlist="/tmp/${namespace}-pods"
 
-  # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+  # Snapshot iptables/nftables rules on each node
   oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
   while IFS= read -r i; do
     queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
+    queue ${ARTIFACT_DIR}/network/nft-list-ruleset-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i nft list ruleset
   done < ${podlist}
   # Snapshot all used ports on each node.
   while IFS= read -r i; do
@@ -234,7 +235,7 @@ function gather_network() {
 
 # Gather network details both from SDN and OVN. One of them should succeed.
 gather_network openshift-sdn app=sdn sdn
-gather_network openshift-ovn-kubernetes app=ovnkube-node ovnkube-node
+gather_network openshift-ovn-kubernetes app=ovnkube-node ovn-controller
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
