@@ -1,0 +1,75 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make go-build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/must-gather-operator
+images:
+- dockerfile_path: build/Dockerfile
+  from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - quay.io/redhat-services-prod/openshift/boilerplate:image-v7.4.0
+  to: must-gather-operator
+promotion:
+  to:
+  - name: 4.20-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.20-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.20-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make e2e-binary-build
+tests:
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "true"
+    test:
+    - ref: go-verify-deps
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: must-gather-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift-priv
+  repo: must-gather-operator
