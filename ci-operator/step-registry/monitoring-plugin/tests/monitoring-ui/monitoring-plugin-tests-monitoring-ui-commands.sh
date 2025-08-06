@@ -103,8 +103,11 @@ console_route=$(oc get route console -n openshift-console -o jsonpath='{.spec.ho
 export CYPRESS_BASE_URL=https://$console_route
 
 # Set Cypress authentication username and password.
-export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
-export CYPRESS_LOGIN_USERS=${users}
+# export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
+# export CYPRESS_LOGIN_USERS=${users}
+# Use the IDP once issue https://issues.redhat.com/browse/OCPBUGS-59366 is fixed.
+export CYPRESS_LOGIN_IDP=kube:admin
+export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 
 # Run the Cypress tests.
 export NO_COLOR=1
