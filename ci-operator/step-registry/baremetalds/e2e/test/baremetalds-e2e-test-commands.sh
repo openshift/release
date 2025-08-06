@@ -44,6 +44,17 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/etcd:3.5.16-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-16-0-ExW1ETJqOZa6gx2F"
   # new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
   "registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ"
+  # image used by SigstoreImageVerification test, we also need to mirror the signature
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-16a47375542a993a78368ac80f729382277853523c2baf237c0ae27e41e40fd3.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-16a47375542a993a78368ac80f729382277853523c2baf237c0ae27e41e40fd3.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-a1dc9b439291e609fc80847b5c7954e117af4b74b7b60506a07b200e9c08d272.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-a1dc9b439291e609fc80847b5c7954e117af4b74b7b60506a07b200e9c08d272.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-2c3ded2309184bedf27a03dd99e8f6b1bd28febd7fc9b64dc76a862e3a221214.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-2c3ded2309184bedf27a03dd99e8f6b1bd28febd7fc9b64dc76a862e3a221214.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-9bae0ce4b604680683a3f8d538c8f86ffab8b982577eee240e0accf369b3ac78.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-9bae0ce4b604680683a3f8d538c8f86ffab8b982577eee240e0accf369b3ac78.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-bf920ca7f146b802e1c9a8aab1fba3a3fe601c56b075ecef90834c13b90bb5bb.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-bf920ca7f146b802e1c9a8aab1fba3a3fe601c56b075ecef90834c13b90bb5bb.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-de2179c139422b80990c400ef4021aadb61f1fa6113c8ed0a214f981059ebaa8.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-de2179c139422b80990c400ef4021aadb61f1fa6113c8ed0a214f981059ebaa8.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-43c54eaff5af90941cc9895821dfa09448e1c8889de6815aadd4cb9d7e1fb5d7.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-43c54eaff5af90941cc9895821dfa09448e1c8889de6815aadd4cb9d7e1fb5d7.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-19ea09c75445a0949e1a39fb100233eded8d3a0b9f6bc0f3e6f237b6c74f0930.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-19ea09c75445a0949e1a39fb100233eded8d3a0b9f6bc0f3e6f237b6c74f0930.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-0415f56ccc05526f2af5a7ae8654baec97d4a614f24736e8eef41a4591f08019.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-0415f56ccc05526f2af5a7ae8654baec97d4a614f24736e8eef41a4591f08019.sig"
+  "quay.io/openshifttest/busybox-testsigstoresigned:sha256-c5439d7db88ab5423999530349d327b04279ad3161d7596d2126dfb5b02bfd1f.sig $DEVSCRIPTS_TEST_IMAGE_REPO:sha256-c5439d7db88ab5423999530349d327b04279ad3161d7596d2126dfb5b02bfd1f.sig"
 )
 
 function run-oc-image-mirror() {
