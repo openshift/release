@@ -74,6 +74,18 @@ releases:
       product: ocp
       stream: nightly
       version: "4.11"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.10"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.11"
   ppc64le-initial:
     candidate:
       architecture: ppc64le
@@ -145,6 +157,25 @@ tests:
       BRANCH: "4.10"
       TEST_TYPE: upgrade
     workflow: openshift-e2e-libvirt
+- as: ocp-e2e-aws-ovn-heterogeneous-upgrade
+  cron: 52 3 9,24 * *
+  steps:
+    cluster_profile: aws-3
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    workflow: openshift-upgrade-aws-heterogeneous
+- as: ocp-e2e-upgrade-aws-arm64
+  cron: 24 3 6,20 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      OCP_ARCH: arm64
+      TEST_SUITE: upgrade-conformance
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: master
   org: openshift

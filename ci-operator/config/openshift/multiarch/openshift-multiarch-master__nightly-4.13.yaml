@@ -60,13 +60,6 @@ base_images:
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
 releases:
-  arm64-initial:
-    candidate:
-      architecture: arm64
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.13"
   arm64-latest:
     candidate:
       architecture: arm64
@@ -84,37 +77,16 @@ releases:
       product: ocp
       stream: nightly
       version: "4.13"
-  multi-initial:
-    candidate:
-      architecture: multi
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.13"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
       version: "4.13"
-  ppc64le-initial:
-    candidate:
-      architecture: ppc64le
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.13"
   ppc64le-latest:
     candidate:
       architecture: ppc64le
       product: ocp
-      stream: nightly
-      version: "4.13"
-  s390x-initial:
-    candidate:
-      architecture: s390x
-      product: ocp
-      relative: 1
       stream: nightly
       version: "4.13"
   s390x-latest:
@@ -129,14 +101,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-e2e-aws-ovn-heterogeneous-upgrade
-  cron: 30 11 * * 0
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    workflow: openshift-upgrade-aws-heterogeneous
 - as: ocp-e2e-aws-ovn-heterogeneous
   cron: 08 11 * * 5
   steps:
@@ -179,17 +143,6 @@ tests:
     env:
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-sdn
-- as: ocp-e2e-upgrade-aws-ovn-arm64
-  cron: 36 0 * * 6
-  steps:
-    cluster_profile: aws-3
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      OCP_ARCH: arm64
-      TEST_SUITE: upgrade-conformance
-    workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-arm64
   cron: 10 1 * * 6
   steps:
@@ -300,19 +253,6 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     workflow: openshift-e2e-azure-ovn
-- as: ocp-e2e-upgrade-azure-ovn-arm64
-  cron: 48 5 * * 6
-  steps:
-    cluster_profile: azure-arm64
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: ci.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-      TEST_SUITE: upgrade-conformance
-    workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   capabilities:
   - sshd-bastion
