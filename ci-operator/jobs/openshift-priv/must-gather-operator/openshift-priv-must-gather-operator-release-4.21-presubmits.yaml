@@ -1,12 +1,11 @@
 presubmits:
-  openshift-priv/oc-mirror:
+  openshift-priv/must-gather-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build06
-    context: ci/prow/e2e
+    - ^release-4\.21$
+    - ^release-4\.21-
+    context: ci/prow/coverage
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -16,9 +15,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oc-mirror-release-4.20-e2e
-    path_alias: github.com/openshift/oc-mirror
-    rerun_command: /test e2e
+    name: pull-ci-openshift-priv-must-gather-operator-release-4.21-coverage
+    path_alias: github.com/openshift/must-gather-operator
+    rerun_command: /test coverage
     spec:
       containers:
       - args:
@@ -26,7 +25,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=e2e
+        - --secret-dir=/secrets/must-gather-operator-codecov-token
+        - --target=coverage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -45,6 +45,9 @@ presubmits:
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
+        - mountPath: /secrets/must-gather-operator-codecov-token
+          name: must-gather-operator-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -56,19 +59,21 @@ presubmits:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
+      - name: must-gather-operator-codecov-token
+        secret:
+          secretName: must-gather-operator-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )coverage,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build06
+    - ^release-4\.21$
+    - ^release-4\.21-
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -79,8 +84,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oc-mirror-release-4.20-images
-    path_alias: github.com/openshift/oc-mirror
+    name: pull-ci-openshift-priv-must-gather-operator-release-4.21-images
+    path_alias: github.com/openshift/must-gather-operator
     rerun_command: /test images
     spec:
       containers:
@@ -127,74 +132,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    context: ci/prow/integration
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oc-mirror-release-4.20-integration
-    path_alias: github.com/openshift/oc-mirror
-    rerun_command: /test integration
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=integration
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build06
+    - ^release-4\.21$
+    - ^release-4\.21-
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -205,8 +146,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oc-mirror-release-4.20-lint
-    path_alias: github.com/openshift/oc-mirror
+    name: pull-ci-openshift-priv-must-gather-operator-release-4.21-lint
+    path_alias: github.com/openshift/must-gather-operator
     rerun_command: /test lint
     spec:
       containers:
@@ -255,10 +196,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build06
-    context: ci/prow/sanity
+    - ^release-4\.21$
+    - ^release-4\.21-
+    context: ci/prow/test
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -268,9 +208,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oc-mirror-release-4.20-sanity
-    path_alias: github.com/openshift/oc-mirror
-    rerun_command: /test sanity
+    name: pull-ci-openshift-priv-must-gather-operator-release-4.21-test
+    path_alias: github.com/openshift/must-gather-operator
+    rerun_command: /test test
     spec:
       containers:
       - args:
@@ -278,7 +218,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=sanity
+        - --target=test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -314,14 +254,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sanity,?($|\s.*)
+    trigger: (?m)^/test( | .* )test,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build06
-    context: ci/prow/unit
+    - ^release-4\.21$
+    - ^release-4\.21-
+    context: ci/prow/validate
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -331,9 +270,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oc-mirror-release-4.20-unit
-    path_alias: github.com/openshift/oc-mirror
-    rerun_command: /test unit
+    name: pull-ci-openshift-priv-must-gather-operator-release-4.21-validate
+    path_alias: github.com/openshift/must-gather-operator
+    rerun_command: /test validate
     spec:
       containers:
       - args:
@@ -341,7 +280,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=validate
         command:
         - ci-operator
         image: ci-operator:latest
@@ -377,13 +316,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build06
+    - ^release-4\.21$
+    - ^release-4\.21-
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:
@@ -394,8 +332,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oc-mirror-release-4.20-verify-deps
-    path_alias: github.com/openshift/oc-mirror
+    name: pull-ci-openshift-priv-must-gather-operator-release-4.21-verify-deps
+    path_alias: github.com/openshift/must-gather-operator
     rerun_command: /test verify-deps
     spec:
       containers:
