@@ -14,8 +14,10 @@ images:
     RUN set -x && \
       curl --silent --location  https://rpm.nodesource.com/setup_16.x | bash - && \
       curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-      PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2" && \
+      PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2 python3.9" && \
       yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+      ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
+      python3 -m pip install requests  && \
       yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
       yum -y install terraform && \
       wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
@@ -45,8 +47,8 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:951480
-      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1015944
+      QUAY_OPERATOR_CHANNEL: stable-3.15
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
     test:
     - ref: quay-tests-enable-quay-catalogsource
