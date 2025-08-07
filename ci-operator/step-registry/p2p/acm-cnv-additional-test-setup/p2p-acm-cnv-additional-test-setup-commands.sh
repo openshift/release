@@ -10,5 +10,5 @@ cp -L $KUBECONFIG /tmp/kubeconfig
 
 export KUBECONFIG=/tmp/kubeconfig
 
-oc whoami
-sleep 5400
+
+sleep 7200
