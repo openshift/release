@@ -29,7 +29,8 @@ function update_volume() {
     ibmcloud is volume-update $volume_id  --profile $STORAGE_PROFILE
 
     echo "Waiting for volume $volume_id to become available..."
-    while true; do
+    counter=0
+    while [ $counter -lt 10 ]; do
         status=$(ibmcloud is vol $volume_id --output json | jq -r .status)
         echo "Volume status: $status"
         if [ "$status" = "available" ]; then
@@ -38,7 +39,13 @@ function update_volume() {
         fi
         echo "Waiting 30 seconds before checking again..."
         sleep 30
+        counter=$((counter + 1))
     done
+
+    if [ $counter -eq 10 ]; then
+        echo "ERROR: Volume $volume_id failed to become available after 10 attempts"
+        return 1
+    fi
 
     ibmcloud is volume $volume_id
 }
@@ -55,14 +62,22 @@ function add_data_volume() {
     ibmcloud is instance-volume-attachment-add data-attachment $1 $1-data-volume --auto-delete true
     
     echo "Waiting for volume attachment to complete..."
-    while true; do
+    counter=0
+    while [ $counter -lt 10 ]; do
         attachment_status=$(ibmcloud is instance-volume-attachments $1 --output json 2>/dev/null | jq -r '.[] | select(.volume.name == "'$1'-data-volume") | .status // empty' 2>/dev/null)
         if [ "$attachment_status" = "attached" ]; then
             echo "Volume $1-data-volume is now attached to instance $1"
             break
         fi
+        echo "Waiting 30 seconds before checking again..."
         sleep 30
+        counter=$((counter + 1))
     done
+
+    if [ $counter -eq 10 ]; then
+        echo "ERROR: Volume $1-data-volume failed to attach to instance $1 after 10 attempts"
+        return 1
+    fi
 }
 
 ibmcloud_login
