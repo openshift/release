@@ -571,14 +571,17 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-gcp-custom-dns
+  as: gcp-custom-dns
   optional: true
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp-qe
     env:
       FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
+    test:
+    - chain: cucushift-installer-check-cluster-health
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
@@ -1256,7 +1259,13 @@ tests:
     post:
     - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-gcp
+    - chain: ipi-install
+    - ref: cucushift-installer-check-gcp-private
     test:
     - chain: cucushift-installer-check-cluster-health
   timeout: 6h0m0s
