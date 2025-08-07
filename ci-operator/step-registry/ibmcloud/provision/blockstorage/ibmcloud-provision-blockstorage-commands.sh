@@ -48,6 +48,7 @@ function update_volume() {
     fi
 
     ibmcloud is volume $volume_id
+    return 0
 }
 
 function add_data_volume() {
@@ -79,6 +80,7 @@ function add_data_volume() {
         echo "ERROR: Volume $1-data-volume failed to attach to instance $1 after 10 attempts"
         return 1
     fi
+    return 0
 }
 
 ibmcloud_login
