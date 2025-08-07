@@ -17,6 +17,8 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
+FOREMAN_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/foreman_instance_${LAB})
+export FOREMAN_INSTANCE
 
 # 1. Set the corresponding host on the lab Foreman instance
 # 2. Use badfish to set the boot interface and bounce the box
@@ -40,7 +42,19 @@ for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$N
     PXE_LOADER="Grub2 UEFI"
     echo "Boot mode is UEFI, using Grub2 UEFI loader"
   fi
-  hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PSWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "$PXE_LOADER" --build 1
+  podman run \
+    -v /tmp/foreman_config_updated_$LAB_CLOUD.yml:/opt/hammer/foreman_config.yml \
+    quay.io/cloud-bulldozer/foreman-cli:latest \
+    hammer \
+      -c /opt/hammer/foreman_config.yml \
+      --verify-ssl false \
+      -u $LAB_CLOUD \
+      -p $PSWD \
+      host update \
+        --name $i \
+        --operatingsystem "$FOREMAN_OS" \
+        --pxe-loader "$PXE_LOADER" \
+        --build 1
   sleep 10
   podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman
   podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
@@ -72,8 +86,28 @@ done
 EOF
 envsubst '${NUM_NODES},${LOGIN},${LAB_CLOUD},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated-$LAB_CLOUD.sh
 
+# Generate the foreman_config.yml file
+OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+export PSWD
+cat > /tmp/foreman_config.yml << 'EOF'
+:modules:
+    - hammer_cli_foreman
+
+:foreman:
+    :enable_module: true
+    :host: '${FOREMAN_INSTANCE}'
+    :username: '${LAB_CLOUD}'
+    :password: '${PSWD}'
+
+:log_dir: '~/.hammer/log'
+:log_level: 'error'
+EOF
+envsubst '${FOREMAN_INSTANCE},${LAB_CLOUD},${PSWD}' < /tmp/foreman_config.yml > /tmp/foreman_config_updated_$LAB_CLOUD.yml
+
 scp -q ${SSH_ARGS} /tmp/foreman-deploy_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
 scp -q ${SSH_ARGS} /tmp/foreman-wait_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
+scp -q ${SSH_ARGS} /tmp/foreman_config_updated_$LAB_CLOUD.yml root@${bastion}:/tmp/
 
 ssh ${SSH_ARGS} root@${bastion} "
   set -e
