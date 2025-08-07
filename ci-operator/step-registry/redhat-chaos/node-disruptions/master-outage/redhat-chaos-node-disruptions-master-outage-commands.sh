@@ -78,7 +78,7 @@ elif [ "$platform" = "VSphere" ]; then
     export VSPHERE_USERNAME
     VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
     export VSPHERE_PASSWORD
-elif [ "$platform" = "None" ] && { [ "${CLOUD_TYPE:-}" = "bm" ] || [ "${CLOUD_TYPE:-}" = "baremetal" ]; }; then
+elif [ "$platform" = "None" ] || [ "$platform" = "bm" ] || [ "$platform" = "baremetal" ]; then
     # Get a node that matches the LABEL_SELECTOR using oc command
     target_node=$(oc get nodes -l "${LABEL_SELECTOR}" --no-headers | head -1 | awk '{print $1}')
     
@@ -100,20 +100,6 @@ elif [ "$platform" = "None" ] && { [ "${CLOUD_TYPE:-}" = "bm" ] || [ "${CLOUD_TY
                 export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
                 # shellcheck disable=SC2154
                 export NODE_NAME="${target_node}"
-                
-                # Test IPMI connectivity
-                echo "Testing IPMI connectivity to BMC at ${bmc_address}..."
-                if command -v ipmitool >/dev/null 2>&1; then
-                    # Extract IP address from BMC_ADDR for ipmitool
-                    bmc_ip=$(echo "${bmc_address}" | sed 's/.*://')
-                    if ipmitool -I lanplus -H "${bmc_ip}" -U "${bmc_user}" -P "${bmc_pass}" power status >/dev/null 2>&1; then
-                        echo "IPMI connectivity test successful"
-                    else
-                        echo "WARNING: IPMI connectivity test failed."
-                    fi
-                else
-                    echo "WARNING: ipmitool not available, skipping IPMI connectivity test"
-                fi
                 
                 break
             fi
