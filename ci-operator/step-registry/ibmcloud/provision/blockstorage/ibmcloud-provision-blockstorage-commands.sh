@@ -31,24 +31,17 @@ function update_volume() {
     echo "Waiting for volume $volume_id to become available..."
     counter=0
     while [ $counter -lt 10 ]; do
+        sleep 30
+        counter=$(expr $counter + 1)
         status=$(ibmcloud is vol $volume_id --output json | jq -r .status)
         echo "Volume status: $status"
         if [ "$status" = "available" ]; then
             echo "Volume $volume_id is now available"
-            break
+            return 0
         fi
-        echo "Waiting 30 seconds before checking again..."
-        sleep 30
-        counter=$((counter + 1))
     done
-
-    if [ $counter -eq 10 ]; then
-        echo "ERROR: Volume $volume_id failed to become available after 10 attempts"
-        return 1
-    fi
-
-    ibmcloud is volume $volume_id
-    return 0
+    echo "ERROR: Volume $volume_id failed to become available after 10 attempts"
+    return 1
 }
 
 function add_data_volume() {
@@ -66,21 +59,16 @@ function add_data_volume() {
     echo "Waiting for volume attachment to complete..."
     counter=0
     while [ $counter -lt 10 ]; do
+        sleep 30
+        counter=$(expr $counter + 1)
         attachment_status=$(ibmcloud is instance-volume-attachments $1 --output json 2>/dev/null | jq -r '.[] | select(.volume.name == "'$1'-data-volume") | .status // empty' 2>/dev/null)
         if [ "$attachment_status" = "attached" ]; then
             echo "Volume $1-data-volume is now attached to instance $1"
-            break
+            return 0
         fi
-        echo "Waiting 30 seconds before checking again..."
-        sleep 30
-        counter=$((counter + 1))
     done
-
-    if [ $counter -eq 10 ]; then
-        echo "ERROR: Volume $1-data-volume failed to attach to instance $1 after 10 attempts"
-        return 1
-    fi
-    return 0
+    echo "ERROR: Volume $1-data-volume failed to attach to instance $1 after 10 attempts"
+    return 1
 }
 
 ibmcloud_login
