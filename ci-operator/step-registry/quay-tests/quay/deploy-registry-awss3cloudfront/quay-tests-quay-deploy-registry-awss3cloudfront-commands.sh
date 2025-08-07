@@ -64,6 +64,7 @@ DISTRIBUTED_STORAGE_CONFIG:
       host: s3.us-east-2.amazonaws.com
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
+FEATURE_SUPERUSER_CONFIGDUMP: true
 EOF
 
 ls utility -l
