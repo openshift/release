@@ -86,6 +86,11 @@ function download_logs() {
   #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
 }
 
+function get_attribute() {
+  key_name="$1"
+  jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key==$key_name).value' --arg key_name "$key_name" "$DATAROUTER_JSON"
+}
+
 function write_attribute() {
   key_name="$1"
   key_value="$2"
@@ -103,18 +108,17 @@ function generate_attribute_architecture() {
   if [[ "$JOB_NAME" =~ amd64|arm64|multi|ppc64le|s390x ]]
   then
     architecture="${BASH_REMATCH[0]}"
-    write_attribute architecture "$architecture"
   else
     generate_attribute_version_installed
-    version_installed="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="version_installed").value' "$DATAROUTER_JSON")"
+    version_installed="$(get_attribute "version_installed")"
     if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
     then
       architecture="${BASH_REMATCH[0]}"
     else
       architecture='amd64'
     fi
-    write_attribute architecture "$architecture"
   fi
+  write_attribute architecture "$architecture"
 }
 
 function generate_attribute_cloud_provider() {
@@ -176,12 +180,12 @@ function generate_attribute_profilename() {
 }
 
 function generate_attribute_version_installed() {
-  version_installed="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="version_installed").value' "$DATAROUTER_JSON")"
+  version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
   then
     release_dir="${LOCAL_DIR_ORI}/release/artifacts"
     release_info_file="$release_dir/release-images-latest"
-    arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
+    arch="$(get_attribute "architecture")"
     if [[ -z "$arch" ]]
     then
       for release_file in 'release-images-arm64-latest' \
