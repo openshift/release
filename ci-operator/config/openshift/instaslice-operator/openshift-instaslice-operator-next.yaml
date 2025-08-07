@@ -49,11 +49,11 @@ images:
 releases:
   initial:
     release:
-      channel: fast
+      channel: stable
       version: "4.18"
   latest:
     release:
-      channel: fast
+      channel: stable
       version: "4.18"
 resources:
   '*':
@@ -71,7 +71,7 @@ tests:
   container:
     from: instaslice-base-src
   skip_if_only_changed: ^related_images.json|related_images.developer.json$
-- as: e2e-gpu
+- as: e2e-sno-gpu
   optional: true
   steps:
     cluster_profile: gcp
@@ -81,23 +81,22 @@ tests:
       SCHEDULER_IMAGE: das-scheduler
       WEBHOOK_IMAGE: das-webhook
     env:
-      COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: a2-highgpu-1g
-      CONFIDENTIAL_COMPUTE: Disabled
+      CONTROL_PLANE_NODE_TYPE: a2-highgpu-1g
       CONTROL_PLANE_ZONES: '[us-central1-f]'
       EMULATED_MODE: disabled
       IMAGE_REGISTRY: pipeline
       IMAGE_TAG: e2e-test
-      ON_HOST_MAINTENANCE: Terminate
     post:
     - chain: ipi-deprovision
     pre:
     - chain: ipi-conf-gcp
+    - ref: single-node-conf-gcp
     - ref: ipi-conf-gcp-zones
-    - ref: ipi-conf-gcp-confidential-computing
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - ref: openshift-instaslice-operator-e2e-next
+    - ref: openshift-instaslice-operator-e2e-sno-next
 zz_generated_metadata:
   branch: next
   org: openshift
