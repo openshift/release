@@ -29,19 +29,20 @@ oc --context app.ci --namespace ci extract configmap/config --to "${APPDATA}/pro
 mkdir "${APPDATA}/plugins"
 oc --context app.ci --namespace ci extract configmap/plugins --to "${APPDATA}/plugins" > /dev/null
 
-CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
-CONTAINER_ENGINE_OPTS=${CONTAINER_ENGINE_OPTS:- --platform linux/amd64}
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-podman}
+$CONTAINER_ENGINE login -u=$(oc --context app.ci whoami) -p=$(oc --context app.ci whoami -t) quay-proxy.ci.openshift.org --authfile /tmp/t.c
+CONTAINER_ENGINE_OPTS=${CONTAINER_ENGINE_OPTS:- --platform linux/amd64 --authfile /tmp/t.c}
 mounts_labels="ro,Z"
 if [[ $(uname -s) = "Darwin" && ${CONTAINER_ENGINE} = "podman" ]]; then
   # Darwin (MacOS)
   mounts_labels="ro"
 fi
-$CONTAINER_ENGINE pull registry.ci.openshift.org/ci/check-gh-automation:latest $CONTAINER_ENGINE_OPTS
+$CONTAINER_ENGINE pull quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest $CONTAINER_ENGINE_OPTS
 $CONTAINER_ENGINE run \
     --rm \
     --platform linux/amd64 \
     -v "${APPDATA}:/data:${mounts_labels}" \
-    registry.ci.openshift.org/ci/check-gh-automation:latest \
+    quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest \
     --repo="$1" \
     --app-check-mode="$app_check_mode" \
     --app="$app_name" \
