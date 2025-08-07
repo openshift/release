@@ -71,23 +71,58 @@ function copy-file-from-first-master {
 if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
   cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
   set +e
+  # Read cluster shutdown time from /var/cluster-shutdown-time
+  if [[ -f /var/cluster-shutdown-time ]]; then
+    start_timestamp="$(cat /var/cluster-shutdown-time)"
+    echo "Cluster shutdown time is set to ${start_timestamp}"
+  else
+    # Fallback on current time if /var/cluster-shutdown-time is not set
+    start_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+    echo "Unable to find cluster shutdown time, falling back to ${start_timestamp}"
+  fi
+
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   until oc --request-timeout=5s get nodes; do sleep 10; done | /usr/local/bin/tqdm --desc "Waiting for API server to come up" --null
   mapfile -t nodes < <( oc --request-timeout=5s get nodes -o name )
 
-  echo "Approving CSRs at $(date)"
+  echo "Approving CSRs at $(date +%X)"
   fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
   for field in ${fields[@]}; do
     (( required_csrs=${#nodes[@]} ))
     approved_csrs=0
+    attempt=0
     until (( approved_csrs >= required_csrs )); do
-      mapfile -t csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
-      if [[ ${#csrs[@]} -gt 0 ]]; then
-        echo
-        oc --request-timeout=5s adm certificate approve ${csrs[@]} && (( approved_csrs=approved_csrs+${#csrs[@]} ))
+      ((attempt++))
+      echo -n ""
+      echo -n ""
+      echo "$(date +%X) attempt #${attempt} approved CSRs: ${approved_csrs} of ${required_csrs}"
+
+      mapfile -t all_csrs < <(oc --request-timeout=5s get csr --field-selector=spec.signerName=${field} --no-headers)
+      pending_csrs=()
+      approved_csrs=0
+
+      for csr_line in "${all_csrs[@]}"; do
+        csr_name=$(echo "$csr_line" | awk '{print $1}')
+        csr_condition=$(echo "$csr_line" | awk '{print $NF}')
+        if [[ "$csr_condition" == "Pending" ]]; then
+          pending_csrs+=("$csr_name")
+        else
+          # Don't count CSRs created before the start of the script
+          if [[ $(date -d "$(oc --request-timeout=5s get csr ${csr_name} -o jsonpath='{.metadata.creationTimestamp}')" +%s) -ge $(date -d "${start_timestamp}" +%s) ]]; then
+            (( approved_csrs=approved_csrs+1 ))
+          fi
+        fi
+      done
+      echo "found ${#pending_csrs[@]} pending CSRs, ${approved_csrs} fresh approved CSRs, total ${#all_csrs[@]} CSRs"
+      if [[ ${#pending_csrs[@]} -gt 0 ]]; then
+        for csr_name in ${pending_csrs[@]}; do
+          oc --request-timeout=5s get csr ${csr_name} -o yaml
+          oc --request-timeout=5s adm certificate approve ${csr_name}
+        done
       fi
-      sleep 10
-      done | /usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null
+      sleep 30
+      echo "" >&3
+    done 3> >(/usr/local/bin/tqdm --desc "Approving ${field} CSRs" --null)
   done
   echo "All CSRs approved at $(date)"
 
@@ -101,7 +136,7 @@ if [ ! -f /tmp/ensure-nodes-are-ready.sh ]; then
         continue
       fi
       TIME_DIFF=$(($(date +%s)-$(date -d ${NODE_HEARTBEAT_TIME} +%s)))
-      sleep 1
+      sleep 10
       done | /usr/local/bin/tqdm --desc "Waiting for ${nodename} to send heartbeats" --null
   done
   echo "All nodes are ready at $(date)"
@@ -271,9 +306,10 @@ openssl req -newkey rsa:4096 -nodes -sha256 -keyout "${temp_dir}/ca.key" -x509 -
 
 openssl genrsa -out "${temp_dir}/ca.key" 4096
 openssl req -x509 -sha256 -key "${temp_dir}/ca.key" -nodes -new -days ${tenYears} -out "${temp_dir}/ca.crt" -subj "/CN=${baseDomain}" -set_serial 1
+cat ${temp_dir}/ca.crt >> /home/assisted/custom_manifests/ca.pem
 
 oc create configmap custom-ca \
-     --from-file=ca-bundle.crt="${temp_dir}/ca.crt" \
+     --from-file=ca-bundle.crt="/home/assisted/custom_manifests/ca.pem" \
      -n openshift-config
 
 oc patch proxy/cluster \

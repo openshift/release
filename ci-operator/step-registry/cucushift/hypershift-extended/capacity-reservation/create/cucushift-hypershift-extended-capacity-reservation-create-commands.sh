@@ -17,7 +17,7 @@ CR_OUTPUT_FILE=${SHARED_DIR}/reservation_details.json
 function create_ondemand_capacity_reservation() {
     echo "Create on-demand capacity reservation..."
     aws ec2 create-capacity-reservation \
-        --availability-zone "${HYPERSHIFT_HC_ZONES}" \
+        --availability-zone "${NODEPOOL_CAPACITY_RESERVATION_ZONE}" \
         --instance-type "${ON_DEMAND_INSTANCE_TYPE}" \
         --instance-count ${CP_INSTANCES_NUMBER} \
         --instance-platform "${OPERATING_SYSTEM}" \

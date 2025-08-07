@@ -46,19 +46,18 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-fips-arm-f7-logging
-  cron: 50 21 * * 2
+- as: aws-ipi-fips-arm-f999-logging
+  cron: 5 11 29 2 *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-observability
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       FIPS_ENABLED: "true"
       FORCE_SUCCESS_EXIT: "true"
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.3-konflux
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -72,7 +71,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "35"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - ref: openshift-logging-install-konflux-catalogsource
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi

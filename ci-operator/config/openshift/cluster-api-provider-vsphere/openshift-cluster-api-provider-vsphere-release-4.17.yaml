@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.17"
   commitchecker:
     name: commitchecker
     namespace: ci
@@ -83,17 +87,17 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-serial
-- as: regression-clusterinfra-vsphere-ipi-techpreview
+- as: regression-clusterinfra-vsphere-ipi-techpreview-capi
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
+      E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_FILTERS: CAPI
-      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: verify-commits
   commands: |

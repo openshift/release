@@ -151,21 +151,22 @@ presubmits:
     - ^release-4\.20$
     - ^release-4\.20-
     cluster: build10
-    context: ci/prow/e2e-aws-ovn-serial
+    context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.20-e2e-aws-ovn-serial
-    rerun_command: /test e2e-aws-ovn-serial
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.20-e2e-aws-ovn-serial-1of2
+    rerun_command: /test e2e-aws-ovn-serial-1of2
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-serial
@@ -216,7 +217,80 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-1of2,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build10
+    context: ci/prow/e2e-aws-ovn-serial-2of2
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.20-e2e-aws-ovn-serial-2of2
+    rerun_command: /test e2e-aws-ovn-serial-2of2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-serial
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-2of2,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -363,11 +437,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build02
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -440,7 +514,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator
     decorate: true
     labels:
@@ -512,7 +586,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-aescbc
     decorate: true
     labels:
@@ -586,7 +660,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-aesgcm
     decorate: true
     labels:
@@ -660,7 +734,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-perf-aescbc
     decorate: true
     labels:
@@ -734,7 +808,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-perf-aesgcm
     decorate: true
     labels:
@@ -808,7 +882,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-perf-single-node
     decorate: true
     labels:
@@ -882,7 +956,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-rotation-aescbc
     decorate: true
     labels:
@@ -956,7 +1030,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-rotation-aesgcm
     decorate: true
     labels:
@@ -1030,7 +1104,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-rotation-single-node
     decorate: true
     labels:
@@ -1104,7 +1178,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-encryption-single-node
     decorate: true
     labels:
@@ -1178,7 +1252,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-operator-single-node
     decorate: true
     labels:
@@ -1251,7 +1325,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-180d
     decorate: true
     labels:
@@ -1324,7 +1398,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-360d
     decorate: true
     labels:
@@ -1397,7 +1471,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-90d
     decorate: true
     labels:
@@ -1470,7 +1544,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-180d
     decorate: true
     labels:
@@ -1543,7 +1617,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-360d
     decorate: true
     labels:
@@ -1616,7 +1690,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-90d
     decorate: true
     labels:
@@ -1689,7 +1763,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-180d
     decorate: true
     labels:
@@ -1762,7 +1836,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-360d
     decorate: true
     labels:
@@ -1835,7 +1909,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-90d
     decorate: true
     labels:
@@ -1908,7 +1982,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-180d
     decorate: true
     labels:
@@ -1981,7 +2055,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-1y
     decorate: true
     labels:
@@ -2054,7 +2128,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-2y
     decorate: true
     labels:
@@ -2127,7 +2201,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-3y
     decorate: true
     labels:
@@ -2200,7 +2274,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-90d
     decorate: true
     labels:
@@ -2273,7 +2347,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build02
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     labels:
@@ -2417,11 +2491,86 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-short-cert-rotation,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build02
+    context: ci/prow/e2e-short-cert-rotation-azure
+    decorate: true
+    decoration_config:
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.20-e2e-short-cert-rotation-azure
+    optional: true
+    rerun_command: /test e2e-short-cert-rotation-azure
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-short-cert-rotation-azure
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-short-cert-rotation-azure,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
@@ -2474,7 +2623,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/k8s-e2e-gcp
     decorate: true
     labels:
@@ -2546,7 +2695,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/k8s-e2e-gcp-serial
     decorate: true
     labels:
@@ -2619,7 +2768,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     labels:
@@ -2672,7 +2821,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     labels:
@@ -2725,7 +2874,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build02
     context: ci/prow/verify-deps
     decorate: true
     labels:

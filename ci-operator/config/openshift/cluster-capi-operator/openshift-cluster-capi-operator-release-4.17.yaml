@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.17"
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -169,19 +173,18 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
-- as: regression-clusterinfra-cucushift-rehearse-capi-aws-ipi
+- as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
+      E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_FILTERS: NonHyperShiftHOST&;capi;CAPI
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "1200"
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 7h0m0s
 zz_generated_metadata:
   branch: release-4.17

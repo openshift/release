@@ -49,10 +49,24 @@ find $calico_dir -name "00*" -print0 | xargs -0 -n1 oc apply -f
 # Install operator
 find $calico_dir -name "02*" -print0 | xargs -0 -n1 oc apply -f
 
-timeout 15m bash -c 'until oc get crd installations.operator.tigera.io; do sleep 15; done'
+operator_yaml=$(find $calico_dir -name "02-tigera-operator*")
+
+tigera_dir=/tmp/tigera
+mkdir $tigera_dir
+
+TIGERA_OPERATOR_VERSION=$(yq-v4 '.spec.template.spec.containers[] | select(.name == "tigera-operator").env[] | select(.name == "TIGERA_OPERATOR_INIT_IMAGE_VERSION") | .value' "${operator_yaml}")
+wget -qO- "https://github.com/tigera/operator/archive/refs/tags/${TIGERA_OPERATOR_VERSION}.tar.gz" | \
+  tar xvz --strip-components=1 -C $tigera_dir
+
+# Install manually the CRDs that we need immediately
+oc create -f ${tigera_dir}/pkg/crds/operator/operator.tigera.io_installations.yaml || true
+oc create -f ${tigera_dir}/pkg/crds/operator/operator.tigera.io_apiservers.yaml || true
+
+# Make sure the CRDs are available
+timeout 60s bash -c 'until oc get crd installations.operator.tigera.io; do sleep 5; done'
 oc wait --for condition=established --timeout=60s crd installations.operator.tigera.io
 
-timeout 15m bash -c 'until oc get crd apiservers.operator.tigera.io; do sleep 15; done'
+timeout 60s bash -c 'until oc get crd apiservers.operator.tigera.io; do sleep 5; done'
 oc wait --for condition=established --timeout=60s crd apiservers.operator.tigera.io
 
 # Install API Server

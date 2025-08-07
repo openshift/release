@@ -48,17 +48,42 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}" << 'EOF'
+JOB="$(echo "${JOB_SPEC}" | jq '.job')"
+IPI_BOOTSTRAP_IP=""
+
+if [[ "${JOB}" =~ "baremetal-ipi" ]]; then
+  echo "This is a IPI job. Saving bootstrap ip for post steps."
+  cp "${SHARED_DIR}"/ipi_bootstrap_ip_address "${SHARED_DIR}"/ipi_bootstrap_ip_address_fw
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+  IPI_BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address_fw")"
+
+  # copy bootstrap ip to bastion host for use in cleanup
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/ipi_bootstrap_ip_address_fw" "root@${AUX_HOST}:/var/builds/$CLUSTER_NAME/"
+else
+  echo "This is a UPI job. Not saving bootstrap ip for post steps."
+  IPI_BOOTSTRAP_IP="UPI"
+fi
+
+fw_ip=("${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}")
+
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}" <<'EOF'
   set -o nounset
   set -o errexit
   INTERNAL_NET_CIDR="${1}"
-  IP_ARRAY="${@:2}"
-  for ip in $IP_ARRAY; do
+  BMC_NETWORK="${2}"
+  IPI_BOOTSTRAP_IP="${3}"
+  IP_ARRAY=("${@:4}")
+  for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
-    # Allow connections on port 22 used by observer pod
-    iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
+    if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
+      iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
+    fi
+    iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
+  if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
+    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
+    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+  fi
 EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code

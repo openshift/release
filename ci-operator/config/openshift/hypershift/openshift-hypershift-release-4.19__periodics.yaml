@@ -83,6 +83,18 @@ tests:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-multi-x-ax
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      AZURE_MULTI_ARCH: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   capabilities:
   - build-tmpfs
@@ -98,12 +110,15 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
+      PUBLIC_ONLY: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
   cron: 0 2 * * *
   steps:
     cluster_profile: hypershift
+    env:
+      PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
@@ -193,6 +208,16 @@ tests:
     test:
     - chain: hypershift-conformance
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest-calico
+- as: e2e-kubevirt-metal-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
+    workflow: hypershift-kubevirt-baremetalds-conformance-calico
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:
@@ -229,6 +254,16 @@ tests:
       ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-17
       REDHAT_OPERATORS_INDEX_TAG: v4.17
     workflow: hypershift-kubevirt-baremetalds-conformance
+- as: e2e-kubevirt-metal-conformance-cilium
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
+    workflow: hypershift-kubevirt-baremetalds-conformance-cilium
 - as: e2e-kubevirt-metal-ovn-disconnected
   cron: 0 8 * * *
   steps:

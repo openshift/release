@@ -182,13 +182,24 @@ fi
 echo "Cluster secrets validation passed"
 
 #Visit hc with custom kubeconfig
-CUSTOM_KUBECONFIG=/tmp/custom_kube
-oc get -n "$HYPERSHIFT_NAMESPACE" secret "${CLUSTER_NAME}-custom-admin-kubeconfig" -o jsonpath='{.data.kubeconfig}' | base64 -d > $CUSTOM_KUBECONFIG || exit 1
+CUSTOM_KUBECONFIG=/tmp/custom_kube_${CLUSTER_NAME}
+rm -f "$CUSTOM_KUBECONFIG"
+timeout=300
+start=$(date +%s)
+while true; do
+  if ! oc get -n "$HYPERSHIFT_NAMESPACE" secret "${CLUSTER_NAME}-custom-admin-kubeconfig" -o jsonpath='{.data.kubeconfig}' | base64 -d > "$CUSTOM_KUBECONFIG"; then
+      echo "ERROR: Failed to get kubeconfig" >&2
+      exit 1
+  fi
 
-oc --kubeconfig $CUSTOM_KUBECONFIG get clusterversion version &>/dev/null || {
-    echo "ERROR: Cluster API unreachable with kubeconfig: $CUSTOM_KUBECONFIG" >&2
-    exit 1
-}
-echo "Cluster API endpoint reachable with custom kubeconfig"
+  if oc --kubeconfig $CUSTOM_KUBECONFIG get clusterversion version &>/dev/null;then 
+      echo "Cluster API endpoint reachable with custom kubeconfig"
+      break
+  fi
 
-rm -rf /tmp/custom_kube
+  if [ $(($(date +%s) - start)) -ge $timeout ]; then
+        echo "timeout, no expected result get"
+        exit 1
+    fi
+done
+rm -rf /tmp/custom_kube_${CLUSTER_NAME}
