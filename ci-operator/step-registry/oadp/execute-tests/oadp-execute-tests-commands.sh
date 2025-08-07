@@ -12,6 +12,7 @@ export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
 export KUBECONFIG="/home/jenkins/.kube/config"
 export OADP_TEST_FOCUS="--focus=${OADP_TEST_FOCUS}"
+export TEMP_TEST_FOCUS=$OADP_TEST_FOCUS
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -68,8 +69,9 @@ if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   OADP_TEST_FOCUS=""
   export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
-  export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
+  export EXTRA_GINKGO_PARAMS="--skip=tc-id:OADP-555" &&\
   (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
+  OADP_TEST_FOCUS=$TEMP_TEST_FOCUS
 fi
 
 # Run OADP tests with the focus
