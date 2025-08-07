@@ -102,6 +102,8 @@ ${ASSISTED_MIRROR_CM}
 ${AGENT_SERVICE_CONFIG}
 EOF
 
+sleep 3600
+
 set -x
 oc wait --timeout=5m --for=condition=ReconcileCompleted AgentServiceConfig agent
 oc wait --timeout=15m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
