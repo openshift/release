@@ -24,7 +24,7 @@ function find_resource_group() {
 }
 
 function update_volume() {
-
+    # $1: instance name/id
     volume_id=$(ibmcloud is instance $1 --output json | jq -r '.volume_attachments[0].volume.id')
     ibmcloud is volume-update $volume_id  --profile $STORAGE_PROFILE
 
@@ -52,6 +52,7 @@ function update_volume() {
 
 function add_data_volume() {
     # Get the zone of the instance first
+    # $1: instance name/id
     instance_zone=$(ibmcloud is instance $1 --output json | jq -r '.zone.name')
     echo "Instance $1 is in zone: ${instance_zone}"
     
