@@ -238,9 +238,9 @@ function update_sno_bip_live_iso {
   if [ -e \/dev\/md126 ]; then mdadm --stop \/dev\/md126; fi\n \
   if [ -e \/dev\/md127 ]; then mdadm --stop \/dev\/md127; fi\n \
   for i in $(lsblk -I8,259 -nd --output name); do wipefs -a \/dev\/$i; done\n \
-  \1 --delete-karg console=ttyS0,115200n8 --append-karg console='"${CONSOLE}"' --insecure-ignition --copy-network\n \
+  \1 --delete-karg console=ttyS0,115200n8 --console '"${CONSOLE}"' --insecure-ignition --copy-network\n \
   echo "Adding UEFI boot entry for Red Hat CoreOS"\n \
-  efibootmgr -c -d '"${escaped_root_device}"' -p 2 -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shim'"${shim_arch}"'.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | base64 -w0)
+  efibootmgr -c -d '"${escaped_root_device}"' -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shim'"${shim_arch}"'.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | base64 -w0)
 
   sed -i -e 's/'"${b64_pre}"'/'"${b64_new}"'/g' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign
 
