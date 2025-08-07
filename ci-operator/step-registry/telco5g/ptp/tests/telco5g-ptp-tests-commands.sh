@@ -377,6 +377,9 @@ export PTP_LOG_LEVEL=debug
 export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 
+# Turn off color in ginkgo output to make it easier to read in logs
+export GINKGO_NO_COLOR=TRUE
+
 # wait before first run
 # wait more to let openshift complete initialization
 sleep 300
