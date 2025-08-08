@@ -52,6 +52,18 @@ base_images:
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
 releases:
+  arm64-initial:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
   initial:
     candidate:
       architecture: multi
@@ -115,6 +127,30 @@ tests:
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure
+- as: ocp-e2e-upgrade-aws-ovn-arm64
+  interval: 72h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      OCP_ARCH: arm64
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: ocp-e2e-upgrade-aws-ovn-multi-a-a
+  interval: 72h
+  steps:
+    cluster_profile: aws
+    env:
+      OCP_ARCH: arm64
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: ocp-e2e-upgrade-aws-ovn-multi-x-x
+  interval: 72h
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-upgrade-aws
 - as: ocp-ovn-remote-libvirt-multi-z-z
   capabilities:
   - sshd-bastion
