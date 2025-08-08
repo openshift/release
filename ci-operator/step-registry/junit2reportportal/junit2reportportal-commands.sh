@@ -338,7 +338,7 @@ function fix_xmls() {
   else
     # in openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
     # Element 'property': This element is not expected.
-    property_xml_files="$(grep -l -r '<property ' $xml_files)"
+    property_xml_files="$(grep -l -r '<property ' $xml_files)" || true
     if [[ -n "$property_xml_files" ]]
     then
       sed -i '\;<property.*</property>;d' $property_xml_files
