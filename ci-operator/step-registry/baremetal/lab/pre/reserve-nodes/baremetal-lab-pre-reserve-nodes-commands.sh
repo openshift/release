@@ -72,7 +72,7 @@ systemd-cat -t "${BUILD_ID}" -p7 cat /var/builds/${BUILD_ID}/prow.env
 # The current implementation of the following scripts is different based on the auxiliary host. Keeping the script in
 # the remote aux servers temporarily.
 N_MASTERS=${N_MASTERS} N_WORKERS=${N_WORKERS} \
-  REQUEST_BOOTSTRAP_HOST=${REQUEST_BOOTSTRAP_HOST} REQUEST_VIPS=true APPEND="false" ARCH="${ARCH}" VENDOR="${VENDOR}" /usr/bin/reserve-hosts.sh
+  REQUEST_BOOTSTRAP_HOST=${REQUEST_BOOTSTRAP_HOST} REQUEST_VIPS=true APPEND="false" ARCH="${ARCH}" VENDOR="${VENDOR}" /opt/html/bmanzari/reserve-hosts.sh
 # If the number of requested ADDITIONAL_WORKERS is greater than 0, we need to reserve the additional workers
 if [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
   N_WORKERS="${ADDITIONAL_WORKERS}" N_MASTERS=0 REQUEST_BOOTSTRAP_HOST=false \
