@@ -281,6 +281,18 @@ tests:
       OO_CHANNEL: stable
       TEST_SUITE: openshift/csi
     workflow: openshift-e2e-aws-csi-efs
+- as: aws-efs-single-zone-operator-e2e
+  run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      EFS_ENABLE_SINGLE_ZONE: "true"
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+      ZONES_COUNT: "1"
+    workflow: openshift-e2e-aws-csi-efs
 - as: aws-efs-cross-account-operator-e2e
   optional: true
   run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
@@ -292,6 +304,19 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       OO_CHANNEL: stable
       TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs-cross-account
+- as: aws-efs-single-zone-cross-account-operator-e2e
+  run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EFS_ENABLE_SINGLE_ZONE: "true"
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+      ZONES_COUNT: "1"
     workflow: openshift-e2e-aws-csi-efs-cross-account
 - as: aws-efs-sts-cross-account-operator-e2e
   optional: true
@@ -315,6 +340,19 @@ tests:
     env:
       OO_CHANNEL: stable
       TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
+- as: aws-efs-single-zone-operator-e2e-extended
+  optional: true
+  run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      EFS_ENABLE_SINGLE_ZONE: "true"
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+      ZONES_COUNT: "1"
     workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
 - as: e2e-azure
   steps:

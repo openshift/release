@@ -57,6 +57,7 @@ DB_CONNECTION_ARGS:
     sslkey: /.postgresql/postgresql.key
     threadlocals: true
 DB_URI: postgresql://${GCP_POSTGRESQL_USERNAME}:${GCP_POSTGRESQL_PASSWORD}@$GCP_SQL_HOSTIP:5432/${GCP_POSTGRESQL_DBNAME}?sslmode=verify-ca&sslcert=/.postgresql/postgresql.crt&sslkey=/.postgresql/postgresql.key&sslrootcert=/.postgresql/root.crt  
+FEATURE_SUPERUSER_CONFIGDUMP: true
 EOF
 
 oc create secret generic postgresql-client-certs -n "${QUAYNAMESPACE}" \

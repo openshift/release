@@ -31,9 +31,20 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: oc-mirror
+- dockerfile_path: images/cli/Dockerfile.test
+  inputs:
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: oc-mirror-tests
 promotion:
   to:
   - disabled: true
+    excluded_images:
+    - oc-mirror-tests
     name: "4.20"
     namespace: ocp
 releases:
@@ -87,6 +98,12 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: integration
+  commands: |
+    ./scripts/flow-controller.sh all_happy_path
+  container:
+    from: oc-mirror-tests
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

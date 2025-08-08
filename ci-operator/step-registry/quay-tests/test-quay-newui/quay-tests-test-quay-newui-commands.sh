@@ -13,6 +13,7 @@ QUAY_PASSWORD="password"
 cd new-ui-tests 
 skopeo -v
 oc version
+python3 -V
 terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
@@ -103,12 +104,12 @@ echo "The Quay hostname is $quay_hostname"
 #curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' --data '{"username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
 
 quay_access_token=$(cat $SHARED_DIR/quay_oauth2_token|tr -d '\n')
-echo "The Quay super user access token is ${quay_access_token}" 
+#echo "The Quay super user access token is ${quay_access_token}" 
 
 ocp_endpoint=$(cat $SHARED_DIR/kubeconfig|grep "server:"|awk '{print $2}'|tr -d '\n')
 echo "The OCP cluster endpoint is ${ocp_endpoint}"
 ocp_kubeadmin_password=$(cat $SHARED_DIR/kubeadmin-password |tr -d '\n')
-echo "The OCP cluster kubeadmin password is ${ocp_kubeadmin_password}"
+#echo "The OCP cluster kubeadmin password is ${ocp_kubeadmin_password}"
 
 export CYPRESS_QUAY_ENDPOINT=${quay_hostname}
 export CYPRESS_QUAY_ENDPOINT_PROTOCOL=https

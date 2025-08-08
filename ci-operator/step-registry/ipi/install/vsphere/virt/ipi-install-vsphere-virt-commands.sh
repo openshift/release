@@ -30,7 +30,7 @@ function approve_csrs() {
       oc adm certificate approve $CSRS --kubeconfig=${CLUSTER_KUBECONFIG} || true
       CSR_COUNT=$(( CSR_COUNT + 1 ))
     fi
-    if [[ $CSR_COUNT == 2 ]]; then
+    if [[ $CSR_COUNT == $((2*${BM_COUNT})) ]]; then
         return 0
     fi
     sleep 15
@@ -74,10 +74,14 @@ function enable_storage_operator() {
 
 # Wait for the VM node to become ready
 function wait_for_node_ready() {
-  echo "$(date -u --rfc-3339=seconds) - Waiting for node ${VM_NAME} to become Ready"
-  oc wait --for=condition=Ready=True node ${VM_NAME} --timeout=10m
+  NODES=""
+  for (( i=0; i<${BM_COUNT}; i++ )); do
+    NODES="${NODES} ${VM_NAME}-${i}"
+  done
+  echo "$(date -u --rfc-3339=seconds) - Waiting for nodes ${NODES} to become Ready"
+  oc wait --for=condition=Ready=True node ${NODES} --timeout=10m
   if [[ $? -ne 0 ]]; then
-    echo "$(date -u --rfc-3339=seconds) - Node did not become ready"
+    echo "$(date -u --rfc-3339=seconds) - Nodes did not become ready"
     exit 1
   fi
 }
@@ -114,7 +118,10 @@ echo ${VIRT_IMAGE}
 IGNITION_DATA=$(oc get secret worker-user-data -n openshift-machine-api -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.data.userData')
 
 echo "$(date -u --rfc-3339=seconds) - Generating virtual machine yaml"
-virtctl create vm --name ${VM_NAME} --instancetype ci-baremetal --volume-import type:registry,url:docker://${VIRT_IMAGE},size:60Gi,pullmethod:node --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual -n ${VM_NAMESPACE} > "${SHARED_DIR}/vm.yaml"
+for (( i=0; i<${BM_COUNT}; i++ )); do
+  echo "$(date -u --rfc-3339=seconds) - Generating ${VM_NAME}-${i}"
+  virtctl create vm --name "${VM_NAME}-${i}" --instancetype ci-baremetal --volume-import type:registry,url:docker://${VIRT_IMAGE},size:60Gi,pullmethod:node --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual -n ${VM_NAMESPACE} >> "${SHARED_DIR}/vm.yaml"
+done
 
 # Create namespace if it does not exist (it will exist if multiple jobs run in same namespace)
 if [[ "$(oc get ns ${VM_NAMESPACE} --ignore-not-found --kubeconfig="${VIRT_KUBECONFIG}")" == "" ]]; then
@@ -123,22 +130,28 @@ if [[ "$(oc get ns ${VM_NAMESPACE} --ignore-not-found --kubeconfig="${VIRT_KUBEC
 fi
 
 # Create VM (VM will not be running)
-echo "$(date -u --rfc-3339=seconds) - Creating virtual machine"
+echo "$(date -u --rfc-3339=seconds) - Creating virtual machines"
 oc create -f "${SHARED_DIR}/vm.yaml" --kubeconfig=${VIRT_KUBECONFIG}
 
 # Update VM to have CI network
-echo "$(date -u --rfc-3339=seconds) - Patching networking config into virtual machine"
-oc patch vm ${VM_NAME} -n ${VM_NAMESPACE} --type=merge --patch-file ${VM_NETWORK_PATCH} --kubeconfig=${VIRT_KUBECONFIG}
+echo "$(date -u --rfc-3339=seconds) - Patching networking config into virtual machines"
+for (( i=0; i<${BM_COUNT}; i++ )); do
+  oc patch vm "${VM_NAME}-${i}" -n ${VM_NAMESPACE} --type=merge --patch-file ${VM_NETWORK_PATCH} --kubeconfig=${VIRT_KUBECONFIG}
+done
 
 # Start VM
-echo "$(date -u --rfc-3339=seconds) - Starting virtual machine"
-virtctl start "${VM_NAME}" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
+echo "$(date -u --rfc-3339=seconds) - Starting virtual machines"
+for (( i=0; i<${BM_COUNT}; i++ )); do
+  virtctl start "${VM_NAME}-${i}" -n ${VM_NAMESPACE} --kubeconfig=${VIRT_KUBECONFIG}
+done
 
 # Monitor cluster for CSRs
 approve_csrs
 
 # Remove provider taint
-oc adm taint nodes ${VM_NAME} node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"
+for (( i=0; i<${BM_COUNT}; i++ )); do
+  oc adm taint nodes "${VM_NAME}-${i}" node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"
+done
 
 # Wait for node to be ready to prevent any interruption during the e2e tests
 wait_for_node_ready
