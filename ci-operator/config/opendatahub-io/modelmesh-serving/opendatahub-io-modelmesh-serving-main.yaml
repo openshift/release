@@ -56,6 +56,28 @@ tests:
   container:
     from: modelmesh-serving-develop
   run_if_changed: ^(apis/.*|controllers/.*|pkg/.*|Dockerfile|main\.go|go\.mod|go\.sum)
+- as: fvt-odh-manifests
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum|opendatahub/odh-manifests)
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.8xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+    test:
+    - as: fvt-odh-manifests
+      commands: |
+        export HOME=/go
+        TAG=stable CONTROLLERNAMESPACE=opendatahub NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true make e2e-test-for-odh
+      dependencies:
+      - env: PR_MODELMESH_SERVING_IMAGE
+        name: modelmesh-serving
+      from: modelmesh-serving-develop
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: hypershift-hostedcluster-workflow
 - as: pr-image-mirror
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
   steps:
