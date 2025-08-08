@@ -50,7 +50,6 @@ function createEndpointGateway() {
             fi
             echo "Attempt $(( counter + 1 )) of 5 failed. Retrying in 10 seconds..."
             sleep 10
-            (( counter++ ))
         fi
     done
 
@@ -78,7 +77,7 @@ function waitingStatus() {
         status=$(ibmcloud is endpoint-gateway $endpoint --output JSON | jq -r ."lifecycle_state")
         if [[ "${status}" == "stable" ]]; then
             return 0
-        elif [[ "$?" != "0" ]]; then
+        else
             return 1
         fi
     done
@@ -134,10 +133,10 @@ run_command "ibmcloud is security-group-rule-add ${sgID} inbound tcp --remote '0
 
 srv_array=("IAM" "VPC" "ResourceController" "ResourceManager" "DNSServices" "COS" "GlobalSearch" "GlobalTagging" "KeyProtect" "HyperProtect" "COSConfig" "GlobalCatalog")
 # "ResourceController" "ResourceManager"  just can be has one, otherwise will got "An endpoint gateway already exists for this service"
-version=$(oc version -o json | jq -r .clientVersion.gitVersion | cut -d '.' -f1,2)
-echo "get ocp version: ${version}"
-ver=$(echo $version | cut -d '.' -f2)
-if (( $ver % 2 == 0 )); then
+day=$(date +%d)
+##remove the leading zero to prevent octal interpretation
+day_as_int=$((10#$day))
+if (( $day_as_int % 2 == 0 )); then
     unset 'srv_array[2]'
 else
     unset 'srv_array[3]'
