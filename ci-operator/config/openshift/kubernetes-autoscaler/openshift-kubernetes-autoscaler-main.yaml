@@ -1,4 +1,8 @@
 base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -89,9 +93,10 @@ tests:
   container:
     from: src
 - as: git-history
-  commands: ./hack/verify_history.sh
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
   container:
-    from: src
+    from: commitchecker
   optional: true
 - as: goimports
   commands: IS_CONTAINER=TRUE make goimports
