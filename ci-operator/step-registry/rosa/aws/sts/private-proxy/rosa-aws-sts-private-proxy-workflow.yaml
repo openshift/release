@@ -2,7 +2,7 @@ workflow:
   as: rosa-aws-sts-private-proxy
   steps:
     env:
-      STS: "true"      
+      STS: "true"
       COMPUTE_MACHINE_TYPE: "m5.xlarge"
       WORKER_DISK_SIZE: "128GiB"
       ENABLE_AUTOSCALING: "false"
@@ -10,7 +10,7 @@ workflow:
       DISABLE_SCP_CHECKS: "false"
       EC2_METADATA_HTTP_TOKENS: "required"
       DEFAULT_MACHINE_POOL_LABELS: "k8s.ovn.org/egress-assignable="
-      REPLICAS: "3"     
+      REPLICAS: "3"
       MULTI_AZ: "true"
       # Specific
       ENABLE_BYOVPC: "true"
@@ -18,18 +18,19 @@ workflow:
       PRIVATE: "true"
       PRIVATE_LINK: "true"
     pre:
-    - ref: aws-provision-vpc-shared
-    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
-    - chain: aws-provision-bastionhost
-    - ref: proxy-config-generate
-    - chain: rosa-aws-sts-provision
-    - ref: aws-provision-tags-for-byo-vpc
-    - ref: osd-ccs-conf-idp-htpasswd-multi-users
-    - ref: rosa-cluster-wait-ready-nodes
+      - ref: aws-provision-vpc-shared
+      - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+      - chain: aws-provision-bastionhost
+      - ref: proxy-config-generate
+      - chain: rosa-aws-sts-provision
+      - ref: aws-provision-tags-for-byo-vpc
+      - ref: osd-ccs-conf-idp-htpasswd-multi-users
+      - ref: rosa-cluster-wait-ready-nodes
     post:
-    - chain: rosa-aws-sts-deprovision
-    - ref: aws-deprovision-s3buckets
-    - ref: aws-deprovision-stacks
+      - chain: rosa-aws-sts-deprovision
+      - ref: aws-deprovision-s3buckets
+      - ref: aws-deprovision-stacks
+      - ref: junit2reportportal
   documentation: |-
     This workflow installs a rosa sts cluster configured to use private-link, proxy. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     After finish testing, the cluster will be deprovsioned.

@@ -17,15 +17,21 @@ images:
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - quay.io/redhat-services-prod/openshift/boilerplate:image-v7.4.0
-    ubi_minimal:
-      as:
-      - registry.access.redhat.com/ubi8/ubi-minimal:8.10-1753764099
-      - registry.access.redhat.com/ubi8/ubi-minimal
   to: must-gather-operator
+operator:
+  bundles:
+  - as: must-gather-operator-bundle
+    context_dir: bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-must-gather-operator:latest
+    with: pipeline:must-gather-operator
+  - pullspec: quay.io/openshift/origin-must-gather:latest
+    with: stable:must-gather
 promotion:
   to:
-  - disabled: true
-    name: "4.21"
+  - name: "4.21"
     namespace: ocp
 releases:
   initial:

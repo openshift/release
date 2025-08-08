@@ -2,34 +2,40 @@
 
 set -o pipefail
 
-# the exit code of this step is not expected to be caught from the overall test suite in ReportPortal. Excluding it
-touch "${ARTIFACT_DIR}/skip_overall_if_fail"
-
 set -x
+if [[ "${NO_REPORTPORTAL,,}" = 'true' ]]
+then
+  echo "Skip, as user choose not to send results to ReportPortal for job: ${JOB_NAME}"
+  exit 0
+fi
 if ! (env | grep -q JOB_SPEC)
 then
-  echo "No JOB_SPEC. Skip"
+  echo "Skip, as no JOB_SPEC defined and we rely on it heavily"
   exit 0
 fi
 
-ALLOWED_REPOS=("openshift-tests-private"
-               "verification-tests"
-               "oadp-qe-automation"
+ALLOWED_REPOS=("openshift/openshift-tests-private"
+               "openshift/rosa"
+               "openshift/verification-tests"
+               "oadp-qe/oadp-qe-automation"
               )
+org="$(jq -r 'if .extra_refs then .extra_refs[0].org
+              elif .refs then .refs.org
+              else error
+              end' <<< ${JOB_SPEC})"
 repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
                elif .refs then .refs.repo
                else error
-               end
-' <<< ${JOB_SPEC:-''})"
+               end' <<< ${JOB_SPEC})"
 # shellcheck disable=SC2076
-if ! [[ "${ALLOWED_REPOS[*]}" =~ "$repo" ]]
+if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repo: $repo"
+    echo "Skip repository: $org/$repo"
     exit 0
 fi
 
 LOGS_PATH="logs"
-if [[ "$(jq -r '.type' <<< ${JOB_SPEC:-''})" = "presubmit" ]]
+if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = "presubmit" ]]
 then
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
@@ -37,17 +43,21 @@ then
     echo "Expected pull number not found, exit 1"
     exit 1
   fi
+  pr_org="$(jq -r '.refs.org' <<< $JOB_SPEC)"
   pr_repo="$(jq -r '.refs.repo' <<< $JOB_SPEC)"
-  if [[ -z "$pr_repo" ]]
+  if [[ -z "$pr_org" ]] || [[ -z "$pr_repo" ]]
   then
-    echo "Expected repo name not found, exit 2"
+    echo "Expected org/repo name not found, exit 2"
     exit 2
   fi
-  LOGS_PATH="pr-logs/pull/openshift_${pr_repo}/${pr_number}"
+  LOGS_PATH="pr-logs/pull/${pr_org}_${pr_repo}/${pr_number}"
 fi
-DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration then .decoration_config.gcs_configuration.bucket else error end' <<< ${JOB_SPEC:-''})"
 PROWCI=''
 PROWWEB=''
+DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration
+                    then .decoration_config.gcs_configuration.bucket
+                    else error
+                    end' <<< ${JOB_SPEC})"
 if [[ "$DECK_NAME" = 'test-platform-results' ]]
 then
   PROWCI="https://prow.ci.openshift.org"
@@ -58,7 +68,7 @@ then
   PROWWEB="https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
 else
   echo "Unknow bucket name: $DECK_NAME"
-  exit 1
+  exit 3
 fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
@@ -74,6 +84,11 @@ function download_logs() {
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml|build-log.txt|skip_overall_if_fail)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
   gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
   #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
+}
+
+function get_attribute() {
+  key_name="$1"
+  jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key==$key_name).value' --arg key_name "$key_name" "$DATAROUTER_JSON"
 }
 
 function write_attribute() {
@@ -93,30 +108,17 @@ function generate_attribute_architecture() {
   if [[ "$JOB_NAME" =~ amd64|arm64|multi|ppc64le|s390x ]]
   then
     architecture="${BASH_REMATCH[0]}"
-    write_attribute architecture "$architecture"
   else
-    release_dir="${LOCAL_DIR_ORI}/release/artifacts"
-    for release_file in 'release-images-arm64-latest' \
-                        'release-images-ppc64le-latest' \
-                        'release-images-s390x-latest' \
-                        'release-images-latest'
-    do
-      release_info_file="$release_dir/$release_file"
-      if [[ -f "$release_info_file" ]]
-      then
-        version_installed="$(jq -r '.metadata.name' "$release_info_file")"
-        write_attribute version_installed "$version_installed"
-        if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
-        then
-          architecture="${BASH_REMATCH[0]}"
-        else
-          architecture='amd64'
-        fi
-        write_attribute architecture "$architecture"
-        break
-      fi
-    done
+    generate_attribute_version_installed
+    version_installed="$(get_attribute "version_installed")"
+    if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
+    then
+      architecture="${BASH_REMATCH[0]}"
+    else
+      architecture='amd64'
+    fi
   fi
+  write_attribute architecture "$architecture"
 }
 
 function generate_attribute_cloud_provider() {
@@ -152,24 +154,14 @@ function generate_attribute_install() {
 }
 
 function generate_attribute_install_method() {
-  install_method="unknown"
-  for keyword in 'agent' \
-                 'hypershift' \
-                 'ipi' \
-                 'rosa' \
-                 'upi'
-  do
-    if [[ "$JOB_NAME_SAFE" =~ $keyword ]]
-    then
-      install_method="$keyword"
-      break
-    fi
-  done
-  write_attribute install_method "$install_method"
-
-  if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
+  if [[ "$JOB_NAME_SAFE" =~ agent|hypershift|ipi|rosa|upi ]]
   then
-    write_attribute install_method_catalog "classic"
+    install_method="${BASH_REMATCH[0]}"
+    write_attribute install_method "$install_method"
+    if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
+    then
+      write_attribute install_method_catalog "classic"
+    fi
   fi
 }
 
@@ -186,25 +178,35 @@ function generate_attribute_profilename() {
 }
 
 function generate_attribute_version_installed() {
-  version_installed="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="version_installed").value' "$DATAROUTER_JSON")"
+  version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
   then
     release_dir="${LOCAL_DIR_ORI}/release/artifacts"
-    release_file="release-images-latest"
-    arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
-    if [[ "$arch" = 'arm64' ]]
+    release_info_file="$release_dir/release-images-latest"
+    arch="$(get_attribute "architecture")"
+    if [[ -z "$arch" ]]
     then
-      release_file="release-images-arm64-latest"
-    elif [[ "$arch" = 'ppc64le' ]]
-    then
-      release_file="release-images-ppc64le-latest"
+      for release_file in 'release-images-arm64-latest' \
+                          'release-images-ppc64le-latest' \
+                          'release-images-s390x-latest'
+      do
+        release_info_file="$release_dir/$release_file"
+        if [[ -f "$release_info_file" ]]
+        then
+          break
+        fi
+      done
+    else
+      if [[ "$arch" =~ arm64|ppc64le|s390x ]]
+      then
+        release_info_file="$release_dir/release-images-${arch}-latest"
+      fi
     fi
-    release_info_file="$release_dir/$release_file"
     if [[ -f "$release_info_file" ]]
     then
       version_installed="$(jq -r '.metadata.name' "$release_info_file")"
+      write_attribute version_installed "$version_installed"
     fi
-    write_attribute version_installed "$version_installed"
   fi
 }
 
@@ -261,7 +263,6 @@ function generate_metadata() {
 EOF_JSON
 
   generate_attributes
-  cat "$DATAROUTER_JSON"
 }
 
 function generate_results() {
@@ -322,7 +323,29 @@ EOF
   if [[ "$failures_num" == "1" ]]; then
     sed -i '/testcase classname/a \      <failure message="Installation failed" type="failed"/>' "${junit_file}"
   fi
+}
 
+function fix_xmls() {
+  # We are updating the copies of the xmls that we will send to DataRouter/ReportPortal,
+  # The original xmls are not touched, it should not harm
+  xml_files="$(find "$LOCAL_DIR_RST" -name "*.xml")"
+  if [[ -z "$xml_files" ]]
+  then
+    echo 'No xml files to process, exit'
+    exit 0
+  else
+    # in openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
+    # Element 'property': This element is not expected.
+    property_xml_files="$(grep -l -r '<property ' $xml_files)" || true
+    if [[ -n "$property_xml_files" ]]
+    then
+      sed -i '\;<property.*</property>;d' $property_xml_files
+    fi
+  fi
+}
+
+function debug_info() {
+  cat "$DATAROUTER_JSON"
   ls -alR "$LOCAL_DIR"
 }
 
@@ -340,4 +363,6 @@ export INSTALL_RESULT="fail"
 download_logs
 generate_metadata
 generate_results
+fix_xmls
+debug_info
 droute_send
