@@ -11,12 +11,10 @@ JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
-BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
-LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
   NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
   export NUM_WORKER_NODES
@@ -42,9 +40,6 @@ ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
-bastion_controlplane_interface: $BASTION_CP_INTERFACE
-bastion_lab_interface: $LAB_INTERFACE
-controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
