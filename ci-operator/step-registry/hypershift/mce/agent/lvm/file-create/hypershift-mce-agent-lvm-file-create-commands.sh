@@ -29,7 +29,7 @@ spec:
             Type=oneshot
             RemainAfterExit=true
             ExecStartPre=/usr/bin/bash -x -c '[ -f /var/lvm-operator-storage.lvm ] || /usr/bin/fallocate -l 256G /var/lvm-operator-storage.lvm'
-            ExecStart=/usr/sbin/losetup /dev/loop0 /var/lvm-operator-storage.lvm
+            ExecStart=/usr/sbin/losetup /dev/loop10 /var/lvm-operator-storage.lvm
 
             [Install]
             WantedBy=multi-user.target
@@ -38,4 +38,4 @@ EOF
 oc wait --for=condition=Updating --timeout=10m machineconfigpool/worker
 oc wait --for=condition=Updated --timeout=30m machineconfigpool/worker
 
-echo "/dev/loop0" > "${SHARED_DIR}/lvmdevice"
+echo "/dev/loop10" > "${SHARED_DIR}/lvmdevice"
