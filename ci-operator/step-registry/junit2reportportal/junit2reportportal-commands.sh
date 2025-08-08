@@ -154,16 +154,14 @@ function generate_attribute_install() {
 }
 
 function generate_attribute_install_method() {
-  install_method="unknown"
   if [[ "$JOB_NAME_SAFE" =~ agent|hypershift|ipi|rosa|upi ]]
   then
     install_method="${BASH_REMATCH[0]}"
-  fi
-  write_attribute install_method "$install_method"
-
-  if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
-  then
-    write_attribute install_method_catalog "classic"
+    write_attribute install_method "$install_method"
+    if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
+    then
+      write_attribute install_method_catalog "classic"
+    fi
   fi
 }
 
