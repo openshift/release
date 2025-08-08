@@ -185,15 +185,11 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
   tasks:
 
   - name: Remove last run for ${CLUSTER_NAME}_ci
-    shell: |
-        kcli delete plan --yes ${CLUSTER_NAME}_ci
-        kcli delete plan --yes ${CLUSTER_NAME}
+    shell: kcli delete plan --yes ${CLUSTER_NAME}_ci
     ignore_errors: yes
 
   - name: Remove last run for ${ADD_BM_HOST:-empty}_ci
-    shell: |
-        kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
-        kcli delete plan --yes ${ADD_BM_HOST:-empty}
+    shell: kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
     ignore_errors: yes
 
 EOF

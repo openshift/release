@@ -106,6 +106,8 @@ es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} 
 orion_exit_status=$?
 set -e
 
-cp *.csv *.xml ${ARTIFACT_DIR}/
+if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
+  cp *.csv *.xml ${ARTIFACT_DIR}/
+fi
 
 exit $orion_exit_status

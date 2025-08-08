@@ -51,8 +51,6 @@ fi
 echo $CLOUD_OUTPUT | jq .
 CLOUD=$(echo $CLOUD_OUTPUT | jq -r .'cloud.name')
 echo "The cloud name is: $CLOUD"
-echo $CLOUD > ${SHARED_DIR}/lab_cloud
-
 
 # Create schedule
 echo

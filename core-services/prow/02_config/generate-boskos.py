@@ -94,7 +94,7 @@ CONFIG = {
         'us-west-2': 5
     },
     'aws-perfscale-qe-quota-slice': {
-        'us-west-2': 20,
+        'us-west-2': 10,
     },
     'metal-perscale-cpt-quota-slice': {
         'rdu3': 1,
@@ -564,11 +564,7 @@ CONFIG = {
     },
     'ibmcloud-rhoai-qe-quota-slice': {
         'us-east': 40,
-    },
-    'aws-oadp-qe-quota-slice': {
-        'us-east-1': 15,
-        'us-east-2': 15,
-    },
+    }
 }
 
 for i in range(2,7):

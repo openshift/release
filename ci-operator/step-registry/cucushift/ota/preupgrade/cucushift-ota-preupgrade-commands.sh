@@ -24,8 +24,14 @@ function get_tp_operator(){
     "4.17")
     tp_operator=("cluster-api" "olm")
     ;;
-    *)
+    "4.18")
     tp_operator=("cluster-api")
+    ;;
+    "4.19")
+    tp_operator=("cluster-api")
+    ;;
+    *)
+    tp_operator=()
     ;;
     esac
     echo ${tp_operator[*]}

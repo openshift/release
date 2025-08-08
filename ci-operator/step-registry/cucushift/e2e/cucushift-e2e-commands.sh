@@ -128,8 +128,8 @@ function filter_test_by_network() {
             networktag='@network-ovnkubernetes'
             ;;
         other)
-	    networktag='@other-cni'
-	    ;;
+            networktag=''
+            ;;
         *)
             echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
             ;;

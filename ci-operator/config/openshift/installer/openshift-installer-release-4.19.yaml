@@ -571,17 +571,14 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: gcp-custom-dns
+  as: e2e-gcp-custom-dns
   optional: true
-  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp-qe
     env:
       FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
-    test:
-    - chain: cucushift-installer-check-cluster-health
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
@@ -894,12 +891,10 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-techpreview
+- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
   optional: true
   steps:
     cluster_profile: vsphere-elastic
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -1259,13 +1254,7 @@ tests:
     post:
     - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
     pre:
-    - ref: gcp-provision-vpc
-    - ref: ignition-bastionhost
-    - ref: gcp-provision-bastionhost
-    - ref: proxy-config-generate
-    - chain: ipi-conf-gcp
-    - chain: ipi-install
-    - ref: cucushift-installer-check-gcp-private
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
     test:
     - chain: cucushift-installer-check-cluster-health
   timeout: 6h0m0s

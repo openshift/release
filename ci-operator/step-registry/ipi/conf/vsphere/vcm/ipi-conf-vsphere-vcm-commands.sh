@@ -37,8 +37,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
-CP_DISKS=""
-W_DISKS=""
+DISKS=""
 
 set +o errexit
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
@@ -131,38 +130,11 @@ fi
 
 if [ -n "${ADDITIONAL_DISK}" ]; then
   echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
-  CP_DISKS="platform:
+  DISKS="platform:
     vsphere:
       dataDisks:
-      - sizeGiB: 10
-        name: Disk1
-        provisioningMode: Thick
-      - sizeGiB: 50
-        name: Disk2
-        provisioningMode: Thin"
-  W_DISKS="platform:
-    vsphere:
-      dataDisks:
-      - sizeGiB: 50
+      - sizeGiB: 20
         name: Disk1"
-  if [ "${DISK_SETUP}" == "true" ]; then
-    echo "$(date -u --rfc-3339=seconds) - configuring disk setup"
-    CP_DISKS="${CP_DISKS}
-  diskSetup:
-  - type: etcd
-    etcd:
-      platformDiskID: Disk1
-  - type: user-defined
-    userDefined:
-      platformDiskID: Disk2
-      mountPath: /var/lib/containers"
-    W_DISKS="${W_DISKS}
-  diskSetup:
-  - type: user-defined
-    userDefined:
-      platformDiskID: Disk1
-      mountPath: /var/lib/containers"
-  fi
 fi
 
 if [ ${Z_VERSION} -gt 9 ]; then
@@ -191,11 +163,11 @@ else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
-  ${CP_DISKS}
+  ${DISKS}
 compute:
 - name: worker
   replicas: ${COMPUTE_NODE_REPLICAS}
-  ${W_DISKS}"
+  ${DISKS}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then

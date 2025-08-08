@@ -53,9 +53,6 @@ EOF
   echo "will deprovision GCE cluster ${infraID} in region ${region}"
 done
 
-# log installer version for debugging purposes
-openshift-install version
-
 clusters=$( find "${logdir}" -mindepth 1 -type d )
 for workdir in $(shuf <<< ${clusters}); do
   queue deprovision "${workdir}"
