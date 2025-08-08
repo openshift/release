@@ -265,7 +265,6 @@ function generate_metadata() {
 EOF_JSON
 
   generate_attributes
-  cat "$DATAROUTER_JSON"
 }
 
 function generate_results() {
@@ -326,7 +325,29 @@ EOF
   if [[ "$failures_num" == "1" ]]; then
     sed -i '/testcase classname/a \      <failure message="Installation failed" type="failed"/>' "${junit_file}"
   fi
+}
 
+function fix_xmls() {
+  # We are updating the copies of the xmls that we will send to DataRouter/ReportPortal,
+  # The original xmls are not touched, it should not harm
+  xml_files="$(find "$LOCAL_DIR_RST" -name "*.xml")"
+  if [[ -z "$xml_files" ]]
+  then
+    echo 'No xml files to process, exit'
+    exit 0
+  else
+    # in openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
+    # Element 'property': This element is not expected.
+    property_xml_files="$(grep -l -r '<property ' $xml_files)"
+    if [[ -n "$property_xml_files" ]]
+    then
+      sed -i '\;<property.*</property>;d' $property_xml_files
+    fi
+  fi
+}
+
+function debug_info() {
+  cat "$DATAROUTER_JSON"
   ls -alR "$LOCAL_DIR"
 }
 
@@ -344,4 +365,6 @@ export INSTALL_RESULT="fail"
 download_logs
 generate_metadata
 generate_results
+fix_xmls
+debug_info
 droute_send
