@@ -1,0 +1,31 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-byo-ami-provision
+  steps:
+  - ref: aws-provision-ami
+  - chain: ipi-conf-aws
+  - ref: ipi-conf-aws-ami
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
+  - chain: ipi-install
+  - ref: cucushift-installer-check-aws-custom-ami
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  env:
+  - name: ENABLE_AWS_AMI_DEFAULT_MACHINE
+    default: "no"
+    documentation: |-
+      If set custom AMI in default machine platform
+  - name: ENABLE_AWS_AMI_CONTROL_PLANE
+    default: "no"
+    documentation: |-
+      If set custom AMI for control plane nodes
+  - name: ENABLE_AWS_AMI_COMPUTE
+    default: "yes"
+    documentation: |-
+      If set custom AMI for compute nodes
+  - name: ENCRYPTED_AMI
+    default: "no"
+    documentation: |-
+      If ENCRYPTED while copying AMI.
+  documentation: |-
+    Create an IPI cluster using BYO AMI profile on AWS for QE e2e tests.
