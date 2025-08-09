@@ -409,6 +409,7 @@ function upgrade() {
     if check_ota_case_enabled "OCP-21588"; then
         log_file=$(mktemp)
         echo "Testing --allow-explicit-upgrade option"
+        echo "oc adm upgrade --to-image=${TARGET} --force=${FORCE_UPDATE}"
         run_command "oc adm upgrade --to-image=${TARGET} --force=${FORCE_UPDATE} 2>&1 | tee ${log_file}" || true
         if grep -q 'specify --allow-explicit-upgrade to continue' "${log_file}"; then
             echo "--allow-explicit-upgrade prompt message is shown"
