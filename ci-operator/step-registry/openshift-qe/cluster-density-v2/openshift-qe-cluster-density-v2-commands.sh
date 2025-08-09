@@ -63,7 +63,8 @@ ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false EXTRA_FLAGS='--pod-r
 
 # The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+echo ITERATION_MULTIPLIER_ENV is $ITERATION_MULTIPLIER_ENV
+export ITERATIONS=$(($iteration_multiplier * $current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
