@@ -1,0 +1,18 @@
+workflow:
+  as: hypershift-aws-e2e-external-oidc
+  documentation: |-
+    The HyperShift aws e2e exterbak oidc workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    In this workflow, a keycloak service is deployed to be used as the external oidc authority for the hosted cluster
+  steps:
+    post:
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - ref: hypershift-aws-run-e2e-external
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: idp-external-oidc-keycloak-server
+    - ref: hypershift-install

@@ -304,6 +304,21 @@ tests:
       SNYK_ENABLE_DEPS_SCAN: "false"
     workflow: openshift-ci-security
 - always_run: false
+  as: e2e-aws-ext-oidc
+  capabilities:
+  - build-tmpfs
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-external-oidc
+- always_run: false
   as: e2e-openstack-aws
   optional: true
   steps:
