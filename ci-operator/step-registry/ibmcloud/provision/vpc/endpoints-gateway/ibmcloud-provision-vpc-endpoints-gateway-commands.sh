@@ -29,26 +29,43 @@ function findTarget() {
 }
 
 function createEndpointGateway() {
-    local vpcID="$1" sgID="$2" subnetID="$3" targetCRN="$4" vpeGatewayName="$5" ret log cmd
+    local vpcID="$1" sgID="$2" subnetID="$3" targetCRN="$4" vpeGatewayName="$5" ret log cmd counter=0
     log=$(mktemp)
     echo "ibmcloud is endpoint-gateway-delete ${vpeGatewayName} --vpc ${vpcID} -f || true" >>"${SHARED_DIR}/ibmcloud_remove_resources_by_cli.sh"
     cmd="ibmcloud is endpoint-gateway-create --vpc ${vpcID} --sg ${sgID} --new-reserved-ip '{\"subnet\":{\"id\": \"${subnetID}\"}}' --target ${targetCRN} --name ${vpeGatewayName}"
     echo "Command: $cmd"
-    eval "$cmd" &> "${log}"; ret=$?
-    cat "${log}"
-    if [[ "$ret" != "0" ]] && grep -q "endpoint gateway already exists for this service" "${log}"; then
-        echo "The endpoint gateway already exists for this service, ignore the error..."
-        return 0
-    fi
-    waitingStatus ${vpeGatewayName};  ret=$?
-    echo "${vpeGatewayName} waiting status: ${ret}"
-    run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
+    while [ $counter -lt 5 ]
+    do
+        counter=$(expr $counter + 1)
+        eval "$cmd" &> "${log}"; ret=$?
+        cat "${log}"
+        if [[ "$ret" == 0 ]]; then
+            echo "Successfully created ${vpeGatewayName}."
+            break # Exit loop on success
+        else
+            if grep -q "endpoint gateway already exists for this service" "${log}"; then
+                echo "The endpoint gateway already exists for this service, treating as success..."
+                ret=0 # Override exit status to 0 to proceed
+                break
+            fi
+            echo "Attempt ${counter} of 5 failed. Retrying in 10 seconds..."
+            sleep 10
+        fi
+    done
 
-    if [[ "${ret}" != 0 ]]; then
-        echo "ERROR: fail to create the endpoint gateway ${vpeGatewayName} on vpc"
+    # Cleanup temporary log file
+    rm -f "${log}"
+    
+    #check the endpoint-gateway status when created or has an existed
+    echo "Waiting for ${vpeGatewayName} to become available..."
+    waitingStatus "${vpeGatewayName}" || {
+        echo "ERROR: The created endpoint gateway ${vpeGatewayName} status is not available."
+        run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
         return 1
-    fi
-    return 0
+    }
+    echo "Successfully verified ${vpeGatewayName} status."
+    run_command "ibmcloud is endpoint-gateway ${vpeGatewayName}"
+    return 0    
 }
 
 function waitingStatus() {
@@ -60,6 +77,8 @@ function waitingStatus() {
         status=$(ibmcloud is endpoint-gateway $endpoint --output JSON | jq -r ."lifecycle_state")
         if [[ "${status}" == "stable" ]]; then
             return 0
+        elif [[ "$?" != "0" ]]; then ## fail to get the status, directly exit 1
+            return 1
         fi
     done
     return 1
@@ -113,6 +132,15 @@ ibmcloud is endpoint-gateway-targets -q -output JSON > ${allTargetsFile} || exit
 run_command "ibmcloud is security-group-rule-add ${sgID} inbound tcp --remote '0.0.0.0/0' --port-min=443 --port-max=443" || exit 1
 
 srv_array=("IAM" "VPC" "ResourceController" "ResourceManager" "DNSServices" "COS" "GlobalSearch" "GlobalTagging" "KeyProtect" "HyperProtect" "COSConfig" "GlobalCatalog")
+# "ResourceController" "ResourceManager"  just can be has one, otherwise will got "An endpoint gateway already exists for this service"
+
+if  (( RANDOM % 2 )); then
+    unset 'srv_array[2]'
+else
+    unset 'srv_array[3]'
+fi
+srv_array=("${srv_array[@]}")
+echo "serives:" "${srv_array[@]}"
 
 for srv in "${srv_array[@]}"; do
     real_srv_endpoint_url=""
