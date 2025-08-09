@@ -78,9 +78,48 @@ elif [ "$platform" = "VSphere" ]; then
     export VSPHERE_USERNAME
     VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
     export VSPHERE_PASSWORD
+elif [ "$platform" = "None" ] || [ "$platform" = "bm" ] || [ "$platform" = "baremetal" ]; then
+    # Get a node that matches the LABEL_SELECTOR using oc command
+    target_node=$(oc get nodes -l "${LABEL_SELECTOR}" --no-headers | head -1 | awk '{print $1}')
+    
+    echo "Target node for baremetal testing: ${target_node}"
+    
+    # Extract BMC credentials from hosts.yaml for the target node
+    if [ -f "${SHARED_DIR}/hosts.yaml" ] && [ -n "$target_node" ]; then
+        echo "Found hosts.yaml, extracting BMC credentials..."
+        for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+            # shellcheck disable=SC1090
+            . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+            
+            if [[ "${target_node}" == "${name}"* ]]; then
+                # shellcheck disable=SC2154
+                export BMC_USER="${bmc_user}"
+                # shellcheck disable=SC2154
+                export BMC_PASSWORD="${bmc_pass}"
+                # shellcheck disable=SC2154
+                export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+                # shellcheck disable=SC2154
+                export NODE_NAME="${target_node}"
+                
+                break
+            fi
+        done
+    else
+        echo "ERROR: hosts.yaml not found or target node not identified"
+        echo "Available nodes:"
+        oc get nodes -l "${LABEL_SELECTOR}" --no-headers || true
+        echo "Contents of SHARED_DIR:"
+        ls -la "${SHARED_DIR}" || true
+        exit 1
+    fi
+    
+    export NODE_NAME="$target_node"
+
+    # Run the node scenario
+    echo "Starting node stop/start scenario for baremetal node..."
+    ./node-disruptions/prow_run.sh
 fi
 
-./node-disruptions/prow_run.sh
 rc=$?
 
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
