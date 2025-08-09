@@ -1,0 +1,38 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-custom-dns-private-provision
+  steps:
+  - ref: aws-provision-vpc-shared
+  - chain: aws-provision-bastionhost
+  - ref: aws-provision-security-group
+  - chain: ipi-conf-aws
+  - ref: ipi-conf-aws-usage-info
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-aws-custom-security-groups
+  - chain: aws-provision-iam-user-minimal-permission
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-in-bastion
+  - ref: aws-provision-private-custom-dns
+  - ref: bastion-dnsmasq
+  - ref: proxy-config-generate
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-aws-private
+  - ref: cucushift-installer-check-user-provisioned-dns
+  - ref: cucushift-installer-check-aws-custom-vpc
+  - ref: aws-provision-tags-for-byo-vpc
+  - ref: enable-qe-catalogsource
+  env:
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+    documentation: |-
+      Allow users to select the user provisioned dns option for AWS installations during configuration. Valid options are "yes" and "no". When "yes", the
+      configuration will enable the user provisioned dns option through the install configuration file.
+  documentation: |-
+    Create an IPI cluster with user provisioned DNS.
