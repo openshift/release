@@ -41,7 +41,7 @@ spec:
     - name: ECO_DUMP_FAILED_TESTS
       value: "true"
     - name: ECO_HWACCEL_NFD_CPU_FLAGS_HELPER_IMAGE
-      value: quay.io/rh_ee_ggordani/cpuinfo:release-4.15
+      value: quay.io/rh_ee_ggordani/cpuinfo:release-4.19
     - name: ECO_REPORTS_DUMP_DIR
       value: /home/testuser/reports
     imagePullPolicy: Always
@@ -76,6 +76,7 @@ oc get pod testpod
 
 while : ; do
   oc exec testpod -- ls /home/testuser/reports > /tmp/Files
+  oc logs testpod
   if ! grep -q 'nfd_suite_test_junit.xml' /tmp/Files ; then
     echo
     echo "Waiting for test results..."
