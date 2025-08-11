@@ -165,7 +165,19 @@ if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
     echo "Modifying PXE loader of server $i ..."
-    hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
+    podman run \
+      -v /tmp/foreman_config_updated_$LAB_CLOUD.yml:/opt/hammer/foreman_config.yml \
+      quay.io/cloud-bulldozer/foreman-cli:latest \
+      hammer \
+        -c /opt/hammer/foreman_config.yml \
+        --verify-ssl false \
+        -u $LAB_CLOUD \
+        -p $PSWD \
+        host update \
+          --name $i \
+          --operatingsystem "$FOREMAN_OS" \
+          --pxe-loader "PXELinux BIOS" \
+          --build 1
   done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
@@ -207,6 +219,30 @@ if [[ "$PRE_UEFI" == "true" ]]; then
 fi
 EOF
 envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+
+# Generate the foreman_config.yml file
+if [[ "$PRE_PXE_LOADER" == "true" ]]; then
+  FOREMAN_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/foreman_instance_${LAB})
+  export FOREMAN_INSTANCE
+  OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+  PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+  export PSWD
+  cat > /tmp/foreman_config.yml << 'EOF'
+  :modules:
+      - hammer_cli_foreman
+
+  :foreman:
+      :enable_module: true
+      :host: '${FOREMAN_INSTANCE}'
+      :username: '${LAB_CLOUD}'
+      :password: '${PSWD}'
+
+  :log_dir: '~/.hammer/log'
+  :log_level: 'error'
+EOF
+  envsubst '${FOREMAN_INSTANCE},${LAB_CLOUD},${PSWD}' < /tmp/foreman_config.yml > /tmp/foreman_config_updated_$LAB_CLOUD.yml
+  scp -q ${SSH_ARGS} /tmp/foreman_config_updated_$LAB_CLOUD.yml root@${bastion}:/tmp/
+fi
 
 # Override JETLAG_BRANCH to main when JETLAG_LATEST is true
 if [[ ${JETLAG_LATEST} == 'true' ]]; then
