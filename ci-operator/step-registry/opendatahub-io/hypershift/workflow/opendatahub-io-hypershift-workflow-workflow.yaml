@@ -1,0 +1,27 @@
+workflow:
+  as: opendatahub-io-hypershift-workflow
+  documentation: |-
+    Enhanced HyperShift workflow that extends hypershift-hostedcluster-workflow with 
+    fast, focused debugging capabilities optimized for quick PR feedback.
+    
+    This workflow provides:
+    - Fast HyperShift cluster provisioning
+    - Automatic operator subscription installation via custom catalog
+    - Lightweight, operator-focused debugging collection
+    - Comprehensive pod logs and operator-specific resources
+    - Quick post-failure analysis optimized for CI speed
+    
+    Use this workflow for fast, reliable HyperShift-based operator testing
+    with efficient debugging data collection that prioritizes quick PR
+    feedback while retaining deep analysis capabilities when needed.
+
+  steps:
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - chain: hypershift-hostedcluster-create
+    - ref: opendatahub-io-hypershift-subscribe
+    post:
+    - chain: hypershift-hostedcluster-dump
+      best_effort: true
+    - chain: hypershift-hostedcluster-destroy
+      best_effort: true

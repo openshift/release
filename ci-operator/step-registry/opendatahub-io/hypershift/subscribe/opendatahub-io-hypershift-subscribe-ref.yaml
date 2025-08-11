@@ -1,0 +1,44 @@
+ref:
+  as: opendatahub-io-hypershift-subscribe
+  from: cli
+  commands: opendatahub-io-hypershift-subscribe-commands.sh
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  timeout: 20m
+  env:
+  - name: OO_PACKAGE
+    documentation: The name of the operator package to be installed. Must be present in the index image referenced by `OO_INDEX`.
+  - name: OO_CHANNEL
+    documentation: The name of the operator channel to track.
+  - name: OO_INSTALL_NAMESPACE
+    documentation: The namespace into which the operator will be installed.
+  - name: OO_TARGET_NAMESPACES
+    documentation: A comma-separated list of namespaces the operator will target. Special value `!all` means that all namespaces will be targeted. If no OperatorGroup exists in `OO_INSTALL_NAMESPACE`, a new one will be created with its target namespaces set to `OO_TARGET_NAMESPACES`. The special value `!install` will set the target namespace to the operator's installation namespace.
+    default: "!all"
+  - name: OO_CONFIG_ENVVARS
+    documentation: A comma-separated list of environment variables the operator's deployment will be configured with (key1=value1,key2=value2).
+    default: ""
+  dependencies:
+  - name: ci-index
+    env: OO_INDEX
+  documentation: |-
+    The opendatahub-io-hypershift-subscribe step installs an optional operator from a provided
+    index image on a HyperShift hosted cluster. This step automatically:
+    
+    1. Uses the hosted cluster kubeconfig (${SHARED_DIR}/nested_kubeconfig)
+    2. Creates a custom CatalogSource from the provided index image (OO_INDEX)
+    3. Creates the installation namespace if it doesn't exist
+    4. Creates an OperatorGroup with proper target namespace configuration
+    5. Creates a Subscription pointing to the custom catalog
+    6. Waits for the CSV to become ready with proper retry logic
+    
+    This step is specifically designed for HyperShift environments and supports
+    custom catalog testing (e.g., PR bundle validation through ci-index).
+    
+    Unlike the standard optional-operators-subscribe step, this implementation:
+    - Explicitly manages the hosted cluster kubeconfig
+    - Supports custom catalog creation from OO_INDEX
+    - Uses local namespace strategy to avoid permission issues
+    - Provides enhanced error handling and debugging output
