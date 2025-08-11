@@ -132,6 +132,7 @@ export GOPATH="${HOME}"/go
 export GOBIN="${GOPATH}"/bin
 export IMAGE_REGISTRY=quay.io/openshift-kni/
 export CNF_TESTS_IMAGE=cnf-tests:latest
+export BUSY_CPUS_IMAGE=cnf-tests:latest
 
 ## Print the nodes in the cluster
 oc get nodes
