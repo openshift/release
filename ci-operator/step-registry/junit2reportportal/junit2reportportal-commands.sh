@@ -122,12 +122,11 @@ function generate_attribute_architecture() {
 }
 
 function generate_attribute_cloud_provider() {
-  cloud_provider="unknown"
   if [[ "$JOB_NAME_SAFE" =~ alibaba|aws|azure|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere ]]
   then
     cloud_provider="${BASH_REMATCH[0]}"
+    write_attribute cloud_provider "$cloud_provider"
   fi
-  write_attribute cloud_provider "$cloud_provider"
 }
 
 function generate_attribute_install() {
