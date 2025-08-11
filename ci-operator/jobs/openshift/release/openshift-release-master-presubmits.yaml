@@ -1774,6 +1774,31 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: app.ci
+    context: ci/prow/pull-ci-openshift-release-sanitize-prow-jobs-cluster-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-sanitize-prowjobs-cluster-config-validation
+    rerun_command: /test prow-jobs-cluster-config-validation
+    run_if_changed: ^core-services/sanitize-prow-jobs/_clusters.yaml
+    spec:
+      containers:
+      - command:
+        - ./hack/validate-prow-jobs-clusters_config.sh
+        image: quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )prow-jobs-cluster-config-validation,?($|\s.*)
+
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build10
     context: ci/prow/pylint
     decorate: true
