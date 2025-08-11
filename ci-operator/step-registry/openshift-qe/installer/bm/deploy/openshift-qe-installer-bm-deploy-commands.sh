@@ -4,9 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Fix UID issue (from Telco QE Team)
-~/fix_uid.sh
-
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
@@ -17,7 +14,7 @@ KUBECONFIG_SRC=""
 BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
-LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
 LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
@@ -29,6 +26,8 @@ export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
 
+
+echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -88,6 +87,14 @@ fi
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
+# Copy the ssh key to the bastion host
+OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+bastion2=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+ssh ${SSH_ARGS} root@${bastion} "
+   ssh-keygen -R ${bastion2}
+   sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@${bastion2}
+"
+
 # Clean up previous attempts
 cat > /tmp/clean-resources.sh << 'EOF'
 echo 'Running clean-resources.sh'
@@ -120,7 +127,7 @@ if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
     echo "Resetting IDRAC of server $i ..."
     podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --racreset
   done
-  
+
   # Wait for all IDRACs to become ready
   echo "Waiting for IDRACs to become ready..."
   for i in $HOSTS; do
@@ -128,10 +135,10 @@ if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
     max_attempts=30  # Maximum number of attempts (adjust as needed)
     attempt=1
     sleep_interval=10  # Seconds between attempts
-    
+
     while [ $attempt -le $max_attempts ]; do
       echo "Attempt $attempt/$max_attempts for server $i"
-      
+
       if podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state; then
         echo "✓ IDRAC for server $i is ready"
         break
@@ -146,11 +153,11 @@ if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
           sleep $sleep_interval
         fi
       fi
-      
+
       ((attempt++))
     done
   done
-  
+
   echo "IDRAC reset and readiness check completed"
 fi
 
@@ -158,7 +165,19 @@ if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
     echo "Modifying PXE loader of server $i ..."
-    hammer -c /root/.hammer/cli.modules.d/foreman_$LAB.yml --verify-ssl false -u $LAB_CLOUD -p $PWD host update --name $i --operatingsystem "$FOREMAN_OS" --pxe-loader "PXELinux BIOS" --build 1
+    podman run \
+      -v /tmp/foreman_config_updated_$LAB_CLOUD.yml:/opt/hammer/foreman_config.yml \
+      quay.io/cloud-bulldozer/foreman-cli:latest \
+      hammer \
+        -c /opt/hammer/foreman_config.yml \
+        --verify-ssl false \
+        -u $LAB_CLOUD \
+        -p $PSWD \
+        host update \
+          --name $i \
+          --operatingsystem "$FOREMAN_OS" \
+          --pxe-loader "PXELinux BIOS" \
+          --build 1
   done
 fi
 if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
@@ -200,6 +219,30 @@ if [[ "$PRE_UEFI" == "true" ]]; then
 fi
 EOF
 envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+
+# Generate the foreman_config.yml file
+if [[ "$PRE_PXE_LOADER" == "true" ]]; then
+  FOREMAN_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/foreman_instance_${LAB})
+  export FOREMAN_INSTANCE
+  OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+  PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+  export PSWD
+  cat > /tmp/foreman_config.yml << 'EOF'
+  :modules:
+      - hammer_cli_foreman
+
+  :foreman:
+      :enable_module: true
+      :host: '${FOREMAN_INSTANCE}'
+      :username: '${LAB_CLOUD}'
+      :password: '${PSWD}'
+
+  :log_dir: '~/.hammer/log'
+  :log_level: 'error'
+EOF
+  envsubst '${FOREMAN_INSTANCE},${LAB_CLOUD},${PSWD}' < /tmp/foreman_config.yml > /tmp/foreman_config_updated_$LAB_CLOUD.yml
+  scp -q ${SSH_ARGS} /tmp/foreman_config_updated_$LAB_CLOUD.yml root@${bastion}:/tmp/
+fi
 
 # Override JETLAG_BRANCH to main when JETLAG_LATEST is true
 if [[ ${JETLAG_LATEST} == 'true' ]]; then

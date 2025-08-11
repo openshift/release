@@ -588,14 +588,17 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-gcp-custom-dns
+  as: gcp-custom-dns
   optional: true
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp-qe
     env:
       FEATURE_GATES: '["GCPClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
+    test:
+    - chain: cucushift-installer-check-cluster-health
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
@@ -710,6 +713,13 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
+  timeout: 6h0m0s
+- as: e2e-gcp-xpn-dedicated-dns-project
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-xpn-dedicated-dns-project
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-xpn
   optional: true
@@ -913,7 +923,8 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-externallb-ovn
+- always_run: false
+  as: e2e-vsphere-externallb-ovn
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -940,24 +951,15 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups
-- as: e2e-vsphere-static-ovn
+- always_run: false
+  as: e2e-vsphere-static-ovn
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-multi-network-techpreview
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      MULTI_NIC_IPI: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
+- always_run: false
+  as: e2e-vsphere-ovn-multi-network
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -967,14 +969,26 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-disk
+- always_run: false
+  as: e2e-vsphere-ovn-multi-disk
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      FEATURE_GATES: '["VSphereMultiDisk=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-disk-setup
   optional: true
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
-      FEATURE_GATES: '["VSphereMultiDisk=true"]'
+      DISK_SETUP: "true"
+      FEATURE_GATES: '[VSphereMultiDisk=true,MultiDiskSetup=true]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
@@ -998,9 +1012,9 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-zones-techpreview
   optional: true
-  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1313,7 +1327,13 @@ tests:
     post:
     - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-gcp
+    - chain: ipi-install
+    - ref: cucushift-installer-check-gcp-private
     test:
     - chain: cucushift-installer-check-cluster-health
   timeout: 6h0m0s
@@ -1451,7 +1471,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      FEATURE_GATES: '["GCPCustomAPIEndpoints=true"]'
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-custom-endpoints
   timeout: 6h0m0s
