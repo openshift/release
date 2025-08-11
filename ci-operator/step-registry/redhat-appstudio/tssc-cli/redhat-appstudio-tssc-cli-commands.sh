@@ -111,11 +111,11 @@ configure_rhtap_for_prerelease_versions(){
 
 install_rhtap(){
   echo "install"
-  ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" quay --url="https://quay.io" --dockerconfigjson="${QUAY__DOCKERCONFIGJSON}" --token="${QUAY__API_TOKEN}"
-  ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" acs --endpoint="${ACS__CENTRAL_ENDPOINT}" --token="${ACS__API_TOKEN}"
-  ./bin/rhtap-cli integration --kube-config "$KUBECONFIG" gitlab --token "${GITLAB__TOKEN}"
+  ./bin/tssc-cli integration --kube-config "$KUBECONFIG" quay --url="https://quay.io" --dockerconfigjson="${QUAY__DOCKERCONFIGJSON}" --token="${QUAY__API_TOKEN}"
+  ./bin/tssc-cli integration --kube-config "$KUBECONFIG" acs --endpoint="${ACS__CENTRAL_ENDPOINT}" --token="${ACS__API_TOKEN}"
+  ./bin/tssc-cli integration --kube-config "$KUBECONFIG" gitlab --token "${GITLAB__TOKEN}"
   
-  ./bin/rhtap-cli deploy --config ./installer/config.yaml --kube-config "$KUBECONFIG" | tee /tmp/command_output.txt
+  ./bin/tssc-cli deploy --config ./installer/config.yaml --kube-config "$KUBECONFIG" | tee /tmp/command_output.txt
 
 
   WEBHOOK_URL="https://$(oc get routes -n openshift-pipelines pipelines-as-code-controller -ojsonpath='{.spec.host}')"

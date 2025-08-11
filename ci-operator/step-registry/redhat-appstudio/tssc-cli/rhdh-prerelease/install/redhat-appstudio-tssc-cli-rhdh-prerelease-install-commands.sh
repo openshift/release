@@ -7,7 +7,7 @@ cd /tmp
 curl -sSLO $RHDH_INSTALL_SCRIPT
 chmod +x install-rhdh-catalog-source.sh
 
-# Comment out lines to apply subscription as the rhtap-cli will do this.
+# Comment out lines to apply subscription as the tssc-cli will do this.
 sed -i.bak '/# Create OperatorGroup/,$ s/^/#/' install-rhdh-catalog-source.sh
 
 # Add line to script to store IIB_IMAGE
