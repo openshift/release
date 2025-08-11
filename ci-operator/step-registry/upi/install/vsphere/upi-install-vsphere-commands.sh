@@ -55,6 +55,11 @@ fi
 cp -rt "${installer_dir}" \
     /var/lib/openshift-install/upi/"${CLUSTER_TYPE}"/*
 
+# Copy install-config to artifacts directory for debugging
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
 function gather_console_and_bootstrap() {
