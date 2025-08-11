@@ -49,6 +49,4 @@ fi
 
 echo "$RUN_COMMAND"
 
-sleep 2h
-
 ${RUN_COMMAND}
