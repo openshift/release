@@ -237,7 +237,7 @@ CONFIG = {
         'eastus': 6,
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 120,
+        'default': 140,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
