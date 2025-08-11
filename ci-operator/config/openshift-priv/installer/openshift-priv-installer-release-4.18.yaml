@@ -376,6 +376,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-proxy
   optional: true
+  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
@@ -589,6 +590,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
+  run_if_changed: azure
   steps:
     cluster_profile: azure4
     env:
@@ -824,10 +826,12 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
+- as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -894,6 +898,7 @@ tests:
 - always_run: false
   as: e2e-crc
   optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
