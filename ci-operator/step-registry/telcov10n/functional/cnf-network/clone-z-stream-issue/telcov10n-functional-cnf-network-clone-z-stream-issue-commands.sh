@@ -13,6 +13,12 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+echo "Validate JOB_TYPE variable: ${JOB_TYPE}"
+if [ "$JOB_TYPE" = "presubmit" ]; then
+  echo "JOB_TYPE=presubmit — skipping script"
+  exit 0
+fi
+
 if [[ ! -f "$CLUSTER_VERSION_FILE" ]]; then
   echo "Error: Cluster version file not found: '$CLUSTER_VERSION_FILE'." >&2
   exit 1
