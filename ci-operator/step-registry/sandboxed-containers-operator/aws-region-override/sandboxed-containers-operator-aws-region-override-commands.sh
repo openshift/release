@@ -94,32 +94,32 @@ echo "=========================================="
 cp "${CONFIG}" "${CONFIG}.backup"
 
 # Method 1: Use yq to modify the region (preferred if yq is available)
-if command -v yq &> /dev/null; then
-    echo "Using yq to modify install-config.yaml"
-    yq eval ".platform.aws.region = \"${TARGET_AWS_REGION}\"" -i "${CONFIG}"
-
-    # Update zones if they exist and are region-specific
-    current_zones=$(yq eval '.platform.aws.zones // []' "${CONFIG}")
-    if [[ "$current_zones" != "[]" && "$current_zones" != "null" ]]; then
-        echo "Updating availability zones for new region..."
+#if command -v yq &> /dev/null; then
+#    echo "Using yq to modify install-config.yaml"
+#    yq eval ".platform.aws.region = \"${TARGET_AWS_REGION}\"" -i "${CONFIG}"
+#
+#    # Update zones if they exist and are region-specific
+#    current_zones=$(yq eval '.platform.aws.zones // []' "${CONFIG}")
+#    if [[ "$current_zones" != "[]" && "$current_zones" != "null" ]]; then
+#        echo "Updating availability zones for new region..."
         # Clear existing zones - let the installer pick appropriate zones for the new region
-        yq eval 'del(.platform.aws.zones)' -i "${CONFIG}"
-        echo "Cleared specific zones - installer will select appropriate zones for ${TARGET_AWS_REGION}"
-    fi
+#        yq eval 'del(.platform.aws.zones)' -i "${CONFIG}"
+#        echo "Cleared specific zones - installer will select appropriate zones for ${TARGET_AWS_REGION}"
+#    fi
 
     # Update compute zones if they exist
-    yq eval 'del(.compute[].platform.aws.zones)' -i "${CONFIG}" 2>/dev/null || true
-    # Update control plane zones if they exist
-    yq eval 'del(.controlPlane.platform.aws.zones)' -i "${CONFIG}" 2>/dev/null || true
+#    yq eval 'del(.compute[].platform.aws.zones)' -i "${CONFIG}" 2>/dev/null || true
+#    # Update control plane zones if they exist
+#    yq eval 'del(.controlPlane.platform.aws.zones)' -i "${CONFIG}" 2>/dev/null || true
 
-else
+#else
     echo "Using sed to modify install-config.yaml (yq not available)"
     # Fallback method using sed
     sed -i "s/region: ${LEASED_RESOURCE}/region: ${TARGET_AWS_REGION}/g" "${CONFIG}"
 
     # Remove any hardcoded zones that might be region-specific
     sed -i '/zones:/,/^[[:space:]]*[^[:space:]-]/{ /zones:/d; /^[[:space:]]*-[[:space:]]*[a-z0-9-]*[a-z]$/d; }' "${CONFIG}"
-fi
+#fi
 
 # Validate the change
 echo "=========================================="
