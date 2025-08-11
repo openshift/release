@@ -265,63 +265,68 @@ EOF_JSON
   generate_attributes
 }
 
-function generate_results() {
-#  testsuite_name='Overall CI (test step)'
-#  junit_file="$LOCAL_DIR_RST/junit_test-steps.xml"
-#  failure_count=0
-#  step_dirs=$(find "$LOCAL_DIR_ORI" -maxdepth 1 -mindepth 1 -type d | grep -v '/release$' | sort)
-#  for step_dir in $step_dirs
-#  do
-#    step_name="$(basename "${step_dir}")"
-#    file_finished="${step_dir}/finished.json"
-#    if [ -f "${file_finished}" ]
-#    then
-#      result=$(jq -r '.result' "${file_finished}")
-#      if [[ "$result" = 'SUCCESS' ]]
-#      then
-#        cat >> "$junit_file" << EOF_JUNIT_SUCCESS
-#  <testcase classname="$testsuite_name" name="$step_name" time="1">
-#    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
-#  </testcase>
-#EOF_JUNIT_SUCCESS
-#      elif [[ "$result" = 'FAILURE' ]]
-#      then
-#        let failure_count+=1
-#        cat >> "$junit_file" << EOF_JUNIT_FAILURE
-#  <testcase classname="$testsuite_name" name="$step_name" time="1">
-#    <failure message="Step $step_name failed" type="failed"/>
-#    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
-#  </testcase>
-#EOF_JUNIT_FAILURE
-#      fi
-#    else
-#      let failure_count+=1
-#    fi
-#  done
-#  sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$junit_file"
-#  sed -i "1 a <testsuite name=\"$testsuite_name\" failures=\"$failure_count\" errors=\"0\" skipped=\"0\" tests=\"$(wc -w <<< $step_dirs)\">" "$junit_file"
-#  sed -i '$ a </testsuite>' "$junit_file"
-#  cp "$junit_file" "${ARTIFACT_DIR}"
+function generate_result_teststeps() {
+  testsuite_name='Overall CI (test step)'
+  junit_file="$LOCAL_DIR_RST/junit_test-steps.xml"
+  failure_count=0
+  step_dirs=$(find "$LOCAL_DIR_ORI" -maxdepth 1 -mindepth 1 -type d | grep -v '/release$' | sort)
+  for step_dir in $step_dirs
+  do
+    step_name="$(basename "${step_dir}")"
+    file_finished="${step_dir}/finished.json"
+    if [ -f "${file_finished}" ]
+    then
+      cat >> "$junit_file" << EOF_JUNIT
+  <testcase classname="$testsuite_name" name="$step_name" time="1">
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+  </testcase>
+EOF_JUNIT
+      result=$(jq -r '.result' "${file_finished}")
+      if [[ "$result" = 'SUCCESS' ]]
+      then
+        continue
+      elif [[ "$result" = 'FAILURE' ]]
+      then
+        sed -i "\;classname=\"$testsuite_name\" name=\"$step_name\";a \    <failure message=\"Step $step_name failed\" type=\"failed\"/>" "$junit_file"
+      fi
+    fi
+    let failure_count+=1
+  done
+  sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$junit_file"
+  sed -i "1 a <testsuite name=\"$testsuite_name\" failures=\"$failure_count\" errors=\"0\" skipped=\"0\" tests=\"$(wc -w <<< $step_dirs)\">" "$junit_file"
+  sed -i '$ a </testsuite>' "$junit_file"
+  cp "$junit_file" "${ARTIFACT_DIR}"
+}
 
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
-
+# For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
+function generate_result_customize_prow() {
   testsuite_name='Installation'
   # using the same junit filename as the one generated in must-gather step to overwirte installation results
   junit_file="$LOCAL_DIR_RST/junit_install.xml"
-  failures_num="1"
-  if [[ "$INSTALL_RESULT" == "succeed" ]]; then
-    failures_num="0"
-  fi
-  cat >"${junit_file}" <<EOF
+  cat > "$junit_file" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite_name}" failures="${failures_num}" errors="0" skipped="0" tests="1">
-    <testcase classname="${testsuite_name}" name="${testsuite_name}" time="1">
-      <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/build-log.txt</system-out>
-    </testcase>
+<testsuite name="${testsuite_name}" failures="0" errors="0" skipped="0" tests="1">
+  <testcase classname="${testsuite_name}" name="${testsuite_name}" time="1">
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/build-log.txt</system-out>
+  </testcase>
 </testsuite>
 EOF
-  if [[ "$failures_num" == "1" ]]; then
-    sed -i '/testcase classname/a \      <failure message="Installation failed" type="failed"/>' "${junit_file}"
+  if [[ "$INSTALL_RESULT" == "fail" ]]
+  then
+    sed -i 's;failures="0";failures="1";' "$junit_file"
+    sed -i '/testcase classname/a \    <failure message="Installation failed" type="failed"/>' "$junit_file"
+  fi
+}
+
+function generate_results() {
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
+
+  # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
+  if [[ "$REPORTPORTAL_PROJECT" = 'prow' ]]
+  then
+    generate_result_customize_prow
+  else
+    generate_result_teststeps
   fi
 }
 
