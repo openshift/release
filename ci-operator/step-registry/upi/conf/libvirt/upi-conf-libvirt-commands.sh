@@ -106,3 +106,25 @@ spec:
         path: /etc/sysctl.conf
 EOF
 fi
+
+echo "Saving chrony config..."
+cat >> ${SHARED_DIR}/99-worker-chrony.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-chrony
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIDEwLjEzMC4zNC4xMDEgaWJ1cnN0CmRyaWZ0ZmlsZSAvdmFyL2xpYi9jaHJvbnkvZHJpZnQKbWFrZXN0ZXAgMS4wIDMKcnRjc3luYwprZXlmaWxlIC9ldGMvY2hyb255LmtleXMKbG9nZGlyIC92YXIvbG9nL2Nocm9ueQo=
+        mode: 0644
+        filesystem: root
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
