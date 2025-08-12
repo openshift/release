@@ -1,0 +1,235 @@
+# UDN Chaos Monitoring Alerts Configuration
+# Based on Service Unavailability Test Results
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udn-chaos-monitoring-config
+  namespace: openshift-monitoring
+data:
+  # PrometheusRule for UDN Chaos Monitoring
+  udn-chaos-alerts.yaml: |
+    apiVersion: monitoring.coreos.com/v1
+    kind: PrometheusRule
+    metadata:
+      name: udn-chaos-performance-alerts
+      namespace: openshift-monitoring
+      labels:
+        prometheus: kube-prometheus
+        role: alert-rules
+    spec:
+      groups:
+      - name: udn.chaos.performance
+        interval: 30s
+        rules:
+        
+        # P99 Latency Monitoring - Layer 2
+        - alert: UDNLayer2P99LatencyElevated
+          expr: |
+            histogram_quantile(0.99, 
+              sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer2"}[5m])) by (le)
+            ) > 60
+          for: 2m
+          labels:
+            severity: warning
+            component: udn
+            layer: layer2
+            chaos_impact: "medium"
+          annotations:
+            summary: "UDN Layer 2 P99 latency elevated above baseline"
+            description: |
+              Layer 2 P99 pod ready latency is {{ $value }}s, which exceeds baseline (57.6s).
+              Expected during chaos: 59.3s (+3.0% increase).
+              Current reading suggests potential chaos event or performance degradation.
+              
+        - alert: UDNLayer2P99LatencyCritical  
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer2"}[5m])) by (le)
+            ) > 65
+          for: 1m
+          labels:
+            severity: critical
+            component: udn
+            layer: layer2
+            chaos_impact: "high"
+          annotations:
+            summary: "UDN Layer 2 P99 latency critically elevated"
+            description: |
+              Layer 2 P99 pod ready latency is {{ $value }}s, significantly above chaos baseline (59.3s).
+              This indicates either severe chaos impact or underlying infrastructure issues.
+              Immediate investigation required.
+              
+        # P99 Latency Monitoring - Layer 3  
+        - alert: UDNLayer3P99LatencyElevated
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer3"}[5m])) by (le)
+            ) > 65
+          for: 2m
+          labels:
+            severity: warning
+            component: udn
+            layer: layer3
+            chaos_impact: "medium"
+          annotations:
+            summary: "UDN Layer 3 P99 latency elevated above baseline"
+            description: |
+              Layer 3 P99 pod ready latency is {{ $value }}s, which exceeds baseline (60.4s).
+              Expected during chaos: 62.1s (+2.8% increase).
+              Current reading suggests potential chaos event or performance degradation.
+              
+        - alert: UDNLayer3P99LatencyCritical
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer3"}[5m])) by (le)
+            ) > 70
+          for: 1m
+          labels:
+            severity: critical
+            component: udn
+            layer: layer3
+            chaos_impact: "high"
+          annotations:
+            summary: "UDN Layer 3 P99 latency critically elevated"
+            description: |
+              Layer 3 P99 pod ready latency is {{ $value }}s, significantly above chaos baseline (62.1s).
+              This indicates either severe chaos impact or underlying infrastructure issues.
+              Immediate investigation required.
+              
+        # Master Node Chaos Detection
+        - alert: MasterNodeChaosDetected
+          expr: |
+            (
+              count(up{job="kube-apiserver"} == 0) > 0
+              or
+              count(up{job="etcd"} == 0) > 0
+            )
+          for: 30s
+          labels:
+            severity: warning
+            component: control-plane
+            chaos_type: "master-disruption"
+          annotations:
+            summary: "Master node chaos event detected"
+            description: |
+              Control plane disruption detected. Expected P99 latency impact:
+              - Layer 2: +3.0% increase (57.6s → 59.3s)
+              - Layer 3: +2.8% increase (60.4s → 62.1s)
+              Monitoring enhanced during chaos event.
+              
+        # OVN Memory Monitoring During Chaos
+        - alert: OVNMemoryAnomalyDuringChaos
+          expr: |
+            (
+              avg(container_memory_usage_bytes{container="ovn-kubernetes",namespace="openshift-ovn-kubernetes"}) > 150 * 1024 * 1024
+              and
+              count(up{job="kube-apiserver"} == 0) > 0
+            )
+          for: 5m
+          labels:
+            severity: warning
+            component: ovn
+            chaos_correlation: "memory-anomaly"
+          annotations:
+            summary: "Unexpected OVN memory increase during chaos"
+            description: |
+              OVN memory usage is {{ $value | humanize1024 }}, above expected levels during chaos.
+              Normal chaos behavior shows memory improvement, not increase.
+              Expected: Layer 2 ~92MB, Layer 3 ~115MB during chaos.
+              
+        # OVN CPU Monitoring During Chaos  
+        - alert: OVNCPUAnomalyDuringChaos
+          expr: |
+            (
+              avg(rate(container_cpu_usage_seconds_total{container="ovn-kubernetes",namespace="openshift-ovn-kubernetes"}[5m])) > 0.06
+              and
+              count(up{job="kube-apiserver"} == 0) > 0
+            )
+          for: 5m
+          labels:
+            severity: warning
+            component: ovn
+            chaos_correlation: "cpu-anomaly"
+          annotations:
+            summary: "Unexpected OVN CPU increase during chaos"
+            description: |
+              OVN CPU usage is {{ $value | humanizePercentage }}, above expected levels during chaos.
+              Normal chaos behavior shows CPU improvement or stability, not increase.
+              Expected: Layer 2 ~4.66%, Layer 3 ~4.34% during chaos.
+
+  # Grafana Dashboard Query Templates
+  grafana-queries.yaml: |
+    # Grafana Query Templates for UDN Chaos Monitoring
+    
+    p99_latency_layer2: |
+      histogram_quantile(0.99, 
+        sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer2"}[5m])) by (le)
+      )
+      
+    p99_latency_layer3: |
+      histogram_quantile(0.99,
+        sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer3"}[5m])) by (le)
+      )
+      
+    ovn_memory_usage: |
+      avg(container_memory_usage_bytes{container="ovn-kubernetes",namespace="openshift-ovn-kubernetes"}) / 1024 / 1024
+      
+    ovn_cpu_usage: |
+      avg(rate(container_cpu_usage_seconds_total{container="ovn-kubernetes",namespace="openshift-ovn-kubernetes"}[5m])) * 100
+      
+    chaos_event_detection: |
+      (count(up{job="kube-apiserver"} == 0) > 0) or (count(up{job="etcd"} == 0) > 0)
+      
+    # Chaos correlation queries
+    latency_during_chaos_layer2: |
+      histogram_quantile(0.99,
+        sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer2"}[5m])) by (le)
+      ) and on() (count(up{job="kube-apiserver"} == 0) > 0)
+      
+    latency_during_chaos_layer3: |
+      histogram_quantile(0.99,
+        sum(rate(ovn_kubernetes_pod_ready_duration_seconds_bucket{layer="layer3"}[5m])) by (le)
+      ) and on() (count(up{job="kube-apiserver"} == 0) > 0)
+
+  # AlertManager Configuration
+  alertmanager-routing.yaml: |
+    # AlertManager routing for UDN chaos alerts
+    
+    route:
+      group_by: ['alertname', 'layer', 'chaos_impact']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'udn-chaos-team'
+      routes:
+      - match:
+          severity: critical
+          component: udn
+        receiver: 'udn-critical-team'
+        repeat_interval: 15m
+      - match:
+          chaos_correlation: memory-anomaly
+        receiver: 'ovn-performance-team'
+      - match:
+          chaos_correlation: cpu-anomaly  
+        receiver: 'ovn-performance-team'
+        
+    receivers:
+    - name: 'udn-chaos-team'
+      slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK'
+        channel: '#udn-chaos-monitoring'
+        title: 'UDN Chaos Performance Alert'
+        text: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Layer: {{ .Labels.layer }}
+          Impact: {{ .Labels.chaos_impact }}
+          Description: {{ .Annotations.description }}
+          {{ end }}
+          
+    - name: 'udn-critical-team'
+      pagerduty_configs:
+      - service_key: 'YOUR_PAGERDUTY_KEY'
+        description: 'Critical UDN Performance Issue During Chaos' 
