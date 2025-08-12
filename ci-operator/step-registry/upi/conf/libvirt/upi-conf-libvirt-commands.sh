@@ -104,19 +104,28 @@ spec:
         mode: 0644
         overwrite: true
         path: /etc/sysctl.conf
-      - path: /usr/local/bin/append-chrony.sh
-        mode: 0755
-        overwrite: true
-        contents:
-          source: data:text/plain;charset=utf-8;base64,ZWNobyAic2VydmVyIDEwLjEzMC4zNC4xMDEgaWJ1cnN0IiA+PiAvZXRjL2Nocm9ueS5jb25m
-      - path: /etc/systemd/system/append-chrony.service
-        mode: 0644
-        overwrite: true
-        contents:
-          source: data:text/plain;charset=utf-8;base64,W3VuaXRdCkRlc2NyaXB0aW9uPUFwcGVuZCBjdXN0b20gY2hyb255IGNvbmYKQWZ0ZXI9bXVsdGktdXNlci5zZXJ2aWNlLmNvbmZpZwoKW1NlcnZpY2VdClR5cGU9b25lc2hvdApFeGVjU3RhcnQ9L3Vzci9sb2NhbC9iaW4vYXBwZW5kLWNocm9ueS5zaAoKW0luc3RhbGxdCldhbnRlZGJ5PW11bHRpLXVzZXIudGFyZ2V0Cg==
-    systemd:
-      units:
-      - name: append-chrony.service
-        enabled: true
 EOF
 fi
+
+echo "Saving chrony config..."
+cat >> ${SHARED_DIR}/99-worker-chrony.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-chrony
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIDEwLjEzMC4zNC4xMDEgaWJ1cnN0CmRyaWZ0ZmlsZSAvdmFyL2xpYi9jaHJvbnkvZHJpZnQKbWFrZXN0ZXAgMS4wIDMKcnRjc3luYwprZXlmaWxlIC9ldGMvY2hyb255LmtleXMKbG9nZGlyIC92YXIvbG9nL2Nocm9ueQo=
+        mode: 0644
+        filesystem: root
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+
