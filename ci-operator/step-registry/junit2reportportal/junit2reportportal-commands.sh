@@ -176,6 +176,14 @@ function generate_attribute_profilename() {
   write_attribute profilename "$profile_name"
 }
 
+function generate_attribute_pr_author() {
+  if [[ "$LOGS_PATH" =~ pr-logs ]]
+  then
+    pr_author="$(jq -r '.refs.pulls[0].author' <<< $JOB_SPEC)"
+    write_attribute pr_author "$pr_author"
+  fi
+}
+
 function generate_attribute_version_installed() {
   version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
@@ -215,6 +223,7 @@ function generate_attributes() {
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
+  generate_attribute_pr_author
   generate_attribute_version_installed
 }
 
