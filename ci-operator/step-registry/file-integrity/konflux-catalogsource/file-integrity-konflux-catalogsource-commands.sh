@@ -36,16 +36,16 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle-$TEST_TYPE
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-bundle-${TEST_TYPE}
     source: registry.redhat.io/compliance/openshift-file-integrity-operator-bundle
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-$TEST_TYPE
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-${TEST_TYPE}
     source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
   - mirrors:
     - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-$TEST_TYPE
     source: registry.redhat.io/compliance/openshift-compliance-operator-bundle  
   - mirrors:
-    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-$TEST_TYPE
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-${TEST_TYPE}
     source: registry.redhat.io/compliance/openshift-compliance-rhel8-operator
   - mirrors:
     - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-content-$TEST_TYPE
@@ -79,8 +79,8 @@ check_mcp_status() {
     fi
   done
   if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
-    run_command "oc get mcp,node"
-    run_command "oc get mcp worker -o yaml"
+    run "oc get mcp,node"
+    run "oc get mcp worker -o yaml"
     return 1
   fi
 }
@@ -165,18 +165,24 @@ EOF
 main() {
   echo "Enabling konflux catalogsource"
   set_proxy
+  if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+    export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  fi
 
   run "oc whoami"
   run "oc version -o yaml"
 
-  create_icsp_connected || {
-    echo "failed to create imagecontentsourcepolicies. resolve the above errors"
-    return 1
-  }
+  # Skip ICSP creation if nested_kubeconfig exists (for hypershift scenarios)
+  if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+    create_icsp_connected || {
+      echo "failed to create imagecontentsourcepolicies. resolve the above errors"
+      return 1
+    }
 
-  check_mcp_status || {
-    echo "failed to check mcp status. resolve the above errors"
-  }
+    check_mcp_status || {
+      echo "failed to check mcp status. resolve the above errors"
+    }
+  fi
 
   check_marketplace || {
     echo "failed to check marketplace. resolve the above errors"
@@ -192,8 +198,5 @@ main() {
     echo "failed to create catalogsource. resolve the above errors"
     return 1
   }
-
-  #support hypershift config guest cluster's icsp
-  oc get imagecontentsourcepolicy -oyaml >/tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
 }
 main
