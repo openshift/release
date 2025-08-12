@@ -57,6 +57,28 @@ trap finished EXIT TERM
 # Make sure this host hasn't been previously used
 ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
 
+if [ -f 02_configure_host.sh ]; then
+  CODE_BLOCK=$(cat <<'EOF'
+# TODO(dtantsur): move this to metal3-dev-env
+if [ ${IP_STACK} = "v6v4" ]; then
+  # Make sure that BMC's use IPv6 on v6-primary stack
+  sed -i "/address/s|//[0-9.]*:|//[${PROVISIONING_HOST_EXTERNAL_IP}]:|" "${NODES_FILE}"
+fi
+EOF
+)
+  sed -i '163 r /dev/stdin' 02_configure_host.sh <<<"$CODE_BLOCK"
+fi
+
+if [ -f 04_setup_ironic.sh ]; then
+  CODE_BLOCK=$(cat <<'EOF'
+    if [[ -n "${REDFISH_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY:-}" ]]; then
+        echo "SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY = '${REDFISH_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY}'" | sudo tee -a "$WORKING_DIR/virtualbmc/sushy-tools/conf.py"
+    fi
+EOF
+)
+  sed -i '230 r /dev/stdin' 04_setup_ironic.sh <<<"$CODE_BLOCK"
+fi
+
 # Copy dev-scripts source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 
