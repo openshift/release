@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.18
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
   operator-sdk:
     name: "4.18"
     namespace: origin
@@ -77,6 +81,10 @@ releases:
     release:
       channel: fast
       version: "4.18"
+  latest-4-19:
+    release:
+      channel: fast
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -93,7 +101,7 @@ tests:
   container:
     from: instaslice-base-src
   skip_if_only_changed: ^related_images.json|related_images.developer.json$
-- as: e2e-gpu
+- as: e2e-bundle
   optional: true
   steps:
     cluster_profile: gcp
@@ -118,13 +126,26 @@ tests:
     - ref: ipi-conf-gcp-confidential-computing
     - chain: ipi-install
     test:
-    - ref: openshift-instaslice-operator-e2e-next
-- as: e2e-bundle
+    - ref: openshift-instaslice-operator-e2e-bundle-next-setup
+    - as: run-sdk
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n das-operator "$OO_BUNDLE" --timeout 10m0s
+      dependencies:
+      - env: OO_BUNDLE
+        name: das-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-instaslice-operator-e2e-bundle-next-run-e2e
+- as: e2e-bundle-4-19
   optional: true
   steps:
     cluster_profile: gcp
     dependencies:
       DAEMONSET_IMAGE: das-daemonset
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-19
       OPERATOR_IMAGE: instaslice-operator
       SCHEDULER_IMAGE: das-scheduler
       WEBHOOK_IMAGE: das-webhook
