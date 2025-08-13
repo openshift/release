@@ -189,26 +189,6 @@ check_mirror_registry() {
   fi
 }
 
-# Applicable for 'disconnected' env
-function configure_host_pull_secret () {
-    echo "Retrieving the redhat, redhat stage, and mirror registries pull secrets from shared credentials..."
-    redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
-    redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
-    redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
-    redhat_registry_auth=$(echo -n " " "$redhat_auth_user":"$redhat_auth_password" | base64 -w 0)
-    reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.url')
-    reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.user')
-    reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.password')
-    reg_quay_auth=$(echo -n " " "$reg_quay_user":"$reg_quay_password" | base64 -w 0)
-
-    mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
-    mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
-
-    echo "Appending the pull secrets to Podman auth configuration file '${XDG_RUNTIME_DIR}/containers/auth.json'..."
-    oc extract secret/pull-secret -n openshift-config --confirm --to ${TMP_DIR}
-    jq --argjson a "{\"${reg_quay_url}\": {\"auth\": \"$reg_quay_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
-}
-
 # set the registry auths for the cluster
 function set_cluster_auth () {
     # get the registry configures of the cluster
@@ -267,12 +247,17 @@ function set_CA_for_nodes () {
 # Applicable for 'disconnected' env
 install_oc_mirror() {
   echo "Installing the latest oc-mirror client into /tmp..."
-  run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
-  if ls /tmp/oc-mirror > /dev/null; then
-    chmod +x /tmp/oc-mirror
+  if which oc-mirror &> /dev/null; then
+    echo "oc-mirror is available on the host."
   else
-    echo "ERROR: can not find oc-mirror"
-    exit 1
+    echo "oc-mirror is not available or not in the PATH."
+    run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
+    if ls /tmp/oc-mirror > /dev/null; then
+      chmod +x /tmp/oc-mirror
+    else
+      echo "ERROR: can not find oc-mirror"
+      exit 1
+    fi
   fi
 }
 
@@ -333,40 +318,36 @@ EOF
   if [[ ! -f /usr/bin/skopeo ]]; then
     yum install -y skopeo
   fi
-  skopeo copy --all docker://${INDEX_IMAGE} "oci://${TMP_DIR}/oci-local-catalog" --remove-signatures --src-tls-verify=false
-  if [ $? == 0 ]; then
-    echo "Skopeo command succeeded"
-  else
-    echo "Skopeo command failed. Retrying"
-    mirror_registry_cred_file="/var/run/vault/mirror-registry/registry_creds"
-    mirror_registry_user=`cat $mirror_registry_cred_file|cut -d: -f1`
-    mirror_registry_password=`cat $mirror_registry_cred_file|cut -d: -f2`
-    reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.user')
-    reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.password')
-    redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
-    redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
-    redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
-    skopeo login ${MIRROR_REGISTRY_HOST} -u ${mirror_registry_user} -p ${mirror_registry_password} --tls-verify=false
-    skopeo login registry.redhat.io -u ${redhat_auth_user} -p ${redhat_auth_password}
-    skopeo login quay.io -u ${reg_quay_user} -p ${reg_quay_password}
 
-    RETRY_COUNT=0
-    MAX_RETRIES=3
-    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-      set +e
-      skopeo copy --all docker://${INDEX_IMAGE} "oci://${TMP_DIR}/oci-local-catalog" --remove-signatures --src-tls-verify=false
-      COPY_STATUS=$?
-      set -e
-      if [ $COPY_STATUS -eq 0 ]; then
-        echo "Copy succeeded"
-        break
-      else
-        RETRY_COUNT=$((RETRY_COUNT + 1))
-        echo "Retry $RETRY_COUNT/$MAX_RETRIES..."
-        sleep 30
-      fi
-    done
-  fi
+  echo "Skopeo command failed. Retrying"
+  mirror_registry_cred_file="/var/run/vault/mirror-registry/registry_creds"
+  mirror_registry_user=`cat $mirror_registry_cred_file|cut -d: -f1`
+  mirror_registry_password=`cat $mirror_registry_cred_file|cut -d: -f2`
+  reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.user')
+  reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.password')
+  redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
+  redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
+  redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
+  skopeo login ${MIRROR_REGISTRY_HOST} -u ${mirror_registry_user} -p ${mirror_registry_password} --tls-verify=false
+  skopeo login registry.redhat.io -u ${redhat_auth_user} -p ${redhat_auth_password}
+  skopeo login quay.io -u ${reg_quay_user} -p ${reg_quay_password}
+
+  RETRY_COUNT=0
+  MAX_RETRIES=3
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    set +e
+    skopeo copy --all docker://${INDEX_IMAGE} "oci://${TMP_DIR}/oci-local-catalog" --remove-signatures --src-tls-verify=false
+    COPY_STATUS=$?
+    set -e
+    if [ $COPY_STATUS -eq 0 ]; then
+      echo "Copy succeeded"
+      break
+    else
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      echo "Retry $RETRY_COUNT/$MAX_RETRIES..."
+      sleep 30
+    fi
+  done
 
   echo "create ImageSetConfiguration"
 cat <<EOF |tee "${TMP_DIR}/imageset-config.yaml"
@@ -378,7 +359,12 @@ mirror:
     targetCatalog: ${TARGET_CATALOG}
     targetTag: "latest"
 EOF
-  run "/tmp/oc-mirror --config=${TMP_DIR}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${XDG_RUNTIME_DIR}/containers/registries.conf --verbose=9 --dest-skip-tls --source-skip-tls --continue-on-error --skip-missing --oci-insecure-signature-policy"
+  if which oc-mirror &> /dev/null; then
+    echo "oc-mirror is available on the host."
+    run "oc-mirror --config=${TMP_DIR}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${XDG_RUNTIME_DIR}/containers/registries.conf --verbose=9 --continue-on-error --skip-missing --dest-skip-tls --source-skip-tls --oci-insecure-signature-policy"
+  else
+    run "/tmp/oc-mirror --config=${TMP_DIR}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${XDG_RUNTIME_DIR}/containers/registries.conf --verbose=9 --continue-on-error --skip-missing --dest-skip-tls --source-skip-tls --oci-insecure-signature-policy"
+  fi
 }
 
 function create_idms_disconnected() {
@@ -444,11 +430,6 @@ main() {
       return 1
     }
 
-    configure_host_pull_secret || {
-      echo "failed to configure pull secret on the host. resolve the above errors"
-      return 1
-    }
-
     tmp_prune_disruptive_resource || {
       echo "failed to prune disruptive resources. resolve the above errors"
       return 1
@@ -461,7 +442,6 @@ main() {
 
     mirror_catalog_and_operator || {
       tar -czC "${PWD}" -f "${ARTIFACT_DIR}/mirror.tar.gz" . || true
-      sleep 28800
       echo "failed to mirror catalog and operator. resolve the above errors"
       return 1
     }
