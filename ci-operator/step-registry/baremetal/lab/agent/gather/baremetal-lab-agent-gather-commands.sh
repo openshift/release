@@ -40,4 +40,3 @@ else
   echo "Failed to collect the agent logs."
 fi
 
-sleep 36000 & wait
