@@ -1,0 +1,33 @@
+base_images:
+build_root:
+  from_repository: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-external-oidc-conformance
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance
+      TEST_SKIPS: ExternalOIDC\|\[Feature:OAuthServer\]\|\[Feature:RoleBindingRestrictions\]\|oauth-apiserver\|\[apigroup:oauth.openshift.io\]\|\[apigroup:user.openshift.io\]\|OAuth access token
+    pre:
+    - chain: idp-external-oidc-keycloak
+    workflow: openshift-e2e-aws
