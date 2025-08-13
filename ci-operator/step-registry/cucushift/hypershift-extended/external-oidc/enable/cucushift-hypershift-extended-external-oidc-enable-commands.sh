@@ -106,7 +106,7 @@ if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") == "1"  ]]; then
     fi
 fi
 
-if [ "${HYPERSHIFT_MANAGED_SERVICE:-}" = "ARO-HCP" ] && [ "$(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}")" = "1" ]; then
+if [ "${HYPERSHIFT_MANAGED_SERVICE:-}" = "ARO-HCP" ] && [ "$(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.19)}")" = "1" ]; then
     echo "Creating an empty secret for the console client"
     # The secret will be populated by the day2 operator in the hosted cluster.
     oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters

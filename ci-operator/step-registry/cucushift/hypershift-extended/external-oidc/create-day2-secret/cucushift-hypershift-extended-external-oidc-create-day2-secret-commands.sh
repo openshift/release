@@ -8,8 +8,8 @@ if [[ ! -f "${SHARED_DIR}/hosted_cluster_version" ]]; then
 fi
 
 HOSTED_CLUSTER_VERSION=$(<"${SHARED_DIR}/hosted_cluster_version")
-if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") != "1" ]]; then
-    echo "Skipping day2 secret creation for OCP <=4.19 clusters"
+if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.19)}") != "1" ]]; then
+    echo "Skipping day2 secret creation for OCP <=4.18 clusters"
     exit 0
 fi
 
