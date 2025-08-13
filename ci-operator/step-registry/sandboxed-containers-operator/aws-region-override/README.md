@@ -1,10 +1,10 @@
 # Sandboxed Containers Operator - AWS Region Override
 
-This documentation describes how to use the custom AWS region override step for the Sandboxed Containers Operator with OpenShift IPI (Installer Provisioned Infrastructure) workflows.
+This documentation describes how to use the custom AWS region override step for the Sandboxed Containers Operator with OpenShift IPI  workflows.
 
 ## Overview
 
-By default, IPI workflows determine the AWS region through the `LEASED_RESOURCE` environment variable, which is set by the cluster profile lease system. This custom step allows the Sandboxed Containers Operator to override that region selection with flexible configuration options, enabling testing in specific AWS regions where sandboxed containers and confidential computing features are best supported.
+By default, IPI workflows determine the AWS region through the `LEASED_RESOURCE` environment variable, which is set by the cluster profile lease system. The `sandboxed-containers-operator-e2e-aws` workflow was modified to place `sandboxed-containers-operator-aws-region-override` before cluster installation.
 
 ## Components
 
@@ -12,7 +12,7 @@ By default, IPI workflows determine the AWS region through the `LEASED_RESOURCE`
 
 **Location**: `ci-operator/step-registry/sandboxed-containers-operator/aws-region-override/`
 
-**Purpose**: Modifies the install-config.yaml to use a different AWS region than the leased resource, specifically for sandboxed containers operator testing.
+**Purpose**: `ipi-conf-aws` creates `install-config.yaml` in the `pre:` step.  `sandboxed-containers-operator-aws-region-override` modifies `install-config.yaml` to use a different AWS region before cluster installation in `ipi-install`
 
 **Environment Variables**:
 - `AWS_REGION_OVERRIDE`: Explicit region override (highest priority)
@@ -24,182 +24,61 @@ By default, IPI workflows determine the AWS region through the `LEASED_RESOURCE`
 
 ```yaml
 tests:
-- as: e2e-sandboxed-containers-eu-west-1
+- as: aws-ipi-peerpods
   steps:
     cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
     env:
-      AWS_REGION_OVERRIDE: "eu-west-1"
+      AWS_REGION_OVERRIDE: us-east-2
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.10.0
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aws
 ```
 
-### Pattern 2: Restrict to Regions with Good Sandboxed Containers Support
+### Pattern 2: Use a Random Region From a Specific List of Regions
 
 ```yaml
 tests:
-- as: e2e-sandboxed-containers-allowed-regions
+- as: aws-ipi-peerpods-random-allowed-region
   steps:
     cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
     env:
       AWS_ALLOWED_REGIONS: "us-east-1 us-west-2 eu-west-1 ap-southeast-1"
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.10.0
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aws
 ```
 
-### Pattern 3: Force Region with Validation
+### Pattern 3: Force a Specific Region From a List
 
 ```yaml
 tests:
-- as: e2e-sandboxed-containers-ap-southeast
+- as: aws-ipi-peerpods-ap-southeast-1
   steps:
     cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
     env:
       AWS_REGION_OVERRIDE: "ap-southeast-1"
       AWS_ALLOWED_REGIONS: "ap-southeast-1 ap-northeast-1 ap-south-1"
-```
-
-### Pattern 4: Integration with PeerPods Testing
-
-```yaml
-tests:
-- as: e2e-sandboxed-containers-peerpods-eu
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    - ref: sandboxed-containers-operator-peerpods-param-cm
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
-    env:
-      AWS_REGION_OVERRIDE: "eu-central-1"
-```
-
-## Complete CI Configuration Examples
-
-### Example 1: Sandboxed Containers Operator Configuration
-
-```yaml
-# Example CI configuration for sandboxed-containers-operator
-# Location: ci-operator/config/openshift/sandboxed-containers-operator/
-
-base_images:
-  base:
-    name: "4.16"
-    namespace: ocp
-    tag: base
-
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
-
-tests:
-
-# Force installation in a specific region for sandboxed containers testing
-- as: e2e-sandboxed-containers-eu-west-1
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
-    env:
-      AWS_REGION_OVERRIDE: "eu-west-1"
-  skip_if_only_changed: "^docs/|\\.md$|^(?:.*/)?(?:\\.gitignore|OWNERS|PROJECT|LICENSE)$"
-
-# Test sandboxed containers in US West region
-- as: e2e-sandboxed-containers-us-west-2
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
-    env:
-      AWS_REGION_OVERRIDE: "us-west-2"
-
-# Restrict to regions known to work well with sandboxed containers
-- as: e2e-sandboxed-containers-allowed-regions
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
-    env:
-      AWS_ALLOWED_REGIONS: "us-east-1 us-west-2 eu-west-1 ap-southeast-1"
-
-# Multi-region testing for sandboxed containers
-- as: e2e-sandboxed-containers-us-east-1
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
-    env:
-      AWS_REGION_OVERRIDE: "us-east-1"
-
-- as: e2e-sandboxed-containers-eu-west-1
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
-    env:
-      AWS_REGION_OVERRIDE: "eu-west-1"
-
-# Using with environment config map in specific region
-- as: e2e-sandboxed-containers-with-env-cm
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-aws-pre
-    - ref: sandboxed-containers-operator-aws-region-override
-    - ref: sandboxed-containers-operator-env-cm
-    test:
-    - ref: sandboxed-containers-operator-e2e-aws
-    post:
-    - chain: ipi-aws-post
-    env:
-      AWS_REGION_OVERRIDE: "ca-central-1"
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.10.0
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aws
 ```
 
 ## Region Selection Priority
@@ -215,7 +94,6 @@ The step follows this priority order (highest to lowest):
 ### AWS Credentials
 - Your AWS credentials (in the cluster profile) must have permissions in the target region
 - Ensure sufficient service quotas in the target region for your cluster size
-- Target region should support required EC2 instance types for sandboxed containers
 
 ### Cluster Profile Configuration
 - Use an appropriate cluster profile (e.g., `aws`, `aws-2`)
@@ -241,25 +119,6 @@ The step follows this priority order (highest to lowest):
 - **${SHARED_DIR}/aws-region**: File containing the final region name
 - **AWS_DEFAULT_REGION**: Environment variable set for subsequent steps
 - **Configuration backup**: `install-config.yaml.backup` for debugging
-
-## Sandboxed Containers Specific Considerations
-
-### Instance Type Availability
-- Ensures testing happens in regions where required EC2 instance types are available
-- Some regions may have better support for confidential computing features
-- Metal instances required for certain sandboxed containers features may not be available in all regions
-
-### Regional Feature Support
-- Different AWS regions may have varying support for:
-  - AWS Nitro Enclaves
-  - Confidential computing instance types
-  - Hardware security modules
-  - Specialized instance families needed for sandboxed workloads
-
-### Performance Considerations
-- Network latency to container registries
-- Proximity to development teams
-- Cost optimization based on regional pricing
 
 ## Troubleshooting
 
@@ -334,21 +193,3 @@ To test the region override with sandboxed containers:
 3. Verify the cluster is created in the expected region
 4. Validate that sandboxed containers operator tests pass in the new region
 5. Confirm required instance types are available and functional
-
-## Contributing
-
-When modifying this step:
-
-1. Test with multiple region scenarios
-2. Ensure backward compatibility (no override = use leased region)
-3. Validate error handling for invalid regions
-4. Test with different sandboxed containers configurations
-5. Verify instance type availability in target regions
-6. Update documentation for any new features
-7. Test with different cluster profiles and base domains
-
-## Related Steps
-
-- `sandboxed-containers-operator-peerpods-param-cm`: For PeerPods configuration
-- `sandboxed-containers-operator-env-cm`: For environment configuration
-- `sandboxed-containers-operator-e2e-aws`: For running the actual tests
