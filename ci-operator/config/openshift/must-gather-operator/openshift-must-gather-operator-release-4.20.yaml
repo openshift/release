@@ -1,22 +1,22 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+  golang-builder:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
-  ubi_minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "9"
 binary_build_commands: make go-build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: build/Dockerfile
-  from: ubi_minimal
+- dockerfile_path: Dockerfile.openshift
+  from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    golang-builder:
       as:
-      - quay.io/redhat-services-prod/openshift/boilerplate:image-v7.4.0
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: must-gather-operator
 operator:
   bundles:
