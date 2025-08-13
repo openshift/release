@@ -122,12 +122,11 @@ function generate_attribute_architecture() {
 }
 
 function generate_attribute_cloud_provider() {
-  cloud_provider="unknown"
   if [[ "$JOB_NAME_SAFE" =~ alibaba|aws|azure|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere ]]
   then
     cloud_provider="${BASH_REMATCH[0]}"
+    write_attribute cloud_provider "$cloud_provider"
   fi
-  write_attribute cloud_provider "$cloud_provider"
 }
 
 function generate_attribute_install() {
@@ -177,6 +176,14 @@ function generate_attribute_profilename() {
   write_attribute profilename "$profile_name"
 }
 
+function generate_attribute_pr_author() {
+  if [[ "$LOGS_PATH" =~ pr-logs ]]
+  then
+    pr_author="$(jq -r '.refs.pulls[0].author' <<< $JOB_SPEC)"
+    write_attribute pr_author "$pr_author"
+  fi
+}
+
 function generate_attribute_version_installed() {
   version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
@@ -216,6 +223,7 @@ function generate_attributes() {
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
+  generate_attribute_pr_author
   generate_attribute_version_installed
 }
 
