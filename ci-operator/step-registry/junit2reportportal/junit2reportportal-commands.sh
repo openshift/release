@@ -129,6 +129,15 @@ function generate_attribute_cloud_provider() {
   fi
 }
 
+function generate_attribute_job_type() {
+  job_type='periodic'
+  if [[ "$LOGS_PATH" =~ pr-logs ]]
+  then
+    job_type='presubmit'
+  fi
+  write_attribute job_type "$job_type"
+}
+
 function generate_attribute_install() {
   for keyword in 'cucushift-installer-reportportal-marker' \
                  'idp-htpasswd' \
@@ -220,6 +229,7 @@ function generate_attribute_version_installed() {
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
+  generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
