@@ -204,12 +204,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
     cluster: vsphere02
-    context: ci/prow/regression-clusterinfra-cucushift-rehearse-vsphere-ipi
+    context: ci/prow/regression-clusterinfra-vsphere-ipi-ccm
     decorate: true
     decoration_config:
       timeout: 7h0m0s
@@ -218,10 +218,11 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cloud-provider-vsphere-release-4.21-regression-clusterinfra-cucushift-rehearse-vsphere-ipi
+    name: pull-ci-openshift-cloud-provider-vsphere-release-4.21-regression-clusterinfra-vsphere-ipi-ccm
     optional: true
     path_alias: github.com/kubernetes/cloud-provider-vsphere
-    rerun_command: /test regression-clusterinfra-cucushift-rehearse-vsphere-ipi
+    rerun_command: /test regression-clusterinfra-vsphere-ipi-ccm
+    run_if_changed: ^(go\.mod|go\.sum)$
     spec:
       containers:
       - args:
@@ -230,7 +231,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=regression-clusterinfra-cucushift-rehearse-vsphere-ipi
+        - --target=regression-clusterinfra-vsphere-ipi-ccm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -278,7 +279,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )regression-clusterinfra-cucushift-rehearse-vsphere-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )regression-clusterinfra-vsphere-ipi-ccm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

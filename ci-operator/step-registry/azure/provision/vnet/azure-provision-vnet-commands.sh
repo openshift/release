@@ -144,9 +144,22 @@ if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name ${clusterSubnetSNG} -n 'ign_in' --priority 102 --access Allow --source-port-ranges '*' --destination-port-ranges 22623"
 fi
 
-run_command "az network vnet create --name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefixes ${AZURE_VNET_ADDRESS_PREFIXES}"
-run_command "az network vnet subnet create --name ${controlPlaneSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --network-security-group ${clusterSubnetSNG}"
-run_command "az network vnet subnet create --name ${computeSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_COMPUTE_SUBNET_PREFIX} --network-security-group ${clusterSubnetSNG}"
+vnet_option=""
+if [[ "${AZURE_VNET_ENABLE_ENCRYPTION}" == "true" ]]; then
+    vnet_option="--enable-encryption true --encryption-policy ${AZURE_VNET_ENCRYPTION_POLICY}"
+fi
+
+vnet_ipv6=""
+master_ipv6=""
+worker_ipv6=""
+if [[ "${IPSTACK}" == "dualstack" ]]; then
+    vnet_ipv6="${AZURE_VNET_IPV6_ADDRESS_PREFIXES:-fd00:29cc:9e56::/48}"    
+    master_ipv6="${AZURE_CONTROL_PLANE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56::/64}"
+    worker_ipv6="${AZURE_COMPUTE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56:1::/64}"
+fi
+run_command "az network vnet create --name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefixes ${AZURE_VNET_ADDRESS_PREFIXES} ${vnet_ipv6} ${vnet_option}"
+run_command "az network vnet subnet create --name ${controlPlaneSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${master_ipv6} --network-security-group ${clusterSubnetSNG}"
+run_command "az network vnet subnet create --name ${computeSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_COMPUTE_SUBNET_PREFIX} ${worker_ipv6} --network-security-group ${clusterSubnetSNG}"
 
 #Due to sometime frequent vnet list will return empty, so save vnet list output into a local file
 vnet_check "${RESOURCE_GROUP}"

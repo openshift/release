@@ -39,6 +39,8 @@ images:
       as:
       - pipeline:bin
   to: deploy
+- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+  to: downstream-deploy
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/cincinnati-ci-public/rust:e2e-test-ubi9
     ENV HOME="/root"
@@ -67,6 +69,7 @@ promotion:
   to:
   - excluded_images:
     - rustup-build
+    - downstream-deploy
     name: cincinnati-build-root
     namespace: cincinnati-ci
 resources:
@@ -146,14 +149,14 @@ tests:
   commands: just format
   container:
     from: src
-- as: e2e
+- as: olm-e2e
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.18"
   steps:
     test:
     - as: openshift-e2e-test
@@ -162,6 +165,29 @@ tests:
       - env: CINCINNATI_IMAGE
         name: deploy
       from: e2e-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- always_run: false
+  as: osus-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  steps:
+    test:
+    - as: openshift-e2e-test
+      cli: latest
+      commands: just test_cincinnati test_cincinnati_inspect
+      dependencies:
+      - env: CINCINNATI_IMAGE
+        name: deploy
+      from: src
       resources:
         requests:
           cpu: 100m

@@ -505,7 +505,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-gcp-capi-techpreview
     decorate: true
     decoration_config:
@@ -896,12 +896,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/regression-clusterinfra-aws-ipi-techpreview
+    context: ci/prow/regression-clusterinfra-aws-ipi-techpreview-capi
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -914,10 +914,11 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-master-regression-clusterinfra-aws-ipi-techpreview
+    name: pull-ci-openshift-priv-cluster-api-master-regression-clusterinfra-aws-ipi-techpreview-capi
     optional: true
     path_alias: sigs.k8s.io/cluster-api
-    rerun_command: /test regression-clusterinfra-aws-ipi-techpreview
+    rerun_command: /test regression-clusterinfra-aws-ipi-techpreview-capi
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -927,7 +928,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=regression-clusterinfra-aws-ipi-techpreview
+        - --target=regression-clusterinfra-aws-ipi-techpreview-capi
         command:
         - ci-operator
         image: ci-operator:latest
@@ -978,7 +979,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )regression-clusterinfra-aws-ipi-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )regression-clusterinfra-aws-ipi-techpreview-capi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

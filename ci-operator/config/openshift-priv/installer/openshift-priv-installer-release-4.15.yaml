@@ -119,6 +119,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   inputs:
@@ -285,6 +288,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-proxy
   optional: true
+  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
@@ -381,6 +385,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
+  run_if_changed: azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-resourcegroup
@@ -428,9 +433,9 @@ tests:
   as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
-      PLATFORM_VERSION: "8.4"
+      PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-workers-rhel
   timeout: 6h0m0s
 - always_run: false
@@ -637,6 +642,7 @@ tests:
 - always_run: false
   as: e2e-crc
   optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc

@@ -15,6 +15,7 @@ function cli_Login() {
     AZURE_AUTH_CLIENT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientId)"
     AZURE_AUTH_CLIENT_SECRET="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientSecret)"
     AZURE_AUTH_TENANT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .tenantId)"
+    AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
     # az should already be there
     command -v az
     az version
@@ -46,6 +47,7 @@ function cli_Login() {
 
     echo "$(date -u --rfc-3339=seconds) - Logging in to Azure..."
     az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none || return 1
+    az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 }
 
 function gatherLBs() {

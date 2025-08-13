@@ -1,0 +1,68 @@
+ref:
+  as: olmv1-performance
+  cli: latest
+  from_image:
+    namespace: ci
+    name: tests-private-burner
+    tag: "4.20"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 500Mi
+  timeout: 30m
+  grace_period: 15m0s
+  env:
+  - name: E2E_VERSION
+    default: "v2.4.0"
+    documentation: |-
+      Override the e2e version
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is false, which means the workload with delete and recreate a set number of namespaces
+  - name: EXTRA_FLAGS
+    default: "--churn-duration=5m --timeout=30m"
+    documentation: |-
+      Default is Churn Duration for 5 minutes
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: ITERATION_MULTIPLIER_ENV
+    default: "9"
+    documentation: |-
+      The number of iterations per worker nodes to create
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint
+  - name: PPROF
+    default: "true"
+  commands: olmv1-performance-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  - namespace: test-credentials
+    name: ocp-perfscale-horreum-poc
+    mount_path: /horreum-secret
+  documentation: |-
+    Run olmv1 benchmark test.

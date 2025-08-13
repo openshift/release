@@ -11,11 +11,30 @@ ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
 ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
 
+# TODO: update to 4.19 once ODF 4.19 is released in the official redhat-operators 4.19 catalog
+ODF_MAX_VERSION="4.18"
+ODF_MAX_VERSION_NUMERIC=$(echo "${ODF_MAX_VERSION}" | awk -F. '{ printf "%d%02d", $1, $2 }')
+
+function ocp_version() {
+  oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
+}
+
+function ocp_version_numeric() {
+  ocp_version | awk -F. '{ printf "%d%02d", $1, $2 }'
+}
+
 # Make the masters schedulable so we have more capacity to run VMs
 CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
 if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
 then
   oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+fi
+
+if [ "$(ocp_version_numeric)" -ge "${ODF_MAX_VERSION_NUMERIC}" ]
+then
+  ODF_OPERATOR_CHANNEL=stable-${ODF_MAX_VERSION}
+else
+  ODF_OPERATOR_CHANNEL=stable-$(ocp_version)
 fi
 
 echo "Installing ODF from ${ODF_OPERATOR_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
@@ -25,48 +44,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
-EOF
-
-oc apply -f - <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  annotations:
-    operatorframework.io/managed-by: marketplace-operator
-    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-  generation: 5
-  name: redhat-operators-4-15
-  namespace: openshift-marketplace
-spec:
-  displayName: Red Hat Operators
-  grpcPodConfig:
-    nodeSelector:
-      kubernetes.io/os: linux
-      node-role.kubernetes.io/master: ""
-    priorityClassName: system-cluster-critical
-    securityContextConfig: restricted
-    tolerations:
-    - effect: NoSchedule
-      key: node-role.kubernetes.io/master
-      operator: Exists
-    - effect: NoExecute
-      key: node.kubernetes.io/unreachable
-      operator: Exists
-      tolerationSeconds: 120
-    - effect: NoExecute
-      key: node.kubernetes.io/not-ready
-      operator: Exists
-      tolerationSeconds: 120
-  icon:
-    base64data: ""
-    mediatype: ""
-  image: registry.redhat.io/redhat/redhat-operator-index:v4.15
-  priority: -100
-  publisher: Red Hat
-  sourceType: grpc
-  updateStrategy:
-    registryPoll:
-      interval: 10m
 EOF
 
 # deploy new operator group

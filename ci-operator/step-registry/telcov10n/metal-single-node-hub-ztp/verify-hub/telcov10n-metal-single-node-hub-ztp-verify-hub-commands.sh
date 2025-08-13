@@ -95,7 +95,7 @@ def test_http_endpoint(url):
 
 def test_cluster_version(bash):
     oc_cmd = "oc get clusterversion version -ojsonpath='{.status.desired.version}'"
-    assert bash.run_script_inline([oc_cmd]).startswith("${OCP_HUB_VERSION}")
+    assert bash.run_script_inline([oc_cmd]).startswith("${EXPECTED_MAJOR_HUB_VERSION}")
 
 @pytest.mark.parametrize("namespace", [
     "${MCH_NAMESPACE}",

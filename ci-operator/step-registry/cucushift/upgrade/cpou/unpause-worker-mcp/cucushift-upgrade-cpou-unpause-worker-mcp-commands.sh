@@ -90,8 +90,6 @@ for mcp in "${normal_mcp_arr[@]}"
 do
     check_mcp ${mcp} "True"
 done
-current_minor_ver="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -f2 -d.)"
-echo -e "current minor version: ${current_minor_ver} \n"
 
 IFS=" " read -r -a arr <<<"$PAUSED_MCP_NAME"
 for mcp in "${arr[@]}";
@@ -100,11 +98,5 @@ do
     printf "\n"
     unpause ${mcp}
     printf "\n"
-    if [[ "${current_minor_ver}" -lt "19" ]] && [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-        echo "Found rhel worker, this step is supposed to be used in eus upgrade, skipping mcp checking here, need to check it after rhel worker upgraded..."
-        run_command "oc get machineconfigpools"
-        run_command "oc get node -owide"
-    else
-        check_mcp ${mcp} "True"
-    fi
+    check_mcp ${mcp} "True"
 done

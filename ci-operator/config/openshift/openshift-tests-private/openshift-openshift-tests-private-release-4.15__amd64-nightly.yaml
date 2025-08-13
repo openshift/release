@@ -103,33 +103,6 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: alibaba-ipi-private-fips-f28
-  cron: 12 15 30 * *
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
-- as: alibaba-ipi-private-fips-f28-destructive
-  cron: 22 23 13 * *
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
-- as: alibaba-ipi-private-fips-f28-ui
-  cron: 43 3 22 * *
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-e2e-test-qe-ui
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
 - as: aws-c2s-ipi-disc-priv-fips-f14
   cron: 55 7 2 * *
   steps:
@@ -165,6 +138,7 @@ tests:
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
@@ -725,8 +699,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8-etcd-encryption
-- as: aws-ipi-proxy-fips-f14-fips-check
-  cron: 11 12 8 * *
+- as: aws-ipi-proxy-fips-f999-fips-check
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -778,6 +752,18 @@ tests:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - chain: cucushift-sdn-live-migration-ovn
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn
+- as: aws-ipi-sdn-live-migration-ovn-connection-testing-f28
+  capabilities:
+  - intranet
+  cron: 33 23 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    test:
+    - ref: cucushift-sdn-live-migration-ovn-connection-testing
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn
 - as: aws-ipi-shared-vpc-phz-f14
   cron: 47 12 1 * *
@@ -911,123 +897,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-workers-marketplace
-- as: aws-ocm-osd-ccs-f28
-  cron: 52 21 27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@osd_ccs'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: osd-ccs-aws
-- as: aws-rosa-non-sts-f28
-  cron: 56 11 29 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-non-sts
-- as: aws-rosa-non-sts-byo-vpc-kms-proxy-f28
-  cron: 30 5 25 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-non-sts-byo-vpc-kms-proxy
-- as: aws-rosa-sts-f28
-  cron: 54 4 29 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts
-- as: aws-rosa-sts-byo-kms-oidc-f28
-  cron: 26 11 9 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-byo-kms-oidc
-- as: aws-rosa-sts-localzone-f28
-  cron: 9 12 10 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-localzone
-- as: aws-rosa-sts-security-group-f28
-  cron: 13 2 24 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-security-group
-- as: aws-rosa-sts-private-proxy-f28
-  cron: 11 7 5 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@disconnected and @rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-private-proxy
-- as: aws-rosa-sts-shared-vpc-f28
-  cron: 32 15 19 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.15"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-shared-vpc
 - as: aws-rosa-hcp-cilium-stage-full-f14
   cron: 20 7 22 * *
   steps:
@@ -1287,12 +1156,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@ota'
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: OTA
-      TEST_TIMEOUT: "75"
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-confidential-trustedlaunch-f14
   cron: 35 6 28 * *
@@ -2137,7 +2002,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
 - as: gcp-ipi-confidential-secureboot-mini-perm-f14
-  cron: 11 22 8,24 * *
+  cron: 32 22 2 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2871,17 +2736,18 @@ tests:
     - ref: openshift-extended-test-disruptive
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
-- as: vsphere-ipi-ovn-dualstack-privmaryv6-f28-file-integrity
-  cron: 35 0 6 * *
+- as: vsphere-ipi-ovn-dualstack-privmaryv6-f999-file-integrity
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: vsphere-elastic
     env:
       FILTERS_ADDITIONAL: ""
-      INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-15@sha256:aa51bfd2a19330b39cd770e418d36c107daaa6aca01d3b5eea671c2d41d0bb47
+      INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-15:latest
       IP_FAMILIES: DualStackIPv6Primary
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
@@ -3348,6 +3214,60 @@ tests:
     - ref: cucushift-installer-check-realtime
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: baremetal-sno-ipv4-etcd-encryption-rt-kernel-kdump-f28
+  capabilities:
+  - intranet
+  cron: 43 18 13 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_ETCD_ENCRYPTION: "true"
+      ENABLE_KDUMP: "true"
+      RESERVE_BOOTSTRAP: "false"
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
+- as: baremetal-sno-ipv4-etcd-encryption-rt-kernel-basecap-f28
+  capabilities:
+  - intranet
+  cron: 59 18 2 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: baremetal MachineAPI Ingress
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      BASELINE_CAPABILITY_SET: None
+      ENABLE_ETCD_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: cucushift-installer-check-capability
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
+- as: baremetal-upi-ovn-ipv6-static-realtime-kernel-f28
+  capabilities:
+  - intranet
+  cron: 54 21 2 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: cucushift-installer-check-realtime
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-ipv6-static
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

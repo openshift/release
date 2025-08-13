@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.18"
   commitchecker:
     name: commitchecker
     namespace: ci
@@ -76,17 +80,17 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-upgrade-vsphere
-- as: regression-clusterinfra-cucushift-rehearse-vsphere-ipi
+- as: regression-clusterinfra-vsphere-ipi-ccm
   optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: vsphere-elastic
     env:
-      TEST_FILTERS: NonHyperShiftHOST
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "1200"
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-vsphere-ipi
   timeout: 7h0m0s
 - as: verify-commits

@@ -37,7 +37,7 @@ K8S_CLUSTER_URL=$(oc whoami --show-server)
 echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
-K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
+K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
 oc logout
 
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME

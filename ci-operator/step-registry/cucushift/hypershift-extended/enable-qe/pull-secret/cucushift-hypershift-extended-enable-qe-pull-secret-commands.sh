@@ -55,7 +55,7 @@ function check_update_pullsecret() {
     COUNT=${#workers_arr[*]}
 
     for worker in ${workers_arr[*]}; do
-        count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' || true)
+        count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c quay.io/openshifttest || true)
         if [ $count -gt 0 ] ; then
             UPDATED_COUNT=$((UPDATED_COUNT + 1))
         fi
@@ -124,7 +124,7 @@ for i in $(seq ${RETRIES}); do
   COUNT=${#workers_arr[*]}
   for worker in ${workers_arr[*]}
   do
-  count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' || true)
+  count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c quay.io/openshifttest || true)
   if [ $count -gt 0 ] ; then
       UPDATED_COUNT=`expr $UPDATED_COUNT + 1`
   fi

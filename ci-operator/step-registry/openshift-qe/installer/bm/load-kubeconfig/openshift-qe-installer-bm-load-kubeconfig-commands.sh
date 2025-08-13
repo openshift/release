@@ -4,11 +4,10 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Fix UID issue (from Telco QE Team)
-~/fix_uid.sh
-
-SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-bastion=$(cat "/secret/address")
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 
 if [ -z "${KUBECONFIG_PATH}" ]; then
   scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig ${SHARED_DIR}/kubeconfig

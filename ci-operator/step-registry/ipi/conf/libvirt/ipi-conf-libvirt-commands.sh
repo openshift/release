@@ -56,7 +56,7 @@ controlPlane:
   replicas: ${MASTER_REPLICAS}
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14
+  - cidr: 10.8.0.0/14
     hostPrefix: 23
   machineCIDR: 192.168.${CLUSTER_SUBNET}.0/24
   networkType: OVNKubernetes

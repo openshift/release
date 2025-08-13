@@ -105,8 +105,12 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
 
   # The name of the kernel artifact depends on the arch
   if [ "$ARCH" == "s390x" ]; then
-    KERNEL="agent.${ARCH}-kernel.img"
-    
+    if echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 19 )) { exit 0 } else {exit 1} }'; then
+      KERNEL="agent.${ARCH}-vmlinuz"
+    else
+      KERNEL="agent.${ARCH}-kernel.img"
+    fi
+
     # Merge the initrds together and rename them so they can be found on the remote host; for some reason, order matters when catting these together
     cat "${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS}" "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD}" > "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}"
   elif [ "$ARCH" == "ppc64le" ]; then

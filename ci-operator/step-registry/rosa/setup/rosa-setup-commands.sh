@@ -25,14 +25,14 @@ fi
 
 # functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
 #configure aws
-aws_region=${REGION:-$LEASED_RESOURCE}
+aws_region=${REGION:-us-east-2}
 configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
 configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 
 # Log in to rosa/ocm
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 rosa_login ${OCM_LOGIN_ENV} $OCM_TOKEN
-
+rosa init
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
@@ -64,21 +64,25 @@ if [[ "$UPGRADE_ENABLED" == "true" ]];then
     log "It doesn't support to upgrade with nightly version now"
     exit 1
   fi
+
   # Get the latest OCP version
   version_cmd="rosa list version --hosted-cp --channel-group $CHANNEL_GROUP -o json"
   filter_cmd="$version_cmd | jq -r '.[] | .raw_id'"
   versionList=$(eval $filter_cmd)
   echo -e "Available cluster versions:\n${versionList}"
   target_version=$(echo "$versionList" | head -1 || true)
-
   # Cluster version is OCP latest Y stream version - 4
   filter_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
   versionList=$(eval $filter_cmd)
 
-  end_version_x=$(echo ${target_version} | cut -d '.' -f1)
-  end_version_y=$(echo ${target_version} | cut -d '.' -f2)
-  current_version_y=`expr $end_version_y - 4`
-  start_version=$(echo "$versionList" | grep -i $end_version_x.$current_version_y | head -5 | sort -V | head -1 || true )
+  if [[ "$VERSION" == "" ]];then
+    end_version_x=$(echo ${target_version} | cut -d '.' -f1)
+    end_version_y=$(echo ${target_version} | cut -d '.' -f2)
+    current_version_y=`expr $end_version_y - 4`
+    start_version=$(echo "$versionList" | grep -i $end_version_x.$current_version_y | head -5 | sort -V | head -1 || true )
+  else
+    start_version=$(echo "$versionList" | grep -i $VERSION | head -5 | sort -V | head -1 || true )
+  fi
 
   export VERSION=$start_version
 fi

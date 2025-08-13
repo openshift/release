@@ -339,7 +339,7 @@ presubmits:
       containers:
       - command:
         - hack/validate-boskos.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -418,6 +418,7 @@ presubmits:
       ci.openshift.io/generator: cluster-init
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-build02-dry
+    optional: true
     rerun_command: /test build02-dry
     run_if_changed: ^clusters/.*
     spec:
@@ -495,7 +496,7 @@ presubmits:
             secretKeyRef:
               key: build03-id
               name: build03-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -518,6 +519,65 @@ presubmits:
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )build03-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: app.ci
+    context: ci/build-farm/build04-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build04
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build04-dry
+    rerun_command: /test build04-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build04
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build04_id
+          valueFrom:
+            secretKeyRef:
+              key: build04-id
+              name: build04-dex-oidc
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build04.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build04-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -706,7 +766,7 @@ presubmits:
             secretKeyRef:
               key: build09-id
               name: build09-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -863,7 +923,7 @@ presubmits:
         - ./core-services/cluster-pools/_config.yaml
         command:
         - ci-operator-checkconfig
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-checkconfig_latest
+        image: quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -889,7 +949,7 @@ presubmits:
         - ./
         command:
         - hack/validate-ci-operator-config.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-ci-operator_latest
+        image: quay.io/openshift/ci-public:ci_determinize-ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1001,7 +1061,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250522-9b3f5faca
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250709-d01b8af18
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1090,7 +1150,7 @@ presubmits:
         - ./
         command:
         - hack/validate-generated-config.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-prowgen_latest
+        image: quay.io/openshift/ci-public:ci_ci-operator-prowgen_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1116,7 +1176,7 @@ presubmits:
         - ./
         command:
         - hack/validate-generated-dashboards.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_dashboards-validation_latest
+        image: quay.io/openshift/ci-public:ci_dashboards-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1222,7 +1282,7 @@ presubmits:
         - ./
         command:
         - hack/validate-prow-job-ordering.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_sanitize-prow-jobs_latest
+        image: quay.io/openshift/ci-public:ci_sanitize-prow-jobs_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1274,7 +1334,7 @@ presubmits:
         - ./
         command:
         - hack/validate-prow-config-formatting.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-prow-config_latest
+        image: quay.io/openshift/ci-public:ci_determinize-prow-config_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1301,7 +1361,7 @@ presubmits:
         - ./ci-operator/config
         command:
         - hack/validate-ci-operator-config-filename.py
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1327,7 +1387,7 @@ presubmits:
         - ./
         command:
         - hack/validate-prow-job-semantics.py
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1378,7 +1438,7 @@ presubmits:
         - ./
         command:
         - hack/validate-release-controller-config.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1546,7 +1606,7 @@ presubmits:
         - ./
         command:
         - hack/validate-registry-metadata.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_generate-registry-metadata_latest
+        image: quay.io/openshift/ci-public:ci_generate-registry-metadata_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1656,7 +1716,7 @@ presubmits:
           fi
         command:
         - /bin/bash
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_promoted-image-governor_latest
+        image: quay.io/openshift/ci-public:ci_promoted-image-governor_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1732,7 +1792,7 @@ presubmits:
         - hack
         command:
         - pylint
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_python-validation_latest
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:

@@ -22,7 +22,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -52,7 +52,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -82,7 +82,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -112,7 +112,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -142,7 +142,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -172,7 +172,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -202,7 +202,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.17:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -415,7 +415,7 @@ periodics:
       name: github-users
     - name: github-token
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: github-credentials-openshift-ci-robot
 - agent: kubernetes
   cluster: app.ci
   cron: '@yearly'
@@ -1025,7 +1025,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250709-d01b8af18
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1044,7 +1044,7 @@ periodics:
   cron: 0 22 * * 3
   decorate: true
   extra_refs:
-  - base_ref: master
+  - base_ref: main
     org: openshift
     repo: ci-tools
     workdir: true
@@ -1060,7 +1060,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250709-d01b8af18
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1104,10 +1104,11 @@ periodics:
       - --future-release=4.21
       - --self-approve=true
       - --assign=openshift/test-platform
+      - --rebalancer-cron=0 0 * * 2,5
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/autoconfigbrancher
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-config-brancher_latest
+      image: quay.io/openshift/ci-public:ci_auto-config-brancher_latest
       imagePullPolicy: Always
       name: auto-config-brancher
       resources:
@@ -1117,10 +1118,19 @@ periodics:
       - mountPath: /etc/github
         name: token
         readOnly: true
+      - mountPath: /etc/prometheus
+        name: prometheus
+        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+    - name: prometheus
+      secret:
+        items:
+        - key: sa.ci-monitoring.app.ci.token.txt
+          path: token
+        secretName: app-ci-openshift-user-workload-monitoring-credentials
 - agent: kubernetes
   cluster: app.ci
   cron: 0 0 1 6 *
@@ -1214,7 +1224,7 @@ periodics:
         value: /home/prow/go
       - name: GOROOT
         value: /usr/lib/golang
-      image: registry.ci.openshift.org/operator-lifecycle-manager/olm-v0-bumper:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:operator-lifecycle-manager_olm-v0-bumper_latest
       imagePullPolicy: Always
       name: bumper
       resources:
@@ -1269,7 +1279,7 @@ periodics:
         value: /home/prow/go
       - name: GOROOT
         value: /usr/lib/golang
-      image: registry.ci.openshift.org/operator-lifecycle-manager/olm-v1-bumper:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:operator-lifecycle-manager_olm-v1-bumper_latest
       imagePullPolicy: Always
       name: bumper
       resources:
@@ -1387,7 +1397,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1444,7 +1454,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1485,24 +1495,57 @@ periodics:
   name: periodic-org-sync
   spec:
     containers:
-    - args:
-      - --config-path=./org/config.yaml
-      - --confirm=true
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --fix-org
-      - --fix-org-members
-      - --fix-teams
-      - --fix-team-members
-      - --fix-team-repos
-      - --fix-repos
-      - --github-hourly-tokens=600
-      - --github-allowed-burst=600
-      command:
-      - /ko-app/peribolos
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250522-9b3f5faca
+    - command:
+      - sh
+      - -c
+      - |
+        set -euo pipefail
+
+        echo "Filtering openshift-priv from org/config.yaml"
+
+        # Safety check: ensure openshift-priv exists exactly once
+        count=$(grep -cE '^  openshift-priv:' org/config.yaml || true)
+        if [ "$count" -ne 1 ]; then
+            echo "ERROR: expected exactly one 'openshift-priv:' key, found $count" >&2
+            exit 1
+        fi
+
+        # Remove the openshift-priv org block using range deletion
+        # This deletes from "  openshift-priv:" line up to (but not including) the next org
+        sed -E '/^  openshift-priv:/,/^  [a-zA-Z0-9_-]+:/{/^  openshift-priv:/d; /^  [a-zA-Z0-9_-]+:/!d;}' \
+            org/config.yaml > /tmp/stripped-config.yaml
+
+        # Verify the result is valid
+        if ! grep -qE '^orgs:' /tmp/stripped-config.yaml; then
+            echo "ERROR: Output YAML appears malformed (no 'orgs:' found)" >&2
+            exit 1
+        fi
+
+        if grep -qE '^  openshift-priv:' /tmp/stripped-config.yaml; then
+            echo "ERROR: openshift-priv still present in output" >&2
+            exit 1
+        fi
+
+        echo "Successfully removed openshift-priv from configuration"
+
+        # Run peribolos with the filtered config
+        exec /ko-app/peribolos \
+          --config-path=/tmp/stripped-config.yaml \
+          --confirm=true \
+          --github-token-path=/etc/github/oauth \
+          --github-endpoint=http://ghproxy \
+          --github-endpoint=https://api.github.com \
+          --github-graphql-endpoint=http://ghproxy/graphql \
+          --fix-org \
+          --fix-org-members \
+          --fix-teams \
+          --fix-team-members \
+          --fix-team-repos \
+          --fix-repos \
+          --github-hourly-tokens=600 \
+          --github-allowed-burst=600 \
+          --allow-repo-archival
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1571,7 +1614,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1607,6 +1650,7 @@ periodics:
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
+      - --ignore=Azure/ARO-HCP
       command:
       - repo-brancher
       image: repo-brancher:latest
@@ -1729,7 +1773,7 @@ periodics:
         done
       command:
       - /bin/bash
-      image: registry.ci.openshift.org/ocp/4.12:cli
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.12_cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2063,7 +2107,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2095,7 +2139,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2127,7 +2171,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250522-9b3f5faca
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250709-d01b8af18
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2177,7 +2221,7 @@ periodics:
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
       - --dry-run=false
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_promoted-image-governor_latest
+      image: quay.io/openshift/ci-public:ci_promoted-image-governor_latest
       imagePullPolicy: Always
       name: promoted-image-governor
       resources:
@@ -2215,8 +2259,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-image-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.14
-      - --future-release=ocm-2.14
+      - --current-release=ocm-2.15
+      - --future-release=ocm-2.15
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2260,8 +2304,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/cluster-api-provider-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.14
-      - --future-release=ocm-2.14
+      - --current-release=ocm-2.15
+      - --future-release=ocm-2.15
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2305,8 +2349,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.14
-      - --future-release=ocm-2.14
+      - --current-release=ocm-2.15
+      - --future-release=ocm-2.15
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2350,8 +2394,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.14
-      - --future-release=ocm-2.14
+      - --current-release=ocm-2.15
+      - --future-release=ocm-2.15
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2395,8 +2439,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.14
-      - --future-release=ocm-2.14
+      - --current-release=ocm-2.15
+      - --future-release=ocm-2.15
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2440,8 +2484,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-test-infra
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.14
-      - --future-release=ocm-2.14
+      - --current-release=ocm-2.15
+      - --future-release=ocm-2.15
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2507,6 +2551,12 @@ periodics:
         --peribolos-config=../config/org/config.yaml \
         --log-level=debug \
         --delete-invalid-users \
+        --skip-ocp-priv-admin=RH-Cachito \
+        --skip-ocp-priv-admin=openshift-bot \
+        --skip-ocp-priv-admin=openshift-ci-robot \
+        --skip-ocp-priv-admin=openshift-merge-robot \
+        --skip-ocp-priv-admin=openshift-cherrypick-robot \
+        --skip-ocp-priv-admin=openshift-art-build-bot \
         --dry-run=false
       command:
       - /bin/bash
@@ -2573,6 +2623,7 @@ periodics:
       - --bot=openshift-merge-robot
       - --bot=openshift-ci-robot
       - --check-branch-protection=false
+      - --ignore=Azure/ARO-HCP
       - --ignore=openshift
       - --ignore=openshift-priv
       - --ignore=kata-containers/kata-containers
@@ -2596,7 +2647,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: uay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
       imagePullPolicy: Always
       name: check-gh-automation
       resources:
@@ -2663,7 +2714,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-merge-bot
-      image: uay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
       imagePullPolicy: Always
       name: check-gh-automation
       resources:
@@ -2904,7 +2955,7 @@ periodics:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2999,7 +3050,7 @@ periodics:
         done
       command:
       - /bin/bash
-      image: image-registry.openshift-image-registry.svc:5000/ocp/cli-jq:latest
+      image: registry.ci.openshift.org/ocp/cli-jq:latest
       imagePullPolicy: Always
       name: ""
       resources:

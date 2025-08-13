@@ -18,6 +18,11 @@ REG_STAGE_ENABLED=false
 # Indicate if konflux fbc is used.
 KONFLUX_ENABLED=false
 
+echo "LOGGING_INDEX_IMAGE=$LOGGING_INDEX_IMAGE"
+echo "CLO_INDEX_IMAGE=$CLO_INDEX_IMAGE"
+echo "LO_INDEX_IMAGE=$LO_INDEX_IMAGE"
+echo "EO_INDEX_IMAGE=$EO_INDEX_IMAGE" 
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -32,14 +37,14 @@ function set_proxy () {
     fi
 }
 
-## Wait up to 30 minutes until cluster is ready if IDMS or pull-secrect is updated
+# Wait up to 30 minutes until cluster is ready if the IDMS/ICSP or pull-secrect is updated
 function wait_cluster_ready() {
     # If no icsp,secret is updated. We needn't wait the cluster ready
     if [[ "$CLUSTER_UPDATED" == "false" ]];then
         return 0
     fi
     # The cluster upgrade may take serveral minutes to be ready
-    echo "Wait up to 30 minutes until the cluster upgrade succeed"
+    echo "#Wait up to 30 minutes until the cluster upgrade succeed"
     machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
     count=0
     while [[ $count -lt 120 ]]
@@ -90,6 +95,8 @@ function validate_index_image() {
         KONFLUX_ENABLED=true
     fi
 
+    echo "REG_STAGE_ENABLED=$REG_STAGE_ENABLED,REG_BREW_ENABLED=$REG_BREW_ENABLED,KONFLUX_ENABLED=$KONFLUX_ENABLED,REG_QE_OPT_ENABLED=$REG_QE_OPT_ENABLED"
+
     count=0
     if [[ $REG_STAGE_ENABLED == "true"  ]]; then
 	    echo "use registry.stage.redhat.io as the mirror registry"
@@ -136,7 +143,7 @@ EOF
 }
 
 # Update the registry credential in local and in cluster
-# Note: That is the best try step, we didn't validate the credential here
+# Note: That is the best try step, we didn't validate the credential correctness here
 function enable_registry_credential () {
     echo "# Enable registry credential "
     # get the credential saved in cluster
@@ -152,8 +159,9 @@ function enable_registry_credential () {
          reg_qe_opt_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
 	 reg_qe_opt_auth=$(echo -n "${reg_qe_opt_user}:${reg_qe_opt_password}" | base64 -w 0)
 	 if [[ $reg_qe_opt_auth != "" ]]; then
+             echo " Set cred for quay.io/openshift-qe-optional-operators"
              jq --argjson var '{"quay.io/openshift-qe-optional-operators":{"auth":"'${reg_qe_opt_auth}'","email":""}}' '.auths |= . + $var' /tmp/.dockerconfigjson > ${tmp_dockerconfig}
-             mv ${tmp_dockerconfig} /tmp/.dockerconfigjson
+             cp ${tmp_dockerconfig} /tmp/.dockerconfigjson
 	 fi
      fi
 
@@ -162,8 +170,9 @@ function enable_registry_credential () {
          reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
 	 reg_brew_auth=$(echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0)
 	 if [[ $reg_brew_auth != "" ]]; then
+             echo " Set cred for brew.registry.redhat.io"
              jq --argjson var '{"brew.registry.redhat.io":{"auth":"'${reg_brew_auth}'","email":""}}' '.auths |= . + $var' /tmp/.dockerconfigjson > ${tmp_dockerconfig}
-             mv ${tmp_dockerconfig} /tmp/.dockerconfigjson
+             cp ${tmp_dockerconfig} /tmp/.dockerconfigjson
 	 fi
      fi
 
@@ -172,8 +181,9 @@ function enable_registry_credential () {
          reg_stage_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
          reg_stage_auth=`echo -n "${reg_stage_user}:${reg_stage_password}" | base64 -w 0`
 	 if [[ $reg_stage_auth != "" ]]; then
+             echo " Set cred for registry.stage.redhat.io"
              jq --argjson var '{"registry.stage.redhat.io":{"auth":"'${reg_stage_auth}'","email":""}}' '.auths |= . + $var' /tmp/.dockerconfigjson > ${tmp_dockerconfig}
-             mv ${tmp_dockerconfig} /tmp/.dockerconfigjson
+             cp ${tmp_dockerconfig} /tmp/.dockerconfigjson
 	 fi
      fi
 
@@ -190,7 +200,8 @@ function enable_registry_credential () {
 	 ret=$?
 	 echo "${result}"
          if [[ $ret -eq 0 && ! $result =~ "pull-secret was not changed" ]]; then
-                 CLUSTER_UPDATED=true
+             echo "oc set data secret/pull-secret successed"
+             CLUSTER_UPDATED=true
          else
              echo "oc set data secret/pull-secret failed!"
 	     exit 1
@@ -200,6 +211,7 @@ function enable_registry_credential () {
      fi
 }
 
+# Only create one IDMS or ICSP, so the cluster only need to be updated one time.
 function create_image_mirror_set_connected() {
     echo "# Create IDMS/ICSP for cluster"
     cat <<EOF>/tmp/mirror_set_brew_clo.yaml
@@ -276,7 +288,7 @@ EOF
 
     cat <<EOF>/tmp/mirror_set_stage_clo.yaml
   - mirrors:
-    - registry.stage.redhat.io/rh-osbs/openshift-logging-cluster-logging-operator-bundle
+    - registry.stage.redhat.io/openshift-logging/cluster-logging-operator-bundle
     source: registry.redhat.io/openshift-logging/cluster-logging-operator-bundle
   - mirrors:
     - registry.stage.redhat.io/openshift-logging/cluster-logging-rhel9-operator
@@ -297,7 +309,7 @@ EOF
 
     cat <<EOF>/tmp/mirror_set_stage_lo.yaml
   - mirrors:
-    - registry.stage.redhat.io/rh-osbs/openshift-logging-loki-operator-bundle
+    - registry.stage.redhat.io/openshift-logging/loki-operator-bundle
     source: registry.redhat.io/openshift-logging/loki-operator-bundle
   - mirrors:
     - registry.stage.redhat.io/openshift-logging/loki-rhel9-operator
@@ -333,7 +345,6 @@ EOF
 
     cat <<EOF>/tmp/mirror_set_konflux_clo.yaml
   - mirrors:
-    mirror_set_konflux_clo=" - mirrors:
     - quay.io/redhat-user-workloads/obs-logging-tenant/cluster-logging-operator-v6-3
     source: registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator
   - mirrors:
@@ -418,7 +429,7 @@ spec:
 
     # Needn't create IDMS/ICSP, return 0
     if [[ $mirror_set_clo == "" && $mirror_set_clo == "" && $mirror_set_clo == "" ]]; then
-        echo "skip: no ICSP/IDMS "
+        echo "skip: no need new ICSP or IDMS "
         return 0
     fi
 
@@ -456,6 +467,7 @@ spec:
     fi
 }
 
+# create catalogsource with given catalogsource name and catalog image
 function create_catalog_source(){
     catalog_name=$1
     catalog_image=$2
@@ -500,9 +512,11 @@ spec:
       interval: 15m" >/tmp/logging-catalog.yaml
     fi
 
-    run_command "oc apply --overwrite=true -f /tmp/logging-catalog.yaml"
+    run_command "oc -n openshift-marketplace delete catalogsource ${catalog_name}"
+    run_command "oc create -f /tmp/logging-catalog.yaml"
 }
 
+# create catalogsourcs for various catalog images
 function create_catalog_sources_connected()
 {   echo "# Create catalog sources"
     catalog_sources=""

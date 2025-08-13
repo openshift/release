@@ -219,6 +219,43 @@ function check_the_host_was_locked {
 
 EO-shared-function
 
+echo "----------------------------------------------------------------------"
+echo " extract_cluster_image_set_reference "
+echo "----------------------------------------------------------------------"
+
+  cat <<EO-shared-function >> ${functions_path}
+
+# ----------------------------------------------------------------------
+# extract_cluster_image_set_reference
+#
+# Parameter positions:
+#
+# 1 - the RELEASE_IMAGE_LATEST: OCP image tag
+# 2 - the PULL_SECRET that allows to download such image
+# ----------------------------------------------------------------------
+
+function extract_cluster_image_set_reference {
+
+  local rel_img
+  rel_img=\${1} ; shift
+
+  local pull_secret
+  pull_secret=\${1} ; shift
+
+  oc adm release extract -a \${pull_secret} --command=openshift-baremetal-install \${rel_img}
+  attempts=0
+  while sleep 5s ; do
+    ./openshift-baremetal-install version > /dev/null && break
+    [ \$(( attempts=\${attempts} + 1 )) -lt 2 ] || exit 1
+  done
+
+  echo -n "\$(./openshift-baremetal-install version | head -1 | awk '{print \$2}')"
+}
+
+# ----------------------------------------------------------------------
+
+EO-shared-function
+
   cat ${SHARED_DIR}/"$(basename ${functions_path})"
 
   echo

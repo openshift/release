@@ -220,6 +220,33 @@ if [[ -n "${MULTI_NIC_IPI}" ]]; then
   echo "multi-nic is enabled, an additional NIC will be attached to nodes"
 fi
 
+# Generate labels for reference back to job
+PROW_JOB_TYPE="$(echo ${JOB_SPEC} | jq -r '.type')"
+PROW_JOB="$(echo ${JOB_SPEC} | jq -r '.job')"
+PROW_BUILD_ID="$(echo ${JOB_SPEC} | jq -r '.buildid')"
+PROW_GS_BUCKET="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.bucket')"
+JOB_URL_PREFIX="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.job_url_prefix // empty')"
+if [[ "${JOB_URL_PREFIX}" == "" ]]; then
+  JOB_URL_PREFIX="https://prow.ci.openshift.org/view/"
+fi
+
+# The following will only be present for presubmits
+GIT_ORG="$(echo ${JOB_SPEC} | jq -r '.refs.org')"
+GIT_REPO="$(echo ${JOB_SPEC} | jq -r '.refs.repo')"
+GIT_PR="$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')"
+
+LEASE_ANNOTATIONS="prow-job-type: \"${PROW_JOB_TYPE}\"
+    prow-job-name: \"${PROW_JOB}\"
+    prow-build-id: \"${PROW_BUILD_ID}\"
+    prow-gs-bucket: \"${PROW_GS_BUCKET}\"
+    prow-url-prefix: \"${JOB_URL_PREFIX}\""
+if [[ "${PROW_JOB_TYPE}" == "presubmit" ]]; then
+  LEASE_ANNOTATIONS="${LEASE_ANNOTATIONS}
+    git-org: \"${GIT_ORG}\"
+    git-repo: \"${GIT_REPO}\"
+    git-pr: \"${GIT_PR}\""
+fi
+
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
   log "creating bastion lease resource ${VSPHERE_BASTION_LEASED_RESOURCE}"
 
@@ -229,7 +256,8 @@ kind: Lease
 metadata:
   generateName: \"${LEASED_RESOURCE}-\"
   namespace: \"vsphere-infra-helpers\"
-  annotations: {}
+  annotations:
+    ${LEASE_ANNOTATIONS}
   labels:
     vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"
     boskos-lease-id: \"${LEASED_RESOURCE}\"
@@ -257,7 +285,6 @@ else
   OPENSHIFT_REQUIRED_CORES=$((OPENSHIFT_REQUIRED_CORES / ${#pools[@]}))
   OPENSHIFT_REQUIRED_MEMORY=$((OPENSHIFT_REQUIRED_MEMORY / ${#pools[@]}))
 fi
-
 
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
@@ -291,7 +318,8 @@ kind: Lease
 metadata:
   generateName: \"${LEASED_RESOURCE}-\"
   namespace: \"vsphere-infra-helpers\"
-  annotations: {}
+  annotations:
+    ${LEASE_ANNOTATIONS}
   labels:
     cluster-id: \"${cluster_name}\"
     vsphere-capacity-manager.splat-team.io/lease-namespace: \"${NAMESPACE}\"

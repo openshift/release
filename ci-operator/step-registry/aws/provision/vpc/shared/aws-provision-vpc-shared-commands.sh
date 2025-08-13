@@ -14,10 +14,21 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+
+  echo "Using shared AWS account."
+  if [[ ! -f "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    echo "ERROR: The ENABLE_SHARED_VPC is enabled, but the 2nd AWS account credential file \${CLUSTER_PROFILE_DIR}/.awscred_shared_account file does not exit, please check your cluster profile."
+    exit 1
+  fi
+
   CLUSTER_CREATOR_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
   CLUSTER_CREATOR_AWS_ACCOUNT_NO=$(echo $CLUSTER_CREATOR_USER_ARN | awk -F ":" '{print $5}')
-  echo "Using shared AWS account, cluster creator account: ${CLUSTER_CREATOR_AWS_ACCOUNT_NO:0:6}***"
+  echo "Cluster creator account: ${CLUSTER_CREATOR_AWS_ACCOUNT_NO:0:6}***"
+
   export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  SHARED_ACCOUNT_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
+  SHARED_ACCOUNT_AWS_ACCOUNT_NO=$(echo $SHARED_ACCOUNT_USER_ARN | awk -F ":" '{print $5}')
+  echo "Shared account: ${SHARED_ACCOUNT_AWS_ACCOUNT_NO:0:6}***"
 else
   echo "Using regular AWS account."
 fi
@@ -744,6 +755,16 @@ fi
 
 if [[ "${ADDITIONAL_SUBNETS_COUNT}" -gt 0 ]]; then
   aws_add_param_to_json "AdditionalSubnetsCount" ${ADDITIONAL_SUBNETS_COUNT} "$vpc_params"
+fi
+
+# Enable support for AWS EFS CSI driver in single-zone, cross-account configuration.
+# This condition is used by the chain: storage-conf-csi-optional-aws-efs-cross-account.
+# It ensures that both the cluster and the shared VPC subnet are in the same availability zone.
+if [[ ${EFS_ENABLE_SINGLE_ZONE} == "true" ]] && [[ "${ZONES_COUNT}" -eq 1 ]]; then
+  if [[ -s "${SHARED_DIR}/install-config.yaml" ]]; then
+    ZONES_LIST="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'controlPlane.platform.aws.zones[0]' 2>/dev/null)"
+    echo "Getting single zone ZONES_LIST=\"${ZONES_LIST}\" from install-config"
+  fi
 fi
 
 if [[ ${ZONES_LIST} != "" ]]; then

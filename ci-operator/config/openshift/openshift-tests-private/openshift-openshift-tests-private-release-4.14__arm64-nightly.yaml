@@ -370,6 +370,7 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
@@ -462,7 +463,8 @@ tests:
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: baremetalds-ipi-ovn-ipv4-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 56 19 27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -471,11 +473,14 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
+      PACKET_METRO: dc
+      PACKET_PLAN: c3.large.arm64
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-equinix
 - as: baremetalds-ipi-ovn-ipv4-f28-destructive
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 41 21 15 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -484,9 +489,11 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
+      PACKET_METRO: dc
+      PACKET_PLAN: c3.large.arm64
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-equinix
 - as: baremetal-compact-agent-ipv4-dynamic-connected-f28
   capabilities:
   - intranet
@@ -683,6 +690,7 @@ tests:
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
