@@ -49,6 +49,28 @@ if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
     attempt=1
     sleep_interval=10  # Seconds between attempts
 
+    # First, expect IDRAC to become unreachable during reset
+    echo "Expecting IDRAC for server $i to become unreachable during reset..."
+    unreachable_attempts=1
+    max_unreachable_attempts=10
+
+    while [ $unreachable_attempts -lt $max_unreachable_attempts ]; do
+      echo "Attempt $unreachable_attempts/$max_unreachable_attempts for server $i"
+      if [[ "$(podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state --output json 2>&1  | jq -r '.error' 2>/dev/null)" == "true" ]]; then
+        echo "✓ IDRAC for server $i became unreachable after reset"
+        break
+      else
+        echo "IDRAC for server $i is still reachable, waiting..."
+        sleep 5
+        ((unreachable_attempts+=1))
+      fi
+    done
+
+    if [ $unreachable_attempts -eq $max_unreachable_attempts ]; then
+      echo "Warning: IDRAC for server $i did not become unreachable during reset"
+    fi
+
+    # Now wait for IDRAC to become ready again
     while [ $attempt -le $max_attempts ]; do
       echo "Attempt $attempt/$max_attempts for server $i"
 
