@@ -101,6 +101,34 @@ elif [ "$platform" = "None" ] || [ "$platform" = "bm" ] || [ "$platform" = "bare
                 # shellcheck disable=SC2154
                 export NODE_NAME="${target_node}"
                 
+                # Install ipmitool if not available (required for baremetal operations)
+                if ! command -v ipmitool >/dev/null 2>&1; then
+                    echo "Installing ipmitool for baremetal operations..."
+                    if command -v yum >/dev/null 2>&1; then
+                        yum install -y OpenIPMI-tools || {
+                            echo "ERROR: Failed to install OpenIPMI-tools via yum"
+                            exit 1
+                        }
+                    elif command -v apt-get >/dev/null 2>&1; then
+                        apt-get update && apt-get install -y ipmitool || {
+                            echo "ERROR: Failed to install ipmitool via apt-get"
+                            exit 1
+                        }
+                    elif command -v dnf >/dev/null 2>&1; then
+                        dnf install -y OpenIPMI-tools || {
+                            echo "ERROR: Failed to install OpenIPMI-tools via dnf"
+                            exit 1
+                        }
+                    else
+                        echo "ERROR: Cannot install ipmitool - no supported package manager found"
+                        echo "Supported package managers: yum, apt-get, dnf"
+                        exit 1
+                    fi
+                    echo "ipmitool installed successfully"
+                else
+                    echo "ipmitool already available"
+                fi
+                
                 break
             fi
         done
