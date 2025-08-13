@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+  openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.23-openshift-4.19
+    tag: rhel-8-release-golang-1.24-openshift-4.20
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -18,12 +18,18 @@ images:
       as:
       - $GO_RUNTIME
   to: knative-client-cli-artifacts
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal:latest
+  to: knative-client-client
 - dockerfile_path: openshift/ci-operator/knative-images/kn/Dockerfile
   inputs:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
       as:
       - $GO_BUILDER
   to: knative-client-kn
@@ -32,7 +38,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
       as:
       - $GO_BUILDER
   to: knative-client-test-grpc-ping
@@ -41,7 +47,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
       as:
       - $GO_BUILDER
   to: knative-client-test-helloworld
@@ -50,7 +56,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
       as:
       - $GO_BUILDER
   to: knative-client-test-servingcontainer
@@ -59,7 +65,7 @@ images:
     ocp_ubi-minimal_8:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
       as:
       - $GO_BUILDER
   to: knative-client-test-sidecarcontainer
@@ -70,30 +76,31 @@ promotion:
   to:
   - additional_images:
       client-src: src
+    name: knative-v1.19
     namespace: openshift
-    tag: knative-v1.17
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.20"
+    release:
+      channel: fast
+      version: "4.19"
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1Gi
 tests:
-- always_run: false
-  as: test-e2e
+- as: test-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.19"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -140,13 +147,14 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
       commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
         make test-e2e
       dependencies:
+      - env: KNATIVE_CLIENT_CLIENT
+        name: knative-client-client
       - env: KNATIVE_CLIENT_TEST_GRPC_PING
         name: knative-client-test-grpc-ping
       - env: KNATIVE_CLIENT_TEST_HELLOWORLD
@@ -162,10 +170,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
   timeout: 5h0m0s
 zz_generated_metadata:
-  branch: release-v1.17
+  branch: release-v1.19
   org: openshift-knative
   repo: client
-  variant: "420"
+  variant: "419"
