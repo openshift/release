@@ -9,6 +9,14 @@ CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
 CONSOLE_CLIENT_SECRET="$(</var/run/hypershift-ext-oidc-app-console/client-secret)"
 CONSOLE_CLIENT_SECRET_NAME=authid-console-openshift-console
 
+HOSTED_CLUSTER_RELEASE=$(yq-v4 'select(.kind == "HostedCluster") | .spec.release.image' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
+HOSTED_CLUSTER_NAME=$(yq-v4 'select(.kind == "HostedCluster") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
+yq-v4 "select(.metadata.name == \"$HOSTED_CLUSTER_NAME-pull-secret\") | .data.\".dockerconfigjson\"" "${SHARED_DIR}"/hypershift_create_cluster_render.yaml | base64 -d > /tmp/hosted_cluster_pull_secret
+HOSTED_CLUSTER_VERSION=$(oc image info -a /tmp/hosted_cluster_pull_secret $HOSTED_CLUSTER_RELEASE | grep -o 'io.openshift.release=.*' | grep -Eo '=4\.[0-9]+' | grep -Eo '[^=]+')
+echo "$HOSTED_CLUSTER_VERSION" > "${SHARED_DIR}"/hosted_cluster_version
+echo "The hosted cluster minor version is: $HOSTED_CLUSTER_VERSION"
+rm -f /tmp/hosted_cluster_pull_secret
+
 # Generate the main part of the patch.yaml
 # Note, the value examples (e.g. extra's values) in this patch.yaml may be tested and referenced otherwhere.
 # So, when modifying them, search and modify otherwhere too
@@ -78,14 +86,6 @@ yq-v4 'select(.kind == "HostedCluster") *= load("/tmp/patch.yaml")' "${SHARED_DI
 
 echo "Applying patched artifacts"
 oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render_ext_oidc_enabled.yaml
-
-HOSTED_CLUSTER_RELEASE=$(yq-v4 'select(.kind == "HostedCluster") | .spec.release.image' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
-HOSTED_CLUSTER_NAME=$(yq-v4 'select(.kind == "HostedCluster") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
-yq-v4 "select(.metadata.name == \"$HOSTED_CLUSTER_NAME-pull-secret\") | .data.\".dockerconfigjson\"" "${SHARED_DIR}"/hypershift_create_cluster_render.yaml | base64 -d > /tmp/hosted_cluster_pull_secret
-HOSTED_CLUSTER_VERSION=$(oc image info -a /tmp/hosted_cluster_pull_secret $HOSTED_CLUSTER_RELEASE | grep -o 'io.openshift.release=.*' | grep -Eo '=4\.[0-9]+' | grep -Eo '[^=]+')
-echo "$HOSTED_CLUSTER_VERSION" > "${SHARED_DIR}"/hosted_cluster_version
-echo "The hosted cluster minor version is: $HOSTED_CLUSTER_VERSION"
-rm -f /tmp/hosted_cluster_pull_secret
 
 # TODO: Remove this conditional when OCPBUGS-57736 is backported to 4.19.
 if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") == "1"  ]]; then
