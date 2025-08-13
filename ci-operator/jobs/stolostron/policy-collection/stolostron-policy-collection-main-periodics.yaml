@@ -87,8 +87,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere02
-  cron: 0 0 1,15 * *
+  cluster: build01
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -98,24 +98,13 @@ periodics:
     org: stolostron
     repo: policy-collection
   labels:
-    ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-    ci-operator.openshift.io/variant: ocp4.19
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: ocp4.20
     ci.openshift.io/generator: prowgen
-    job-release: "4.19"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stolostron-policy-collection-main-ocp4.19-interop-opp-vsphere
-  reporter_config:
-    slack:
-      channel: '#opp-discussion'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-stolostron-policy-collection-main-ocp4.20-interop-opp-aws
   spec:
     containers:
     - args:
@@ -124,8 +113,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=interop-opp-vsphere
-      - --variant=ocp4.19
+      - --target=interop-opp-aws
+      - --variant=ocp4.20
       command:
       - ci-operator
       image: ci-operator:latest
@@ -174,8 +163,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 0 23 31 2 *
+  cluster: vsphere02
+  cron: 0 0 1,15 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -185,13 +174,13 @@ periodics:
     org: stolostron
     repo: policy-collection
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
     ci-operator.openshift.io/variant: ocp4.20
     ci.openshift.io/generator: prowgen
     job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stolostron-policy-collection-main-ocp4.20-interop-opp-aws
+  name: periodic-ci-stolostron-policy-collection-main-ocp4.20-interop-opp-vsphere
   spec:
     containers:
     - args:
@@ -200,7 +189,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=interop-opp-aws
+      - --target=interop-opp-vsphere
       - --variant=ocp4.20
       command:
       - ci-operator
