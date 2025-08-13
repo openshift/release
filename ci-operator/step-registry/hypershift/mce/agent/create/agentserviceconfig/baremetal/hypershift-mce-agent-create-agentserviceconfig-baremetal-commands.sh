@@ -6,7 +6,7 @@ set -o pipefail
 set -E
 
 export PATH=${PATH}:/cli
-gnu_architecture=$(sed 's/amd64/x86_64/' <<< "${architecture:-amd64}")
+gnu_architecture=$(sed 's/amd64/x86_64/' <<< "${agent_architecture:-amd64}")
 
 pushd deploy/operator
 
