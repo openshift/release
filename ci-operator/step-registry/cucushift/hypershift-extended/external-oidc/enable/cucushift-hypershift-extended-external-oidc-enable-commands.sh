@@ -96,11 +96,11 @@ rm -f /tmp/hosted_cluster_pull_secret
 # fi
 
 if [ "${HYPERSHIFT_MANAGED_SERVICE:-}" = "ARO-HCP" ] && [ "$(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}")" = "1" ]; then
-  echo "Creating an empty secret for the console client"
-  # The secret will be populated by the day2 operator in the hosted cluster.
-  oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters
-  oc annotate secret "$CONSOLE_CLIENT_SECRET_NAME" -n clusters hypershift.openshift.io/hosted-cluster-sourced=true
+    echo "Creating an empty secret for the console client"
+    # The secret will be populated by the day2 operator in the hosted cluster.
+    oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters
+    oc annotate secret "$CONSOLE_CLIENT_SECRET_NAME" -n clusters hypershift.openshift.io/hosted-cluster-sourced=true
 else
-  echo "Creating the console client secret"
-  oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
+    echo "Creating the console client secret"
+    oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
 fi
