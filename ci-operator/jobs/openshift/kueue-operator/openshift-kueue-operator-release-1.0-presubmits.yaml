@@ -10,7 +10,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-fips-image-scan-kueue-operator
     rerun_command: /test fips-image-scan-kueue-operator
@@ -72,7 +71,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-images
     rerun_command: /test images
@@ -126,7 +124,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-lint
     rerun_command: /test lint
@@ -180,7 +177,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-security
     optional: true
@@ -243,7 +239,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-test
     rerun_command: /test test
@@ -297,7 +292,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-test-e2e-4-17
     optional: true
@@ -366,7 +360,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-test-e2e-4-18
     rerun_command: /test test-e2e-4-18
@@ -434,7 +427,6 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-test-e2e-4-19
     rerun_command: /test test-e2e-4-19
@@ -498,11 +490,82 @@ presubmits:
     - ^release-1\.0$
     - ^release-1\.0-
     cluster: build07
+    context: ci/prow/test-e2e-4-19-hypershift
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kueue-operator-release-1.0-test-e2e-4-19-hypershift
+    rerun_command: /test test-e2e-4-19-hypershift
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-e2e-4-19-hypershift
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )test-e2e-4-19-hypershift,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-1\.0$
+    - ^release-1\.0-
+    cluster: build07
     context: ci/prow/test-generate
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kueue-operator-release-1.0-test-generate
     rerun_command: /test test-generate
