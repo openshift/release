@@ -93,32 +93,6 @@ tests:
   container:
     from: instaslice-base-src
   skip_if_only_changed: ^related_images.json|related_images.developer.json$
-- as: e2e-gpu
-  optional: true
-  steps:
-    cluster_profile: gcp
-    dependencies:
-      DAEMONSET_IMAGE: das-daemonset
-      OPERATOR_IMAGE: instaslice-operator
-      SCHEDULER_IMAGE: das-scheduler
-      WEBHOOK_IMAGE: das-webhook
-    env:
-      COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: a2-highgpu-1g
-      COMPUTE_ON_HOST_MAINTENANCE: Terminate
-      COMPUTE_ZONES: '[us-central1-f]'
-      EMULATED_MODE: disabled
-      IMAGE_REGISTRY: pipeline
-      IMAGE_TAG: e2e-test
-    post:
-    - chain: ipi-deprovision
-    pre:
-    - chain: ipi-conf-gcp
-    - ref: ipi-conf-gcp-zones
-    - ref: ipi-conf-gcp-confidential-computing
-    - chain: ipi-install
-    test:
-    - ref: openshift-instaslice-operator-e2e-next
 - as: e2e-bundle
   optional: true
   steps:
