@@ -23,8 +23,7 @@ PODMAN_AUTH_PATH="$(cat /var/run/${TEST_PROJECT}/slcm-container/PODMAN_AUTH_PATH
 VAULT_PASSWORD=$(cat /var/run/${TEST_PROJECT}/slcm-container/VAULT_PASSWORD)
 ECO_GOTESTS_CONTAINER="$(cat /var/run/${TEST_PROJECT}/slcm-container/ECO_GOTESTS_CONTAINER)"
 ECO_VALIDATION_CONTAINER="$(cat /var/run/${TEST_PROJECT}/slcm-container/ECO_VALIDATION_CONTAINER)"
-TB1SLCM1="$(cat /var/run/${TEST_PROJECT}/slcm-container/tb1slcm1)"
-TB2SLCM1="$(cat /var/run/${TEST_PROJECT}/slcm-container/tb2slcm1)"
+S614="$(cat /var/run/${TEST_PROJECT}/slcm-container/s614)"
 SKIP_DCI="$(cat /var/run/${TEST_PROJECT}/slcm-container/SKIP_DCI)"
 STAMP="$(cat /var/run/${TEST_PROJECT}/slcm-container/STAMP)"
 LATENCY_DURATION="$(cat /var/run/${TEST_PROJECT}/slcm-container/LATENCY_DURATION)"
@@ -84,7 +83,7 @@ copy_junit_files() {
     
     echo "Testing connectivity from jump server to target..."
     if ! ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} -o ConnectTimeout=10 ${REMOTE_USER}@${TB2SLCM1} 'echo Connection successful'"; then
+        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} -o ConnectTimeout=10 ${REMOTE_USER}@${S614} 'echo Connection successful'"; then
         echo "ERROR: Cannot reach target server from jump server"
         return 1
     fi
@@ -100,7 +99,7 @@ copy_junit_files() {
     # Check and list files on target server
     echo "Checking for XML files on target server..."
     target_files=$(ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TB2SLCM1} 'ls -la ${REMOTE_JUNIT_DIR}/*.xml 2>/dev/null'" || echo "")
+        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${S614} 'ls -la ${REMOTE_JUNIT_DIR}/*.xml 2>/dev/null'" || echo "")
     
     file_count=$(echo "$target_files" | grep -c "\.xml$" || echo "0")
     
@@ -108,7 +107,7 @@ copy_junit_files() {
         echo "Found $file_count XML files on target server:"
         echo "$target_files"
         ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-            "scp -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TB2SLCM1}:${REMOTE_JUNIT_DIR}/*.xml ${JUMP_TEMP_DIR}/"
+            "scp -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${S614}:${REMOTE_JUNIT_DIR}/*.xml ${JUMP_TEMP_DIR}/"
         
         # Verify copy to jump server and list files
         jump_files=$(ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
@@ -145,7 +144,7 @@ copy_junit_files() {
             # Cleanup remote directory on target server after successful copy
             echo "=== Cleanup: Removing remote directory on target server ==="
             ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-                "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TB2SLCM1} 'rm -rf ${REMOTE_JUNIT_DIR}'" && \
+                "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${S614} 'rm -rf ${REMOTE_JUNIT_DIR}'" && \
                 echo "Successfully removed ${REMOTE_JUNIT_DIR} from target server" || \
                 echo "WARNING: Could not remove ${REMOTE_JUNIT_DIR} from target server"
         else
@@ -208,8 +207,8 @@ all:
           tun_name: "${IFNAME}"
     targets:
       hosts:
-        "${TB2SLCM1}":
-          ansible_host: "${TB2SLCM1}"
+        "${S614}":
+          ansible_host: "${S614}"
           ansible_ssh_common_args: >-
             -i "${SSH_KEY}" ${SSHOPTS[*]}
             -o ProxyCommand="ssh -W %h:%p ${SSHOPTS[*]} -i "${SSH_KEY}" -q ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}"
@@ -242,8 +241,7 @@ EDU_PTP: "${EDU_PTP}"
 COPY_TO_PROW: "${COPY_TO_PROW}"
 PROW_JUNIT_TEMP_DIR: "/tmp/prow_pipeline_${BUILD_ID}"
 infra_hosts:
-  tb1slcm1: "${TB1SLCM1}"
-  tb2slcm1: "${TB2SLCM1}"
+  s614: "${S614}"
 END_VARS
 
 ansible-galaxy collection install ansible.posix
