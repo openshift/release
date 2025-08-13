@@ -26,14 +26,23 @@ spec:
             prefixPolicy: Prefix
             prefix:
               prefixString: 'oidc-user-test:'
-          # TODO: Uncomment this when OCPBUGS-57736 is fixed.
-          # extra:
-          # - key: extratest.openshift.com/bar
-          #   valueExpression: '"extra-test-mark"'
-          # - key: extratest.openshift.com/foo
-          #   valueExpression: claims.email
-          # uid:
-          #   expression: '"testuid-" + claims.sub + "-uidtest"'
+EOF
+
+# TODO: Remove this conditional when OCPBUGS-57736 is backported to 4.19.
+if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") == "1"  ]]; then
+    echo "Appending the extra and uid settings ..."
+    cat <<EOF >> /tmp/patch.yaml
+          extra:
+          - key: extratest.openshift.com/bar
+            valueExpression: '"extra-test-mark"'
+          - key: extratest.openshift.com/foo
+            valueExpression: claims.email
+          uid:
+            expression: '"testuid-" + claims.sub + "-uidtest"'
+EOF
+fi
+
+cat <<EOF >> /tmp/patch.yaml
         issuer:
           audiences:
           - ${CLI_CLIENT_ID}
@@ -78,22 +87,24 @@ echo "$HOSTED_CLUSTER_VERSION" > "${SHARED_DIR}"/hosted_cluster_version
 echo "The hosted cluster minor version is: $HOSTED_CLUSTER_VERSION"
 rm -f /tmp/hosted_cluster_pull_secret
 
-# TODO: Uncomment this when OCPBUGS-57736 is fixed.
-# echo "Checking External OIDC uid and extra settings ..."
-# echo "First, checking ExternalOIDCWithUIDAndExtraClaimMappings featuregate ..."
-# if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.18)}") == "1"  ]]; then
-#     # Once the ExternalOIDCWithUIDAndExtraClaimMappings feature PRs are merged and backported to 4.18, remove the `curl` line
-#     if curl -sS https://raw.githubusercontent.com/openshift/api/refs/heads/release-"$HOSTED_CLUSTER_VERSION"/payload-manifests/featuregates/featureGate-Hypershift-Default.yaml | yq-v4 '.status.featureGates[].enabled' | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
-#         CREATED_CLAIM_MAPPINGS=$(oc get hc/"$HOSTED_CLUSTER_NAME" -o jsonpath='{.spec.configuration.authentication.oidcProviders[*].claimMappings}')
-#         if jq '.uid' <<< "$CREATED_CLAIM_MAPPINGS" | grep -q testuid && jq -c '.extra' <<< "$CREATED_CLAIM_MAPPINGS" | grep -q 'bar.*foo'; then
-#             echo "HostedCluster: External OIDC uid and extra settings are honored."
-#         else
-#             echo "$CREATED_CLAIM_MAPPINGS"
-#             echo "HostedCluster: External OIDC uid and extra settings are not honored!"
-#             exit 1
-#         fi
-#     fi
-# fi
+# TODO: Remove this conditional when OCPBUGS-57736 is backported to 4.19.
+if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") == "1"  ]]; then
+    echo "Checking External OIDC uid and extra settings ..."
+    echo "First, checking ExternalOIDCWithUIDAndExtraClaimMappings featuregate ..."
+    if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.18)}") == "1"  ]]; then
+        # Once the ExternalOIDCWithUIDAndExtraClaimMappings feature PRs are merged and backported to 4.18, remove the `curl` line
+        if curl -sS https://raw.githubusercontent.com/openshift/api/refs/heads/release-"$HOSTED_CLUSTER_VERSION"/payload-manifests/featuregates/featureGate-Hypershift-Default.yaml | yq-v4 '.status.featureGates[].enabled' | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
+            CREATED_CLAIM_MAPPINGS=$(oc get hc/"$HOSTED_CLUSTER_NAME" -o jsonpath='{.spec.configuration.authentication.oidcProviders[*].claimMappings}')
+            if jq '.uid' <<< "$CREATED_CLAIM_MAPPINGS" | grep -q testuid && jq -c '.extra' <<< "$CREATED_CLAIM_MAPPINGS" | grep -q 'bar.*foo'; then
+                echo "HostedCluster: External OIDC uid and extra settings are honored."
+            else
+                echo "$CREATED_CLAIM_MAPPINGS"
+                echo "HostedCluster: External OIDC uid and extra settings are not honored!"
+                exit 1
+            fi
+        fi
+    fi
+fi
 
 if [ "${HYPERSHIFT_MANAGED_SERVICE:-}" = "ARO-HCP" ] && [ "$(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}")" = "1" ]; then
     echo "Creating an empty secret for the console client"
