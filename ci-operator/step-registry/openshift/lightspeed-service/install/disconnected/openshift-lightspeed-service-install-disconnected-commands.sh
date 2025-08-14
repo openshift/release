@@ -7,7 +7,7 @@ set -o pipefail
 # Set XDG_RUNTIME_DIR/containers to be used by oc mirror
 export HOME=/tmp/home
 export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman
+#export REGISTRY_AUTH_PREFERENCE=podman
 mkdir -p "${XDG_RUNTIME_DIR}/containers"
 cd "$HOME" || exit 1
 
@@ -96,11 +96,11 @@ function mirror_catalog_icsp() {
     echo $MIRROR_REGISTRY_HOST
     if [[ $ret -eq 0 ]]; then 
         jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
-      export REG_CREDS=${XDG_RUNTIME_DIR}/containers/auth.json
     else
         echo "!!! fail to extract the auth of the cluster"
         return 1
     fi
+    export REG_CREDS=${XDG_RUNTIME_DIR}/containers/auth.json
 
 # prepare ImageSetConfiguration
 run_command "mkdir /tmp/images"
@@ -128,8 +128,8 @@ EOF
     # run_command "oc image mirror -a ${REG_CREDS} -f mapping.txt --insecure --filter-by-os='.*'"
 
     # print and apply generated ICSP and catalog source
-    run_command "cat oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4.17.yaml"
-    run_command "cat oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml*"
+    run_command "cat oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4-17.yaml"
+    run_command "cat oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml"
     # Applying the catalogsource and imagedigestmirrorset but avoiding applying clustercatalog
     run_command "oc apply -f ./oc-mirror-workspace/working-dir/cluster-resources/cs-redhat-operator-index-v4-17.yaml"
     run_command "oc apply -f ./oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml"
@@ -164,6 +164,149 @@ EOF
       return 1
     }
     return 0
+
+    # Install ollama
+    run_command "podman login ${MIRROR_REGISTRY_HOST} --tls-verify=false"
+    
+    
+    cat <<EOF > Dockerfile.ollama-gemma3
+FROM ollama/ollama:latest
+
+# Pull the gemma3:1b model at build time
+RUN ollama pull gemma3:1b
+
+# Start ollama serve in the background, then preload the model so it's ready for queries
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["ollama serve & sleep 5 && ollama run gemma3:1b || true && tail -f /dev/null"]
+EOF
+
+    run_command "podman build -t ${MIRROR_REGISTRY_HOST}/ollama/gemma3:1b -f Dockerfile.ollama-gemma3"
+    run_command "podman push ${MIRROR_REGISTRY_HOST}/ollama/gemma3:1b --tls-verify=false"
+
+    # Deploy ollama to OpenShift cluster
+    run_command "oc create namespace ollama --dry-run=client -o yaml | oc apply -f -"
+    # Create a Deployment for ollama
+    cat <<EOF | oc apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ${MIRROR_REGISTRY_HOST}/ollama/gemma3:1b
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /.ollama
+        ports:
+        - containerPort: 11434
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
+        env:
+        - name: OLLAMA_HOST
+          value: "0.0.0.0"
+        - name: OLLAMA_ORIGINS
+          value: "*"
+      volumes:
+        - name: ollama-data
+          emptyDir: {}
+        - name: ollama-models
+          value: "/opt/ollama-models"
+EOF
+
+    # Create a Service to expose ollama internally
+    cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+  - protocol: TCP
+    port: 11434
+    targetPort: 11434
+  type: ClusterIP
+EOF
+
+    cat <<EOF | oc apply -f -
+apiVersion: v1
+stringData:
+  apitoken: bla
+kind: Secret
+metadata:
+  labels:
+    app: openshift-lightspeed
+    app.kubernetes.io/component: lightspeed-w-rag
+    app.kubernetes.io/instance: lightspeed-w-rag
+    app.kubernetes.io/name: lightspeed-w-rag
+    app.kubernetes.io/part-of: lightspeed-w-rag-app
+  name: ollama-creds
+  namespace: openshift-lightspeed
+type: Opaque
+EOF
+
+    cat <<EOF | oc apply -f -
+apiVersion: ols.openshift.io/v1alpha1
+kind: OLSConfig
+metadata:
+  name: cluster
+  labels:
+    app.kubernetes.io/created-by: lightspeed-operator
+    app.kubernetes.io/instance: olsconfig-sample
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: olsconfig
+    app.kubernetes.io/part-of: lightspeed-operator
+spec:
+  llm:
+    providers:
+      - credentialsSecretRef:
+          name: ollama-creds
+        models:
+          - name: gemma3:1b
+        name: ollama
+        type: openai
+        url: http://ollama-service.ollama.svc.cluster.local:11434/v1
+  ols:
+    defaultModel: gemma3:1b
+    defaultProvider: ollama
+    deployment:
+      replicas: 1
+    logLevel: DEBUG
+    queryFilters:
+      - name: foo_filter
+        pattern: '\b(?:foo)\b'
+        replaceWith: "deployment"
+      - name: bar_filter
+        pattern: '\b(?:bar)\b'
+        replaceWith: "openshift"
+EOF
+
+    # Wait for the deployment to be ready
+    run_command "oc rollout status deployment/ollama -n ollama --timeout=300s"
+    
+    echo "Ollama is accessible at: http://ollama-service.ollama.svc.cluster.local:11434/v1"
+    
+    # Test the connection
+    run_command "oc get pods -n ollama"
+    run_command "oc get svc -n ollama"
 
 }
 
