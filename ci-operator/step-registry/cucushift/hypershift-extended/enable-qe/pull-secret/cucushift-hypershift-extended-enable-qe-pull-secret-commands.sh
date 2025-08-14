@@ -54,7 +54,7 @@ function check_update_pullsecret() {
     IFS="," read -r -a workers_arr <<< "$workers"
     COUNT=${#workers_arr[*]}
 
-    for worker in ${workers_arr[*]}; do
+    for worker in "${workers_arr[@]}"; do
         count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c quay.io/openshifttest || true)
         if [ $count -gt 0 ] ; then
             UPDATED_COUNT=$((UPDATED_COUNT + 1))
@@ -122,7 +122,7 @@ for i in $(seq ${RETRIES}); do
   workers=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{","}{end}')
   IFS="," read -r -a workers_arr <<< "$workers"
   COUNT=${#workers_arr[*]}
-  for worker in ${workers_arr[*]}
+  for worker in "${workers_arr[@]}"
   do
   count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c quay.io/openshifttest || true)
   if [ $count -gt 0 ] ; then
