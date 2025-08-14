@@ -37,29 +37,27 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
-CP_DISKS=""
-W_DISKS=""
 
 set +o errexit
-# release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
+# release-controller always expose RELEASE_IMAGE_LATEST when job configuration defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
 # but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with
 # user specified image pullspec, to avoid auth error when accessing it, always use build farm
 # registry pullspec.
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
-# release:initial image, once that, use 'oc get istag release:inital' to workaround it.
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuration defines
+# release:initial image, once that, use 'oc get istag release:initial' to workaround it.
 echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
 if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
     tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
-    echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+    echo "Getting initial release image from RELEASE_IMAGE_INITIAL..."
 elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
     tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
-    echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+    echo "Getting initial release image from build farm imagestream: ${tmp_release_image_initial}"
 fi
 # For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
-# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
+# RELEASE_IMAGE_LATEST are pointed to different images, RELEASE_IMAGE_INITIAL has
 # higher priority than RELEASE_IMAGE_LATEST
 TESTING_RELEASE_IMAGE=""
 if [[ -n ${tmp_release_image_initial:-} ]]; then
@@ -129,10 +127,24 @@ else
   echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
 fi
 
+# Creating platform config for 4.12+
+# Add node resource configs
+SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
+CP_PLATFORM="platform:
+    vsphere:
+      cpus: $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
+      coresPerSocket: $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
+      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})"
+W_PLATFORM="platform:
+    vsphere:
+      cpus: $(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
+      coresPerSocket: $(jq -r '.spec.compute.coresPerSocket' ${SPEC_CONFIG})
+      memoryMB: $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})"
+
+# Add additional disks
 if [ -n "${ADDITIONAL_DISK}" ]; then
   echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
-  CP_DISKS="platform:
-    vsphere:
+  CP_PLATFORM="
       dataDisks:
       - sizeGiB: 10
         name: Disk1
@@ -140,14 +152,13 @@ if [ -n "${ADDITIONAL_DISK}" ]; then
       - sizeGiB: 50
         name: Disk2
         provisioningMode: Thin"
-  W_DISKS="platform:
-    vsphere:
+  W_PLATFORM="
       dataDisks:
       - sizeGiB: 50
         name: Disk1"
   if [ "${DISK_SETUP}" == "true" ]; then
     echo "$(date -u --rfc-3339=seconds) - configuring disk setup"
-    CP_DISKS="${CP_DISKS}
+    CP_PLATFORM="${CP_PLATFORM}
   diskSetup:
   - type: etcd
     etcd:
@@ -156,7 +167,7 @@ if [ -n "${ADDITIONAL_DISK}" ]; then
     userDefined:
       platformDiskID: Disk2
       mountPath: /var/lib/containers"
-    W_DISKS="${W_DISKS}
+    W_PLATFORM="${W_PLATFORM}
   diskSetup:
   - type: user-defined
     userDefined:
@@ -191,11 +202,11 @@ else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
-  ${CP_DISKS}
+  ${CP_PLATFORM}
 compute:
 - name: worker
   replicas: ${COMPUTE_NODE_REPLICAS}
-  ${W_DISKS}"
+  ${W_PLATFORM}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
