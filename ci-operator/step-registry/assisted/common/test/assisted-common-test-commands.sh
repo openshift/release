@@ -6,11 +6,11 @@ set -o pipefail
 
 echo "************ assisted common test command ************"
 
-timeout -s 9 175m ssh -F ${SHARED_DIR}/ssh_config ci_machine bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+timeout -s 9 300m ssh -F ${SHARED_DIR}/ssh_config ci_machine bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 set -euo pipefail
 source /root/config.sh
 
 set -x
 cd /home/assisted
-make \${MAKEFILE_TARGET:-test_parallel}
+make \${MAKEFILE_TARGET:-test_parallel} || (sleep 4h ; false)
 EOF
