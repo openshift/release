@@ -221,7 +221,7 @@ EOF
     local -i counter=0
     local status=""
     while [ $counter -lt 600 ]; do
-      counter+=20
+      ((counter+=20))
       echo "waiting ${counter}s"
       sleep 20
       status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
@@ -252,7 +252,7 @@ EOF
     local -i counter=0
     local status=""
     while [ $counter -lt 600 ]; do
-      counter+=20
+      ((counter+=20))
       echo "waiting ${counter}s"
       sleep 20
       status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
@@ -283,7 +283,7 @@ EOF
     local -i counter=0
     local status=""
     while [ $counter -lt 600 ]; do
-      counter+=20
+	  ((counter+=20))
       echo "waiting ${counter}s"
       sleep 20
       status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
