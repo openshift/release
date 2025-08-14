@@ -64,7 +64,7 @@ if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
   cat <<EOF >>/tmp/all.yml
 hybrid_worker_count: $NUM_HYBRID_WORKER_NODES
 hv_ip_offset: 0
-hv_vm_ip_offset: 36
+hv_vm_ip_offset: 30
 hv_inventory: true
 compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0

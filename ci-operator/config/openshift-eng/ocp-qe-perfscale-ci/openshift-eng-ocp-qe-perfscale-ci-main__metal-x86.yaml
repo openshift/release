@@ -273,6 +273,37 @@ tests:
     - ref: openshift-qe-installer-bm-prereqs
     - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-cluster-health
+- always_run: false
+  as: deploy-mno-hybrid-120nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      JETLAG_PR: "682"
+      NUM_HYBRID_WORKER_NODES: "115"
+      NUM_NODES: "4"
+      NUM_WORKER_NODES: "2"
+      STARTING_NODE: "6"
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-foreman
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
+    - chain: openshift-qe-node-density-heavy
+- always_run: false
+  as: test-mno-hybrid-120nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    test:
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - chain: openshift-qe-node-density-heavy
 zz_generated_metadata:
   branch: main
   org: openshift-eng
