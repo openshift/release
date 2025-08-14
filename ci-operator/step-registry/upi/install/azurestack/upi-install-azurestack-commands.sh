@@ -123,6 +123,9 @@ export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP_NAME")
 
+command -v az
+az version
+
 az group create --name "$RESOURCE_GROUP" --location "$LEASED_RESOURCE"
 
 KUBECONFIG="${dir}/auth/kubeconfig"
