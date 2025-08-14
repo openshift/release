@@ -711,6 +711,7 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
 fi
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.16.0-0.nightly-ppc64le-2025-09-15-034832"
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
@@ -765,6 +766,7 @@ grep tgName "${SHARED_DIR}/install-config.yaml" || true
 dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+ls -l "${SHARED_DIR}/install-config.yaml" || true
 
 # Powervs requires config.json
 cat > "/tmp/powervs-config.json" << EOF
