@@ -13,6 +13,7 @@ set -x
 TEST_PROJECT="project-01"
 
 ## SLCM VARs
+ANSIBLE_SKIP_TAGS="$(cat /var/run/${TEST_PROJECT}/slcm-container/ANSIBLE_SKIP_TAGS)"
 DCI_REMOTE_CI="$(cat /var/run/${TEST_PROJECT}/slcm-container/DCI_REMOTE_CI)"
 CLOUD_RAN_PARTNER_REPO="$(cat /var/run/${TEST_PROJECT}/slcm-container/cloud_ran_partner_repo)"
 CLOUD_RAN_PARTNER_REPO_VERSION="$(cat /var/run/${TEST_PROJECT}/slcm-container/cloud_ran_partner_repo_version)"
@@ -240,9 +241,14 @@ DCI_PIPELINE_FILES: "${DCI_PIPELINE_FILES}"
 EDU_PTP: "${EDU_PTP}"
 COPY_TO_PROW: "${COPY_TO_PROW}"
 PROW_JUNIT_TEMP_DIR: "/tmp/prow_pipeline_${BUILD_ID}"
+ANSIBLE_SKIP_TAGS: "${ANSIBLE_SKIP_TAGS}"
 infra_hosts:
   s614: "${S614}"
 END_VARS
+
+# DEBUG issue with EDU_PTP
+scp -i "${SSH_KEY}" "${SSHOPTS[@]}" slcm_vars.yml ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}:/tmp/debug_edu_ptp_slcm_vars.yml
+# END DEBUG
 
 ansible-galaxy collection install ansible.posix
 
