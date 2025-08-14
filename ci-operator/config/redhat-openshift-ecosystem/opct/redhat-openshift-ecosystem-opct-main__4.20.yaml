@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.15"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
   vsphere-ci-python:
@@ -14,11 +14,19 @@ build_root:
     namespace: openshift
     tag: golang-1.23
 releases:
-  latest:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp
+  initial-minor:
     release:
-      architecture: amd64
       channel: fast
-      version: "4.15"
+      version: "4.19"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -32,24 +40,15 @@ resources:
       memory: 5Gi
 tests:
 - as: platform-external-vsphere
-  cron: 0 5 7,28 * 4
+  cron: 0 10 * * 0
   steps:
     cluster_profile: vsphere-elastic
     env:
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 6h0m0s
-- as: platform-external-vsphere-upgrade
-  cron: 0 15 7,28 * 4
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      OPCT_RUN_MODE: upgrade
-      UPGRADE_TO_CHANNEL_TYPE: candidate
-    workflow: opct-test-platform-external-vsphere
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem
   repo: opct
-  variant: "4.15"
+  variant: "4.20"
