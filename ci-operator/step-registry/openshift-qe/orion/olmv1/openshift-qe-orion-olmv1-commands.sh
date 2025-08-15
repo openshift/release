@@ -171,8 +171,31 @@ es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} 
 orion_exit_status=$?
 set -e
 
-if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
-  cp *.csv *.xml ${ARTIFACT_DIR}/
+if [[ "$OUTPUT_FORMAT" == "JUNIT" ]]; then
+  # Remove timestamps field since RP doesn't support it, 
+  # details: https://redhat-internal.slack.com/archives/CH76YSYSC/p1754418769901119?thread_ts=1754385612.115479&cid=CH76YSYSC
+  python3 <<'EOF'
+import xml.etree.ElementTree as ET
+
+file_path = "junit_olmv1-GCP.xml"
+
+try:
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    for testcase in root.findall('.//testcase'):
+        testcase.attrib.pop("timestamp", None)
+
+    tree.write(file_path, encoding='utf-8', xml_declaration=True)
+    print(f"Successfully removed timestamps and saved to {file_path}")
+
+except ET.ParseError as e:
+    print(f"Error parsing XML file: {e}")
+except IOError as e:
+    print(f"Error reading or writing file: {e}")
+EOF
+  mkdir -p "${ARTIFACT_DIR}"
+  cp *.csv *.xml ${ARTIFACT_DIR}/ 
 fi
 
 notify_slack_if_failure "junit_olmv1-GCP.xml"
