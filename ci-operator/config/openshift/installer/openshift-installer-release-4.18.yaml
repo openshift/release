@@ -336,6 +336,11 @@ tests:
     clone: true
     from: golangci-lint
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: shellcheck
+  commands: IS_CONTAINER=TRUE ./hack/shellcheck.sh
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
@@ -345,6 +350,11 @@ tests:
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
+- as: yaml-lint
+  commands: IS_CONTAINER=TRUE ./hack/yaml-lint.sh
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: e2e-aws-ovn
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^terraform/providers)|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
