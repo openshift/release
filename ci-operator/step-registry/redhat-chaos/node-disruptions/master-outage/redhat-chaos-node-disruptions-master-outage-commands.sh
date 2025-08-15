@@ -103,30 +103,51 @@ elif [ "$platform" = "None" ] || [ "$platform" = "bm" ] || [ "$platform" = "bare
                 
                 # Install ipmitool if not available (required for baremetal operations)
                 if ! command -v ipmitool >/dev/null 2>&1; then
-                    echo "Installing ipmitool for baremetal operations..."
-                    if command -v yum >/dev/null 2>&1; then
-                        yum install -y OpenIPMI-tools || {
-                            echo "ERROR: Failed to install OpenIPMI-tools via yum"
-                            exit 1
-                        }
-                    elif command -v apt-get >/dev/null 2>&1; then
-                        apt-get update && apt-get install -y ipmitool || {
-                            echo "ERROR: Failed to install ipmitool via apt-get"
-                            exit 1
-                        }
-                    elif command -v dnf >/dev/null 2>&1; then
-                        dnf install -y OpenIPMI-tools || {
-                            echo "ERROR: Failed to install OpenIPMI-tools via dnf"
-                            exit 1
-                        }
+                    # Check common locations where ipmitool might be installed
+                    if [ -f "/usr/bin/ipmitool" ]; then
+                        export PATH="/usr/bin:$PATH"
+                        echo "Found ipmitool in /usr/bin, added to PATH"
+                    elif [ -f "/usr/sbin/ipmitool" ]; then
+                        export PATH="/usr/sbin:$PATH"
+                        echo "Found ipmitool in /usr/sbin, added to PATH"
+                    elif [ -f "/opt/ipmitool/bin/ipmitool" ]; then
+                        export PATH="/opt/ipmitool/bin:$PATH"
+                        echo "Found ipmitool in /opt/ipmitool/bin, added to PATH"
                     else
-                        echo "ERROR: Cannot install ipmitool - no supported package manager found"
-                        echo "Supported package managers: yum, apt-get, dnf"
-                        exit 1
+                        echo "Installing ipmitool for baremetal operations..."
+                        if command -v yum >/dev/null 2>&1; then
+                            yum install -y OpenIPMI-tools || {
+                                echo "ERROR: Failed to install OpenIPMI-tools via yum"
+                                echo "WARNING: ipmitool not available - baremetal operations may fail"
+                                echo "Continuing anyway in case ipmitool is available elsewhere..."
+                            }
+                        elif command -v apt-get >/dev/null 2>&1; then
+                            apt-get update && apt-get install -y ipmitool || {
+                                echo "ERROR: Failed to install ipmitool via apt-get"
+                                echo "WARNING: ipmitool not available - baremetal operations may fail"
+                                echo "Continuing anyway in case ipmitool is available elsewhere..."
+                            }
+                        elif command -v dnf >/dev/null 2>&1; then
+                            dnf install -y OpenIPMI-tools || {
+                                echo "ERROR: Failed to install OpenIPMI-tools via dnf"
+                                echo "WARNING: ipmitool not available - baremetal operations may fail"
+                                echo "Continuing anyway in case ipmitool is available elsewhere..."
+                            }
+                        else
+                            echo "ERROR: Cannot install ipmitool - no supported package manager found"
+                            echo "Supported package managers: yum, apt-get, dnf"
+                            echo "WARNING: ipmitool not available - baremetal operations may fail"
+                            echo "Continuing anyway in case ipmitool is available elsewhere..."
+                        fi
                     fi
-                    echo "ipmitool installed successfully"
+                fi
+                
+                # Final check if ipmitool is available
+                if command -v ipmitool >/dev/null 2>&1; then
+                    echo "ipmitool is available and ready for baremetal operations"
                 else
-                    echo "ipmitool already available"
+                    echo "WARNING: ipmitool still not available after installation attempts"
+                    echo "Baremetal node operations may fail"
                 fi
                 
                 break
