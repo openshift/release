@@ -28,7 +28,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api")
     ;;
     esac
-    echo ${tp_operator[*]}
+    echo "${tp_operator[@]}"
 }
 
 # get prometheus object
@@ -92,7 +92,7 @@ function check_manifest_annotations(){
         return 1
     fi
     tp_operators=$(printf "%s " "${tp_operator[*]}")
-    for op_file in ${tp_op_filepaths[*]}; do
+    for op_file in "${tp_op_filepaths[@]}"; do
         op_name=$(yq e '.metadata.name' ${op_file})
         if [ -z "${op_name}" ] ; then
             echo "No metadata.name in manifest!"
@@ -386,7 +386,7 @@ function pre-OCP-47197(){
         echo "Fail to get tp operator list on ${src_ver}!"
         return 1
     fi
-    for tp_op in ${src_tp_op[*]}; do
+    for tp_op in "${src_tp_op[@]}"; do
         if ! check_tp_operator_notfound ${tp_op}; then
             return 1
         fi
@@ -397,7 +397,7 @@ function pre-OCP-47197(){
         echo "Fail to get tp operator list on ${tgt_ver}!"
         return 1
     fi
-    if ! check_manifest_annotations ${tgt_tp_op[*]}; then
+    if ! check_manifest_annotations "${tgt_tp_op[@]}"; then
         echo "Fail to check annotation in target manifest"
         return 1
     else
@@ -453,7 +453,7 @@ function pre-OCP-53907(){
         return 1
     fi
     bad_metadata="true"
-    for image in ${images[*]}; do
+    for image in "${images[@]}"; do
         if [[ "${image}" == "null" ]] ; then
             echo "No image info!"
             return 1
@@ -670,7 +670,7 @@ function pre-OCP-47160(){
         echo "Fail to get tp operator list on ${version}!"
         return 1
     fi
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if ! check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -702,7 +702,7 @@ function pre-OCP-47160(){
     fi
 
     echo "Check the techpreview operator is installed..."
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -772,7 +772,7 @@ function pre-OCP-47200(){
         done
     fi
 
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if ! check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -797,7 +797,7 @@ function pre-OCP-47200(){
     fi
 
     echo "Check the techpreview operator is not installed..."
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if ! check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -810,7 +810,7 @@ function pre-OCP-47200(){
 # Define if the specified case should be run or not
 function run_ota_multi_test(){
     caseset=(OCP-47197)
-    for case in ${caseset[*]}; do
+    for case in "${caseset[@]}"; do
         if ! type pre-"${case}" &>/dev/null; then
             echo "WARN: no pre-${case} function found"
         else

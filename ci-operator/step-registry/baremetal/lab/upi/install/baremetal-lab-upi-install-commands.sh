@@ -233,9 +233,15 @@ function update_sno_bip_live_iso {
   shim_arch=$(echo "$architecture" | sed 's/arm64/aa64/;s/amd64/x64/')
 
   b64_pre=$(jq -r '.storage.files[] | select( .path == "/usr/local/bin/install-to-disk.sh" ).contents.source' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign | cut -d"," -f2)
-  b64_new=$(echo "${b64_pre}" | base64 -d | \
-    sed -e 's/^\(.*coreos-installer install.*\)$/\1 --delete-karg console=ttyS0,115200n8 --append-karg console='"${CONSOLE}"' --insecure-ignition --copy-network\n  echo "Adding UEFI boot entry for Red Hat CoreOS"\n  efibootmgr -c -d '"${escaped_root_device}"' -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shim'"${shim_arch}"'.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | \
-    base64 -w0)
+  b64_new=$(echo "${b64_pre}" | base64 -d | sed -e '
+  s/^\(.*coreos-installer install.*\)$/\
+  if [ -e \/dev\/md126 ]; then mdadm --stop \/dev\/md126; fi\n \
+  if [ -e \/dev\/md127 ]; then mdadm --stop \/dev\/md127; fi\n \
+  for i in $(lsblk -I8,259 -nd --output name); do wipefs -a \/dev\/$i; done\n \
+  \1 --delete-karg console=ttyS0,115200n8 --console '"${CONSOLE}"' --insecure-ignition --copy-network\n \
+  echo "Adding UEFI boot entry for Red Hat CoreOS"\n \
+  efibootmgr -c -d '"${escaped_root_device}"' -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shim'"${shim_arch}"'.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | base64 -w0)
+
   sed -i -e 's/'"${b64_pre}"'/'"${b64_new}"'/g' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign
 
   mv ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign ${INSTALL_DIR}/bootstrap.ign
@@ -369,9 +375,8 @@ fi
 
 if [ "${BOOTSTRAP_IN_PLACE:-false}" != "true" ]; then
   destroy_bootstrap &
+  approve_csrs &
 fi
-
-approve_csrs &
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
