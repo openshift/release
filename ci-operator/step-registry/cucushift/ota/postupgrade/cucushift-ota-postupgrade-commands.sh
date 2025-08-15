@@ -28,7 +28,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api")
     ;;
     esac
-    echo ${tp_operator[*]}
+    echo "${tp_operator[@]}"
 }
 
 function check_tp_operator_notfound(){
@@ -165,7 +165,7 @@ function post-OCP-47197(){
         echo "Fail to get tp operator list on ${ver}!"
         return 1
     fi
-    for tp_op in ${tp_op[*]}; do
+    for tp_op in "${tp_op[@]}"; do
         if ! check_tp_operator_notfound ${tp_op}; then
             return 1
         fi
@@ -200,7 +200,7 @@ function post-OCP-53921(){
         echo "No image extracted from recommended update!"
         return 1
     fi
-    for image in ${images[*]}; do
+    for image in "${images[@]}"; do
         if [[ "${image}" == "null" ]] ; then
             echo "No image info!"
             return 1
@@ -296,7 +296,7 @@ function post-OCP-23799(){
 # Define if the specified case should be ran or not
 function run_ota_multi_test(){
     caseset=(OCP-47197)
-    for case in ${caseset[*]}; do
+    for case in "${caseset[@]}"; do
         if ! type post-"${case}" &>/dev/null; then
             echo "WARN: no post-${case} function found"
         else
