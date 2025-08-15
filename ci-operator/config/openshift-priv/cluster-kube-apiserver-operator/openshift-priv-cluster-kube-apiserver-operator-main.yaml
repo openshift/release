@@ -439,6 +439,19 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-cert-rotation-short-azure
   timeout: 8h0m0s
+- as: e2e-tests-extension
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary kube-apiserver-tests-ext"
+        make tests-ext-build
+        echo "Running ./kube-apiserver-tests-ext with sanity test"
+        ./kube-apiserver-tests-ext run-test -n "[Jira:KAS][sig-api-machinery] sanity test should always pass [Suite:openshift/cluster-kube-apiserver-operator/conformance/parallel]"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift-priv
