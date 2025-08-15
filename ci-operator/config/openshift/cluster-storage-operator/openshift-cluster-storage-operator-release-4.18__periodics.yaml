@@ -1,6 +1,6 @@
 base_images:
   cluster-storage-operator-test:
-    name: "4.20"
+    name: "4.18"
     namespace: ocp
     tag: cluster-storage-operator-test
 build_root:
@@ -10,12 +10,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.18"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -46,8 +46,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-csi
+- as: e2e-aws-group-snapshot-tp
+  interval: 8h
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --run=Driver:.csi-hostpath-groupsnapshot.*Feature:(volumegroupsnapshot|VolumeSnapshotDataSource)
+      TEST_SUITE: all
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.18
   org: openshift
   repo: cluster-storage-operator
   variant: periodics
