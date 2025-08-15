@@ -406,15 +406,19 @@ tests:
     - chain: cucushift-installer-check-cluster-health
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
+  as: aws-custom-dns
   optional: true
+  run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: openshift-e2e-aws-custom-dns
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
