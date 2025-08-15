@@ -14,10 +14,10 @@ then
   exit 0
 fi
 
-ALLOWED_REPOS=("openshift/openshift-tests-private"
-               "openshift/rosa"
-               "openshift/verification-tests"
-               "oadp-qe/oadp-qe-automation"
+ALLOWED_REPOS=('openshift/openshift-tests-private'
+               'openshift/rosa'
+               'openshift/verification-tests'
+               'oadp-qe/oadp-qe-automation'
               )
 org="$(jq -r 'if .extra_refs then .extra_refs[0].org
               elif .refs then .refs.org
@@ -34,8 +34,8 @@ then
     exit 0
 fi
 
-LOGS_PATH="logs"
-if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = "presubmit" ]]
+LOGS_PATH='logs'
+if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = 'presubmit' ]]
 then
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
@@ -60,12 +60,12 @@ DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configurati
                     end' <<< ${JOB_SPEC})"
 if [[ "$DECK_NAME" = 'test-platform-results' ]]
 then
-  PROWCI="https://prow.ci.openshift.org"
-  PROWWEB="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PROWCI='https://prow.ci.openshift.org'
+  PROWWEB='https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com'
 elif [[ "$DECK_NAME" = 'qe-private-deck' ]]
 then
-  PROWCI="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
-  PROWWEB="https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PROWCI='https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com'
+  PROWWEB='https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com'
 else
   echo "Unknow bucket name: $DECK_NAME"
   exit 3
@@ -81,7 +81,7 @@ function download_logs() {
   logfile_name="${ARTIFACT_DIR}/rsync.log"
   export PATH="$PATH:/opt/google-cloud-sdk/bin"
   gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private
-  gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml|build-log.txt|skip_overall_if_fail)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
+  gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
   gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
   #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
 }
