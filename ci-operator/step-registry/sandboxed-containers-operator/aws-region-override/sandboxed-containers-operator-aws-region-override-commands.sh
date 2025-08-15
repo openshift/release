@@ -4,9 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Assisted-by: Cursor AI
 echo "=========================================="
 echo "Sandboxed Containers Operator - AWS Region Override Step"
 echo "=========================================="
+
 
 # Validate that we have the necessary variables
 if [[ -z ${LEASED_RESOURCE:-} ]]; then
