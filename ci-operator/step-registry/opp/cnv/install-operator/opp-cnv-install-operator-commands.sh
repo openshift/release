@@ -6,6 +6,14 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+# create the open-cluster-management namespace
+oc apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-cluster-management
+EOF
+
 # Label local-cluster with acm/cnv-operator-install: "true"
 oc label managedcluster local-cluster acm/cnv-operator-install=true --overwrite
 
