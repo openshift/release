@@ -10,6 +10,7 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 oc label managedcluster local-cluster acm/cnv-operator-install=true --overwrite
 
 # Install CNV operator
+cd /tmp/
 git clone https://github.com/stolostron/mtv-integrations.git
 cd mtv-integrations/addons/cnv-addon
 oc apply -f ./
