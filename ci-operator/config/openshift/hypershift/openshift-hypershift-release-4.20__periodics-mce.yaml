@@ -1,6 +1,6 @@
 base_images:
   assisted-service-scripts:
-    name: ocm-2.13
+    name: ocm-2.14
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   dev-scripts:
@@ -16,35 +16,35 @@ base_images:
     namespace: hypershift
     tag: latest
   test-bin:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: hypershift-tests
   upi-installer:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 releases:
-  418-latest:
+  419-latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.20"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
   stable-latest:
     release:
       architecture: amd64
       channel: candidate
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -52,31 +52,31 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-ovn-conformance
-  cron: 59 23 12,15 * *
+  minimum_interval: 72h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       EXTRA_ARGS: --multi-arch=false
-      MCE_VERSION: "2.8"
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-aws-conformance
 - as: e2e-agent-connected-ovn-ipv4-manual-conformance
-  cron: 57 7 7,20 * *
+  minimum_interval: 168h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-agent-manual-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-conformance
-  cron: 58 9 7,17 * *
+  minimum_interval: 72h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-dualstack-metal-conformance
-  cron: 23 21 10,24 * *
+  minimum_interval: 72h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -88,11 +88,11 @@ tests:
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
       IP_STACK: v4v6
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-compact-conformance
-  cron: 24 2 11,24 * *
+  minimum_interval: 72h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -107,19 +107,19 @@ tests:
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-disconnected-ovn-ipv6-metal-conformance
-  cron: 1 18 12,18 * *
+  minimum_interval: 72h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-disconnected-conformance
 - as: e2e-agent-disconnected-ovn-dualstack-metal-conformance
-  cron: 58 22 10,24 * *
+  minimum_interval: 72h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -132,12 +132,11 @@ tests:
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
       IP_STACK: v4v6
-      HYPERSHIFT_HC_RELEASE_IMAGE: registry.ci.openshift.org/ocp/release:4.20.0-0.nightly-2025-07-31-063120
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.8"
     workflow: hypershift-mce-agent-disconnected-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-oadp
-  cron: 23 12 8,22 * *
+  minimum_interval: 72h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -151,8 +150,8 @@ tests:
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
       OADP_OPERATOR_SUB_CHANNEL: stable-1.4
       OADP_OPERATOR_SUB_SOURCE: qe-app-registry
     test:
@@ -162,103 +161,86 @@ tests:
     - ref: hypershift-mce-agent-info
     - chain: hypershift-conformance
     workflow: hypershift-mce-agent-metal3-conformance
-- as: e2e-agent-connected-cilium-ipv4-metal-conformance
-  minimum_interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
-    workflow: hypershift-mce-agent-metal3-conformance-cilium
-- as: e2e-agent-connected-calico-ipv4-metal-conformance
-  minimum_interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
-    workflow: hypershift-mce-agent-metal3-conformance-calico
 - as: e2e-kubevirt-metal-ovn
-  cron: 0 4 1 1 *
+  minimum_interval: 72h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.17
-      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-17
-      REDHAT_OPERATORS_INDEX_TAG: v4.17
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
     workflow: hypershift-mce-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-azure-ovn
-  cron: 38 15 7,16 * *
+  minimum_interval: 72h
   steps:
     cluster_profile: azure4
     env:
       CNV_SUBSCRIPTION_SOURCE: cnv-prerelease-catalog-source
       HYPERSHIFT_NODE_COUNT: "2"
-      MCE_VERSION: "2.8"
+      MCE_VERSION: "2.9"
       ODF_BACKEND_STORAGE_CLASS: managed-csi
       ODF_OPERATOR_CHANNEL: stable-4.17
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-mce-kubevirt-azure-conformance
 - as: e2e-kubevirt-metal-ovn-multinet
-  cron: 31 7 9,17 * *
+  minimum_interval: 168h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       ATTACH_DEFAULT_NETWORK: "false"
       HYPERSHIFT_NODE_COUNT: "2"
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.17
-      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-17
-      REDHAT_OPERATORS_INDEX_TAG: v4.17
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
     workflow: hypershift-mce-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-metal-ovn-multinet-default-net
-  cron: 22 3 14,18 * *
+  minimum_interval: 168h
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       ATTACH_DEFAULT_NETWORK: "true"
       HYPERSHIFT_NODE_COUNT: "2"
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.17
-      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-17
-      REDHAT_OPERATORS_INDEX_TAG: v4.17
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
     workflow: hypershift-mce-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-aws-ovn-gpu
-  cron: 3 10 5,28 * *
+  minimum_interval: 336h
   steps:
     cluster_profile: aws-kubevirt
     dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:stable-latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:stable-latest
       RELEASE_IMAGE_LATEST: release:stable-latest
     env:
       BASE_DOMAIN: cnv-qe.rhood.us
-      MCE_VERSION: "2.8"
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-kubevirt-gpu-conformance
 - as: e2e-ibmz-ovn-conformance
-  cron: 49 6 5,26 * *
+  minimum_interval: 168h
   steps:
     cluster_profile: aws-2
     env:
-      MCE_VERSION: "2.8"
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-ibmz-conformance
 - as: e2e-power-ovn-conformance
-  cron: 0 8 * * *
+  minimum_interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
-      MCE_VERSION: "2.8"
+      MCE_VERSION: "2.9"
     workflow: hypershift-mce-power-conformance
 - as: e2e-x86-power-heterogeneous-conformance
-  cron: 0 8 * * *
+  minimum_interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
         NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
@@ -266,17 +248,21 @@ tests:
       HYPERSHIFT_INFRA_AVAILABILITY_POLICY: HighlyAvailable
       HYPERSHIFT_NODE_COUNT: "1"
       IS_HETEROGENEOUS: "yes"
-      MCE_VERSION: "2.8"
+      MCE_VERSION: "2.9"
+      TEST_SKIPS: ""
       USE_GLB: "no"
+    test:
+    - chain: hypershift-mce-power-test
+    - ref: hypershift-mce-agent-info
     workflow: hypershift-mce-power-conformance
 - as: e2e-aws-critical
   cron: 0 0 29 2 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
-      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:418-latest
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:419-latest
     env:
-      MCE_VERSION: "2.8"
+      MCE_VERSION: "2.9"
       TEST_SUITE: openshift/conformance/parallel/minimal
     test:
     - ref: hypershift-mce-multi-version-test-info
@@ -287,17 +273,17 @@ tests:
   steps:
     cluster_profile: equinix-ocp-hcp
     dependencies:
-      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:418-latest
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:419-latest
     env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
       TEST_SUITE: openshift/conformance/parallel/minimal
     test:
     - ref: hypershift-mce-multi-version-test-info
     - chain: hypershift-conformance
     workflow: hypershift-mce-agent-metal3-conformance
 zz_generated_metadata:
-  branch: release-4.18
+  branch: release-4.20
   org: openshift
   repo: hypershift
   variant: periodics-mce
