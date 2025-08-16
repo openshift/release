@@ -44,6 +44,9 @@ export HOME=/tmp
 
 ret=0
 
+# for debug and verification
+BASE_DOMAIN="qe1.devcluster.openshift.com"
+
 hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
             --output text)"
