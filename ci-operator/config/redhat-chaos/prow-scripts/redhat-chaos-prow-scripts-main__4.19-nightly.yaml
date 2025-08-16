@@ -15,6 +15,10 @@ base_images:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
+  prow-scripts.prow:
+    name: prow-scripts
+    namespace: chaos
+    tag: latest
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -25,8 +29,10 @@ images:
 - dockerfile_path: cerberus/Dockerfile_prow
   from: cerberus.prow
   to: cerberus-main-prow-419
-- dockerfile_path: Dockerfile
-  from: krkn.prow
+- dockerfile_literal: |-
+    FROM prow-scripts.prow
+    RUN ls
+  from: prow-scripts.prow
   to: prow-scripts-419
 - dockerfile_literal: |-
     FROM ocp-qe-perfscale-ci
@@ -209,6 +215,332 @@ tests:
     test:
     - ref: redhat-chaos-start-krkn
     workflow: redhat-chaos-krkn-hub-node-tests
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l3-1-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "1"
+      ENABLE_LAYER_3: "true"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l3-3-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "3"
+      ENABLE_LAYER_3: "true"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l3-5-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "5"
+      ENABLE_LAYER_3: "true"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l3-8-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "8"
+      ENABLE_LAYER_3: "true"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l2-1-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "1"
+      ENABLE_LAYER_3: "false"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l2-3-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "3"
+      ENABLE_LAYER_3: "false"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l2-5-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "5"
+      ENABLE_LAYER_3: "false"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: krkn-hub-worker-pod-disruption-udn-density-pods-l2-8-kill
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      DISRUPTION_COUNT: "8"
+      ENABLE_LAYER_3: "false"
+      EXPECTED_POD_COUNT: "24"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      POD_LABEL: ovnkube-node-worker
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.19
+      USER_TAGS: |
+        TicketId 419
+      WORKER_REPLICA_COUNT: "24"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-ovn-disruption-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: udn-density-pods-l3
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      ENABLE_LAYER_3: "true"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      USER_TAGS: |
+        TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: udn-density-pods-l2
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "true"
+      ENABLE_LAYER_3: "false"
+      EXTRA_FLAGS: --churn-duration=30m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      USER_TAGS: |
+        TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-udn-density-pods
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - as: krkn-hub-tests-udn-aws-ipsec
   cron: 0 4 * * 1
