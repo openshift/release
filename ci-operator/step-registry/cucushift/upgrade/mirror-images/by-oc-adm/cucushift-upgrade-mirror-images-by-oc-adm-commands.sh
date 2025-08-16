@@ -55,7 +55,7 @@ function mirror_image(){
     local apply_sig_together="$1"
     local mirror_crd_type="${2:-icsp}"
 
-    target_version=$(oc adm release info "${TARGET}" --output=json | jq .metadata.version)
+    target_version=$(oc adm release info -a "${CLUSTER_PROFILE_DIR}/pull-secret"  "${TARGET}" --output=json | jq .metadata.version)
    
     echo "Mirroring ${target_version} (${TARGET}) to ${MIRROR_RELEASE_IMAGE_REPO}"
 
@@ -117,7 +117,7 @@ function extract_oc(){
     echo -e "Extracting oc\n"
     local target_version minor_version retry=5 tmp_oc="/tmp/client-2" binary='oc'
     mkdir -p ${tmp_oc}
-    target_version="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    target_version="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${TARGET}" --output=json | jq -r '.metadata.version')"
     minor_version="$(echo "${target_version}" | cut -f2 -d.)"
     if (( minor_version > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
         binary='oc.rhel8'
