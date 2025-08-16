@@ -22,6 +22,8 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
 
+kubectl get ns stackrox && { echo 'Found stackrox namespace. Aborting install.'; return 0; } || true
+
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
