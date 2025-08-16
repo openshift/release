@@ -17,6 +17,7 @@ support_np_skew() {
     extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
   fi
   extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+  extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.arch) = \"arm64\"' /tmp/hc.yaml "
   extra_flags+="&& oc apply -f /tmp/hc.yaml"
   echo "$extra_flags"
 }
