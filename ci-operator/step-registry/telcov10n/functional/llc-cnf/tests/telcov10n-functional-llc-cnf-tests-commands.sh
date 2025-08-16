@@ -13,10 +13,12 @@ export ROLE_WORKER_CNF=worker-cnf
 
 # local variables
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
-NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
-NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
-GINKGO_LABEL="uncore-cache"
-GINKGO_SUITES="test/e2e/performanceprofile/functests/13_llc"
+NTO_REPO="https://github.com/mrniranjan/cluster-node-tuning-operator.git"
+#NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
+NTO_BRANCH="all_420_fixes"
+#NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
+GINKGO_LABELS=("tier-0" "tier-1" "tier-2" "tier-3" "uncore-cache")
+GINKGO_SUITES="test/e2e/performanceprofile/functests"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
 
@@ -132,6 +134,7 @@ export GOPATH="${HOME}"/go
 export GOBIN="${GOPATH}"/bin
 export IMAGE_REGISTRY=quay.io/openshift-kni/
 export CNF_TESTS_IMAGE=cnf-tests:latest
+export BUSY_CPUS_IMAGE=cnf-tests:latest
 
 ## Print the nodes in the cluster
 oc get nodes
@@ -147,13 +150,17 @@ make vet
 run_tests_status=0
 
 run_tests() {
-    echo "************ Running ${GINKGO_LABEL} tests ************"
-    GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
+    local label=$1
+    echo "************ Running ${label} tests ************"
+    GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${label}" \
     --timeout=24h --keep-separate-reports --keep-going --flake-attempts=2 \
-    --junit-report=junit.xml --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
+    --junit-report="junit_${label}.xml" --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
 }
 
-run_tests || run_tests_status=$?
+# Run tests for each label
+for label in "${GINKGO_LABELS[@]}"; do
+    run_tests "${label}" || run_tests_status=$?
+done
 popd
 
 echo "Ginkgo command failed with exit code: ${run_tests_status}"
