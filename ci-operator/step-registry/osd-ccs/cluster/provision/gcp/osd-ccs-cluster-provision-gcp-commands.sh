@@ -66,28 +66,12 @@ function add_iam_policy_binding()
 
   local interested_roles=("roles/compute.networkAdmin" "roles/compute.securityAdmin" "roles/dns.admin" "projects/${vpc_project_id}/roles/resourcemanager.projects.get_set_IamPolicy")
   local cmd
-  # 调试段
-  echo "===== 调试信息开始 ====="
-  echo "当前PATH: $PATH"
-  echo "gcloud位置: $(which gcloud)"
-  ls -l ${HOME}/google-cloud-sdk/bin/gcloud
-  echo "===== 调试信息结束 ====="
 
-  # 确保可执行
-  chmod +x ${HOME}/google-cloud-sdk/bin/*
-
-  # 尝试直接执行
-  ${HOME}/google-cloud-sdk/bin/gcloud --version || {
-     echo "直接执行失败"
-     exit 1
-  }
-
-  set -x
   for role in "${interested_roles[@]}"; do
-    cmd="gcloud projects add-iam-policy-binding ${vpc_project_id} --member \"serviceAccount:${sa_email}\" --role ${role} 1>/dev/null"
-    backoff "${cmd}"
+    backoff gcloud projects add-iam-policy-binding "${vpc_project_id}" \
+        --member "serviceAccount:${sa_email}" \
+        --role "${role}"
   done
-  set +x
 
   service_project_id="$(jq -r -c .project_id "${GCP_CREDENTIALS_FILE}")"
   for project in "${service_project_id}" "${vpc_project_id}"; do
