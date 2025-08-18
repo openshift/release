@@ -43,6 +43,8 @@ function gcloud_auth() {
     export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
     popd
   fi
+  chmod +x ${HOME}/google-cloud-sdk/bin/*
+
 
   # login to the service project
   service_project_id="$(jq -r -c .project_id "${GCP_CREDENTIALS_FILE}")"
