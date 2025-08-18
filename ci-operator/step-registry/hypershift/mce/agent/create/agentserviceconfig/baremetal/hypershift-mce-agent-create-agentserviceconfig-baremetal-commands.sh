@@ -7,7 +7,6 @@ set -E
 
 export PATH=${PATH}:/cli
 gnu_architecture=$(sed 's/amd64/x86_64/' <<< "${agent_architecture:-amd64}")
-cpu_architecture=$(sed 's/amd64/x86_64/;s/arm64/aarch64/' <<< "${agent_architecture:-amd64}")
 
 pushd deploy/operator
 
@@ -82,7 +81,7 @@ spec:
  - openshiftVersion: '${CLUSTER_VERSION}'
    version: $(echo "$OS_IMAGES" | yq '.[] | select(.cpu_architecture == "'"$gnu_architecture"'").version')
    url: $(echo "$OS_IMAGES" | yq '.[] | select(.cpu_architecture == "'"$gnu_architecture"'").url')
-   cpuArchitecture: ${cpu_architecture}
+   cpuArchitecture: ${gnu_architecture}
 "
 
 if [ "${DISCONNECTED}" = "true" ]; then
