@@ -1,16 +1,35 @@
 base_images:
-  ubi_minimal:
-    name: ubi-minimal
+  base-rhel9:
+    name: 4.20-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  golang-builder:
+    name: builder
     namespace: ocp
-    tag: "9"
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make go-build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/must-gather-operator
 images:
-- dockerfile_path: build/Dockerfile
-  from: ubi_minimal
+- dockerfile_path: Dockerfile.openshift
+  from: base-rhel9
+  inputs:
+    golang-builder:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: must-gather-operator
+operator:
+  bundles:
+  - as: must-gather-operator-bundle
+    context_dir: bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-must-gather-operator:latest
+    with: pipeline:must-gather-operator
+  - pullspec: quay.io/openshift/origin-must-gather:latest
+    with: stable:must-gather
 promotion:
   to:
   - disabled: true
@@ -58,10 +77,11 @@ tests:
   commands: make test
   container:
     from: src
-- as: validate
+- as: validate-boilerplate
   commands: make validate
   container:
     from: src
+  optional: true
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
