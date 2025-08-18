@@ -5,17 +5,16 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
-    context: ci/prow/integration
+    cluster: build05
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-online-access-transparency-service-main-integration
-    rerun_command: /test integration
+    name: pull-ci-openshift-online-access-transparency-service-main-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -23,7 +22,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=integration
+        - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -62,7 +62,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
