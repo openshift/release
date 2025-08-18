@@ -71,9 +71,6 @@ function add_iam_policy_binding()
   echo "当前PATH: $PATH"
   echo "gcloud位置: $(which gcloud)"
   ls -l ${HOME}/google-cloud-sdk/bin/gcloud
-  file ${HOME}/google-cloud-sdk/bin/gcloud
-  uname -m
-  ldd ${HOME}/google-cloud-sdk/bin/gcloud || echo "ldd检查失败"
   echo "===== 调试信息结束 ====="
 
   # 确保可执行
