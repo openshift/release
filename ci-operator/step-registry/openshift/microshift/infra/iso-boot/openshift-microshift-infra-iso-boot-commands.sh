@@ -49,14 +49,22 @@ function get_source_dir() {
 }
 
 if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
-  SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/presubmits" "scenarios-bootc")
-  if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
-    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/periodics" "scenarios-bootc")
+  if [[ "${JOB_NAME}" =~ .*release.* ]]; then
+    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/releases" "scenarios-bootc")
+  else
+    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/presubmits" "scenarios-bootc")
+    if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
+        SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/periodics" "scenarios-bootc")
+    fi
   fi
 else
-  SCENARIO_SOURCES=$(get_source_dir "scenarios/presubmits" "scenarios")
-  if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
-    SCENARIO_SOURCES=$(get_source_dir "scenarios/periodics" "scenarios-periodics")
+  if [[ "${JOB_NAME}" =~ .*release.* ]]; then
+    SCENARIO_SOURCES=$(get_source_dir "scenarios/releases" "scenarios")
+  else
+    SCENARIO_SOURCES=$(get_source_dir "scenarios/presubmits" "scenarios")
+    if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
+        SCENARIO_SOURCES=$(get_source_dir "scenarios/periodics" "scenarios-periodics")
+    fi
   fi
 fi
 
