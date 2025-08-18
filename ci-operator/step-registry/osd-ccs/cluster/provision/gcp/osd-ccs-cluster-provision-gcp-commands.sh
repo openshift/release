@@ -338,6 +338,7 @@ while true; do
   fi
   if (( $(date +"%s") - $start_time >= $BOOTSTRAP_TIMEOUT )) && ! wait_for_bootstrap; then
     logger "ERROR" "Timed out while waiting for cluster bootstrap completion (in $BOOTSTRAP_TIMEOUT seconds)"
+    sleep 1800
     exit 1
   fi
   if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
