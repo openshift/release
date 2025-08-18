@@ -376,21 +376,9 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-proxy
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
-  optional: true
-  steps:
-    cluster_profile: aws-3
-    env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      FEATURE_SET: TechPreviewNoUpgrade
-      USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
@@ -590,7 +578,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
-  run_if_changed: azure
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: azure4
     env:
@@ -838,12 +826,14 @@ tests:
     workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-static-ovn
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS(_ALIASES)|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-multi-network
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -898,7 +888,6 @@ tests:
 - always_run: false
   as: e2e-crc
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
