@@ -10,6 +10,7 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 HOSTED_CLUSTER_NS=$(oc get -A hostedclusters.hypershift.openshift.io -o=jsonpath="{.items[?(@.metadata.name=='$HOSTED_CLUSTER_NAME')].metadata.namespace}")
 AGENT_NAMESPACE="${HOSTED_CLUSTER_NS}-${HOSTED_CLUSTER_NAME}"
+CPU_ARCHITECTURE=$(sed 's/aarch64/arm64/' <<< "${ADDITIONAL_WORKER_ARCHITECTURE}")
 
 oc get ns "${AGENT_NAMESPACE}" || oc create namespace "${AGENT_NAMESPACE}"
 
@@ -26,7 +27,7 @@ metadata:
   name: ${HOSTED_CLUSTER_NAME}
   namespace: ${AGENT_NAMESPACE}
 spec:
-  cpuArchitecture: ${ADDITIONAL_WORKER_ARCHITECTURE}
+  cpuArchitecture: ${CPU_ARCHITECTURE}
   pullSecretRef:
     name: pull-secret
   sshAuthorizedKey: $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
