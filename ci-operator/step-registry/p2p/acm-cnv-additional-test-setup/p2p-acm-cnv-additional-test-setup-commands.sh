@@ -60,21 +60,21 @@ else
   exit 1
 fi
 
-sleep 7200
 
-# PULL_SECRET="${CLUSTER_PROFILE_DIR}/cloud-openshift-auth"
-# if [[ -f "${PULL_SECRET}" ]]; then
+OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+PULL_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cloud-openshift-auth")
+if [[ -f "${PULL_SECRET}" ]]; then
 
-#   oc create -f - <<EOF
-#           apiVersion: v1
-#           kind: Secret
-#           metadata:
-#             name: pull-secret
-#             namespace: ocm
-#           type: kubernetes.io/dockerconfigjson
-#           data:
-#             .dockerconfigjson: "${PULL_SECRET}"
-# EOF
+  oc create -f - <<EOF
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: pull-secret
+            namespace: ocm
+          type: kubernetes.io/dockerconfigjson
+          data:
+            .dockerconfigjson: "${PULL_SECRET}"
+EOF
 
 #   echo "secret created"
 # else
