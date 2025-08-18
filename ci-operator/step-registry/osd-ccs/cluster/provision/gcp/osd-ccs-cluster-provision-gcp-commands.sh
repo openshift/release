@@ -65,6 +65,8 @@ function add_iam_policy_binding()
 
   local interested_roles=("roles/compute.networkAdmin" "roles/compute.securityAdmin" "roles/dns.admin" "projects/${vpc_project_id}/roles/resourcemanager.projects.get_set_IamPolicy")
   local cmd
+  echo "current PATH: $PATH"
+  echo "gcloud: $(which gcloud || echo '未找到')"
   for role in "${interested_roles[@]}"; do
     cmd="gcloud projects add-iam-policy-binding ${vpc_project_id} --member \"serviceAccount:${sa_email}\" --role ${role} 1>/dev/null"
     backoff "${cmd}"
