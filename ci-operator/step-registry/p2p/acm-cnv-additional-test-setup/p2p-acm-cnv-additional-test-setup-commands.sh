@@ -76,9 +76,9 @@ if [[ -f "${PULL_SECRET}" ]]; then
             .dockerconfigjson: "${PULL_SECRET}"
 EOF
 
-#   echo "secret created"
-# else
-#   echo "Did not find compatible cloud provider cluster_profile"
-#   exit 1
-# fi
+  echo "secret created"
+else
+  echo "Did not find compatible cloud provider cluster_profile"
+  exit 1
+fi
            
