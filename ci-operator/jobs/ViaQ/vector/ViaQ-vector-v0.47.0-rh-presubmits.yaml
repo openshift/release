@@ -6,6 +6,62 @@ presubmits:
     - ^v0\.47\.0-rh$
     - ^v0\.47\.0-rh-
     cluster: build05
+    context: ci/prow/cargo-clippy-check
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-ViaQ-vector-v0.47.0-rh-cargo-clippy-check
+    optional: true
+    rerun_command: /test cargo-clippy-check
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cargo-clippy-check
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cargo-clippy-check,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^v0\.47\.0-rh$
+    - ^v0\.47\.0-rh-
+    cluster: build05
     context: ci/prow/cargo-deny-check-bans
     decorate: true
     decoration_config:
@@ -55,6 +111,62 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cargo-deny-check-bans,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^v0\.47\.0-rh$
+    - ^v0\.47\.0-rh-
+    cluster: build05
+    context: ci/prow/cargo-fmt-check
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-ViaQ-vector-v0.47.0-rh-cargo-fmt-check
+    optional: true
+    rerun_command: /test cargo-fmt-check
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cargo-fmt-check
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cargo-fmt-check,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
