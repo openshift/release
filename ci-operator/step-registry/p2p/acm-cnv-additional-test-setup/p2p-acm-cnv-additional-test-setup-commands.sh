@@ -61,7 +61,6 @@ else
 fi
 
 
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 PULL_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cloud-openshift-auth")
 if [[ -f "${PULL_SECRET}" ]]; then
 
