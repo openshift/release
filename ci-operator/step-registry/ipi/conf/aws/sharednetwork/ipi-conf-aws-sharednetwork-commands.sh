@@ -104,7 +104,7 @@ EOF
   if aws cloudformation create-stack \
     --stack-name "${stack_name}" \
     --template-body file://"${template_path}" \
-    --tags ${TAGS[*]} \
+    --tags "${TAGS[*]}" \
     --parameters file://"${parameters_path}"; then
 
     echo_date "Created stack: ${stack_name}"
