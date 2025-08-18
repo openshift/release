@@ -5,6 +5,68 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    context: ci/prow/ci-bundle-must-gather-operator-bundle
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-must-gather-operator-master-ci-bundle-must-gather-operator-bundle
+    path_alias: github.com/openshift/must-gather-operator
+    rerun_command: /test ci-bundle-must-gather-operator-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=must-gather-operator-bundle
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-bundle-must-gather-operator-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
     cluster: build05
     context: ci/prow/coverage
     decorate: true
@@ -264,8 +326,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
-    context: ci/prow/validate
+    context: ci/prow/validate-boilerplate
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -275,9 +336,10 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-must-gather-operator-master-validate
+    name: pull-ci-openshift-priv-must-gather-operator-master-validate-boilerplate
+    optional: true
     path_alias: github.com/openshift/must-gather-operator
-    rerun_command: /test validate
+    rerun_command: /test validate-boilerplate
     spec:
       containers:
       - args:
@@ -285,7 +347,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=validate
+        - --target=validate-boilerplate
         command:
         - ci-operator
         image: ci-operator:latest
@@ -321,7 +383,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )validate,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate-boilerplate,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
