@@ -368,7 +368,6 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-proxy
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
@@ -408,15 +407,17 @@ tests:
     - chain: cucushift-installer-check-cluster-health
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
+  as: e2e-aws-custom-dns
   optional: true
+  run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-aws-custom-dns
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
@@ -590,7 +591,7 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: gcp-custom-dns
+  as: e2e-gcp-custom-dns
   optional: true
   run_if_changed: (gcp|google)
   steps:
@@ -599,8 +600,6 @@ tests:
       FEATURE_GATES: '["GCPClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
-    test:
-    - chain: cucushift-installer-check-cluster-health
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
@@ -669,7 +668,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
-  run_if_changed: azure
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: azure4
     env:
@@ -926,8 +925,10 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-externallb-ovn
+- always_run: false
+  as: e2e-vsphere-externallb-ovn
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-externallb
@@ -953,25 +954,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups
-- as: e2e-vsphere-static-ovn
+- always_run: false
+  as: e2e-vsphere-static-ovn
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-multi-network-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-multi-network
   optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      MULTI_NIC_IPI: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
-  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -980,9 +974,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-disk
+- always_run: false
+  as: e2e-vsphere-ovn-multi-disk
   optional: true
-  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1021,9 +1015,9 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-zones-techpreview
   optional: true
-  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1063,7 +1057,6 @@ tests:
 - always_run: false
   as: e2e-crc
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
