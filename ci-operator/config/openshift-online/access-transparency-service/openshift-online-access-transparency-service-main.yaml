@@ -4,10 +4,6 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.23
-images:
-- dockerfile_path: Dockerfile
-  from: ubi:9
-  to: ats-test-image
 promotion:
   to:
   - name: "4.20"
@@ -36,7 +32,14 @@ tests:
   - intranet
   commands: make test
   container:
-    from: ats-test-image
+    from: src
+  restrict_network_access: false
+- as: integration
+  capabilities:
+  - intranet
+  commands: make test-integration
+  container:
+    from: src
   restrict_network_access: false
 zz_generated_metadata:
   branch: main
