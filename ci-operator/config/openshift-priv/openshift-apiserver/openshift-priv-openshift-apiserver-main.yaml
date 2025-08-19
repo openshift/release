@@ -87,6 +87,19 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
+- as: e2e-tests-extension
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary openshift-apiserver-tests-ext"
+        make tests-ext-build
+        echo "Running ./openshift-apiserver-tests-ext with sanity test"
+        ./openshift-apiserver-tests-ext run-test -n "[Jira:openshift-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/openshift-apiserver/conformance/parallel]"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift-priv
