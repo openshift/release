@@ -12,24 +12,6 @@ export PATH=/tmp:${PATH}
 INSTALL_DIR=/tmp/installer
 mkdir ${INSTALL_DIR}
 
-function backoff() {
-    local attempt=0
-    local failed=0
-    while true; do
-        "$@" && failed=0 || failed=1
-        if [[ $failed -eq 0 ]]; then
-            break
-        fi
-        attempt=$(( attempt + 1 ))
-        if [[ $attempt -gt 5 ]]; then
-            break
-        fi
-        echo "command failed, retrying in $(( 2 ** $attempt )) seconds"
-        sleep $(( 2 ** $attempt ))
-    done
-    return $failed
-}
-
 function populate_artifact_dir()
 {
   set +e
