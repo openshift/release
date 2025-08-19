@@ -78,6 +78,8 @@ compute:
       zones: ${edge_zones_str}
 EOF
 
+yq-v4 eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' ${CONFIG} ${PATCH}
+
 if [[ ${EDGE_NODE_INSTANCE_TYPE} != "" ]]; then
   echo "EDGE_NODE_INSTANCE_TYPE: ${EDGE_NODE_INSTANCE_TYPE}"
   echo "      type: ${EDGE_NODE_INSTANCE_TYPE}" >> ${PATCH}

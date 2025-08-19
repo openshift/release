@@ -15,11 +15,12 @@ source ./tests/prow_ci.sh
 
 # functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
 #configure aws
-aws_region=${REGION:-$LEASED_RESOURCE}
+aws_region=${REGION:-us-east-2}
 configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
 configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 cluster_id=$(cat "${SHARED_DIR}/cluster-id")
 
+HOLD_TIME_BEFORE_UPGRADE=${HOLD_TIME_BEFORE_UPGRADE:-"0"}
 CP_UPGRADE_TIMEOUT=${CP_UPGRADE_TIMEOUT:-"14400"}
 NP_UPGRADE_TIMEOUT=${NP_UPGRADE_TIMEOUT:-"7200"}
 test_timeout=`expr $CP_UPGRADE_TIMEOUT + $NP_UPGRADE_TIMEOUT`
@@ -58,7 +59,7 @@ function set_proxy () {
 function get_cluster_upgrade_path () {
   current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
   available_versions=$(rosa list upgrade -c $cluster_id  -ojson)
-  upgrade_version=""
+  available_version=""
   if [[ "$available_versions" != *"There are no available upgrades"* ]]; then
     prefix=$(echo "$current_version" | awk -F. '{print $1"."$2}')
     if [[ -n $available_versions ]];then
@@ -69,17 +70,17 @@ function get_cluster_upgrade_path () {
       # Find the Y stream upgrade version firstly
       for ver in "${sorted_versions[@]}"; do
         if [[ ! "$ver" =~ $prefix ]]; then
-          upgrade_version=$ver
-          log "Y Stream Upgrade version: ($upgrade_version)"
+          available_version=$ver
+          log "Y Stream Upgrade version: ($available_version)"
           break
         fi
       done
       # Find the Z stream upgrade version secondly
-      if [[ -z $upgrade_version ]];then
+      if [[ -z $available_version ]];then
         for ver in "${versionsList[@]}"; do
          if [[ "$ver" =~ "$prefix"* ]]; then
-           upgrade_version="$ver"
-           log "Z Stream Upgrade path: (${upgrade_version})"
+           available_version="$ver"
+           log "Z Stream Upgrade path: (${available_version})"
            break
          fi
         done 
@@ -90,9 +91,10 @@ function get_cluster_upgrade_path () {
 
 
 function upgrade_cluster_to () {
-  upgrade_version=$1
-  log "Upgrade the cluster $cluster_id to $upgrade_version"
-  echo "rosa upgrade cluster -y -m auto --version $upgrade_version -c $cluster_id" 
+  available_version=$1
+  start_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+  log "Upgrade the cluster $cluster_id to $available_version"
+  echo "rosa upgrade cluster -y -m auto --version $available_version -c $cluster_id" 
   start_time=$(date +"%s")
   while true; do
     if (( $(date +"%s") - $start_time >= 1800 )); then
@@ -100,7 +102,7 @@ function upgrade_cluster_to () {
       exit 1
     fi
 
-    rosa upgrade cluster -y -m auto --version $upgrade_version -c $cluster_id  1>"/tmp/update_info.txt" 2>&1 || true
+    rosa upgrade cluster -y -m auto --version $available_version -c $cluster_id  1>"/tmp/update_info.txt" 2>&1 || true
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
       log "Waiting for the previous upgrade schedule to be removed."
@@ -117,9 +119,9 @@ function upgrade_cluster_to () {
     sleep 120
     log "Wait for the cluster upgrading finished ..."
     current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
-    if [[ "$current_version" == "$upgrade_version" ]]; then
-      record_cluster "timers.ocp_upgrade" "${upgrade_version}" $(( $(date +"%s") - "${start_time}" ))
-      log "Upgrade the cluster $cluster_id to the openshift version $upgrade_version successfully after $(( $(date +"%s") - ${start_time} )) seconds"
+    if [[ "$current_version" == "$available_version" ]]; then
+      record_cluster "timers.ocp_upgrade" "${available_version}" $(( $(date +"%s") - "${start_time}" ))
+      log "Upgrade the cluster $cluster_id from $start_version to the openshift version $available_version successfully after $(( $(date +"%s") - ${start_time} )) seconds"
       break
     fi
 
@@ -134,11 +136,13 @@ function upgrade_cluster_to () {
 }
 
 function upgrade_machinepool_to () {
+  log "rosa list machinepool -c $cluster_id"
   rosa list machinepool -c $cluster_id
 
   up_version=$1
   mp_id_list=$(rosa list machinepool -c $cluster_id -o json | jq -r ".[].id")
   for mp_id in $mp_id_list; do
+    node_start_version=$(rosa list machinepool -c $cluster_id -o json | jq -r --arg k $mp_id '.[] | select(.id==$k) .version.id')
     log "rosa upgrade machinepool $mp_id -y -c $cluster_id --version $up_version"
     rosa upgrade machinepool $mp_id -y -c $cluster_id --version $up_version
   done
@@ -151,7 +155,7 @@ function upgrade_machinepool_to () {
         node_version=$(rosa list machinepool -c $cluster_id -o json | jq -r --arg k $mp_id '.[] | select(.id==$k) .version.id')
         if [[ "$node_version" =~ ${up_version}- ]]; then
           record_cluster "timers.machinset_upgrade" "${mp_id}" $(( $(date +"%s") - "${start_time}" ))
-          log "Upgrade the machinepool $mp_id successfully to the openshift version $up_version after $(( $(date +"%s") - ${start_time} )) seconds"
+          log "Upgrade the machinepool $mp_id successfully from $node_start_version to the openshift version $up_version after $(( $(date +"%s") - ${start_time} )) seconds"
           break
         fi
 
@@ -172,6 +176,19 @@ read_profile_file() {
   fi
 }
 
+# hold on before upgrading cluster
+start_time=$(date +"%s")
+echo "$(date): Beginning to wait: ${HOLD_TIME_BEFORE_UPGRADE} seconds"
+while true; do
+  current_time=$(date +"%s")
+  if (( "${current_time}" - "${start_time}" < "${HOLD_TIME_BEFORE_UPGRADE}" )); then
+    sleep 60
+    echo "Hold on before upgrading cluster: $(date)"
+  else
+    break
+  fi
+done
+
 # Log in
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
@@ -189,41 +206,62 @@ else
   exit 1
 fi
 
+if [[ -z "$CHANNEL_GROUP" ]];then
+  CHANNEL_GROUP=$(rosa describe cluster -c $cluster_id -o json | jq -r '.version.channel_group')
+fi
 
-if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
-  log "Get the latest version!"
-  if [[ "$CHANNEL_GROUP" == "nightly" ]]; then
-    log "It doesn't support to upgrade with nightly version now"
-    exit 1
-  fi
-  # Get the latest OCP version
-  version_cmd="rosa list version --hosted-cp --channel-group $CHANNEL_GROUP -o json"
-  filter_cmd="$version_cmd | jq -r '.[] | .raw_id'"
-  versionList=$(eval $filter_cmd)
-  echo -e "Available cluster versions:\n${versionList}"
-  target_version=$(echo "$versionList" | head -1 || true)
-  UPGRADED_TO_VERSION=$target_version
+
+log "Get the latest version!"
+if [[ "$CHANNEL_GROUP" == "nightly" ]]; then
+  log "It doesn't support to upgrade with nightly version now"
+  exit 1
 fi
 
 HOSTED_CP=$(rosa describe cluster -c $cluster_id -o json | jq -r '.hypershift.enabled')
+init_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
 
 start_time=$(date +"%s")
 while true; do
-  current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
-  if [[ "$current_version" == "$UPGRADED_TO_VERSION" ]]; then
-    log "The cluster has been in the version $UPGRADED_TO_VERSION"
-    break
-  fi
+  current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version') 
+  # Get cluster upgrade version path : available_version
   get_cluster_upgrade_path
-  if [ -n "$upgrade_version" ]; then
-    upgrade_cluster_to $upgrade_version
-    if [ "$HOSTED_CP" = "true" ]; then
-      upgrade_machinepool_to $upgrade_version
+
+  # Get specified target version when UPGRADE_ENABLED is set true and compare with avaiable path version
+  # Upgrade cluster to specidied target version
+  if [[ "$UPGRADE_ENABLED" == "true" ]];then
+    target_x=$(echo "$UPGRADED_TO_VERSION" | cut -d'.' -f1)
+    target_y=$(echo "$UPGRADED_TO_VERSION" | cut -d'.' -f2)
+
+    available_x=$(echo "$available_version" | cut -d'.' -f1)
+    available_y=$(echo "$available_version" | cut -d'.' -f2)
+    is_greater=0
+    if (( available_x > target_x )); then
+      is_greater=1
+    elif (( target_x == available_x )) && (( available_y > target_y )); then
+      is_greater=1
     fi
+
+    if (( is_greater == 1 )); then
+      log "The cluster has been in $UPGRADED_TO_VERSION"
+      break
+    fi
+  fi
+  
+  
+  # Upgrade cluster when there is upgrade path,otherwise return log 
+  if [ -n "$available_version" ]; then
+    upgrade_cluster_to $available_version
+    if [ "$HOSTED_CP" = "true" ]; then
+      upgrade_machinepool_to $available_version
+    fi
+    log "Upgrade cluster and machine pool from init version $init_version to final version $current_version"
   else
     log "No available version for upgrade $current_version"
     break
   fi
+  
+
+  # Record log when timeout
   current_time=$(date +"%s")
   if (( "${current_time}" - "${start_time}" >= "${test_timeout}" )); then
     log "error: Timed out while waiting for upgrading cluster"

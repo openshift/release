@@ -39,13 +39,21 @@ git config --global user.email "ztp-spoke-cluster@telcov10n.com"
 git config --global user.name "ZTP Spoke Cluster Telco Verification"
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git clone ${gitea_ssh_uri} \${ztp_repo_dir}
 
-if [ -f \${ztp_repo_dir}/site-configs/kustomization.yaml ]; then
-  sed -i '/${SPOKE_CLUSTER_NAME}/d' \${ztp_repo_dir}/site-configs/kustomization.yaml
+if [ -f \${ztp_repo_dir}/clusters/kustomization.yaml ]; then
+  sed -i '/${SPOKE_CLUSTER_NAME}/d' \${ztp_repo_dir}/clusters/kustomization.yaml
+fi
+
+if [ -f \${ztp_repo_dir}/site-policies/kustomization.yaml ]; then
+  sed -i '/${SPOKE_CLUSTER_NAME}/d' \${ztp_repo_dir}/site-policies/kustomization.yaml
 fi
 
 cd \${ztp_repo_dir}
+# The below line is to force the commit always push something
+# even when you run this twice for exactly the same cluster
+touch .${SPOKE_CLUSTER_NAME}-deleted-at-$(date -u +%s%N)
 git add .
-git rm -r site-configs/${SPOKE_CLUSTER_NAME}
+git rm -r clusters/${SPOKE_CLUSTER_NAME}
+[ -d site-policies/${SPOKE_CLUSTER_NAME} ] && git rm -r site-policies/${SPOKE_CLUSTER_NAME}
 git commit -m 'Delete Related ${SPOKE_CLUSTER_NAME} spoke cluster GitOps files'
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push origin main || {
 GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git pull -r origin main &&

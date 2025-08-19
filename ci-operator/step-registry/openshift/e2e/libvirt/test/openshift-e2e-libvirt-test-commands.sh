@@ -8,7 +8,7 @@ export PATH=/usr/libexec/origin:$PATH
 
 # Initial check
 case "${CLUSTER_TYPE}" in
-libvirt-ppc64le|libvirt-s390x*|powervs*)
+libvirt-ppc64le*|libvirt-s390x*|powervs*)
     ;;
 *)
     >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -326,6 +326,12 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         TEST_ARGS="${TEST_ARGS:-} --from-repository=quay.io/multi-arch/community-e2e-images"
         ;;
     esac
+	# Disabling the test until https://issues.redhat.com/browse/OCPBUGS-55458 is fixed.
+	case "${CLUSTER_TYPE}" in
+	powervs*)
+		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=service-type-load-balancer-availability"
+		;;
+	esac
 
     VERBOSITY="" # "--v 9"
     set -x

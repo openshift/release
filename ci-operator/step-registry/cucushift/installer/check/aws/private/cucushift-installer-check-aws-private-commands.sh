@@ -38,26 +38,19 @@ for cluster_lb in $(cat $CLUSTER_LB_LIST); do
 done
 
 
-#No public Route 53 DNS records that matches the baseDomain for the cluster
-if [[ -z ${BASE_DOMAIN} ]]; then
-  echo "Error: BASE_DOMAIN is not set, exit."
-  exit 1
-fi
-
 PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
-
 if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
     PUBLIC_RECORD_SETS=$(aws route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
 
     if [[ -n "${PUBLIC_RECORD_SETS}" ]]; then
         echo "Error: there's public Route 53 DNS records that matches this cluster"
-	echo "${PUBLIC_RECORD_SETS}"
-	ret=$((ret + 1))
+        echo "${PUBLIC_RECORD_SETS}"
+        ret=$((ret + 1))
     else
         echo "PASS: no public Route 53 DNS records that matches this cluster"
     fi
 else
-    echo "Error: no valid PUBLIC_ZONE_ID found for this base domain ${BASE_DOMAIN}, skip the public DNS checking"
+    echo "WARN: no valid PUBLIC_ZONE_ID found for this base domain ${BASE_DOMAIN}, skip the public DNS checking"
 fi
 
 exit $ret

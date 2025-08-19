@@ -11,10 +11,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  hypershift-tests:
-    name: hypershift-tests
-    namespace: hypershift
-    tag: latest
   ocp_4.18_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
@@ -71,13 +67,13 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-upgrade-gcp-ovn
-- always_run: false
-  as: e2e-aws-ovn-ipsec-upgrade
+- always_run: true
+  as: e2e-aws-ovn-upgrade-ipsec
   steps:
     cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
-    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 - as: e2e-ovn-step-registry
   optional: true
   steps:
@@ -118,13 +114,13 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
 - always_run: false
-  as: e2e-aws-ovn-ipsec-serial
+  as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
     cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
-    workflow: openshift-e2e-aws-ovn-ipsec-serial
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
   timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
@@ -175,7 +171,8 @@ tests:
         Services Secondary IP Family \[LinuxOnly\] should function for service endpoints
         using hostNetwork\| should have ipv4 and ipv6 internal node ip
     workflow: openshift-e2e-vsphere-ovn-dualstack
-- as: e2e-vsphere-ovn-dualstack-primaryv6
+- always_run: false
+  as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -425,15 +422,6 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: cluster-network-operator
     workflow: openshift-ci-security
-- as: hypershift-e2e-aks
-  steps:
-    cluster_profile: hypershift
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: eastus2
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-azure-aks-e2e
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

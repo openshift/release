@@ -1,6 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
+printenv
+
 if [ -z "${SHARED_DIR-}" ] ; then
     echo "The SHARED_DIR environment variable is not defined"
     exit 1
@@ -110,12 +112,26 @@ function ci_subscription_register() {
         return 1
     fi
 
+    # Create a subscription manager registration script which will run elevated.
+    # This is a workaround to avoid sudo logging its command line containing
+    # secrets in the system logs.
+    local -r submgr_script="$(mktemp /tmp/submgr_script.XXXXXXXX.sh)"
+
+    cat >"${submgr_script}" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+subscription-manager register \
+    --org="$(cat /tmp/subscription-manager-org)" \
+    --activationkey="$(cat /tmp/subscription-manager-act-key)"
+EOF
+    chmod +x "${submgr_script}"
+
     # Attempt registration with retries
     for try in $(seq 3) ; do
         echo "Trying to register the system: attempt #${try}"
-        if sudo subscription-manager register \
-                --org="$(cat /tmp/subscription-manager-org)" \
-                --activationkey="$(cat /tmp/subscription-manager-act-key)" ; then
+        if sudo "${submgr_script}" ; then
+            rm -f "${submgr_script}"
             return 0
         fi
 
@@ -159,7 +175,7 @@ function download_microshift_scripts() {
 
 function ci_get_clonerefs() {
     local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
-    if (( go_version < 23 )); then
+    if (( go_version < 24 )); then
         # Releases that use older Go, cannot compile the most recent prow code.
         # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
         mkdir -p /tmp/prow

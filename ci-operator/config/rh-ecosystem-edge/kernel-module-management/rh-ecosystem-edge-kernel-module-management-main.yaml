@@ -115,7 +115,8 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -C "${PULL_PULL_SHA}" -P "${PULL_NUMBER}" -B "${PULL_HEAD_REF}" -N "${PULL_BASE_SHA}"
       credentials:
-      - mount_path: /var/run/secrets
+      - collection: ""
+        mount_path: /var/run/secrets
         name: codecov-token
         namespace: test-credentials
       from: src
@@ -133,7 +134,8 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -B "${PULL_BASE_REF}" -C "${PULL_BASE_SHA}"
       credentials:
-      - mount_path: /var/run/secrets
+      - collection: ""
+        mount_path: /var/run/secrets
         name: codecov-token
         namespace: test-credentials
       from: src
@@ -247,7 +249,6 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  optional: true
   steps:
     test:
     - as: run-test
@@ -262,8 +263,29 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: operator-hub-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: ./ci/prow/operator-hub-upgrade
+      dependencies:
+      - env: OO_HUB_BUNDLE
+        name: hub-operator-bundle
+      from: src-grpcurl
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
 - as: security
-  optional: true
   steps:
     env:
       PROJECT_NAME: kmm

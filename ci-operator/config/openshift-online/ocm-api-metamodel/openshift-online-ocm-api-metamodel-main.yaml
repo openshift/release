@@ -1,0 +1,37 @@
+binary_build_commands: make binary
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y java && dnf clean all
+  from: src
+  to: golang-plus-java
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    unset GOFLAGS
+    go install gotest.tools/gotestsum@latest
+    make test JUNITFILE=${ARTIFACT_DIR}/junit.xml
+  container:
+    from: golang-plus-java
+- as: verify
+  commands: |
+    unset GOFLAGS
+    make verify
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: ocm-api-metamodel

@@ -41,13 +41,10 @@ base_images:
     tag: latest
 releases:
   arm64-latest:
-    prerelease:
+    release:
       architecture: arm64
-      product: ocp
-      version_bounds:
-        lower: 4.19.0-0
-        stream: 4-dev-preview
-        upper: 4.20.0-0
+      channel: candidate
+      version: "4.19"
   arm64-target:
     candidate:
       architecture: arm64
@@ -55,13 +52,10 @@ releases:
       stream: nightly
       version: "4.19"
   latest:
-    prerelease:
+    release:
       architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.19.0-0
-        stream: 4-dev-preview
-        upper: 4.20.0-0
+      channel: candidate
+      version: "4.19"
   target:
     candidate:
       architecture: amd64
@@ -74,46 +68,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-disc-priv-sts-basecap-none-mini-perm-f60
-  cron: 1 21 5 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
-      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-      PERSISTENT_MONITORING: "false"
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-f60
-  cron: 12 2 10 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.19
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-mini-perm-f60
   cron: 1 18 21 2,4,6,8,10,12 *
   steps:
@@ -184,7 +138,8 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
 - as: baremetalds-ipi-ovn-ipv4-f60
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 14 1 13 2,4,6,8,10,12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -194,9 +149,11 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
+      PACKET_METRO: dc
+      PACKET_PLAN: c3.large.arm64
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-equinix
 - as: gcp-ipi-disc-priv-oidc-mini-perm-f60
   cron: 5 1 5 1,3,5,7,9,11 *
   steps:

@@ -5,6 +5,11 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 
+cat <<EOF > /tmp/10-disable-telemetry.yaml
+telemetry:
+  status: Disabled
+EOF
+
 cat <<EOF > /tmp/prepare.sh
 #!/bin/bash
 set -xeuo pipefail
@@ -13,10 +18,13 @@ source /tmp/ci-functions.sh
 ci_subscription_register
 
 download_microshift_scripts
-"\${DNF_RETRY}" "install" "jq"
+"\${DNF_RETRY}" "install" "jq git"
 ci_copy_secrets "${CACHE_REGION}"
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+
+sudo mkdir -p /etc/microshift/config.d
+sudo cp /tmp/10-disable-telemetry.yaml /etc/microshift/config.d/10-disable-telemetry.yaml
 EOF
 chmod +x /tmp/prepare.sh
 
@@ -26,6 +34,7 @@ tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 scp \
   "${SHARED_DIR}/ci-functions.sh" \
   /tmp/prepare.sh \
+  /tmp/10-disable-telemetry.yaml \
   /var/run/rhsm/subscription-manager-org \
   /var/run/rhsm/subscription-manager-act-key \
   /var/run/microshift-dev-access-keys/aws_access_key_id \
@@ -36,7 +45,45 @@ scp \
 
 ssh "${INSTANCE_PREFIX}" "/tmp/prepare.sh"
 
-ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"
+# nvidia-device-plugin scripts live primarily in the main branch of microshift.
+# If the $SUITE is nvidia-device-plugin, we clone the main branch of microshift and copy the scripts to right version of MicroShift's repo.
+if [[ "${SUITE}" == "nvidia-device-plugin" ]]; then
+    ssh "${INSTANCE_PREFIX}" \
+        "git clone --filter=blob:none --no-checkout --depth 1 --sparse https://github.com/openshift/microshift.git /home/${HOST_USER}/microshift-main && \
+            cd /home/${HOST_USER}/microshift-main && \
+            git sparse-checkout add ./scripts/ci-nvidia-device-plugin/ && \
+            git checkout main"
+
+    ssh "${INSTANCE_PREFIX}" \
+        "cp -r /home/${HOST_USER}/microshift-main/scripts/ci-nvidia-device-plugin /home/${HOST_USER}/microshift/scripts/ci-nvidia-device-plugin/"
+
+    if [[ "${JOB_NAME}" == *"release-4.14"* || "${JOB_NAME}" == *"release-4.15"* ]]; then
+        # MicroShift 4.14 and 4.15 healthcheck scripts do not detect missing LVM setup and always expect CSI to be present. For those version, we setup LVM.
+        # Step infra-lvm-install cannot be used because bare-metal-tests step is shared with bare metal instances which are not set up for LVM (missing partitions).
+
+        # Sometimes, devices are in different order and nvme1 stores OS while nvme0 should hold LVM for topolvm.
+        # If /dev/nvme0 is already partitioned (operating system), then use nvme1 for lvm.
+        # If `partx /dev/nvme0n1` fails (rc=1), it couldn't read partition table, so it's the one to use for lvm.
+        if ssh "${INSTANCE_PREFIX}" "sudo partx /dev/nvme0n1"; then
+            device="/dev/nvme1n1"
+        else
+            device="/dev/nvme0n1"
+        fi
+        ssh "${INSTANCE_PREFIX}" "lsblk ; sudo dnf install -y lvm2 && sudo pvcreate ${device} && sudo vgcreate rhel ${device}"
+    fi
+fi
+
+setup_ok=true
+if ! ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/1-setup.sh"; then
+    setup_ok=false
+fi
+# Always try to get the artifacts, even if the setup failed
+scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/artifacts/*" "${ARTIFACT_DIR}" || true
+
+if ! "${setup_ok}"; then
+    exit 1
+fi
+
 boot_id=$(ssh "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id')
 ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/2-reboot.sh" || true
 
@@ -44,18 +91,19 @@ ssh "${INSTANCE_PREFIX}" "bash -x \${HOME}/microshift/scripts/ci-${SUITE}/2-rebo
 boot_timeout=$(( 20 * 60  ))
 start_time=$(date +%s)
 while true ; do
-    if ssh -oConnectTimeout=10 -oBatchMode=yes -oStrictHostKeyChecking=accept-new "${INSTANCE_PREFIX}" "true" &>/dev/null; then
-        new_boot_id=$(ssh "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id')
-        if [[ "${boot_id}" != "${new_boot_id}" ]]; then
-            time_to_up=$(( $(date +%s) - start_time ))
-            echo "Host is up after $(( time_to_up / 60 ))m $(( time_to_up % 60 ))s."
-            break
-        fi
+    new_boot_id=$(ssh -oConnectTimeout=10 -oBatchMode=yes -oStrictHostKeyChecking=accept-new "${INSTANCE_PREFIX}" 'cat /proc/sys/kernel/random/boot_id' 2>/dev/null || true)
+
+    if [[ -n "${new_boot_id}" && "${boot_id}" != "${new_boot_id}" ]]; then
+        time_to_up=$(( $(date +%s) - start_time ))
+        echo "Host is up after $(( time_to_up / 60 ))m $(( time_to_up % 60 ))s."
+        break
     fi
+
     if [ $(( $(date +%s) - start_time )) -gt "${boot_timeout}" ]; then
         echo "ERROR: Waited too long for the host to boot."
         exit 1
     fi
+
     sleep 30
 done
 

@@ -26,7 +26,7 @@ images:
 promotion:
   to:
   - disabled: true
-    name: "2.9"
+    name: "2.10"
     namespace: stolostron
 releases:
   initial:
@@ -116,6 +116,7 @@ tests:
           cpu: 100m
     workflow: ocm-e2e-clusterpool
 - as: sonar-pre-submit
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -126,7 +127,8 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow sonar/go/prow
       credentials:
-      - mount_path: /etc/sonarcloud/
+      - collection: ""
+        mount_path: /etc/sonarcloud/
         name: acm-sonarcloud-token
         namespace: test-credentials
       from: src
@@ -145,7 +147,8 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow sonar/go/prow
       credentials:
-      - mount_path: /etc/sonarcloud/
+      - collection: ""
+        mount_path: /etc/sonarcloud/
         name: acm-sonarcloud-token
         namespace: test-credentials
       from: src
@@ -174,7 +177,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.9
+      DESTINATION_BRANCH: backplane-2.10
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

@@ -49,6 +49,7 @@ rules:
   - clusters
   - machines
   verbs:
+  - list
   - get
   - patch
 - apiGroups:
@@ -57,8 +58,21 @@ rules:
   - ibmpowervsimages
   - awsmachines
   verbs:
+  - list
   - get
   - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ns-deleter
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -69,6 +83,19 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: hypershift-admin
+subjects:
+- kind: ServiceAccount
+  name: hypershift-workload
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hypershift-workload-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ns-deleter
 subjects:
 - kind: ServiceAccount
   name: hypershift-workload

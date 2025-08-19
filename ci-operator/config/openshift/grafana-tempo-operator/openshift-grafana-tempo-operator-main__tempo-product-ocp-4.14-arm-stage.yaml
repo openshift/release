@@ -38,34 +38,30 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: tempo-stage-tests
+- as: tempo-stage-tests
+  cron: 0 0 30 2 *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-observability
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OCP_ARCH: arm64
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:927220
       SKIP_TESTS: tests/e2e/generate tests/e2e-openshift/monolithic-multitenancy-static
         tests/e2e-openshift-serverless/* tests/e2e-openshift-object-stores/*
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:928292
     test:
     - ref: idp-htpasswd
-    - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-downstream
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

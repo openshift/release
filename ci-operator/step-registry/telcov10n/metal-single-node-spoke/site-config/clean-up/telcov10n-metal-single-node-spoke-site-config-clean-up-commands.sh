@@ -17,19 +17,22 @@ function clean_up {
   echo "************ telcov10n Clean up ManagedCluster object and related Spoke namespace ************"
 
   SPOKE_CLUSTER_NAME=${NAMESPACE}
-  set -x
-  oc delete managedcluster ${SPOKE_CLUSTER_NAME} --ignore-not-found
-  oc delete ns ${SPOKE_CLUSTER_NAME} --ignore-not-found
-  set +x
+  # if [ "${SITE_CONFIG_VERSION}" != "v2" ]; then
+    set -x
+    oc delete managedcluster ${SPOKE_CLUSTER_NAME} --ignore-not-found
+  # fi
 
-  echo "************ telcov10n Clean up AgentServiceConfig CR ************"
+  # set +x
+  oc delete ns ${SPOKE_CLUSTER_NAME} --ignore-not-found
+
+  # echo "************ telcov10n Clean up AgentServiceConfig CR ************"
 
   # set -x
   # assisted_service_pod_name=$(oc -n multicluster-engine get pods --no-headers -o custom-columns=":metadata.name" | \
   #   grep "^assisted-service" || echo "assisted-service")
   # oc delete AgentServiceConfig agent --ignore-not-found --timeout=10m && \
   # oc -n multicluster-engine wait --for=delete pod/assisted-image-service-0 pod/${assisted_service_pod_name} --timeout=10m
-  # set +x
+  set +x
 }
 
 

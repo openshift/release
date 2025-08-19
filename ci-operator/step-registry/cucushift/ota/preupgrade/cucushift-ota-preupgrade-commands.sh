@@ -24,17 +24,11 @@ function get_tp_operator(){
     "4.17")
     tp_operator=("cluster-api" "olm")
     ;;
-    "4.18")
-    tp_operator=("cluster-api")
-    ;;
-    "4.19")
-    tp_operator=("cluster-api")
-    ;;
     *)
-    tp_operator=()
+    tp_operator=("cluster-api")
     ;;
     esac
-    echo ${tp_operator[*]}
+    echo "${tp_operator[@]}"
 }
 
 # get prometheus object
@@ -98,7 +92,7 @@ function check_manifest_annotations(){
         return 1
     fi
     tp_operators=$(printf "%s " "${tp_operator[*]}")
-    for op_file in ${tp_op_filepaths[*]}; do
+    for op_file in "${tp_op_filepaths[@]}"; do
         op_name=$(yq e '.metadata.name' ${op_file})
         if [ -z "${op_name}" ] ; then
             echo "No metadata.name in manifest!"
@@ -392,7 +386,7 @@ function pre-OCP-47197(){
         echo "Fail to get tp operator list on ${src_ver}!"
         return 1
     fi
-    for tp_op in ${src_tp_op[*]}; do
+    for tp_op in "${src_tp_op[@]}"; do
         if ! check_tp_operator_notfound ${tp_op}; then
             return 1
         fi
@@ -403,7 +397,7 @@ function pre-OCP-47197(){
         echo "Fail to get tp operator list on ${tgt_ver}!"
         return 1
     fi
-    if ! check_manifest_annotations ${tgt_tp_op[*]}; then
+    if ! check_manifest_annotations "${tgt_tp_op[@]}"; then
         echo "Fail to check annotation in target manifest"
         return 1
     else
@@ -459,7 +453,7 @@ function pre-OCP-53907(){
         return 1
     fi
     bad_metadata="true"
-    for image in ${images[*]}; do
+    for image in "${images[@]}"; do
         if [[ "${image}" == "null" ]] ; then
             echo "No image info!"
             return 1
@@ -514,7 +508,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to-image with to multi arch" \
     "oc adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:f44f1570d0b88a75034da9109211bb39672bc1a5d063133a50dcda7c12469ca7 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
 
@@ -522,7 +516,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to with to multi arch" \
     "oc adm upgrade --to 4.10.0 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
     # verify not progressing.
@@ -580,6 +574,9 @@ function pre-OCP-60397(){
     # set testing graph
     set_upstream_graph "https://arm64.ocp.releases.ci.openshift.org/graph" || return 1
 
+    # wait for status change
+    sleep 60
+
     # check RetrievedUpdates=True
     verify_retrieved_updates  || return 1
 
@@ -600,8 +597,13 @@ function pre-OCP-60397(){
     "architecture=\"arm64\"" \
     || return 1
 
+    #export pull-secrets from live cluster for skopeo inspect to use
+    run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --confirm --to=/tmp/secret/"
     # verify cvo image still non-hetero
-    verify_nonhetero || return 1
+    verify_output \
+    "cvo image pre-transition is non-hetero" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') --authfile /tmp/secret/.dockerconfigjson | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.v2+json" || return 1
 
     # clear the upgrade
     if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
@@ -668,7 +670,7 @@ function pre-OCP-47160(){
         echo "Fail to get tp operator list on ${version}!"
         return 1
     fi
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if ! check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -700,7 +702,7 @@ function pre-OCP-47160(){
     fi
 
     echo "Check the techpreview operator is installed..."
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -770,7 +772,7 @@ function pre-OCP-47200(){
         done
     fi
 
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if ! check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -795,7 +797,7 @@ function pre-OCP-47200(){
     fi
 
     echo "Check the techpreview operator is not installed..."
-    for op in ${tp_op[*]}; do
+    for op in "${tp_op[@]}"; do
         if ! check_tp_operator_notfound ${op}; then
             return 1
         fi
@@ -808,16 +810,18 @@ function pre-OCP-47200(){
 # Define if the specified case should be run or not
 function run_ota_multi_test(){
     caseset=(OCP-47197)
-    for case in ${caseset[*]}; do
+    for case in "${caseset[@]}"; do
         if ! type pre-"${case}" &>/dev/null; then
-            echo "WARN: no pre-${case} function found" >> "${report_file}"
+            echo "WARN: no pre-${case} function found"
         else
             echo "------> ${case}"
             pre-"${case}"
             if [[ $? == 0 ]]; then
-                echo "PASS: pre-${case}" >> "${report_file}"
+                echo "PASS: pre-${case}"
+                export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${case}"
             else
-                echo "FAIL: pre-${case}" >> "${report_file}"
+                echo "FAIL: pre-${case}"
+                export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${case}"
             fi
         fi
     done
@@ -826,14 +830,16 @@ function run_ota_multi_test(){
 # Run single case through case ID
 function run_ota_single_case(){
     if ! type pre-"${1}" &>/dev/null; then
-        echo "WARN: no pre-${1} function found" >> "${report_file}"
+        echo "WARN: no pre-${1} function found"
     else
         echo "------> ${1}"
         pre-"${1}"
         if [[ $? == 0 ]]; then
-            echo "PASS: pre-${1}" >> "${report_file}"
+            echo "PASS: pre-${1}"
+            export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${1}"
         else
-            echo "FAIL: pre-${1}" >> "${report_file}"
+            echo "FAIL: pre-${1}"
+            export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${1}"
             # case failed in the middle may leave the cluster in unusable state
             if type defer-"${1}" &>/dev/null; then
                 defer-"${1}"
@@ -842,11 +848,31 @@ function run_ota_single_case(){
     fi
 }
 
+# Generate the Junit for ota-preupgrade
+function createPreUpgradeJunit() {
+    echo -e "\n# Generating the Junit for ota-preupgrade"
+    local report_file="${ARTIFACT_DIR}/junit_ota_preupgrade.xml"
+    IFS=" " read -r -a ota_success_cases <<< "${SUCCESS_CASE_SET}"
+    IFS=" " read -r -a ota_failure_cases <<< "${FAILURE_CASE_SET}"
+    local cases_count=$((${#ota_success_cases[@]} + ${#ota_failure_cases[@]}))
+    echo '<?xml version="1.0" encoding="UTF-8"?>' > "${report_file}"
+    echo "<testsuite name=\"ota preupgrade\" tests=\"${cases_count}\" failures=\"${#ota_failure_cases[@]}\">" >> "${report_file}"
+    for success in "${ota_success_cases[@]}"; do
+        echo "  <testcase name=\"ota preupgrade should succeed: ${success}\"/>" >> "${report_file}"
+    done
+    for failure in "${ota_failure_cases[@]}"; do
+        echo "  <testcase name=\"ota preupgrade should succeed: ${failure}\">" >> "${report_file}"
+        echo "    <failure message=\"ota preupgrade failed at ${failure}\"></failure>" >> "${report_file}"
+        echo "  </testcase>" >> "${report_file}"
+    done
+    echo '</testsuite>' >> "${report_file}"
+}
+
+
 if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
   exit 0
 fi
 
-report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 # oc cli is injected from release:target
 run_command "which oc"
 run_command "oc version --client"
@@ -858,9 +884,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+export SUCCESS_CASE_SET=""
+export FAILURE_CASE_SET=""
+
 set +e
 if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
 else
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
+createPreUpgradeJunit

@@ -194,12 +194,41 @@ deploy_agnhost_container() {
   $IP link set $dummy up
   $CLI network create --driver macvlan --ipam-driver=none -o parent=$dummy --ipv6 $net
   
-  $CLI run -d --privileged --name $name --network $net --rm registry.k8s.io/e2e-test-images/agnhost:2.40 netexec --http-port=8000
+  $CLI run -d --privileged --name $name --hostname $name --network $net --rm registry.k8s.io/e2e-test-images/agnhost:2.40 netexec --http-port=8000
   $CLI exec $name ip address add dev eth0 172.20.0.100/16
   $CLI exec $name ip route add default dev eth0 via 172.20.0.2
   $CLI exec $name ip -6 address add dev eth0 2001:db8:2::100/64
   $CLI exec $name ip -6 route add default dev eth0 via 2001:db8:2::2
 }
+
+# Set ipForwarding=Global for LGW. This a workaround until OCPBUGS-42993 is fixed.
+local_gateway_mode=$(oc get networks.operator.openshift.io cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}')
+if [ "$local_gateway_mode" = "true" ]; then
+    echo "cluster is in local gateway mode"
+    ip_forwarding=$(oc get networks.operator.openshift.io cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding}')
+    if [ "$ip_forwarding" != "Global" ]; then
+      echo "Setting ip_forwarding to Global..."
+      oc patch Network.operator.openshift.io cluster --type=merge \
+        -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
+
+      echo "Waiting for network operator to start applying changes..."
+      for _ in {1..30}; do
+        if [[ $(oc get co network -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}') == "True" ]]; then
+          echo "Network operator started applying changes"
+          break
+        fi
+        sleep 10
+      done
+      echo "Waiting for network operator to complete changes..."
+      for _ in {1..30}; do
+        if [[ $(oc get co network -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}') == "False" ]]; then
+          echo "Network configuration completed successfully"
+          break
+        fi
+        sleep 10
+      done
+    fi
+fi
 
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
@@ -223,14 +252,20 @@ fi
 # connects, on a specific VRF per extra cluster network, to the corresponding agnhost container macvlan network and that extra cluster network  
 deploy_frr_external_container vrf_neighbors
 
+# apply FRR-K8s overrides to enable debug logging
+oc create namespace openshift-frr-k8s
+oc apply -f - <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: env-overrides
+  namespace: openshift-frr-k8s
+data:
+  frrk8s-loglevel: --log-level=debug
+EOF
+
 # enable route advertisement with FRR
 oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
-
-echo "Waiting for namespace 'openshift-frr-k8s' to be created..."
-until $KCLI get namespace "openshift-frr-k8s" &> /dev/null; do
-  sleep 5
-done
-echo "Namespace 'openshift-frr-k8s' has been created."
 
 echo "Waiting for daemonset 'frr-k8s' to be created..."
 until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do

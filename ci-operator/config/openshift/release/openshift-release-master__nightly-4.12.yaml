@@ -122,19 +122,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ovn-assisted
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: assisted-baremetal
 - as: e2e-aws-ovn-single-node-workers-serial
   interval: 168h
   steps:
@@ -182,12 +169,12 @@ tests:
 - as: e2e-metal-ovn-single-node-live-iso
   cron: 3 4 */5,17 * *
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   cron: 18 7 */5,18 * *
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
@@ -263,13 +250,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-- as: e2e-metal-ipi-sdn-bm-upgrade
+- as: e2e-metal-ipi-sdn-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -315,7 +301,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere-sdn
-  cron: 48 6 */5,18 * *
+  cron: 2 21 * * 6
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -323,7 +309,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-sdn
 - as: e2e-vsphere-ovn-techpreview
-  cron: 35 19 */4,14 * *
+  cron: 46 23 * * 3
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -345,7 +331,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
-  cron: 22 21 */14,28 * *
+  cron: 25 5 * * 0
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -353,7 +339,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-ovn-serial
-  cron: 37 14 */13,26 * *
+  cron: 32 20 * * 0
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -361,7 +347,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-techpreview-serial
-  cron: 46 20 */1,10 * *
+  cron: 6 18 * * 4
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -371,7 +357,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
-  cron: 48 8 */5,18 * *
+  cron: 26 10 * * 2
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -379,7 +365,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
-  cron: 5 18 */8,19 * *
+  cron: 39 18 * * 3
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -387,7 +373,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-ovn-csi
-  cron: 7 5 */12,21 * *
+  cron: 15 10 * * 4
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -398,12 +384,12 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-zones
-  cron: 2 16 */1,14 * *
+  cron: 57 1 * * 6
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-etcd-scaling
-  cron: 58 5 */6,16 * *
+  cron: 27 15 * * 3
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -415,7 +401,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      PLATFORM_VERSION: "8.4"
+      PLATFORM_VERSION: "8.10"
     observers:
       enable:
       - observers-resource-watch
@@ -704,7 +690,8 @@ tests:
         cd /tmp/cnv-ci
         make deploy_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: ""
+        mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:
@@ -746,7 +733,8 @@ tests:
         cd /tmp/cnv-ci
         make upgrade_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: ""
+        mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:
@@ -771,7 +759,7 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 - as: e2e-aws-driver-toolkit
-  cron: 15 22 */14,25 * *
+  interval: 168h
   steps:
     cluster_profile: aws-2
     observers:
@@ -786,58 +774,14 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-telco5g
-  cluster: build05
-  cron: 08 2 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=false
-        CNF_ORIGIN_TESTS=true
-      T5CI_JOB_TYPE: origintests
-      T5CI_VERSION: "4.12"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-origin
-- as: e2e-telco5g-cnftests
-  cluster: build05
-  cron: 00 16 * * 6,0
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.12"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-cnf
-  timeout: 6h0m0s
-- as: e2e-telco5g-sno-cnftests
-  cluster: build05
-  cron: 00 16 * * 6,0
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.12"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 21 * * 6
   restrict_network_access: false
   steps:
     env:
+      SKIP_OCP_INSTALL: "false"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.12"
     observers:

@@ -1,52 +1,46 @@
 base_images:
-  ocp_4.19_ovn-kubernetes:
-    name: "4.19"
-    namespace: ocp
-    tag: ovn-kubernetes
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
-  origin_scos-4.19_ovn-kubernetes:
-    name: scos-4.19
+    tag: rhel-9-golang-1.23-openshift-4.20
+  origin_scos-4.20_ovn-kubernetes:
+    name: scos-4.20
     namespace: origin
     tag: ovn-kubernetes
-  origin_scos-4.19_tools:
-    name: scos-4.19
+  origin_scos-4.20_tools:
+    name: scos-4.20
     namespace: origin
     tag: tools
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.19
+    tag: rhel-9-release-golang-1.23-openshift-4.20
 images:
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: Dockerfile
-  from: origin_scos-4.19_tools
+  from: origin_scos-4.20_tools
   inputs:
-    ocp_4.19_ovn-kubernetes:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:ovn-kubernetes
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.20:
       as:
       - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-    origin_scos-4.19_ovn-kubernetes:
+    origin_scos-4.20_ovn-kubernetes:
       as:
       - ovnkube-trace
+      - registry.ci.openshift.org/ocp/4.19:ovn-kubernetes
   to: network-tools
 promotion:
   to:
-  - name: scos-4.19
+  - name: scos-4.20
     namespace: origin
 releases:
   latest:
     integration:
       include_built_images: true
-      name: scos-4.19
+      name: scos-4.20
       namespace: origin
 resources:
   '*':

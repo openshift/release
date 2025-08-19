@@ -7,7 +7,15 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 
 declare ICSP_NAME=${OTEL_ICSP_NAME}
 declare CATALOG_SOURCE=${OTEL_CATALOG_SOURCE}
-declare DT_INDEX_IMAGE=${OTEL_INDEX_IMAGE}
+declare DT_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE}
+
+# Check if DT_INDEX_IMAGE is not empty
+if [[ -z "$DT_INDEX_IMAGE" ]]; then
+    echo "Error: DT_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "DT_INDEX_IMAGE is set to: $DT_INDEX_IMAGE"
+fi
 
 set_proxy() {
 	[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
@@ -71,7 +79,7 @@ update_global_auth() {
 	brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
 
 	# Create a new dockerconfig with the konflux registry credentials without the "email" field
-	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"https://registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
+	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"https://registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
 
 	# update global auth
 	local -i ret=0
@@ -114,9 +122,18 @@ create_icsp_connected() {
     name: $ICSP_NAME
   spec:
     repositoryDigestMirrors:
-    - mirrors:
-      - registry.stage.redhat.io
-      source: registry.redhat.io
+    - source: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-collector
+    - source: registry.redhat.io/rhosdt/opentelemetry-target-allocator-rhel8
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-target-allocator
+    - source: registry.redhat.io/rhosdt/opentelemetry-rhel8-operator
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-operator
+    - source: registry.redhat.io/rhosdt/opentelemetry-operator-bundle
+      mirrors:
+      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-bundle
 EOF
 		echo "!!! fail to create the ICSP"
 		return 1

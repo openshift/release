@@ -4,6 +4,12 @@ set -o pipefail
 
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Create group_vars directory"
 mkdir ${ECO_CI_CD_INVENTORY_PATH}/group_vars
 
@@ -25,5 +31,5 @@ export CLUSTER_NAME=${CLUSTER_NAME}
 echo CLUSTER_NAME=${CLUSTER_NAME}
 
 cd /eco-ci-cd/
-ansible-playbook ./playbooks/cnf/deploy-cnf-config.yaml -i ./inventories/ocp-deployment/deploy-ocp-hybrid-multinode.yml \
+ansible-playbook ./playbooks/cnf/deploy-cnf-config.yaml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig

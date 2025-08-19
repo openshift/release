@@ -208,4 +208,117 @@ if [[ ${ASSIGN_ROLES_TO_SUBNETS} == "yes" ]]; then
   fi
 fi
 
+
+# ----------------------------------------------------------
+# Check if instances match CPMS spec
+# https://issues.redhat.com/browse/OCPBUGS-55492
+#
+# This check is applicable for all CAPI install*
+# For now, it will be enabled for 4.19+ only.*
+# We will enable the check on the previous versions depending on the backport
+#
+# C2S/SC2S emulator uses single AZ, skip check for them.
+# ----------------------------------------------------------
+
+all_equal() {
+  echo "Checking $*"
+  local first="$1"
+  shift
+  for s in "$@"; do
+    if [ "$first" != "$s" ]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
+
+if [ -f "${SHARED_DIR}/unset-proxy.sh" ] ; then
+  source "${SHARED_DIR}/unset-proxy.sh"
+fi
+
+if ((ocp_major_version == 4 && ocp_minor_version >= 19)) && [[ ! "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+
+  echo "Check if instances match CPMS spec ... "
+
+  workdir=$(mktemp -d)
+  out_machines=${workdir}/machines.json
+  out_instances=${workdir}/instances.json
+  out_subnets=${workdir}/subnets.json
+
+  if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+  fi
+
+  oc get machines.machine.openshift.io -n openshift-machine-api -ojson > $out_machines
+
+  if [ -f "${SHARED_DIR}/unset-proxy.sh" ] ; then
+    source "${SHARED_DIR}/unset-proxy.sh"
+  fi
+
+  aws --region $REGION ec2 describe-instances --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" > $out_instances
+  vpc_id=$(jq -r '.Reservations[].Instances[] | select(.State.Name == "running") | .VpcId' $out_instances | head -n 1)
+  aws --region $REGION ec2 describe-subnets --filters "Name=vpc-id,Values=${vpc_id}" > $out_subnets
+
+  count=$(jq '.items|length' $out_machines)
+  for i in $(seq 0 $((count-1)));
+  do
+    # Outputs from Cluster cluster
+    c_subnet=$(jq -r --argjson i $i '.items[$i].spec.providerSpec.value.subnet.id' $out_machines)
+    c_placement_az=$(jq -r --argjson i $i '.items[$i].spec.providerSpec.value.placement.availabilityZone' $out_machines)
+    c_provider_id=$(jq -r --argjson i $i '.items[$i].spec.providerID' $out_machines)
+    c_name=$(jq -r --argjson i $i '.items[$i].metadata.name' $out_machines)
+    c_role=$(jq -r --argjson i $i '.items[$i].metadata.labels."machine.openshift.io/cluster-api-machine-role"' $out_machines)
+    c_zone_label=$(jq -r --argjson i $i '.items[$i].metadata.labels."machine.openshift.io/zone"' $out_machines)
+    c_instance_id=$(jq -r --argjson i $i '.items[$i].status.providerStatus.instanceId' $out_machines)
+
+    # Outputs from AWS VPC
+    v_subnet_az=$(jq -r --arg s $c_subnet '.Subnets[] | select(.SubnetId==$s) | .AvailabilityZone' $out_subnets)
+    v_subnet_azid=$(jq -r --arg s $c_subnet '.Subnets[] | select(.SubnetId==$s) | .AvailabilityZoneId' $out_subnets)
+
+    # Outputs from AWS EC2 Instance
+    i_subnet=$(jq -r --arg id $c_instance_id '.Reservations[].Instances[] | select(.InstanceId==$id) | .SubnetId' $out_instances)
+    i_placement_az=$(jq -r --arg id $c_instance_id '.Reservations[].Instances[] | select(.InstanceId==$id) | .Placement.AvailabilityZone' $out_instances)
+
+
+    echo -e "\n--------- ${c_role} / ${c_name}"
+    echo -e "** From Cluster cluster"
+    echo -e "Name:\t$c_name"
+    echo -e "Role:\t$c_role"
+
+    echo -e "Subnet:\t$c_subnet"
+    echo -e "Placement AZ:\t$c_placement_az"
+    echo -e "Provider ID:\t$c_provider_id"
+    echo -e "Label machine.openshift.io/zone:\t$c_zone_label"
+    echo -e "Instance ID:\t$c_instance_id"
+
+    echo -e "\n** From AWS VPC: ${c_subnet}"
+    echo -e "Subnet AZ:\t$v_subnet_az"
+    echo -e "Subnet AZ ID:\t$v_subnet_azid"
+
+    echo -e "\n** From AWS EC2: ${c_instance_id}"
+    echo -e "Subnet:\t$i_subnet"
+    echo -e "Placement AZ:\t$i_placement_az"
+
+    provider_az=$(echo "${c_provider_id}" | awk -F'/' '{print $4}')
+
+    if ! all_equal "$c_placement_az" "$c_zone_label" "$v_subnet_az" "$i_placement_az" "$provider_az"; then
+      ret=$((ret+1))
+      echo "FAIL: Instances do NOT match CPMS spec: c_placement_az:$c_placement_az c_zone_label:$c_zone_label v_subnet_az:$v_subnet_az i_placement_az:$i_placement_az provider_az:$provider_az"
+    else
+      echo "PASS: Instances match CPMS spec."
+    fi
+  done
+
+else
+  echo "Skip instances-CPMS checking for ${ocp_major_version}.${ocp_minor_version}"
+fi
+
+
 exit $ret

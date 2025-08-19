@@ -13,9 +13,21 @@ function debug() {
     if (( FRC != 0 )); then
         set +e
         oc image info --show-multiarch "${OO_BUNDLE}" |& tee "${ARTIFACT_DIR}/image-info.txt"
+        echo "Collecting deployments, pods, events, and other resources for debugging. Please check the ARTIFACT_DIR directory."
         for r in pods deployments events subscriptions clusterserviceversions clusterpodplacementconfigs; do
           oc get ${r} -n "${NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/${r}.yaml"
-          oc describe ${r} -n "${NAMESPACE}" |& tee "${ARTIFACT_DIR}/${r}.txt"
+          oc describe ${r} -n "${NAMESPACE}" > "${ARTIFACT_DIR}/${r}.txt" 2>&1
+          if [[ "$r" == "pods" || "$r" == "deployments" ]]; then
+            for file in "${ARTIFACT_DIR}/${r}.yaml" "${ARTIFACT_DIR}/${r}.txt"; do
+              sed -i \
+                -e '/name: HTTP_PROXY/  { n; s/value:.*/value: REDACTED/; }' \
+                -e '/name: HTTPS_PROXY/ { n; s/value:.*/value: REDACTED/; }' \
+                -e '/name: NO_PROXY/    { n; s/value:.*/value: REDACTED/; }' \
+                -e 's/HTTP_PROXY:.*/HTTP_PROXY: REDACTED/' \
+                -e 's/HTTPS_PROXY:.*/HTTPS_PROXY: REDACTED/' \
+                -e 's/NO_PROXY:.*/NO_PROXY: REDACTED/' "$file"
+            done
+          fi
           oc get ${r} -n "${NAMESPACE}" -o wide
         done
     fi
@@ -118,8 +130,8 @@ echo "Waiting for multiarch-tuning-operator"
 wait_created deployments -n ${NAMESPACE} -l app.kubernetes.io/part-of=multiarch-tuning-operator
 oc wait deployments -n ${NAMESPACE} \
   -l app.kubernetes.io/part-of=multiarch-tuning-operator \
-  --for=condition=Available=True
+  --for=condition=Available=True --timeout=300s
 wait_created pods -n ${NAMESPACE} -l control-plane=controller-manager
 oc wait pods -n ${NAMESPACE} \
   -l control-plane=controller-manager \
-  --for=condition=Ready=True
+  --for=condition=Ready=True --timeout=300s

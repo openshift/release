@@ -1,12 +1,12 @@
 base_images:
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
   os:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
 binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
 build_root:
   project_image:
@@ -23,30 +23,30 @@ images:
 - dockerfile_path: Dockerfile.osde2e
   from: os
   inputs:
-    openshift_release_golang-1.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: integreatly-operator-test-harness-osde2e
 - dockerfile_path: Dockerfile.functional
   from: os
   inputs:
-    openshift_release_golang-1.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: integreatly-operator-test-harness
 - dockerfile_path: Dockerfile.scorecard
   from: os
   inputs:
-    openshift_release_golang-1.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: scorecard-test-kuttl
 - dockerfile_path: Dockerfile.external
   from: os
   inputs:
-    openshift_release_golang-1.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: integreatly-operator-test-external
 promotion:
   to:
@@ -88,11 +88,6 @@ tests:
   commands: make gosec
   container:
     from: src
-- as: test-cases-lint
-  commands: make test-cases/lint
-  container:
-    from: src
-  run_if_changed: test-cases/.*
 - as: kubebuilder
   commands: make kubebuilder/check
   container:

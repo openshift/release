@@ -27,7 +27,7 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.18_base-rhel9:
+  ocp_4.19_base-rhel9:
     name: "4.19"
     namespace: ocp
     tag: base-rhel9
@@ -41,17 +41,16 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.18_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cluster-etcd-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -86,34 +85,41 @@ tests:
   container:
     from: test-bin
 - as: e2e-agnostic-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-agnostic-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-aws-disruptive
+- always_run: false
+  as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-disruption
-- as: e2e-aws-disruptive-ovn
+- always_run: false
+  as: e2e-aws-disruptive-ovn
   optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption-ovn
-- as: e2e-gcp-disruptive
+- always_run: false
+  as: e2e-gcp-disruptive
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-disruption
-- as: e2e-gcp-disruptive-ovn
+- always_run: false
+  as: e2e-gcp-disruptive-ovn
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-disruption-ovn
 - as: e2e-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws-3
     env:
@@ -131,7 +137,7 @@ tests:
 - as: e2e-operator-fips
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -145,22 +151,26 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-gcp
+- always_run: false
+  as: e2e-gcp
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
@@ -169,24 +179,28 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-assisted
+- always_run: false
+  as: e2e-metal-assisted
   cluster: build05
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-baremetal
 - as: e2e-aws-ovn-single-node
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
-- as: e2e-metal-single-node-live-iso
+- always_run: false
+  as: e2e-metal-single-node-live-iso
   optional: true
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
-- as: configmap-scale
+- always_run: false
+  as: configmap-scale
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-serial
   steps:
@@ -196,17 +210,20 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-etcd-scaling
-- as: e2e-gcp-ovn-etcd-scaling
+- always_run: false
+  as: e2e-gcp-ovn-etcd-scaling
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-azure-ovn-etcd-scaling
+- always_run: false
+  as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
-- as: e2e-vsphere-ovn-etcd-scaling
+- always_run: false
+  as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -219,29 +236,27 @@ tests:
 - as: e2e-aws-etcd-certrotation
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-etcd-certrotation
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown
   optional: true
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1800"
       CLUSTER_AGE_STEP: "300"
-      PACKET_OS: rocky_9
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown
   optional: true
   steps:
-    cluster_profile: packet-assisted
+    cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1800"
       CLUSTER_AGE_STEP: "300"
-      PACKET_OS: rocky_9
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-aws-cpms
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       commands: make e2e-periodic

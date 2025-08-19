@@ -25,7 +25,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-vsphere-ovn-upgrade
-  interval: 168h
+  cron: 5 7 * * 6
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -33,7 +33,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere
 - as: e2e-vsphere-ovn-upgrade-storage-data
-  interval: 168h
+  cron: 34 0 * * 1
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -64,7 +64,6 @@ tests:
     workflow: openshift-upgrade-aws-single-node-realtime
   timeout: 5h0m0s
 - as: e2e-gcp-ovn-upgrade
-  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-3
@@ -76,7 +75,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-ovn-rt-upgrade
-  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -93,6 +91,7 @@ tests:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v5
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -117,6 +116,7 @@ tests:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v5
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -124,7 +124,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-runc
 - as: e2e-gcp-runc-upgrade
-  cluster: build02
   cron: '@weekly'
   steps:
     cluster_profile: gcp-3
@@ -147,56 +146,13 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-runc
 - as: e2e-vsphere-runc-upgrade
-  cron: '@weekly'
+  cron: 56 4 * * 5
   steps:
     cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere-runc
-- as: e2e-azure-cgroupsv1-upgrade
-  cron: '@weekly'
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      FAIL_ON_CORE_DUMP: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-azure-cgroupsv1
-- as: e2e-gcp-cgroupsv1-upgrade
-  cluster: build02
-  cron: '@weekly'
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    env:
-      FAIL_ON_CORE_DUMP: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-gcp-cgroupsv1
-- as: e2e-aws-cgroupsv1-upgrade
-  cron: '@daily'
-  steps:
-    cluster_profile: aws
-    env:
-      FAIL_ON_CORE_DUMP: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-cgroupsv1
-- as: e2e-vsphere-cgroupsv1-upgrade
-  cron: '@weekly'
-  steps:
-    cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-vsphere-cgroupsv1
 zz_generated_metadata:
   branch: master
   org: openshift

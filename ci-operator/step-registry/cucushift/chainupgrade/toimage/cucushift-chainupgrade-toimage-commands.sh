@@ -49,6 +49,8 @@ function check_failed_operator(){
             failing_operator=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operator \K.*?(?= is)') || true
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'operators \K.*?(?= are)'|tr -d ',') || true
             failing_operators="${failing_operator} ${failing_operators}"
+        elif [[ ${failing_status} == "Unknown" ]]; then
+            failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Failing").message'|grep -oP 'waiting on \K.*?(?= over)'|tr -d ',') || true
         else
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'wait has exceeded 40 minutes for these operators: \K.*'|tr -d ',') || \
             failing_operators=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "Progressing").message'|grep -oP 'waiting up to 40 minutes on \K.*'|tr -d ',') || \
@@ -132,7 +134,7 @@ function extract_ccoctl(){
 }
 
 function update_cloud_credentials_oidc(){
-    local platform preCredsDir tobeCredsDir tmp_ret testcase="oc_update"
+    local platform preCredsDir tobeCredsDir tmp_ret testcase="OCP-66839"
 
     platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
@@ -188,7 +190,10 @@ function update_cloud_credentials_oidc(){
 
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
 function cco_annotation(){
-    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+    local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
+    source_minor_version="$(echo "$source_version" | cut -f2 -d.)"
+    target_minor_version="$(echo "$target_version" | cut -f2 -d.)"
+    if (( source_minor_version == target_minor_version )) || (( source_minor_version < 8 )); then
         echo "CCO annotation change is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
@@ -197,19 +202,19 @@ function cco_annotation(){
     if [[ ${cco_mode} == "Manual" ]]; then
         echo "CCO annotation change is required in Manual mode"
     elif [[ -z "${cco_mode}" || ${cco_mode} == "Mint" ]]; then
-        if [[ "${SOURCE_MINOR_VERSION}" == "14" && ${platform} == "GCP" ]] ; then
+        if [[ "${source_minor_version}" == "14" && ${platform} == "GCP" ]] ; then
             echo "CCO annotation change is required in default or Mint mode on 4.14 GCP cluster"
         else
-            echo "CCO annotation change is not required in default or Mint mode on 4.${SOURCE_MINOR_VERSION} ${platform} cluster"
+            echo "CCO annotation change is not required in default or Mint mode on 4.${source_minor_version} ${platform} cluster"
             return 0
         fi
     else
         echo "CCO annotation change is not required in ${cco_mode} mode"
         return 0
-    fi  
-        
+    fi
+
     echo "Require CCO annotation change"
-    local wait_time_loop_var=0; to_version="$(echo "${TARGET_VERSION}" | cut -f1 -d-)"
+    local wait_time_loop_var=0; to_version="$(echo "${target_version}" | cut -f1 -d-)"
     oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${to_version}"'"}}}' --type=merge
 
     echo "CCO annotation patch gets started"
@@ -230,6 +235,48 @@ function cco_annotation(){
         echo >&2 "Timed out waiting for CCO annotation completing, exiting"
         # Explicitly set failure to cco
         export UPGRADE_FAILURE_TYPE="cloud-credential"
+        return 1
+    fi
+}
+
+function disable_boot_image_update() {
+    # Get current machineManagers value
+    local current_value
+    current_value=$(oc get MachineConfiguration cluster -n openshift-machine-config-operator -o jsonpath='{.spec.managedBootImages.machineManagers}' 2>/dev/null)
+    local get_status=$?
+
+    if [ $get_status -ne 0 ]; then
+        echo "Error: Failed to get current MachineConfiguration. Check cluster access."
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+
+    # Check if the value is already empty array
+    if [[ "$current_value" == "[]" ]]; then
+        echo "machineManagers is already configured as empty array. No changes needed."
+        return 0
+    fi
+
+    echo "Current machineManagers value: $current_value"
+    echo "Disabling updated boot images by editing MachineConfiguration..."
+    # Edit the MachineConfiguration to disable boot image updates
+    if ! oc patch MachineConfiguration cluster --type=merge --patch '{"spec":{"managedBootImages":{"machineManagers":[]}}}' -n openshift-machine-config-operator; then
+        echo "Error: Failed to patch MachineConfiguration."
+	export UPGRADE_FAILURE_TYPE="machine-config"
+        return 1
+    fi
+
+    # Verify the change
+    echo "Verifying the change..."
+    local new_value
+    new_value=$(oc get MachineConfiguration cluster -n openshift-machine-config-operator -o jsonpath='{.spec.managedBootImages.machineManagers}')
+
+    if [[ "$new_value" == "[]" ]]; then
+        echo "Successfully disabled boot image update."
+        return 0
+    else
+        echo "Error: Failed to update machineManagers. Current value: $new_value"
+	export UPGRADE_FAILURE_TYPE="machine-config"
         return 1
     fi
 }
@@ -303,6 +350,30 @@ EOF
     git pull || true
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
+}
+
+function rhel_pre_unpause(){
+    echo "Running the workaround step before unpausing worker mcp"
+    local testcase="rhel"
+    cat > /tmp/rhel_pre_unpause.yaml <<-'EOF'
+---
+- name: RHEL pre-unpause playbook
+  hosts: workers
+  any_errors_fatal: true
+  gather_facts: false
+  vars:
+    required_packages:
+      - ose-azure-acr-image-credential-provider
+      - ose-gcp-gcr-image-credential-provider
+  tasks:
+  - name: Install required package on the node
+    dnf:
+      name: "{{ required_packages }}"
+      state: latest
+      disable_gpg_check: true
+EOF
+    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/rhel_pre_unpause.yaml -vvv
 }
 
 # Do sdn migration to ovn since sdn is not supported from 4.17 version
@@ -608,6 +679,32 @@ function wait_mcp_continous_success() {
     fi
 }
 
+function wait_node_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria=20 max_retries=80 interval=30
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
+        sleep ${interval}
+        if check_node; then
+            (( continous_successful_check += 1 ))
+        else
+            continous_successful_check=0
+        fi
+        echo "${try} wait and retry..."
+        echo "Continue success time: ${continous_successful_check}"
+        (( try += 1 ))
+    done
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some nodes does not get ready or not stable"
+        echo "Debug: current node output is:"
+        oc get node
+        # Explicitly set failure to node
+        export UPGRADE_FAILURE_TYPE="node"
+        return 1
+    else
+        echo "All node status check PASSED"
+        return 0
+    fi
+}
+
 function check_node() {
     local node_number ready_number testcase="node"
     node_number=$(${OC} get node |grep -vc STATUS)
@@ -650,12 +747,12 @@ function health_check() {
 
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response try max_retries
-    if [[ "${TARGET}" =~ "@sha256:" ]]; then
-        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries payload="${1}"
+    if [[ "${payload}" =~ "@sha256:" ]]; then
+        digest="$(echo "${payload}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
     else
-        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        digest="$(oc image info "${payload}" -o json | jq -r ".digest")"
         echo "The target image is using tagname pullspec, its digest is ${digest}"
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -670,32 +767,37 @@ function check_signed() {
         sleep 60
     done
     if (( response == 200 )); then
-        echo "${TARGET} is signed" && return 0
+        echo "${payload} is signed" && return 0
     else
-        echo "Seem like ${TARGET} is not signed" && return 1
+        echo "Seem like ${payload} is not signed" && return 1
     fi
 }
 
 # Check if admin ack is required before upgrade
 function admin_ack() {
-    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+    local source_version="${1}" target_version="${2}" source_minor_version target_minor_version
+    source_minor_version="$(echo "$source_version" | cut -f2 -d.)"
+    target_minor_version="$(echo "$target_version" | cut -f2 -d.)"
+
+    if (( source_minor_version == target_minor_version )) || (( source_minor_version < 8 )); then
         echo "Admin ack is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
     echo -e "All admin acks:\n${out}"
-    if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
+    if [[ ${out} != *"ack-4.${source_minor_version}"* ]]; then
         echo "Admin ack not required: ${out}" && return
     fi
 
-    echo "Require admin ack:\n ${out}"
-    local wait_time_loop_var=0 ack_data testcase="admin_ack"
+    echo -e "Require admin ack:\n ${out}"
+    local wait_time_loop_var=0 ack_data testcase="OCP-44827"
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
+
     ack_data="$(echo "${out}" | jq -r "keys[]")"
     for ack in ${ack_data};
     do
         # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
-        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        if [[ "${ack}" == *"ack-4.${source_minor_version}"* ]]
         then
             echo "Admin ack patch data is: ${ack}"
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
@@ -800,7 +902,7 @@ function check_upgrade_status() {
 
 # Check version, state in history
 function check_history() {
-    local version state testcase="cvo"
+    local version state testcase="OCP-21588"
     version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
     state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
@@ -1096,27 +1198,47 @@ for target in "${TARGET_RELEASES[@]}"; do
     echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
     export FORCE_UPDATE="false"
-    if ! check_signed; then
+    if ! check_signed "${TARGET}"; then
         echo "You're updating to an unsigned images, you must override the verification using --force flag"
         FORCE_UPDATE="true"
     else
         echo "You're updating to a signed images, so run the upgrade command without --force flag"
     fi
     if [[ "${FORCE_UPDATE}" == "false" ]]; then
-        admin_ack
-        cco_annotation
+        admin_ack "${SOURCE_VERSION}" "${TARGET_VERSION}"
+        cco_annotation "${SOURCE_VERSION}" "${TARGET_VERSION}"
     fi
     if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
 	    update_cloud_credentials_oidc
     fi
+    if [[ "${DISABLE_BOOT_IMAGE_UPDATE}" == "true" ]]; then
+	#Disable updated boot images feature for jobs with custom boot image specified in certain upgrade paths
+        echo "Checking conditions for disabling boot image updates..."
+
+        # Get platform
+        PLATFORM=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+
+        # Check all conditions
+        if [[ "${TARGET_MINOR_VERSION}" == "19" ]] && [[ "${PLATFORM}" =~ ^(AWS|GCP)$ ]]; then
+            disable_boot_image_update
+        else
+            echo "Skipping boot image update disablement."
+        fi
+    fi
     upgrade
     check_upgrade_status
 
-    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+    if [[ "${TARGET_MINOR_VERSION}" -lt "19" ]] && [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo "Found rhel worker..."
         run_command "oc get node -owide"
         if [[ $(oc get machineconfigpools worker -ojson | jq -r '.spec.paused') == "true" ]]; then
             echo "worker mcp are paused, it sounds eus upgrade, skip rhel worker upgrade here, should upgrade them after worker mcp unpaused"
+	    #Temporary workaround for 4.14 to 4.16 cpou test with RHEL workers, would be removed until https://github.com/openshift/openshift-ansible/pull/12531 merged
+	    if [[ "${SOURCE_MINOR_VERSION}" == "14" ]]; then
+	        echo "Running workaround for https://issues.redhat.com/browse/OCPBUGS-32057 in 4.14 to 4.16 cpou test"
+		rhel_repo
+	        rhel_pre_unpause
+	    fi
         else
             rhel_repo
             rhel_upgrade
@@ -1129,6 +1251,17 @@ for target in "${TARGET_RELEASES[@]}"; do
 	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
 	sdn2ovn
 	health_check
+    fi
+
+    run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode"
+    # From OCP 4.19, we do not support cgroupmode v1
+    # So update the 'cgroupMode' in the 'cluster' object of nodes.config.openshift.io resource type to 'v2'
+    if [[ "${TARGET_MINOR_VERSION}" -eq "18" ]] && [[ "$(oc get -o json nodes.config.openshift.io cluster | jq -r .spec.cgroupMode)" == "v1" ]]; then
+        run_command "oc patch --type=merge --patch='{\"spec\":{\"cgroupMode\":\"v2\"}}' nodes.config.openshift.io cluster"
+        echo "New cgroupMode:"
+        run_command "oc get -o json nodes.config.openshift.io cluster | jq -r .spec"
+        wait_node_continous_success
+        wait_mcp_continous_success
     fi
 
     if [[ -n "${E2E_RUN_TAGS}" ]]; then

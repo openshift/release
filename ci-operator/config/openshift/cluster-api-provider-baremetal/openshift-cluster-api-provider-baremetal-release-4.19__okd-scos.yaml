@@ -1,0 +1,54 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  origin_scos-4.19_base-stream9:
+    name: scos-4.19
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile
+  from: origin_scos-4.19_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: baremetal-machine-controllers
+promotion:
+  to:
+  - name: scos-4.19
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.19
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: cluster-api-provider-baremetal
+  variant: okd-scos

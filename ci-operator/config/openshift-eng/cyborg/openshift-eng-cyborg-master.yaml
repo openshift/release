@@ -7,15 +7,36 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- dockerfile_path: org_tools/Dockerfile
+- dockerfile_path: org_tools/images/Dockerfile
   inputs:
     ocp_ubi-python-311_9:
       as:
       - registry.ci.openshift.org/ocp/ubi-python-311:9
+  to: cyborg
+- dockerfile_path: org_tools/images/Dockerfile.validator
+  from: cyborg
+  to: org-validator
+- dockerfile_path: org_tools/images/Dockerfile.team-tracking-spreadsheet
+  from: cyborg
   to: team-tracking-spreadsheet-tool
+- dockerfile_path: org_tools/images/Dockerfile.peribolos-generator
+  from: cyborg
+  to: peribolos-generator
+- dockerfile_path: org_tools/images/Dockerfile.openshift-priv-peribolos-generator
+  from: cyborg
+  to: openshift-priv-peribolos-generator
 promotion:
   to:
-  - namespace: continuous-release-jobs
+  - excluded_images:
+    - openshift-priv-peribolos-generator
+    - peribolos-generator
+    - team-tracking-spreadsheet-tool
+    - org-validator
+    namespace: continuous-release-jobs
+    tag: base
+  - excluded_images:
+    - cyborg
+    namespace: continuous-release-jobs
     tag: latest
 resources:
   '*':

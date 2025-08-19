@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -o nounset
+set -o pipefail
 
 ############################################################
 # Variables
@@ -59,6 +60,7 @@ echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
 
 WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
 export WORKSPACE_NAME
+echo "IC Workspace name: ${WORKSPACE_NAME}"
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
@@ -366,7 +368,7 @@ function build_upi_cluster() {
                 done
     echo "Finished Running"
 
-    echo "Extracting the terraformm output from the state file"
+    echo "Extracting the terraform output from the state file"
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
@@ -406,7 +408,6 @@ function build_upi_cluster() {
 
 trap 'error_handler $? $LINENO' ERR
 
-
 report_build
 setup_home
 setup_ibmcloud_cli
@@ -419,4 +420,4 @@ fix_user_permissions
 build_upi_cluster
 
 echo "Successfully created the PowerVS cluster"
-exit 0
+echo 0

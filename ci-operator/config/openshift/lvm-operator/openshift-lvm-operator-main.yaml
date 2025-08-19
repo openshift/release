@@ -4,26 +4,22 @@ base_images:
     namespace: ocp
     tag: v1.31.0
   must-gather:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: must-gather
-  ocp_4.19_base-rhel9:
-    name: "4.19"
+  ocp_4.20_base-rhel9:
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  operator-sdk:
-    name: "4.19"
-    namespace: origin
-    tag: operator-sdk
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_literal: |-
-    FROM ocp_4.19_base-rhel9
+    FROM ocp_4.20_base-rhel9
     RUN dnf install -y make git python3 python3-pip patch
     RUN pip3 install pre-commit
 
@@ -47,7 +43,7 @@ images:
     RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
     RUN chmod +x ${SNYK_DIR}/snyk
     ENV PATH=$PATH:${SNYK_DIR}
-  from: ocp_4.19_base-rhel9
+  from: ocp_4.20_base-rhel9
   inputs:
     root:
       as:
@@ -55,7 +51,7 @@ images:
   to: lvms-pre-commit
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
       - fedora:latest
   to: lvm-operator
@@ -82,19 +78,19 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.20"
       namespace: ocp
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -123,7 +119,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: post-unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -134,7 +130,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: snyk-code
   commands: |
     SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
@@ -145,7 +141,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvms-snyk-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: snyk-deps
   commands: |
     SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
@@ -156,18 +152,18 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvms-snyk-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   cron: '@daily'
   presubmit: true
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
       OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
     test:
     - as: e2e-test
       cli: latest
@@ -193,14 +189,14 @@ tests:
 - as: e2e-aws
   cron: '@daily'
   presubmit: true
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
       OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
     test:
     - as: e2e-test
       cli: latest
@@ -224,15 +220,16 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-aws-hypershift
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
       RELEASE_IMAGE_LATEST: release:multi-latest
     env:
+      HYPERSHFIT_SKIP_VERSION_VALIDATION: "true"
       OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
     test:
     - as: e2e-test
       cli: latest

@@ -1,0 +1,22 @@
+workflow:
+  as: hypershift-aws-conformance-calico
+  documentation: |-
+    The HyperShift aws conformance Calico workflow executes tests against a new ephemeral
+    HyperShift cluster with Calico CNI installed. Administrative access to the control plane
+    is provided via the `KUBECONFIG` environment variable.
+  steps:
+    env:
+      HYPERSHIFT_NETWORK_TYPE: "Other"
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    - ref: cucushift-hypershift-extended-calico
+    - ref: cucushift-hypershift-extended-calico-health-check

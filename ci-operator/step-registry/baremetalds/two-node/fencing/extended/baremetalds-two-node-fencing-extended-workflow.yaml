@@ -1,0 +1,24 @@
+workflow:
+  as: baremetalds-two-node-fencing-extended
+  steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    pre:
+      - chain: baremetalds-ipi-pre
+    test:
+      - ref: openshift-extended-test
+    post:
+      - chain: baremetalds-ipi-post
+    env:
+      PACKET_OS: rocky_9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+      TEST_IMPORTANCE: "LEVEL0"
+      FORCE_SUCCESS_EXIT: "no"
+  documentation: |-
+    This workflow executes a Two Node OpenShift with Fencing (TNF) cluster installation

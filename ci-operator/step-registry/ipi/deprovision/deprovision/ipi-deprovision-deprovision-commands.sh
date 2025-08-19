@@ -81,6 +81,15 @@ fi
 echo "Copying the installation artifacts to the Installer's asset directory..."
 cp -ar "${SHARED_DIR}" /tmp/installer
 
+export INSTALLER_BINARY="openshift-install"
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        echo "Extracting installer from ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+        oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to="/tmp" || exit 1
+        export INSTALLER_BINARY="/tmp/openshift-install"
+fi
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
+
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # C2S/SC2S regions do not support destory
   #   replace ${AWS_REGION} with source_region(us-east-1) in metadata.json as a workaround"
@@ -96,7 +105,7 @@ fi
 if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
   echo "Destroy bootstrap ..."
   set +e
-  openshift-install --dir /tmp/installer destroy bootstrap
+  ${INSTALLER_BINARY} --dir /tmp/installer destroy bootstrap
   set -e
 fi
 
@@ -123,7 +132,7 @@ fi
 
 echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
-openshift-install --dir /tmp/installer destroy cluster &
+${INSTALLER_BINARY} --dir /tmp/installer destroy cluster &
 
 set +e
 wait "$!"

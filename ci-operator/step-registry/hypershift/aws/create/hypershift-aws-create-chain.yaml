@@ -4,7 +4,7 @@ chain:
   - as: create-hostedcluster
     cli: latest
     env:
-    - name: FEATURE_SET
+    - name: GUEST_FEATURE_SET
       default: ""
       documentation: |
         This field sets the cluster feature set. This is used to enable custom features such as tech preview features
@@ -39,6 +39,9 @@ chain:
     - name: ENABLE_ICSP
       default: "false"
       documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: PUBLIC_ONLY
+      default: "false"
+      documentation: "If true, only public subnets are created (requires release version 4.16 or higher)"
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
@@ -71,6 +74,9 @@ chain:
       default: "false"
       documentation: |-
         If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
+    - name: HYPERSHIFT_DYNAMIC_DNS
+      default: ""
+      documentation: "Set dynamic dns for kube-apiserver"
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
@@ -121,8 +127,12 @@ chain:
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
       fi
+
+      if [[ $PUBLIC_ONLY == "true" ]]; then
+        COMMAND+=(--public-only)
+      fi
       
-      if [[ $FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
+      if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
         COMMAND+=(--feature-set=TechPreviewNoUpgrade)
       fi
       
@@ -146,6 +156,10 @@ chain:
         COMMAND+=(--kms-key-arn="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
       fi
       
+      if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
+        COMMAND+=(--kas-dns-name="${HYPERSHIFT_DYNAMIC_DNS}")
+      fi
+
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
@@ -173,20 +187,27 @@ chain:
       # In case of BYO CNI, the HC will never be ready before CNI components are up and running
       if [[ "$HYPERSHIFT_NETWORK_TYPE" == "Other" ]]; then
         echo "Waiting for nodes to join the hosted cluster"
-        num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
-        export num_nodes_expected
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        set +e
-        timeout 25m bash -c '
-          while true; do
-            num_nodes=$(oc get nodes --no-headers | wc -l)
-            if (( num_nodes == num_nodes_expected )); then
-              break
-            fi
-            echo "$num_nodes/$num_nodes_expected have joined the HC"
-            sleep 15s
-          done
-        '
+        if [[ "$ENDPOINT_ACCESS" == "Private" ]]; then
+          # With Private access the cluster is not yet accessible (the Proxy bastion
+          # node was not yet configured). Let's sleep for a little longer than the usual wait
+          # time for nodes to join.
+          sleep 300
+        else
+          num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+          export num_nodes_expected
+          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+          set +e
+          timeout 25m bash -c '
+            while true; do
+              num_nodes=$(oc get nodes --no-headers | wc -l)
+              if (( num_nodes == num_nodes_expected )); then
+                break
+              fi
+              echo "$num_nodes/$num_nodes_expected have joined the HC"
+              sleep 15s
+            done
+          '
+        fi
       else
         set +e
         export CLUSTER_NAME

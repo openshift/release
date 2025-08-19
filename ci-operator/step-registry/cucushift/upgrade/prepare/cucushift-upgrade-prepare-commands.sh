@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
 function set_cluster_access() {
     if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -252,28 +258,33 @@ function test_execution() {
 function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
+    xmlfiles=''
     if ! [[ -d "${ARTIFACT_DIR:-'/default-non-exist-dir'}" ]] ; then
         echo "Artifact dir '${ARTIFACT_DIR}' not exist"
         exit 0
     else
         echo "Artifact dir '${ARTIFACT_DIR}' exist"
         ls -lR "${ARTIFACT_DIR}"
-        files="$(find "${ARTIFACT_DIR}" -name '*.xml' | wc -l)"
-        if [[ "$files" -eq 0 ]] ; then
+        xmlfiles="$(find "${ARTIFACT_DIR}" -name '*.xml')"
+        if [[ "$(wc -w <<< $xmlfiles)" -eq 0 ]] ; then
             echo "There are no JUnit files"
             exit 0
         fi
     fi
+    sed -i -E 's#(testsuite .* )name="([^"]+)"#\1name="cucushift-upgrade-prepare"#' $xmlfiles
+    combinedxml="${ARTIFACT_DIR}/junit_cucushift-upgrade-prepare-combined.xml"
+    jrm "$combinedxml" $xmlfiles || exit 0
+    rm -f $xmlfiles
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]*' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log || exit 0
-    while read row ; do
-	for ctype in "${!results[@]}" ; do
-            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+    if [ -f "$combinedxml" ] ; then
+        testsuites="$(grep 'testsuites.*tests=' "$combinedxml")"
+        for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $testsuites)"
             if [[ -n $count ]] ; then
                 let results[$ctype]+=count || true
             fi
         done
-    done < /tmp/zzz-tmp.log
+    fi
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
@@ -286,7 +297,7 @@ EOF
 
     if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
-        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
+        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | grep -v -E 'grep .*/artifacts' | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
         for (( i=0; i<${results[failures]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
@@ -311,13 +322,14 @@ else
 fi
 
 # check if the cluster is ready
+set_cluster_access
 oc version --client
-oc wait nodes --all --for=condition=Ready=true --timeout=25m
+
+run_command "oc wait nodes --all --for=condition=Ready=true --timeout=25m"
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
-    oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=15m
+    run_command "oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=15m"
 fi
 
-set_cluster_access
 preparation_for_test
 filter_tests
 test_execution

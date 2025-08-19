@@ -7,7 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 function upload_rhcos_image() {
-   curl -X POST --header "Content-Type: application/json" \
+   curl -k -X POST --header "Content-Type: application/json" \
       --header "Accept: application/json" \
       --header "Authorization: Basic ${ENCODED_CREDS}" \
       "https://${NUTANIX_HOST}:${NUTANIX_PORT}/api/nutanix/v3/images" \
@@ -41,7 +41,7 @@ EOF
 }
 
 function get_image_id() {
-   IMAGE_ID=$(curl -X POST --header "Content-Type: application/json" \
+   IMAGE_ID=$(curl -k -X POST --header "Content-Type: application/json" \
       --header "Accept: application/json" \
       --header "Authorization: Basic ${ENCODED_CREDS}" \
       "https://${NUTANIX_HOST}:${NUTANIX_PORT}/api/nutanix/v3/images/list" \
@@ -50,7 +50,7 @@ function get_image_id() {
 }
 
 function launch_vm() {
-   curl -X POST --header "Content-Type: application/json" \
+   curl -k -X POST --header "Content-Type: application/json" \
       --header "Accept: application/json" \
       --header "Authorization: Basic ${ENCODED_CREDS}" \
       "https://${NUTANIX_HOST}:${NUTANIX_PORT}/api/nutanix/v3/vms" \
@@ -115,7 +115,7 @@ EOF
 }
 
 function get_vm_ip() {
-   BASTION_VM_IP=$(curl -X POST --header "Content-Type: application/json" \
+   BASTION_VM_IP=$(curl -k -X POST --header "Content-Type: application/json" \
       --header "Accept: application/json" \
       --header "Authorization: Basic ${ENCODED_CREDS}" \
       "https://${NUTANIX_HOST}:${NUTANIX_PORT}/api/nutanix/v3/vms/list" \

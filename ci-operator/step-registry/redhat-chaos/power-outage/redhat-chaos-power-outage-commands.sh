@@ -1,9 +1,6 @@
 #!/bin/bash
 
 set -o errexit
-set -o nounset
-set -o pipefail
-set -x
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -11,7 +8,11 @@ oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 
-
+console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+export HEALTH_CHECK_URL=https://$console_url
+set -o nounset
+set -o pipefail
+set -x
 
 platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
 if [ "$platform" = "AWS" ]; then
@@ -36,6 +37,23 @@ elif [ "$platform" = "Azure" ]; then
     export AZURE_CLIENT_ID
     AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
     export AZURE_CLIENT_SECRET
+elif [ "$platform" = "IBMCloud" ]; then
+# https://github.com/openshift/release/blob/3afc9cb376776ca27fbb1a4927281e84295f4810/ci-operator/step-registry/openshift-extended/upgrade/pre/openshift-extended-upgrade-pre-commands.sh#L158
+    IBMCLOUD_CLI=ibmcloud
+    export IBMCLOUD_CLI
+    IBMCLOUD_HOME=/output
+    export IBMCLOUD_HOME
+    region="${LEASED_RESOURCE}"
+    CLOUD_TYPE="ibmcloud"
+    export CLOUD_TYPE
+    export region
+    IBMC_URL="https://${region}.iaas.cloud.ibm.com/v1"
+    export IBMC_URL
+    IBMC_APIKEY=$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-api-key)
+    export IBMC_APIKEY
+
+    export TIMEOUT=320
+
 fi
 
 ES_PASSWORD=$(cat "/secret/es/password")

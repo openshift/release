@@ -57,7 +57,7 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
-# download the correct openshift-install from the payload
+# download openshift-install from the payload
 echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to="${INSTALL_DIR}"
@@ -105,8 +105,12 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
 
   # The name of the kernel artifact depends on the arch
   if [ "$ARCH" == "s390x" ]; then
-    KERNEL="agent.${ARCH}-kernel.img"
-    
+    if echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 19 )) { exit 0 } else {exit 1} }'; then
+      KERNEL="agent.${ARCH}-vmlinuz"
+    else
+      KERNEL="agent.${ARCH}-kernel.img"
+    fi
+
     # Merge the initrds together and rename them so they can be found on the remote host; for some reason, order matters when catting these together
     cat "${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS}" "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD}" > "${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}"
   elif [ "$ARCH" == "ppc64le" ]; then

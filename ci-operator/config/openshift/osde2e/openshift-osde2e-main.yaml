@@ -30,8 +30,7 @@ tests:
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="hypershift"
-    export CHANNEL="candidate"
-    export INSTALL_LATEST_XY="4.15"
+    export CHANNEL="stable"
     export SKIP_MUST_GATHER="true"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-credentials"
 
@@ -41,7 +40,6 @@ tests:
     out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
     from: src
-  optional: true
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -230,9 +228,9 @@ tests:
     name: osde2e-credentials
 - as: cleanup-tekton-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-tekton-copy"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-tekton-copy,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -242,11 +240,13 @@ tests:
     name: osde2e-tekton-copy
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
 - as: cleanup-selfservice-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-selfservice-copy"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-selfservice-copy,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --dry-run=false --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -256,11 +256,13 @@ tests:
     name: osde2e-selfservice-copy
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
 - as: cleanup-dev-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-dev"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-dev,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip  --dry-run=false  --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -270,11 +272,13 @@ tests:
     name: osde2e-dev
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
 - as: cleanup-hypershift-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --dry-run=false  --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -284,11 +288,13 @@ tests:
     name: osde2e-hypershift-credentials
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
 - as: cleanup-trt-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-trt-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --dry-run=false  --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -300,9 +306,9 @@ tests:
     name: osde2e-common
 - as: cleanup-informing-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-informing"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-informing,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --dry-run=false  --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -312,6 +318,8 @@ tests:
     name: osde2e-informing
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
 zz_generated_metadata:
   branch: main
   org: openshift

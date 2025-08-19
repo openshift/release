@@ -17,7 +17,7 @@ function queue() {
 
 function deprovision() {
   WORKDIR="${1}"
-  timeout --signal=SIGQUIT 30m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
+  timeout --signal=SIGQUIT 60m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
 }
 
 logdir="${ARTIFACTS}/deprovision"
@@ -53,12 +53,17 @@ EOF
   echo "will deprovision GCE cluster ${infraID} in region ${region}"
 done
 
+# log installer version for debugging purposes
+openshift-install version
+
 clusters=$( find "${logdir}" -mindepth 1 -type d )
 for workdir in $(shuf <<< ${clusters}); do
   queue deprovision "${workdir}"
 done
 
-wait
+if ! wait; then
+  echo "At least one deprovision job failed or timed out."
+fi
 
 gcs_bucket_age_cutoff="$(TZ="GMT" date --date="${CLUSTER_TTL}-8 hours" '+%a, %d %b %Y %H:%M:%S GMT')"
 gcs_bucket_age_cutoff_seconds="$(date --date="${gcs_bucket_age_cutoff}" '+%s')"
