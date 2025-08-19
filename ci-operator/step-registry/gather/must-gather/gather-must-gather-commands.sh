@@ -269,6 +269,8 @@ set -x # log the MG commands
 echo "Running must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather
 if [ -n "$MUST_GATHER_IMAGE" ]; then
+    EXTRA_MG_ARGS="${EXTRA_MG_ARGS} ${MUST_GATHER_IMAGE}"
+fi
     oc --insecure-skip-tls-verify adm must-gather "$MUST_GATHER_IMAGE" --timeout="$MUST_GATHER_TIMEOUT" --dest-dir "${ARTIFACT_DIR}/must-gather" ${EXTRA_MG_ARGS} > "${ARTIFACT_DIR}/must-gather/must-gather.log"
 else
     oc --insecure-skip-tls-verify adm must-gather --timeout="$MUST_GATHER_TIMEOUT" --dest-dir "${ARTIFACT_DIR}/must-gather" ${EXTRA_MG_ARGS} > "${ARTIFACT_DIR}/must-gather/must-gather.log"
