@@ -56,9 +56,7 @@ oc get pod testpod
 
 echo "Waiting for pod to complete..."
 oc wait --for=condition=PodReadyCondition=false pod/testpod --timeout=1800s || true
-oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/testpod --timeout=300s || \
-oc wait --for=jsonpath='{.status.phase}'=Failed pod/testpod --timeout=300s
-
+oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/testpod --timeout=300s
 echo "Pod completed, checking final status and logs..."
 oc get pod testpod
 oc logs testpod
