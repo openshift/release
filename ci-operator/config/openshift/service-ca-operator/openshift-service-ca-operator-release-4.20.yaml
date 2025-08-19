@@ -74,6 +74,19 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-upgrade-aws
+- as: e2e-tests-extension
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary service-ca-operator-tests-ext"
+        make tests-ext-build
+        echo "Running ./service-ca-operator-tests-ext with sanity test"
+        ./service-ca-operator-tests-ext run-test -n "[Jira:service-ca][sig-api-machinery] sanity test should always pass [Suite:openshift/service-ca-operator/conformance/parallel]"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
