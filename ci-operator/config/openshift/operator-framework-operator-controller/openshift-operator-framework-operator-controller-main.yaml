@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  olmv1_bumper:
+    name: v1bumper
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -190,6 +194,12 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: post-merge-olm-v1-downstreaming-refresh
+  postsubmit: true
+  steps:
+    test:
+      - as: postsubmit-olmv1-bumper
+
 zz_generated_metadata:
   branch: main
   org: openshift
