@@ -35,7 +35,7 @@ spec:
             WantedBy=multi-user.target
 EOF
 
-oc wait --for=condition=Updating --timeout=10m machineconfigpool/worker
+#oc wait --for=condition=Updating --timeout=10m machineconfigpool/worker
 oc wait --for=condition=Updated --timeout=30m machineconfigpool/worker
 
 echo "/dev/loop10" > "${SHARED_DIR}/lvmdevice"
