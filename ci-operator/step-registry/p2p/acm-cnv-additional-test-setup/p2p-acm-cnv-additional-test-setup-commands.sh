@@ -33,7 +33,6 @@ EOF
 oc label managedcluster local-cluster cluster.open-cluster-management.io/clusterset=managed-cluster-set --overwrite
 
 oc create -f - <<EOF
- 
         apiVersion: policy.open-cluster-management.io/v1
         kind: Policy
         metadata:
