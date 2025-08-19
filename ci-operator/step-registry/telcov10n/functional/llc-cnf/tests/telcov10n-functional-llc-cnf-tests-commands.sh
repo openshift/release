@@ -215,7 +215,7 @@ done
 # Process each directory group
 for directory in "${!directory_files[@]}"; do
     echo "Processing directory: ${directory}"
-    read -a files_array <<< "${directory_files[${directory}]}"
+    read -r -a files_array <<< "${directory_files[${directory}]}"
 
     if [ ${#files_array[@]} -eq 1 ]; then
         # Only one file for this directory, just copy it
@@ -231,8 +231,7 @@ for directory in "${!directory_files[@]}"; do
     # Create HTML report for the merged file
     html_output_file="${ARTIFACT_DIR}/${directory}.html"
     echo "Creating HTML report: ${merged_file} -> ${html_output_file}"
-    python "${SHARED_DIR}"/telco5gci/j2html.py "${merged_file}" -o "${html_output_file}"
-    if [[ $? -ne 0 ]]; then
+    if ! python "${SHARED_DIR}"/telco5gci/j2html.py "${merged_file}" -o "${html_output_file}"; then
         echo "Error: Failed to process ${merged_file}."
         exit 1
     fi
@@ -240,8 +239,7 @@ for directory in "${!directory_files[@]}"; do
     # Create JSON report for the merged file
     json_output_file="${ARTIFACT_DIR}/${directory}.json"
     echo "Creating JSON report: ${merged_file} -> ${json_output_file}"
-    python "${SHARED_DIR}"/telco5gci/junit2json.py "${merged_file}" -o "${json_output_file}"
-    if [[ $? -ne 0 ]]; then
+    if ! python "${SHARED_DIR}"/telco5gci/junit2json.py "${merged_file}" -o "${json_output_file}"; then
         echo "Error: Failed to create JSON for ${merged_file}."
         exit 1
     fi
