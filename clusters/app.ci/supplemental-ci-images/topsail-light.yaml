@@ -1,75 +1,69 @@
-apiVersion: v1
-kind: List
-items:
-- kind: ImageStream
-  apiVersion: image.openshift.io/v1
-  metadata:
-    namespace: ci
-    name: topsail-light
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    namespace: ci
-    name: topsail-light
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: topsail-light:latest
-    source:
-      dockerfile: |
-        FROM quay.io/centos/centos:stream9
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: topsail-light
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_topsail-light_latest
+  source:
+    dockerfile: |
+      FROM quay.io/centos/centos:stream9
 
-        MAINTAINER Perf&Scale PSAP Team <team-psap@redhat.com>
+      MAINTAINER Perf&Scale PSAP Team <team-psap@redhat.com>
 
-        LABEL 	io.k8s.display-name="OpenShift PSAP topsail" \
-              	io.k8s.description="A lightweight image for running TOPSAIL in a remote host" \
-         	name="topsail" \
-        	url="https://github.com/openshift-psap/"
+      LABEL 	io.k8s.display-name="OpenShift PSAP topsail" \
+              io.k8s.description="A lightweight image for running TOPSAIL in a remote host" \
+        name="topsail" \
+        url="https://github.com/openshift-psap/"
 
-        RUN dnf install -y --quiet \
-        	        git jq vim wget rsync time file psmisc \
-        		python3 python3-pip python3-setuptools gcc g++ \
-          && dnf clean all \
-          && rm -rf $HOME/.cache && rm -rf /var/cache/yum
+      RUN dnf install -y --quiet \
+                git jq vim wget rsync time file psmisc \
+          python3 python3-pip python3-setuptools gcc g++ \
+        && dnf clean all \
+        && rm -rf $HOME/.cache && rm -rf /var/cache/yum
 
-        # Set up the runner user
-        ENV USER_NAME=psap-ci-runner \
-            USER=psap-ci-runner \
-            HOME=/opt/topsail/src \
-            INSIDE_CI_IMAGE="y" \
-            TOPSAIL_LIGHT_IMAGE="true"
+      # Set up the runner user
+      ENV USER_NAME=psap-ci-runner \
+          USER=psap-ci-runner \
+          HOME=/opt/topsail/src \
+          INSIDE_CI_IMAGE="y" \
+          TOPSAIL_LIGHT_IMAGE="true"
 
-        ENV PYTHONPATH=$HOME
+      ENV PYTHONPATH=$HOME
 
-        RUN git clone https://github.com/openshift-psap/topsail/ $HOME
+      RUN git clone https://github.com/openshift-psap/topsail/ $HOME
 
-        RUN echo -e '#!/usr/bin/env bash \n\
-        cd /opt/topsail/src  \n\
-        exec /opt/topsail/src/testing/run "$@" \n\
-        ' > /usr/local/bin/run; chmod ugo+x /usr/local/bin/run \
-         && mkdir -p ${HOME}/.ansible/tmp \
-            && ln -s /usr/bin/python3 /usr/bin/python
+      RUN echo -e '#!/usr/bin/env bash \n\
+      cd /opt/topsail/src  \n\
+      exec /opt/topsail/src/testing/run "$@" \n\
+      ' > /usr/local/bin/run; chmod ugo+x /usr/local/bin/run \
+        && mkdir -p ${HOME}/.ansible/tmp \
+          && ln -s /usr/bin/python3 /usr/bin/python
 
-        RUN chgrp -R 0 "$HOME" && chmod -R g=u "$HOME"
+      RUN chgrp -R 0 "$HOME" && chmod -R g=u "$HOME"
 
-        # Install Python requirements
+      # Install Python requirements
 
-        RUN pip install --quiet --no-cache-dir -r ${HOME}/requirements-light.txt
+      RUN pip install --quiet --no-cache-dir -r ${HOME}/requirements-light.txt
 
-        WORKDIR ${HOME}
+      WORKDIR ${HOME}
 
-        CMD ["bash"]
+      CMD ["bash"]
 
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
-    triggers:
-    - type: ConfigChange
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - type: ConfigChange
