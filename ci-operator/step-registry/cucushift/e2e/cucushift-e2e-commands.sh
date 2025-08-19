@@ -128,8 +128,8 @@ function filter_test_by_network() {
             networktag='@network-ovnkubernetes'
             ;;
         other)
-            networktag=''
-            ;;
+	    networktag='@other-cni'
+	    ;;
         *)
             echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
             ;;
@@ -378,7 +378,6 @@ function summarize_test_results() {
     combinedxml="${ARTIFACT_DIR}/junit_cucushift-e2e-combined.xml"
     jrm "$combinedxml" $xmlfiles || exit 0
     rm -f $xmlfiles
-    set -x
 
     declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
     if [ -f "$combinedxml" ] ; then

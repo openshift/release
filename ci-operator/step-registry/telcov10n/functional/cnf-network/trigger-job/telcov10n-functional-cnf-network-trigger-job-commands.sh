@@ -2,7 +2,12 @@
 set -e
 set -o pipefail
 
-ls -l /var/prow-trigger-token/
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Set tigger TOKEN env var"
 TOKEN=$(cat /var/prow-trigger-token/token)
 

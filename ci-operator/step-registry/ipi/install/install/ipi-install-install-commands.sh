@@ -753,6 +753,15 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
+echo "Will include following openshift config files:"
+find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -name "openshift_manifests_[0-9]*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  ocp_config_file="$( basename "${item}" )"
+  cp "${item}" "${dir}/openshift/${ocp_config_file##openshift_manifests_}"
+done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -name "openshift_manifests_[0-9]*.yaml" \) -print0)
+
 # Collect bootstrap logs for all azure clusters
 case "${CLUSTER_TYPE}" in
 azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true ;;
