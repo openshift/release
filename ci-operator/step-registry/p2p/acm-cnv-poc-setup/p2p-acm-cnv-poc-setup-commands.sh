@@ -23,15 +23,16 @@ oc create -f - <<EOF
             localClusterName: local-cluster
 EOF
 oc -n ocm wait --for=jsonpath='{.status.phase}'=Running mch/multiclusterhub --timeout 15m
-oc create -f - <<EOF
-        kind: HyperConverged
-        apiVersion: hco.kubevirt.io/v1beta1
-        metadata:
-            annotations:
-                deployOVS: 'false'
-            name: kubevirt-hyperconverged
-            namespace: openshift-cnv
-        spec: {}
-EOF
 
-oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m
+# oc create -f - <<EOF
+#         kind: HyperConverged
+#         apiVersion: hco.kubevirt.io/v1beta1
+#         metadata:
+#             annotations:
+#                 deployOVS: 'false'
+#             name: kubevirt-hyperconverged
+#             namespace: openshift-cnv
+#         spec: {}
+# EOF
+
+# oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m

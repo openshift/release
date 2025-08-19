@@ -32,6 +32,73 @@ EOF
 
 oc label managedcluster local-cluster cluster.open-cluster-management.io/clusterset=managed-cluster-set --overwrite
 
+oc create -f - <<EOF
+ 
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: Policy
+        metadata:
+          name: cnv-install
+          namespace: openshift-cnv
+          annotations:
+            policy.open-cluster-management.io/categories: ""
+            policy.open-cluster-management.io/standards: ""
+            policy.open-cluster-management.io/controls: ""
+        spec:
+          disabled: false
+          remediationAction: enforce
+          policy-templates:
+            - objectDefinition:
+                apiVersion: policy.open-cluster-management.io/v1beta1
+                kind: OperatorPolicy
+                metadata:
+                  name: install-cnv-operator
+                spec:
+                  remediationAction: enforce
+                  severity: critical
+                  complianceType: musthave
+                  subscription:
+                    name: kubevirt-hyperconverged
+                    namespace: openshift-cnv
+                    channel: stable
+                    source: redhat-operators
+                    sourceNamespace: openshift-marketplace
+                  upgradeApproval: Automatic
+                  versions:
+                  operatorGroup:
+                    name: default
+                    targetNamespaces:
+                      - openshift-cnv
+        ---
+        apiVersion: cluster.open-cluster-management.io/v1beta1
+        kind: Placement
+        metadata:
+          name: cnv-install-placement
+          namespace: openshift-cnv
+        spec:
+          tolerations:
+            - key: cluster.open-cluster-management.io/unreachable
+              operator: Exists
+            - key: cluster.open-cluster-management.io/unavailable
+              operator: Exists
+          clusterSets:
+            - test-cluster-set
+        ---
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: PlacementBinding
+        metadata:
+          name: cnv-install-placement
+          namespace: openshift-cnv
+        placementRef:
+          name: cnv-install-placement
+          apiGroup: cluster.open-cluster-management.io
+          kind: Placement
+        subjects:
+          - name: cnv-install
+            apiGroup: policy.open-cluster-management.io
+            kind: Policy
+EOF
+
+oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 
