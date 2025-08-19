@@ -146,4 +146,4 @@ else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
 fi
-           
+sleep 7200
