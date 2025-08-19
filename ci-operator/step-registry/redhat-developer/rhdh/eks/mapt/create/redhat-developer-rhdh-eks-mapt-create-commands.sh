@@ -12,7 +12,6 @@ export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
 echo "$RANDOM$RANDOM" > ${SHARED_DIR}/CORRELATE_MAPT
 CORRELATE_MAPT=$(cat ${SHARED_DIR}/CORRELATE_MAPT)
 
-# TODO: add `--spot` flag after resolving Mapt issue where EKS does not support creating control plane instances in `us-east-1e` availability zone, but this zone is chosen automatically by Mapt in region `us-east-1`.
 mapt aws eks create \
   --project-name "eks" \
   --backed-url "s3://${AWS_S3_BUCKET}/eks-${CORRELATE_MAPT}" \
@@ -23,6 +22,7 @@ mapt aws eks create \
   --cpus 2 \
   --memory 4 \
   --arch x86_64 \
+  --spot \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
   --load-balancer-controller \
   --tags app-code=rhdh-003,service-phase=dev,cost-center=726
