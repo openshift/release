@@ -127,23 +127,23 @@ else
 fi
 
 
-PULL_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cloud-openshift-auth")
-if [[ -f "${PULL_SECRET}" ]]; then
+# PULL_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cloud-openshift-auth")
+# if [[ -f "${PULL_SECRET}" ]]; then
 
-  oc create -f - <<EOF
-          apiVersion: v1
-          kind: Secret
-          metadata:
-            name: pull-secret
-            namespace: ocm
-          type: kubernetes.io/dockerconfigjson
-          data:
-            .dockerconfigjson: "${PULL_SECRET}"
-EOF
+#   oc create -f - <<EOF
+#           apiVersion: v1
+#           kind: Secret
+#           metadata:
+#             name: pull-secret
+#             namespace: ocm
+#           type: kubernetes.io/dockerconfigjson
+#           data:
+#             .dockerconfigjson: "${PULL_SECRET}"
+# EOF
 
-  echo "secret created"
-else
-  echo "Did not find compatible cloud provider cluster_profile"
-  exit 1
-fi
+#   echo "secret created"
+# else
+#   echo "Did not find compatible cloud provider cluster_profile"
+#   exit 1
+# fi
 sleep 7200
