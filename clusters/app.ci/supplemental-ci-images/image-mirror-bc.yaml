@@ -1,9 +1,3 @@
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: image-mirror
-  namespace: ci
----
 kind: BuildConfig
 apiVersion: build.openshift.io/v1
 metadata:
@@ -13,9 +7,11 @@ spec:
   successfulBuildsHistoryLimit: 1
   failedBuildsHistoryLimit: 2
   output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
     to:
-      kind: ImageStreamTag
-      name: image-mirror:oc-415
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_image-mirror_oc-415
   source:
     dockerfile: |
       FROM ocp/4.15:cli
