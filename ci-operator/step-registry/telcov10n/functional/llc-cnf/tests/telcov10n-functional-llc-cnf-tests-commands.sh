@@ -215,7 +215,7 @@ done
 # Process each directory group
 for directory in "${!directory_files[@]}"; do
     echo "Processing directory: ${directory}"
-    files_array=(${directory_files[${directory}]})
+    read -a files_array <<< "${directory_files[${directory}]}"
 
     if [ ${#files_array[@]} -eq 1 ]; then
         # Only one file for this directory, just copy it
