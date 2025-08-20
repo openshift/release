@@ -569,6 +569,11 @@ CONFIG = {
         'us-east-1': 15,
         'us-east-2': 15,
     },
+    'azure-oadp-qe-quota-slice': {
+        'centralus': 10,
+        'eastus': 10,
+        'eastus2': 10,
+    },
 }
 
 for i in range(2,7):
