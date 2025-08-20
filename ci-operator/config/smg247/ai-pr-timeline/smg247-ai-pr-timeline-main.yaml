@@ -1,0 +1,30 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/ubi
+      RUN yum install -y python3 python3-pip git
+images:
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9/ubi
+    RUN yum install -y python3 python3-pip git
+    WORKDIR /app
+    COPY . /app
+    RUN if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
+    CMD ["python3", "-m", "app"]
+  from: src
+  to: ai-pr-timeline
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: smg247
+  repo: ai-pr-timeline

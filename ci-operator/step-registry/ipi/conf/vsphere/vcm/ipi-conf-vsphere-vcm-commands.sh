@@ -144,7 +144,7 @@ W_PLATFORM="platform:
 # Add additional disks
 if [ -n "${ADDITIONAL_DISK}" ]; then
   echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
-  CP_PLATFORM="
+  CP_PLATFORM="${CP_PLATFORM}
       dataDisks:
       - sizeGiB: 10
         name: Disk1
@@ -152,7 +152,7 @@ if [ -n "${ADDITIONAL_DISK}" ]; then
       - sizeGiB: 50
         name: Disk2
         provisioningMode: Thin"
-  W_PLATFORM="
+  W_PLATFORM="${W_PLATFORM}
       dataDisks:
       - sizeGiB: 50
         name: Disk1"
