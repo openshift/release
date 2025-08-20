@@ -7,6 +7,19 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+trap 'prepare_next_steps' EXIT TERM INT
+
+function prepare_next_steps() {
+  set +e
+  echo "Copying required artifacts to shared dir"
+  cp \
+      -t "${SHARED_DIR}" \
+      "${dir}/auth/kubeconfig" \
+      "${dir}/auth/kubeadmin-password" \
+      "${dir}/metadata.json"
+  set -e
+}
+
 export HOME=/tmp
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -123,6 +136,9 @@ export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP_NAME")
 
+command -v az
+az version
+
 az group create --name "$RESOURCE_GROUP" --location "$LEASED_RESOURCE"
 
 KUBECONFIG="${dir}/auth/kubeconfig"
@@ -237,15 +253,17 @@ function approve_csrs() {
 approve_csrs &
 
 ## Wait for the default-router to have an external ip...(and not <pending>)
-  echo "$(date -u --rfc-3339=seconds) - Waiting for the default-router to have an external ip..."
-  set +e
-  ROUTER_IP="$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')"
-  while [[ "$ROUTER_IP" == "" || "$ROUTER_IP" == "<pending>" ]]; do
+echo "$(date -u --rfc-3339=seconds) - Waiting for the default-router to have an external ip..."
+set +e
+ROUTER_IP="$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')"
+while [[ "$ROUTER_IP" == "" || "$ROUTER_IP" == "<pending>" ]]; do
+    echo "Waiting for 10s to get router IP..."
     sleep 10;
     ROUTER_IP="$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')"
-  done
-  set -e
+done
+set -e
 
+echo "$(date -u --rfc-3339=seconds) - Adding *.apps dns record..."
 az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $ROUTER_IP --ttl 300
 
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
@@ -265,7 +283,5 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
-cp -t "${SHARED_DIR}" \
-    "${dir}/auth/kubeconfig"
 popd
 touch /tmp/install-complete

@@ -21,7 +21,7 @@ function backoff() {
   local failed=0
   echo "INFO: Running Command '$*'"
   while true; do
-    "$@" && failed=0 || failed=1
+    eval "$*" && failed=0 || failed=1
     if [[ $failed -eq 0 ]]; then
       break
     fi
