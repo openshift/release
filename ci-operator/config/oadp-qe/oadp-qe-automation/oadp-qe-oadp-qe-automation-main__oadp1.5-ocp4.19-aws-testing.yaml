@@ -101,8 +101,34 @@ tests:
     - ref: oadp-execute-tests
     workflow: oadp-ipi-aws-oadp-qe
   timeout: 8h0m0s
+- as: oadp-qe-aws-proxy
+  cron: 30 2 * * *
+  steps:
+    cluster_profile: aws-oadp-qe
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs/oadp-oadp-operator-bundle:1.5.1-23
+      OO_INDEX: brew.registry.redhat.io/rh-osbs/iib:1027573
+    env:
+      BASE_DOMAIN: mig-qe-aws.devcluster.openshift.com
+      ENABLE_HYBRID_OVERLAY: "false"
+      EXECUTE_KUBEVIRT_TESTS: "false"
+      FIPS_ENABLED: "false"
+      OADP_TEST_FOCUS: interop
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: redhat-oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      RE_TRIGGER_ON_FAILURE: "false"
+      REPORTPORTAL_HOSTNAME: reportportal-migration-qe.apps.dno.ocp-hub.prod.psi.redhat.com
+      REPORTPORTAL_PROJECT: OADP
+      USER_TAGS: |
+        scenario oadp oadp-qe aws-proxy
+    test:
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-aws-proxy-oadp-qe
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: oadp-qe
   repo: oadp-qe-automation
-  variant: oadp1.5-ocp4.19-testing
+  variant: oadp1.5-ocp4.19-aws-testing

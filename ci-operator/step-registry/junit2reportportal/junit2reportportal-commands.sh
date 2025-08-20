@@ -129,6 +129,15 @@ function generate_attribute_cloud_provider() {
   fi
 }
 
+function generate_attribute_env_fips() {
+  env_fips='no'
+  if [[ "$JOB_NAME_SAFE" =~ fips ]]
+  then
+    env_fips='yes'
+  fi
+  write_attribute env_fips "$env_fips"
+}
+
 function generate_attribute_job_type() {
   job_type='periodic'
   if [[ "$LOGS_PATH" =~ pr-logs ]]
@@ -229,6 +238,7 @@ function generate_attribute_version_installed() {
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
+  generate_attribute_env_fips
   generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method
