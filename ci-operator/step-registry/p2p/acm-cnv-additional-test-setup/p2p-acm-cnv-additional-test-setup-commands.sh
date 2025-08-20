@@ -246,6 +246,6 @@ subjects:
 
 EOF
 
-oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m
+oc wait HyperConverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m
 
 sleep 7200
