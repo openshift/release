@@ -139,7 +139,7 @@ if [ -f "${KUBECONFIG}" ]; then
     master_count=$masters
     export master_count
 
-    infra_count=$infras
+    infra_count=$infra
     export infra_count
 
     total_node_count=$all
@@ -151,7 +151,7 @@ if [ -f "${KUBECONFIG}" ]; then
     cloud_infrastructure=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     export cloud_infrastructure
     cluster_type=""
-    if [ "$platform" = "AWS" ]; then
+    if [ "$cloud_infrastructure" = "AWS" ]; then
         cluster_type=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.aws.resourceTags[?(@.key=="red-hat-clustertype")].value}') || echo "Cluster Install Failed"
     fi
     if [ -z "$cluster_type" ]; then
@@ -180,15 +180,12 @@ if [[ -n "${LOOKBACK_SIZE}" ]]; then
     EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
-if [[ -n "${LOOKBACK_SIZE}" ]]; then
-    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
-fi
-
 if [[ -n "${DISPLAY}" ]]; then
     EXTRA_FLAGS+=" --display ${DISPLAY}"
 fi
 
 if [[ -n "${DEBUG}" && ${DEBUG} == true ]]; then
+if [[ -n "${DEBUG+x}" && ${DEBUG} == true ]]; then
     export EXTRA_FLAGS+=" --debug"
 fi
 
