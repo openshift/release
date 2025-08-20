@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Version BEFORE upgrade:"
+oc describe clusterversions/version |tail -20
+echo ""
+
 for NODE in `oc -o custom-columns=NAME:.metadata.name get nodes --no-headers`; do
     echo "NODE $NODE"
     OUT=$SHARED_DIR/disk-by-id-for-$NODE.out
