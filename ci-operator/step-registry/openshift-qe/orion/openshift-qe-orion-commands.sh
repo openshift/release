@@ -93,6 +93,53 @@ if [ ${COLLAPSE} == "true" ]; then
     EXTRA_FLAGS+=" --collapse"
 fi
 
+
+# set enviornment based variables if they exist
+if [ -f "${KUBECONFIG}" ]; then
+    masters=0
+    infra=0
+    workers=0
+    all=0
+    master_type=""
+    infra_type=""
+    worker_type=""
+
+    # Using from e2e-benchmarking
+    for node in $(oc get nodes --ignore-not-found --no-headers -o custom-columns=:.metadata.name || true); do
+        labels=$(oc get node "$node" --no-headers -o jsonpath='{.metadata.labels}')
+        if [[ $labels == *"node-role.kubernetes.io/master"* ]]; then
+            masters=$((masters + 1))
+            master_type=$(oc get node "$node" -o jsonpath='{.metadata.labels.beta\.kubernetes\.io/instance-type}')
+            taints=$(oc get node "$node" -o jsonpath='{.spec.taints}')
+
+            if [[ $labels == *"node-role.kubernetes.io/worker"* && $taints == "" ]]; then
+                workers=$((workers + 1))
+            fi
+        elif [[ $labels == *"node-role.kubernetes.io/infra"* ]]; then
+            infra=$((infra + 1))
+            infra_type=$(oc get node "$node" -o jsonpath='{.metadata.labels.beta\.kubernetes\.io/instance-type}')
+        elif [[ $labels == *"node-role.kubernetes.io/worker"* ]]; then
+            workers=$((workers + 1))
+            worker_type=$(oc get node "$node" -o jsonpath='{.metadata.labels.beta\.kubernetes\.io/instance-type}')
+        fi
+        all=$((all + 1))
+    done
+    export TOTAL_NODE_COUNT=$all
+    export node_instance_type=$worker_type
+    export network_plugins=$(oc get network.config/cluster -o jsonpath='{.status.networkType}')
+    export cloud_infrastructure=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+    cluster_type=""
+    if [ "$platform" = "AWS" ]; then
+        cluster_type=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.aws.resourceTags[?(@.key=="red-hat-clustertype")].value}') || echo "Cluster Install Failed"
+    fi
+    if [ -z "$cluster_type" ]; then
+        cluster_type="self-managed"
+    fi
+    export cloud_type=$clustertype
+    export version=${VERSION:=$(oc version -o json | jq -r '.openshiftVersion')}
+fi
+
+
 if [[ -n "${ORION_ENVS}" ]]; then
     ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
     IFS=',' read -r -a env_array <<< "$ORION_ENVS"
@@ -107,6 +154,9 @@ fi
 if [[ -n "${LOOKBACK_SIZE}" ]]; then
     EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
+
+
+
 
 set +e
 set -o pipefail
