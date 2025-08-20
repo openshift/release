@@ -142,8 +142,8 @@ if [ -f "${KUBECONFIG}" ]; then
     infra_count=$infras
     export infra_count
 
-    TOTAL_NODE_COUNT=$all
-    export TOTAL_NODE_COUNT
+    total_node_count=$all
+    export total_node_count
     node_instance_type=$worker_type
     export node_instance_type
     network_plugins=$(oc get network.config/cluster -o jsonpath='{.status.networkType}')
@@ -161,6 +161,8 @@ if [ -f "${KUBECONFIG}" ]; then
     export cloud_type
     export version=${VERSION:=$(oc version -o json | jq -r '.openshiftVersion')}
 fi
+
+env
 
 
 if [[ -n "${ORION_ENVS}" ]]; then
@@ -186,6 +188,12 @@ if [[ -n "${DISPLAY}" ]]; then
     EXTRA_FLAGS+=" --display ${DISPLAY}"
 fi
 
+if [[ -n "${DEBUG}" && ${DEBUG} == true ]]; then
+    export EXTRA_FLAGS+=" --debug"
+fi
+
+
+cat $CONFIG
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
