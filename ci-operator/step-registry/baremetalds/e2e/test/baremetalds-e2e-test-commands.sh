@@ -401,6 +401,18 @@ sleep 10m
 
 check_clusteroperators_status
 
+# --- CUSTOM POST-COMMANDS + WAIT ---
+if [ -n "${CUSTOM_POST_COMMANDS:-}" ]; then
+    echo "### Executing CUSTOM_POST_COMMANDS ###"
+    eval "${CUSTOM_POST_COMMANDS}"
+
+    if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
+        echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds after executing CUSTOM_POST_COMMANDS"
+        sleep "${CUSTOM_POST_TIMEOUT}"
+    fi
+fi
+# --- END CUSTOM POST-COMMANDS ---
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
