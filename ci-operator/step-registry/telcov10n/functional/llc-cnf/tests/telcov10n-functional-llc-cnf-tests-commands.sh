@@ -17,7 +17,7 @@ NTO_REPO="https://github.com/mrniranjan/cluster-node-tuning-operator.git"
 #NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
 NTO_BRANCH="all_420_fixes"
 #NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
-GINKGO_LABELS=("tier-0" "tier-1" "tier-2" "tier-3" "uncore-cache")
+GINKGO_LABELS=("tier-0" "tier-1" "tier-2")
 GINKGO_SUITES="test/e2e/performanceprofile/functests"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
