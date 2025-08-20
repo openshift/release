@@ -60,7 +60,9 @@ for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$N
         --build 1
   sleep 10
   # Skip the boot device change for SuperMicro servers
-  if ! echo "$i" | grep -qE "(1029u|1029p|5039ms|6018r|6029p|6029r|6048p|6048r|6049p)"; then
+  if echo "$i" | grep -qE "(1029u|1029p|5039ms|6018r|6029p|6029r|6048p|6048r|6049p)"; then
+    podman run quay.io/ocp-edge-qe/ipmitool ipmitool -I lanplus -H mgmt-$i -U $USER -P $PSWD chassis bootdev pxe
+  else
     podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman
   fi
   podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
