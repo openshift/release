@@ -124,7 +124,7 @@ if [ -f "${KUBECONFIG}" ]; then
 
     infra_count=$infras
     export infra_count
-    
+
     TOTAL_NODE_COUNT=$all
     export TOTAL_NODE_COUNT
     node_instance_type=$worker_type
@@ -160,9 +160,6 @@ fi
 if [[ -n "${LOOKBACK_SIZE}" ]]; then
     EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
-
-
-
 
 set +e
 set -o pipefail
