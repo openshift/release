@@ -443,12 +443,30 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
   cluster: build05
@@ -489,6 +507,13 @@ tests:
   cron: 0 2 * * 1
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_ARBITERS=1
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
 - as: e2e-metal-ovn-two-node-fencing-extended
   cluster: build05
@@ -661,10 +686,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-ovn-host-groups-csi
+- as: e2e-vsphere-ovn-host-groups-csi-techpreview
   cron: 6 2 * * 1
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -883,7 +910,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-cgroupsv2
 - as: e2e-aws-driver-toolkit
-  cron: 0 */8 * * *
+  interval: 48h
   steps:
     cluster_profile: aws-3
     observers:
@@ -1142,18 +1169,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-gcp-custom-dns
-  interval: 168h
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      USER_PROVISIONED_DNS: "yes"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1849,13 +1864,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-sts-conformance
-  timeout: 6h0m0s
-- as: e2e-rosa-sts-hypershift-ovn
-  cluster: build10
-  cron: '@daily'
-  steps:
-    cluster_profile: aws-perfscale-qe
-    workflow: rosa-aws-sts-hcp-conformance
   timeout: 6h0m0s
 - as: e2e-osd-ccs-gcp
   cluster: build10

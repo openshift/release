@@ -2,35 +2,40 @@
 
 set -o pipefail
 
-# the exit code of this step is not expected to be caught from the overall test suite in ReportPortal. Excluding it
-touch "${ARTIFACT_DIR}/skip_overall_if_fail"
-
 set -x
+if [[ "${NO_REPORTPORTAL,,}" = 'true' ]]
+then
+  echo "Skip, as user choose not to send results to ReportPortal for job: ${JOB_NAME}"
+  exit 0
+fi
 if ! (env | grep -q JOB_SPEC)
 then
-  echo "No JOB_SPEC. Skip"
+  echo "Skip, as no JOB_SPEC defined and we rely on it heavily"
   exit 0
 fi
 
-ALLOWED_REPOS=("openshift-tests-private"
-               "verification-tests"
-               "oadp-qe-automation"
-               "rosa"
+ALLOWED_REPOS=('openshift/openshift-tests-private'
+               'openshift/rosa'
+               'openshift/verification-tests'
+               'oadp-qe/oadp-qe-automation'
               )
+org="$(jq -r 'if .extra_refs then .extra_refs[0].org
+              elif .refs then .refs.org
+              else error
+              end' <<< ${JOB_SPEC})"
 repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
                elif .refs then .refs.repo
                else error
-               end
-' <<< ${JOB_SPEC:-''})"
+               end' <<< ${JOB_SPEC})"
 # shellcheck disable=SC2076
-if ! [[ "${ALLOWED_REPOS[*]}" =~ "$repo" ]]
+if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repo: $repo"
+    echo "Skip repository: $org/$repo"
     exit 0
 fi
 
-LOGS_PATH="logs"
-if [[ "$(jq -r '.type' <<< ${JOB_SPEC:-''})" = "presubmit" ]]
+LOGS_PATH='logs'
+if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = 'presubmit' ]]
 then
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
@@ -38,28 +43,32 @@ then
     echo "Expected pull number not found, exit 1"
     exit 1
   fi
+  pr_org="$(jq -r '.refs.org' <<< $JOB_SPEC)"
   pr_repo="$(jq -r '.refs.repo' <<< $JOB_SPEC)"
-  if [[ -z "$pr_repo" ]]
+  if [[ -z "$pr_org" ]] || [[ -z "$pr_repo" ]]
   then
-    echo "Expected repo name not found, exit 2"
+    echo "Expected org/repo name not found, exit 2"
     exit 2
   fi
-  LOGS_PATH="pr-logs/pull/openshift_${pr_repo}/${pr_number}"
+  LOGS_PATH="pr-logs/pull/${pr_org}_${pr_repo}/${pr_number}"
 fi
-DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration then .decoration_config.gcs_configuration.bucket else error end' <<< ${JOB_SPEC:-''})"
 PROWCI=''
 PROWWEB=''
+DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configuration
+                    then .decoration_config.gcs_configuration.bucket
+                    else error
+                    end' <<< ${JOB_SPEC})"
 if [[ "$DECK_NAME" = 'test-platform-results' ]]
 then
-  PROWCI="https://prow.ci.openshift.org"
-  PROWWEB="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PROWCI='https://prow.ci.openshift.org'
+  PROWWEB='https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com'
 elif [[ "$DECK_NAME" = 'qe-private-deck' ]]
 then
-  PROWCI="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
-  PROWWEB="https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PROWCI='https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com'
+  PROWWEB='https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com'
 else
   echo "Unknow bucket name: $DECK_NAME"
-  exit 1
+  exit 3
 fi
 ROOT_PATH="gs://${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}"
 LOCAL_DIR="/tmp/${JOB_NAME}/${BUILD_ID}"
@@ -72,9 +81,14 @@ function download_logs() {
   logfile_name="${ARTIFACT_DIR}/rsync.log"
   export PATH="$PATH:/opt/google-cloud-sdk/bin"
   gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private
-  gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml|build-log.txt|skip_overall_if_fail)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
+  gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
   gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
   #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
+}
+
+function get_attribute() {
+  key_name="$1"
+  jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key==$key_name).value' --arg key_name "$key_name" "$DATAROUTER_JSON"
 }
 
 function write_attribute() {
@@ -94,39 +108,43 @@ function generate_attribute_architecture() {
   if [[ "$JOB_NAME" =~ amd64|arm64|multi|ppc64le|s390x ]]
   then
     architecture="${BASH_REMATCH[0]}"
-    write_attribute architecture "$architecture"
   else
-    release_dir="${LOCAL_DIR_ORI}/release/artifacts"
-    for release_file in 'release-images-arm64-latest' \
-                        'release-images-ppc64le-latest' \
-                        'release-images-s390x-latest' \
-                        'release-images-latest'
-    do
-      release_info_file="$release_dir/$release_file"
-      if [[ -f "$release_info_file" ]]
-      then
-        version_installed="$(jq -r '.metadata.name' "$release_info_file")"
-        write_attribute version_installed "$version_installed"
-        if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
-        then
-          architecture="${BASH_REMATCH[0]}"
-        else
-          architecture='amd64'
-        fi
-        write_attribute architecture "$architecture"
-        break
-      fi
-    done
+    generate_attribute_version_installed
+    version_installed="$(get_attribute "version_installed")"
+    if [[ "$version_installed" =~ arm64|multi|ppc64le|s390x ]]
+    then
+      architecture="${BASH_REMATCH[0]}"
+    else
+      architecture='amd64'
+    fi
   fi
+  write_attribute architecture "$architecture"
 }
 
 function generate_attribute_cloud_provider() {
-  cloud_provider="unknown"
   if [[ "$JOB_NAME_SAFE" =~ alibaba|aws|azure|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere ]]
   then
     cloud_provider="${BASH_REMATCH[0]}"
+    write_attribute cloud_provider "$cloud_provider"
   fi
-  write_attribute cloud_provider "$cloud_provider"
+}
+
+function generate_attribute_env_fips() {
+  env_fips='no'
+  if [[ "$JOB_NAME_SAFE" =~ fips ]]
+  then
+    env_fips='yes'
+  fi
+  write_attribute env_fips "$env_fips"
+}
+
+function generate_attribute_job_type() {
+  job_type='periodic'
+  if [[ "$LOGS_PATH" =~ pr-logs ]]
+  then
+    job_type='presubmit'
+  fi
+  write_attribute job_type "$job_type"
 }
 
 function generate_attribute_install() {
@@ -153,24 +171,14 @@ function generate_attribute_install() {
 }
 
 function generate_attribute_install_method() {
-  install_method="unknown"
-  for keyword in 'agent' \
-                 'hypershift' \
-                 'ipi' \
-                 'rosa' \
-                 'upi'
-  do
-    if [[ "$JOB_NAME_SAFE" =~ $keyword ]]
-    then
-      install_method="$keyword"
-      break
-    fi
-  done
-  write_attribute install_method "$install_method"
-
-  if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
+  if [[ "$JOB_NAME_SAFE" =~ agent|hypershift|ipi|rosa|upi ]]
   then
-    write_attribute install_method_catalog "classic"
+    install_method="${BASH_REMATCH[0]}"
+    write_attribute install_method "$install_method"
+    if [[ "$install_method" == "ipi" ]] || [[ "$install_method" == "upi" ]]
+    then
+      write_attribute install_method_catalog "classic"
+    fi
   fi
 }
 
@@ -186,35 +194,56 @@ function generate_attribute_profilename() {
   write_attribute profilename "$profile_name"
 }
 
+function generate_attribute_pr_author() {
+  if [[ "$LOGS_PATH" =~ pr-logs ]]
+  then
+    pr_author="$(jq -r '.refs.pulls[0].author' <<< $JOB_SPEC)"
+    write_attribute pr_author "$pr_author"
+  fi
+}
+
 function generate_attribute_version_installed() {
-  version_installed="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="version_installed").value' "$DATAROUTER_JSON")"
+  version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
   then
     release_dir="${LOCAL_DIR_ORI}/release/artifacts"
-    release_file="release-images-latest"
-    arch="$(jq -r '.targets.reportportal.processing.launch.attributes[] | select(.key=="architecture").value' "$DATAROUTER_JSON")"
-    if [[ "$arch" = 'arm64' ]]
+    release_info_file="$release_dir/release-images-latest"
+    arch="$(get_attribute "architecture")"
+    if [[ -z "$arch" ]]
     then
-      release_file="release-images-arm64-latest"
-    elif [[ "$arch" = 'ppc64le' ]]
-    then
-      release_file="release-images-ppc64le-latest"
+      for release_file in 'release-images-arm64-latest' \
+                          'release-images-ppc64le-latest' \
+                          'release-images-s390x-latest'
+      do
+        release_info_file="$release_dir/$release_file"
+        if [[ -f "$release_info_file" ]]
+        then
+          break
+        fi
+      done
+    else
+      if [[ "$arch" =~ arm64|ppc64le|s390x ]]
+      then
+        release_info_file="$release_dir/release-images-${arch}-latest"
+      fi
     fi
-    release_info_file="$release_dir/$release_file"
     if [[ -f "$release_info_file" ]]
     then
       version_installed="$(jq -r '.metadata.name' "$release_info_file")"
+      write_attribute version_installed "$version_installed"
     fi
-    write_attribute version_installed "$version_installed"
   fi
 }
 
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
+  generate_attribute_env_fips
+  generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
+  generate_attribute_pr_author
   generate_attribute_version_installed
 }
 
@@ -262,68 +291,94 @@ function generate_metadata() {
 EOF_JSON
 
   generate_attributes
-  cat "$DATAROUTER_JSON"
 }
 
-function generate_results() {
-#  testsuite_name='Overall CI (test step)'
-#  junit_file="$LOCAL_DIR_RST/junit_test-steps.xml"
-#  failure_count=0
-#  step_dirs=$(find "$LOCAL_DIR_ORI" -maxdepth 1 -mindepth 1 -type d | grep -v '/release$' | sort)
-#  for step_dir in $step_dirs
-#  do
-#    step_name="$(basename "${step_dir}")"
-#    file_finished="${step_dir}/finished.json"
-#    if [ -f "${file_finished}" ]
-#    then
-#      result=$(jq -r '.result' "${file_finished}")
-#      if [[ "$result" = 'SUCCESS' ]]
-#      then
-#        cat >> "$junit_file" << EOF_JUNIT_SUCCESS
-#  <testcase classname="$testsuite_name" name="$step_name" time="1">
-#    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
-#  </testcase>
-#EOF_JUNIT_SUCCESS
-#      elif [[ "$result" = 'FAILURE' ]]
-#      then
-#        let failure_count+=1
-#        cat >> "$junit_file" << EOF_JUNIT_FAILURE
-#  <testcase classname="$testsuite_name" name="$step_name" time="1">
-#    <failure message="Step $step_name failed" type="failed"/>
-#    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
-#  </testcase>
-#EOF_JUNIT_FAILURE
-#      fi
-#    else
-#      let failure_count+=1
-#    fi
-#  done
-#  sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$junit_file"
-#  sed -i "1 a <testsuite name=\"$testsuite_name\" failures=\"$failure_count\" errors=\"0\" skipped=\"0\" tests=\"$(wc -w <<< $step_dirs)\">" "$junit_file"
-#  sed -i '$ a </testsuite>' "$junit_file"
-#  cp "$junit_file" "${ARTIFACT_DIR}"
+function generate_result_teststeps() {
+  testsuite_name='Overall CI (test step)'
+  junit_file="$LOCAL_DIR_RST/junit_test-steps.xml"
+  failure_count=0
+  step_dirs=$(find "$LOCAL_DIR_ORI" -maxdepth 1 -mindepth 1 -type d | grep -v '/release$' | sort)
+  for step_dir in $step_dirs
+  do
+    step_name="$(basename "${step_dir}")"
+    file_finished="${step_dir}/finished.json"
+    if [ -f "${file_finished}" ]
+    then
+      cat >> "$junit_file" << EOF_JUNIT
+  <testcase classname="$testsuite_name" name="$step_name" time="1">
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt</system-out>
+  </testcase>
+EOF_JUNIT
+      result=$(jq -r '.result' "${file_finished}")
+      if [[ "$result" = 'SUCCESS' ]]
+      then
+        continue
+      elif [[ "$result" = 'FAILURE' ]]
+      then
+        sed -i "\;classname=\"$testsuite_name\" name=\"$step_name\";a \    <failure message=\"Step $step_name failed\" type=\"failed\"/>" "$junit_file"
+      fi
+    fi
+    let failure_count+=1
+  done
+  sed -i '1 i <?xml version="1.0" encoding="UTF-8"?>' "$junit_file"
+  sed -i "1 a <testsuite name=\"$testsuite_name\" failures=\"$failure_count\" errors=\"0\" skipped=\"0\" tests=\"$(wc -w <<< $step_dirs)\">" "$junit_file"
+  sed -i '$ a </testsuite>' "$junit_file"
+  cp "$junit_file" "${ARTIFACT_DIR}"
+}
 
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
-
+# For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
+function generate_result_customize_prow() {
   testsuite_name='Installation'
   # using the same junit filename as the one generated in must-gather step to overwirte installation results
   junit_file="$LOCAL_DIR_RST/junit_install.xml"
-  failures_num="1"
-  if [[ "$INSTALL_RESULT" == "succeed" ]]; then
-    failures_num="0"
-  fi
-  cat >"${junit_file}" <<EOF
+  cat > "$junit_file" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite_name}" failures="${failures_num}" errors="0" skipped="0" tests="1">
-    <testcase classname="${testsuite_name}" name="${testsuite_name}" time="1">
-      <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/build-log.txt</system-out>
-    </testcase>
+<testsuite name="${testsuite_name}" failures="0" errors="0" skipped="0" tests="1">
+  <testcase classname="${testsuite_name}" name="${testsuite_name}" time="1">
+    <system-out>${PROWWEB}/gcs/${DECK_NAME}/${LOGS_PATH}/${JOB_NAME}/${BUILD_ID}/build-log.txt</system-out>
+  </testcase>
 </testsuite>
 EOF
-  if [[ "$failures_num" == "1" ]]; then
-    sed -i '/testcase classname/a \      <failure message="Installation failed" type="failed"/>' "${junit_file}"
+  if [[ "$INSTALL_RESULT" == "fail" ]]
+  then
+    sed -i 's;failures="0";failures="1";' "$junit_file"
+    sed -i '/testcase classname/a \    <failure message="Installation failed" type="failed"/>' "$junit_file"
   fi
+}
 
+function generate_results() {
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
+
+  # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
+  if [[ "$REPORTPORTAL_PROJECT" = 'prow' ]]
+  then
+    generate_result_customize_prow
+  else
+    generate_result_teststeps
+  fi
+}
+
+function fix_xmls() {
+  # We are updating the copies of the xmls that we will send to DataRouter/ReportPortal,
+  # The original xmls are not touched, it should not harm
+  xml_files="$(find "$LOCAL_DIR_RST" -name "*.xml")"
+  if [[ -z "$xml_files" ]]
+  then
+    echo 'No xml files to process, exit'
+    exit 0
+  else
+    # in openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
+    # Element 'property': This element is not expected.
+    property_xml_files="$(grep -l -r '<property ' $xml_files)" || true
+    if [[ -n "$property_xml_files" ]]
+    then
+      sed -i '\;<property.*</property>;d' $property_xml_files
+    fi
+  fi
+}
+
+function debug_info() {
+  cat "$DATAROUTER_JSON"
   ls -alR "$LOCAL_DIR"
 }
 
@@ -341,4 +396,6 @@ export INSTALL_RESULT="fail"
 download_logs
 generate_metadata
 generate_results
+fix_xmls
+debug_info
 droute_send

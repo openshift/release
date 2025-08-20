@@ -39,7 +39,7 @@ cat >>assume_role_policy.json <<EOF
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "arn:aws:iam::301721915996:user/\${aws_iam_user.quay.name}"
+        "AWS": "arn:aws:iam::498473767577:user/\${aws_iam_user.quay.name}"
       },
       "Action": "sts:AssumeRole"
     }
