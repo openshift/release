@@ -55,7 +55,7 @@ controlPlane:
   replicas: ${CONTROL_COUNT}
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14
+  - cidr: 10.8.0.0/14
     hostPrefix: 23
   machineNetwork:
   - cidr: "192.168.$(leaseLookup "subnet").0/24"

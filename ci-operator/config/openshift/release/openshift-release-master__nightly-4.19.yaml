@@ -443,12 +443,30 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_MEMORY=16384
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
   cluster: build05
@@ -461,24 +479,55 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_WORKERS=0
+        FEATURE_SET="DevPreviewNoUpgrade"
+        BMC_DRIVER=redfish
     workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-upgrade
   cluster: build05
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_WORKERS=0
+        FEATURE_SET="DevPreviewNoUpgrade"
+        BMC_DRIVER=redfish
     workflow: baremetalds-two-node-fencing-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
   cluster: build05
   cron: 0 2 * * 1
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_ARBITERS=1
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
 - as: e2e-metal-ovn-two-node-fencing-extended
   cluster: build05
   cron: 0 4 * * *
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_WORKERS=0
+        FEATURE_SET="DevPreviewNoUpgrade"
+        BMC_DRIVER=redfish
     workflow: baremetalds-two-node-fencing-extended
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
@@ -489,7 +538,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere-ovn-techpreview
-  interval: 168h
+  cron: 36 17 * * 3
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -501,7 +550,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-multi-network-techpreview
-  interval: 8h
+  cron: 50 12 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -522,7 +571,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - as: e2e-external-vsphere-ccm
-  cron: '@weekly'
+  cron: 54 15 * * 1
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -541,7 +590,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
-  interval: 168h
+  cron: 37 5 * * 0
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -552,7 +601,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-static-ovn
-  interval: 168h
+  cron: 12 22 * * 4
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -561,7 +610,7 @@ tests:
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-externallb-ovn
-  interval: 168h
+  cron: 30 10 * * 2
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -569,7 +618,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
-  interval: 168h
+  cron: 39 7 * * 2
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -580,7 +629,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-techpreview-serial
-  interval: 168h
+  cron: 52 6 * * 5
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -590,7 +639,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
-  interval: 168h
+  cron: 12 3 * * 5
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -601,7 +650,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
-  interval: 168h
+  cron: 10 23 * * 2
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -612,7 +661,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-csi-operator-test
-  cron: '@daily'
+  cron: 39 8 * * *
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -626,7 +675,7 @@ tests:
           cpu: 100m
     workflow: ipi-vsphere
 - as: e2e-vsphere-ovn-csi
-  interval: 168h
+  cron: 3 15 * * 2
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -637,16 +686,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-ovn-host-groups-csi
-  cron: '@weekly'
+- as: e2e-vsphere-ovn-host-groups-csi-techpreview
+  cron: 6 2 * * 1
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups-csi
 - as: e2e-vsphere-ovn-multi-vcenter-csi
-  cron: '@weekly'
+  cron: 37 12 * * 4
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -657,17 +708,17 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-multi-vcenter-csi
 - as: e2e-vsphere-ovn-zones
-  interval: 168h
+  cron: 36 21 * * 2
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
-  interval: 168h
+  cron: 32 0 * * 4
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-host-groups-ovn-techpreview
-  cron: '@daily'
+  cron: 17 11 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -677,7 +728,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-ovn-multi-vcenter
-  cron: '@daily'
+  cron: 5 3 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -689,7 +740,7 @@ tests:
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-multi-vcenter
-  cron: '@daily'
+  cron: 57 14 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -859,7 +910,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-cgroupsv2
 - as: e2e-aws-driver-toolkit
-  cron: 0 */8 * * *
+  interval: 48h
   steps:
     cluster_profile: aws-3
     observers:
@@ -1118,18 +1169,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-gcp-custom-dns
-  interval: 168h
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      USER_PROVISIONED_DNS: "yes"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1139,7 +1178,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-etcd-scaling
 - as: e2e-vsphere-ovn-etcd-scaling
-  interval: 168h
+  cron: 21 12 * * 6
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -1680,7 +1719,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-vsphere-ovn-kube-apiserver-rollout
-  interval: 24h
+  cron: 33 12 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1699,7 +1738,7 @@ tests:
       TEST_TYPE: suite
     workflow: openshift-e2e-azure
 - as: e2e-vsphere-ipi-ovn-runc
-  cron: '@daily'
+  cron: 51 0 * * *
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -1731,7 +1770,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-runc
 - as: e2e-vsphere-ovn-serial-runc
-  cron: '@daily'
+  cron: 34 19 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1766,7 +1805,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial-runc
 - as: e2e-vsphere-ipi-ovn-runc-techpreview
-  cron: '@daily'
+  cron: 10 0 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1825,13 +1864,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-sts-conformance
-  timeout: 6h0m0s
-- as: e2e-rosa-sts-hypershift-ovn
-  cluster: build10
-  cron: '@daily'
-  steps:
-    cluster_profile: aws-perfscale-qe
-    workflow: rosa-aws-sts-hcp-conformance
   timeout: 6h0m0s
 - as: e2e-osd-ccs-gcp
   cluster: build10

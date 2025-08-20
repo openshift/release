@@ -94,7 +94,7 @@ CONFIG = {
         'us-west-2': 5
     },
     'aws-perfscale-qe-quota-slice': {
-        'us-west-2': 10,
+        'us-west-2': 20,
     },
     'metal-perscale-cpt-quota-slice': {
         'rdu3': 1,
@@ -237,7 +237,7 @@ CONFIG = {
         'eastus': 6,
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 120,
+        'default': 140,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -564,14 +564,18 @@ CONFIG = {
     },
     'ibmcloud-rhoai-qe-quota-slice': {
         'us-east': 40,
-    }
+    },
+    'aws-oadp-qe-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+    },
 }
 
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-# Excluding Mihawk0 from lease pool due to S2S migration
-for i in range(1, 3):
+# Excluding Mihawk0,Mihawk1 from lease pool due to S2S migration
+for i in range(2, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
 for i in range(0, 2):

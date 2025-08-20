@@ -407,15 +407,17 @@ tests:
     - chain: cucushift-installer-check-cluster-health
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
+  as: e2e-aws-custom-dns
   optional: true
+  run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-aws-custom-dns
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
@@ -589,13 +591,19 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-gcp-custom-dns
+  as: e2e-gcp-custom-dns-techpreview
   optional: true
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
@@ -665,6 +673,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: azure4
     env:
@@ -711,6 +720,13 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
+  timeout: 6h0m0s
+- as: e2e-gcp-xpn-dedicated-dns-project
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-xpn-dedicated-dns-project
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-xpn
   optional: true
@@ -914,8 +930,10 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-externallb-ovn
+- always_run: false
+  as: e2e-vsphere-externallb-ovn
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-externallb
@@ -931,33 +949,28 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-host-groups
-- as: e2e-vsphere-static-ovn
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-staticip
-  timeout: 6h0m0s
-- as: e2e-vsphere-ovn-multi-network-techpreview
+- as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      MULTI_NIC_IPI: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
+    workflow: openshift-e2e-vsphere-host-groups
+- always_run: false
+  as: e2e-vsphere-static-ovn
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-staticip
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-ovn-multi-network
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -966,15 +979,24 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-disk
+- always_run: false
+  as: e2e-vsphere-ovn-multi-disk
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-disk-setup-techpreview
   optional: true
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
-      FEATURE_GATES: '["VSphereMultiDisk=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      DISK_SETUP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
@@ -997,9 +1019,9 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-zones-techpreview
   optional: true
-  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1025,9 +1047,15 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
+        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
+      BASELINE_CAPABILITY_SET: None
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
+      PERSISTENT_MONITORING: "false"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+      TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 6h0m0s
 - always_run: false
@@ -1306,7 +1334,13 @@ tests:
     post:
     - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-gcp
+    - chain: ipi-install
+    - ref: cucushift-installer-check-gcp-private
     test:
     - chain: cucushift-installer-check-cluster-health
   timeout: 6h0m0s
@@ -1444,7 +1478,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      FEATURE_GATES: '["GCPCustomAPIEndpoints=true"]'
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-custom-endpoints
   timeout: 6h0m0s
