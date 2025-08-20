@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -46,30 +47,49 @@ function checkForInfraReady() {
 
 function rebalanceInfra() {
     if [[ $1 == "prometheus-k8s" ]] ; then
-        log "$(date) - Initiate migration of prometheus componenets to infra nodepools"
+        # Set max retries to 3 and a flag to track success.
+        local max_retries=3
+        local attempt=1
+        local rollout_success=false
+
+	log "$(date) - Print details of prometheus-k8s before rebalance"
         oc get pods -n openshift-monitoring -o wide | grep prometheus-k8s
+	log "$(date) - Attempting to rebalance prometheus-k8s components..."
         oc get sts prometheus-k8s -n openshift-monitoring
-        
-        log "$(date) - Restart stateful set pods"
-        echo "rollout restart -n openshift-monitoring statefulset/prometheus-k8s"
-        oc rollout restart -n openshift-monitoring statefulset/prometheus-k8s 
-        
-        log "$(date) - Wait till they are completely restarted"
-        oc rollout status -n openshift-monitoring statefulset/prometheus-k8s
-        
-        log "$(date) - Check pods status again and the hosting nodes"
-        oc get pods -n openshift-monitoring -o wide | grep prometheus-k8s
+
+        while [[ $attempt -le $max_retries ]]; do
+            log "Attempt ${attempt}/${max_retries}: Triggering rollout restart for prometheus-k8s..."
+            oc rollout restart -n openshift-monitoring statefulset/prometheus-k8s
+
+            log "Waiting for rollout to complete (timeout: 10 minutes)..."
+            # Attempt to get the status, breaking the loop on success.
+            if oc rollout status -n openshift-monitoring statefulset/prometheus-k8s --timeout=10m; then
+                log "✔️ Rollout completed successfully on attempt ${attempt}."
+                rollout_success=true
+                break
+            else
+                log "⚠️ Warning: Rollout failed or timed out on attempt ${attempt}."
+            fi
+            ((attempt++))
+        done
+
+        # If the loop finished without success, log the final error.
+        if ! $rollout_success; then
+            log "❌ Error: StatefulSet prometheus-k8s failed to complete its rollout after ${max_retries} attempts."
+        fi
+        log "Prometheus rebalance attempt finished."
+
     else
         log "$(date) - Initiate migration of ingress router-default pods to infra nodepools"
         echo "Add toleration to use infra nodes"
 
         oc patch ingresscontroller -n openshift-ingress-operator default --type merge --patch  '{"spec":{"nodePlacement":{"nodeSelector":{"matchLabels":{"node-role.kubernetes.io/infra":""}},"tolerations":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/infra","operator":"Exists"}]}}}'
-        
+
         echo "Wait till it gets rolled out"
         sleep 60
 
         oc get pods -n openshift-ingress -o wide
-    fi    
+    fi
 }
 
 function checkInfra() {

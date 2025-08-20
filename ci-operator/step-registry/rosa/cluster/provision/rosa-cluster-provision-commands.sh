@@ -695,6 +695,7 @@ ${HYPERSHIFT_SWITCH} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
+--pod-cidr 10.128.0.0/10 \
 --tags ${TAGS} \
 ${DOMAIN_PREFIX_SWITCH} \
 ${ACCOUNT_ROLES_SWITCH} \
