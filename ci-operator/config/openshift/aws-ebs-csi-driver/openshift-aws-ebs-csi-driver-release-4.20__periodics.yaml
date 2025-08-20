@@ -1,0 +1,40 @@
+base_images:
+  aws-ebs-csi-driver-test:
+    name: "4.20"
+    namespace: ocp
+    tag: aws-ebs-csi-driver-test
+build_root:
+  from_repository: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-e2e-aws-csi-techpreview-volumeattributesclass
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --run=VolumeAttributesClass
+      TEST_SUITE: all
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift
+  repo: aws-ebs-csi-driver
+  variant: periodics

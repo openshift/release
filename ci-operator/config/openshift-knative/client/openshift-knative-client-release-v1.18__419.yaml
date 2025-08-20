@@ -12,8 +12,12 @@ build_root:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/knative/client
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile
-  to: knative-client-client
+- dockerfile_path: openshift/ci-operator/knative-images/cli-artifacts/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+  to: knative-client-cli-artifacts
 - dockerfile_path: openshift/ci-operator/knative-images/kn/Dockerfile
   inputs:
     ocp_ubi-minimal_8:
@@ -24,6 +28,13 @@ images:
       - $GO_BUILDER
   to: knative-client-kn
 - dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.19:
+      as:
+      - $GO_BUILDER
   to: knative-client-test-grpc-ping
 - dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
   inputs:
@@ -35,8 +46,22 @@ images:
       - $GO_BUILDER
   to: knative-client-test-helloworld
 - dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.19:
+      as:
+      - $GO_BUILDER
   to: knative-client-test-servingcontainer
 - dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.19:
+      as:
+      - $GO_BUILDER
   to: knative-client-test-sidecarcontainer
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -66,7 +91,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.19"
-  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -122,8 +147,6 @@ tests:
       commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
         make test-e2e
       dependencies:
-      - env: KNATIVE_CLIENT_CLIENT
-        name: knative-client-client
       - env: KNATIVE_CLIENT_TEST_GRPC_PING
         name: knative-client-test-grpc-ping
       - env: KNATIVE_CLIENT_TEST_HELLOWORLD

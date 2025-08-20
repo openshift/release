@@ -102,8 +102,8 @@ hack/ci-test-e2e.sh -test.v \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
   --e2e.azure-marketplace-publisher "azureopenshift" \
   --e2e.azure-marketplace-offer "aro4" \
-  --e2e.azure-marketplace-sku "aro_417" \
-  --e2e.azure-marketplace-version "417.94.20240701" \
+  --e2e.azure-marketplace-sku "aro_419" \
+  --e2e.azure-marketplace-version "419.6.20250523" \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!
