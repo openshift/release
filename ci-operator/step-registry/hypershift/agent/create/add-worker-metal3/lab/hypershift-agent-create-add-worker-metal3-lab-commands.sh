@@ -102,6 +102,7 @@ metadata:
     bmac.agent-install.openshift.io/hostname: ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}
 spec:
   automatedCleaningMode: disabled
+  architecture: ${CPU_ARCHITECTURE}
   bmc:
     address: ${redfish_scheme}://${bmc_address}${redfish_base_uri}
     disableCertificateVerification: true
