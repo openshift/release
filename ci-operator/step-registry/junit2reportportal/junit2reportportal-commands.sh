@@ -6,9 +6,21 @@ then
   echo "Skip, as user choose not to send results to ReportPortal for job: ${JOB_NAME}"
   exit 0
 fi
-if ! (env | grep -q JOB_SPEC)
+# sometimes the test get execute too fast, and JOB_SPEC haven't populated yet
+# add sleep and retry logic
+jobspec_found='false'
+for (( i=0; i<10; i++ ))
+do
+  if (env | grep -q JOB_SPEC)
+  then
+    jobspec_found='true'
+    break
+  fi
+  sleep 1
+done
+if [[ "$jobspec_found" = 'false' ]]
 then
-  echo "Skip, as no JOB_SPEC defined and we rely on it heavily"
+  echo "Skip, as no JOB_SPEC defined/found and we rely on it heavily"
   exit 0
 fi
 
