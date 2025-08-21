@@ -1,0 +1,36 @@
+ref:
+  as: agent-s390x-create 
+  cli: latest
+  env:
+    - name: CLUSTER_NAME
+      documentation: "Desired name for the openshift cluster"
+    - name: CLUSTER_ARCH
+      documentation: "Desired openshift cluster architecture"
+    - name: CLUSTER_VERSION
+      documentation: "Desired openshift cluster version"
+    - name: CONTROL_NODE_COUNT
+      documentation: "Desired number of master / control nodes for the openshift cluster"
+    - name: COMPUTE_NODE_COUNT
+      documentation: "Desired number of worker / compute nodes for the openshift cluster"
+    - name: PULL_SECRET_FILE
+      documentation: "Pull Secret file path in the machine. Provide the absolute path. This is required to pull images while creating the cluster"
+    - name: REGION
+      documentation: "IBM Cloud region name to create the cluster"
+    - name: RESOURCE_GROUP
+      documentation: "Your resource group name in IBM Cloud, which is already created and has access"
+  commands: agent-s390x-create-commands.sh
+  from: dev-scripts
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 1h
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_MULTI
+      name: release:multi-latest
+    
