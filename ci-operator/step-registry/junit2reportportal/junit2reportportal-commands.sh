@@ -1,16 +1,26 @@
 #!/bin/bash
 
-set -o pipefail
-
 set -x
 if [[ "${NO_REPORTPORTAL,,}" = 'true' ]]
 then
   echo "Skip, as user choose not to send results to ReportPortal for job: ${JOB_NAME}"
   exit 0
 fi
-if ! (env | grep -q JOB_SPEC)
+# sometimes the test get execute too fast, and JOB_SPEC haven't populated yet
+# add sleep and retry logic
+jobspec_found='false'
+for (( i=0; i<10; i++ ))
+do
+  if (env | grep -q JOB_SPEC)
+  then
+    jobspec_found='true'
+    break
+  fi
+  sleep 1
+done
+if [[ "$jobspec_found" = 'false' ]]
 then
-  echo "Skip, as no JOB_SPEC defined and we rely on it heavily"
+  echo "Skip, as no JOB_SPEC defined/found and we rely on it heavily"
   exit 0
 fi
 
@@ -367,12 +377,24 @@ function fix_xmls() {
     echo 'No xml files to process, exit'
     exit 0
   else
-    # in openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
-    # Element 'property': This element is not expected.
+    # when process openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
+    # we got: Element 'property': This element is not expected.
     property_xml_files="$(grep -l -r '<property ' $xml_files)" || true
     if [[ -n "$property_xml_files" ]]
     then
       sed -i '\;<property.*</property>;d' $property_xml_files
+    fi
+
+    # when process openshift-extended-test-longduration/artifacts/junit/import-Workloads.xml
+    # we got: 413 Request Entity Too Large
+    large_xml_files="$(find "$LOCAL_DIR_RST" -size +10240k)" || true
+    if [[ -n "$large_xml_files" ]]
+    then
+      for file in $large_xml_files
+      do
+        grep -B 10 -A 10 -E '<testcase|</testcase>|<failure|</failure>|<system-out|</system-out>' "$file" > "${file}.tmp"
+        mv "${file}.tmp" "$file"
+      done
     fi
   fi
 }
