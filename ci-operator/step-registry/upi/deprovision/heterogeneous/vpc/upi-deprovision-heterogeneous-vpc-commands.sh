@@ -22,7 +22,6 @@ echo "BUILD ID - ${BUILD_ID}"
 TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
 echo "TRIMMED BUILD ID - ${TRIM_BID}"
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
-OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
 
 if [ ! -f "${SHARED_DIR}"/WORKSPACE_NAME ]
 then
