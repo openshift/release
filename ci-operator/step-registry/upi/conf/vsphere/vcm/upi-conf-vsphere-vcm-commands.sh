@@ -69,11 +69,11 @@ function getFailureDomainsWithDSwitch() {
     echo "+getFailureDomainsWithDSwitch"
 
     FAILURE_DOMAIN_OUT="[]"
-    
+
     echo "[" > ${FAILURE_DOMAIN_PATH}
-    
-    for LEASE in "${SHARED_DIR}"/LEASE*; do      
-      if [[ $LEASE =~ "single" ]]; then 
+
+    for LEASE in "${SHARED_DIR}"/LEASE*; do
+      if [[ $LEASE =~ "single" ]]; then
         continue
       fi
 
@@ -90,7 +90,7 @@ function getFailureDomainsWithDSwitch() {
       FIRST=0
 
       jq -r .status.envVars "${LEASE}" > /tmp/envvars
-      
+
       # shellcheck source=/dev/null
       source /tmp/envvars
 
@@ -108,17 +108,17 @@ function getFailureDomainsWithDSwitch() {
       datastoreName=$(basename "${GOVC_DATASTORE}")
 
       {
-        echo "        server = \"${GOVC_URL}\"" 
+        echo "        server = \"${GOVC_URL}\""
         echo "        datacenter = \"${GOVC_DATACENTER}\""
         echo "        cluster = \"${CLUSTER}\""
         echo "        datastore = \"$(echo "${GOVC_DATASTORE}" | rev | cut -d '/' -f 1 | rev)\""
-        echo "        network = \"${GOVC_NETWORK}\"" 
+        echo "        network = \"${GOVC_NETWORK}\""
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
       } >> "${FAILURE_DOMAIN_PATH}"
-      
+
       FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"server":"'"${GOVC_URL}"'","datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]');
     done
-    echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
+    echo "    }" >> "${FAILURE_DOMAIN_PATH}"
     echo "]" >> "${FAILURE_DOMAIN_PATH}"
 
     echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
@@ -162,8 +162,8 @@ if jq -e --argjson IPS "$((end_worker_num + 1))" '.spec.ipAddresses | length < $
   exit 1
 fi
 
-dns_server=$(jq -r '.spec.gateway' "${NETWORK_CONFIG}")
-gateway=${dns_server}
+gateway=$(jq -r '.spec.gateway' "${NETWORK_CONFIG}")
+dns_server=$(jq -r '.spec.nameservers[0]' "${NETWORK_CONFIG}")
 netmask=$(jq -r '.spec.netmask' "${NETWORK_CONFIG}")
 
 lb_ip_address=$(jq -r '.spec.ipAddresses[2]' "${NETWORK_CONFIG}")
@@ -293,7 +293,7 @@ if command -v pwsh &> /dev/null
 then
   ROUTE53_CREATE_JSON='{"Comment": "Create public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
   ROUTE53_DELETE_JSON='{"Comment": "Delete public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
-  
+
   # shellcheck disable=SC2016
   DNS_RECORD='{
   "Action": "${ACTION}",
@@ -596,7 +596,7 @@ spec:
         mode: 0777
         overwrite: true
         path: /var/journal-gather-forwarder/forward.sh
-    
+
     ignition:
       version: 3.2.0
     systemd:
@@ -635,7 +635,7 @@ spec:
         mode: 0777
         overwrite: true
         path: /var/journal-gather-forwarder/forward.sh
-    
+
     ignition:
       version: 3.2.0
     systemd:
@@ -656,7 +656,7 @@ spec:
             [Install]
             WantedBy=multi-user.target
 EOF
-fi 
+fi
 
 # remove channel from CVO
 sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
