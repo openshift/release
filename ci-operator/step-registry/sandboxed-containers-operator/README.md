@@ -74,8 +74,9 @@ In case you want to manage secrets on that path, first must log-in https://selfs
 
 ## Clusterbot
 
-The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) workflow is now
-also available in [clusterbot](https://github.com/openshift/ci-chat-bot/blob/main/README.md).
+The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) and
+[sandboxed-containers-operator-e2e-azure](./e2e/aws/) workflows are
+available in [clusterbot](https://github.com/openshift/ci-chat-bot/blob/main/README.md).
 You have 2 main options:
 
 * ``workflow-launch``
@@ -99,8 +100,10 @@ with ``SLEEP_DURATION!=0`` you have to wait for the
 ``launch-cucushift-installer-wait`` pod from the ``main build OCP``.
 The ``done`` command will not interrupt this step!**
 
-Good news is that any extra azure assets will be torn down automatically
-together with the cluster (temporary subscription are being used).
+For azure you don't need to cleanup any extra resources created
+on the cluster, but **you have to cleanup any extra resources
+(like AMI images, snapshots and S3 buckets!) on AWS** otherwise
+they'll stay there forever, costing us real money!
 
 ### Workflow overview
 
@@ -137,7 +140,8 @@ Workflow overview:
 
 ### Usual workflows
 
-Copy, paste & modify those examples to clusterbot to use our workflow:
+Copy, paste & modify those examples to clusterbot to use our workflow,
+replace the suffix `-azure` with `-aws` to do the same on `aws`:
 
 * Check your kata-container.rpm from brew via ``KATA_RPM_BUILD_TASK`` (no need to return these, you'll get the status via slack as well as url to check the individual test results):
   * kata - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=false","RUNTIMECLASS=kata","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=kata","TEST_TIMEOUT=90"``
@@ -145,6 +149,32 @@ Copy, paste & modify those examples to clusterbot to use our workflow:
   * coco - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=coco","TEST_TIMEOUT=90"``
 * Get a cluster without OSC installed for ~8h - ``workflow-launch sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h"`` (clusterbot will send you ``KUBECONFIG`` of the testing OSC, you can use ``extended-platform-tests`` to install sandboxed constainers operator as all the config maps are prepared, you need to use ``done`` followed by deleting the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
 * Get a cluster with OSC installed for ~8h - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*Operator installation","WORKLOAD_TO_TEST=peer-pods","TEST_TIMEOUT=90"`` (clusterbot will **not** notify you nor give you ``KUBECONFIG``, see below how to get access; after the testing you have to delete the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
+
+### AWS Cleanup
+
+Unlike in Azure in **AWS you are responsible for deleting all
+extra resources you created (AMI images, snapshots, S3 buckets)**
+The main source of left-overs usually is kataconfig, you can
+delete it by:
+
+```
+count=0;
+interval=120 # seconds
+maxcount=<20 minutes>
+oc delete kataconfig example-kataconfig
+while [$count -lt $maxcount ] ; do
+  if [ $(oc get kataconfig example-kataconfig) == "not found" ]
+  then
+    exit 0
+  fi
+  sleep $interval
+  count=$count+$interval
+done
+echo "timed out"
+exit 1
+```
+
+Alternatively delete AMI **and** the associated snapshot manually.
 
 ### Using workflow-launch cluster
 
