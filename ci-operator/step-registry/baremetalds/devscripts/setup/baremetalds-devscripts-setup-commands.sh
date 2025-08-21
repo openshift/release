@@ -423,6 +423,53 @@ exit \$rv
 
 EOF
 
+# --- CUSTOM POST-COMMANDS + WAIT ---
+if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
+    echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds"
+    sleep "${CUSTOM_POST_TIMEOUT}"
+fi
+
+# --- SSHUTTLE SUPPORT ---
+# Only execute if ENABLE_SSHUTTLE is set
+if [[ "${ENABLE_SSHUTTLE:-false}" == "true" ]]; then
+    echo "************ Setting up sshuttle ************"
+
+    # Ensure sshuttle is installed on the local machine
+    if ! command -v sshuttle &> /dev/null; then
+        echo "sshuttle not found, installing..."
+        if command -v dnf &> /dev/null; then
+            sudo dnf install -y sshuttle
+        elif command -v apt &> /dev/null; then
+            sudo apt update
+            sudo apt install -y sshuttle
+        else
+            echo "Package manager not detected, please install sshuttle manually"
+            exit 1
+        fi
+    fi
+
+    # Add entries from dnsmasq config to /etc/hosts
+    DNSMASQ_CONF="/etc/NetworkManager/dnsmasq.d/openshift-ostest.conf"
+    if [[ -f "$DNSMASQ_CONF" ]]; then
+        echo "Adding entries from $DNSMASQ_CONF to /etc/hosts"
+        grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$DNSMASQ_CONF" | while read -r line; do
+            IP=$(echo "$line" | awk '{print $1}')
+            HOSTNAMES=$(echo "$line" | cut -d' ' -f2-)
+            for host in $HOSTNAMES; do
+                if ! grep -q "$host" /etc/hosts; then
+                    echo "$IP $host" | sudo tee -a /etc/hosts
+                fi
+            done
+        done
+    else
+        echo "DNSMasq config $DNSMASQ_CONF not found"
+    fi
+
+    # Run sshuttle to forward the baremetal cluster subnet
+    echo "Starting sshuttle to forward cluster network..."
+    sshuttle -r "root@${VIRTHOST}" 192.168.111.0/24 --dns
+fi
+
 # Copy dev-scripts variables to be shared with the test step
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd /root/dev-scripts
