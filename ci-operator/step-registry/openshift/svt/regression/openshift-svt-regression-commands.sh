@@ -16,14 +16,15 @@ ES_USERNAME=$(cat "/secret/username")
 export ES_USERNAME
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
-# If running from the one folder, will reset SCRIPT and PARAMETERS variables
+# If running from the one folder, will reset SCRIPT, PARAMETERS, SVT_REPO and SVT_REPO_BRANCH variables
 export SCRIPT=${SCRIPT_1:-$SCRIPT}
-
 export PARAMETERS=${PARAMETERS_1:-${PARAMETERS:-""}}
+export SVT_REPO=${SVT_REPO_1:-$SVT_REPO}
+export SVT_REPO_BRANCH=${SVT_REPO_BRANCH_1:-$SVT_REPO_BRANCH}
 
 pushd /tmp
 
-git clone https://github.com/openshift/svt --depth=1
+git clone ${SVT_REPO} -b ${SVT_REPO_BRANCH} --single-branch --depth=1
 pushd svt
 
 echo "========Start Regression test for $SCRIPT========"
