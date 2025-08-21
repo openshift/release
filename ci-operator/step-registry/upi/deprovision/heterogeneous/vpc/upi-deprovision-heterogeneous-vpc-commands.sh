@@ -111,7 +111,7 @@ function setup_multi_arch_vpc_workspace(){
   cd "${IBMCLOUD_HOME_FOLDER}" || true
   curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/main.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
   tar -xf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc.tar.gz
-  mv ocp4-upi-compute-powervs-ibmcloud-main" ocp4-multi-arch-vpc || true
+  mv ocp4-upi-compute-powervs-ibmcloud-main ocp4-multi-arch-vpc || true
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc || true
   ${IBMCLOUD_HOME_FOLDER}/terraform init
 }
