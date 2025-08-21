@@ -438,7 +438,7 @@ fi
 
 PRIVATE_LINK_SWITCH=""
 if [[ "$PRIVATE_LINK" == "true" ]]; then
-  PRIVATE_LINK_SWITCH="--private-link"
+  PRIVATE_LINK_SWITCH="--default-ingress-private"
 
   ENABLE_BYOVPC="true"
   PRIVATE_SUBNET_ONLY="true"

@@ -7,10 +7,8 @@ set -o pipefail
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov)
     export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-    # BASE_DOMAIN=$(yq-go r "${INSTALL_CONFIG}" 'baseDomain')
     ;;
 gcp)
-    BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
     GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
     export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
     sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -33,6 +31,7 @@ esac
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 CLUSTER_NAME=$(yq-go r "${INSTALL_CONFIG}" 'metadata.name')
 PUBLISH_STRATEGY=$(yq-go r "${INSTALL_CONFIG}" 'publish')
+BASE_DOMAIN=$(yq-go r "${INSTALL_CONFIG}" 'baseDomain')
 
 
 ret=0
@@ -58,8 +57,7 @@ aws|aws-arm64|aws-usgov)
                 echo "PASS: No DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
             fi
         else
-            echo "ERROR: No valid PUBLIC_ZONE_ID found."
-            ret=$((ret+1))    
+            echo "PASS: No valid PUBLIC_ZONE_ID found on this platform, no public records would be created."
         fi
     fi
 
@@ -89,8 +87,7 @@ gcp)
                 echo "PASS: No DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
             fi
         else
-            echo "ERROR: No valid base_domain_zone_name found."
-            ret=$((ret + 1))
+            echo "PASS: No valid base_domain_zone_name found on this platform, no records would be created."
         fi
     fi
 

@@ -90,6 +90,10 @@ spec:
     - mirrors:
         - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
       source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
+      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
+
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -121,6 +125,9 @@ spec:
     - mirrors:
         - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
       source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
+      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
@@ -169,6 +176,11 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
 
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
   create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
+else
+  if [[ -n "$CATALOG_SOURCE_IMAGE" || -n "$TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
+    echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
+    exit 1
+  fi
 fi
 
 cat <<EOF | tee "${configmap_path}"
