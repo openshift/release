@@ -55,6 +55,44 @@ tests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
+  # https://steps.ci.openshift.org/reference/oadp-s3-create - perhaps try cloudapi?
+  # https://steps.ci.openshift.org/reference/rosa-aws-sts-provision
+  as: e2e-test-aws-sts
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
+  steps:
+    cluster_profile: aws-3
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      # ROSA STS configuration
+      OCM_LOGIN_ENV: staging
+      STS: "true"
+    pre:
+    - chain: rosa-aws-sts-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    - ref: ipi-install-rbac
+    - ref: optional-operators-subscribe
+    test:
+    - as: e2e
+      cli: latest
+      commands: make test-e2e
+      credentials:
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator-1.5
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    post:
+    - chain: rosa-aws-sts-deprovision
 - as: e2e-test-aws-periodic
   cron: 0 4 * * *
   steps:
