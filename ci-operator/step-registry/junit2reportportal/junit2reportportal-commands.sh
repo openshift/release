@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o pipefail
-
 set -x
 if [[ "${NO_REPORTPORTAL,,}" = 'true' ]]
 then
@@ -367,12 +365,24 @@ function fix_xmls() {
     echo 'No xml files to process, exit'
     exit 0
   else
-    # in openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
-    # Element 'property': This element is not expected.
+    # when process openshift-e2e-cert-rotation-test/artifacts/junit/junit_e2e__20250806-033347.xml
+    # we got: Element 'property': This element is not expected.
     property_xml_files="$(grep -l -r '<property ' $xml_files)" || true
     if [[ -n "$property_xml_files" ]]
     then
       sed -i '\;<property.*</property>;d' $property_xml_files
+    fi
+
+    # when process openshift-extended-test-longduration/artifacts/junit/import-Workloads.xml
+    # we got: 413 Request Entity Too Large
+    large_xml_files="$(find "$LOCAL_DIR_RST" -size +10240k)" || true
+    if [[ -n "$large_xml_files" ]]
+    then
+      for file in $large_xml_files
+      do
+        grep -B 10 -A 10 -E '<testcase|</testcase>|<failure|</failure>|<system-out|</system-out>' "$file" > "${file}.tmp"
+        mv "${file}.tmp" "$file"
+      done
     fi
   fi
 }
