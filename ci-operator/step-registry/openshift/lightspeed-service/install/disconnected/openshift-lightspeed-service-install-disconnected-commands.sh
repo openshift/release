@@ -163,7 +163,7 @@ EOF
 
       return 1
     }
-    return 0
+    
 
     # Install ollama
     run_command "podman login ${MIRROR_REGISTRY_HOST} --tls-verify=false"
@@ -172,10 +172,72 @@ EOF
     cat <<EOF > Dockerfile.ollama-gemma3
 FROM ollama/ollama:latest
 
-# Pull the gemma3:1b model at build time
-RUN ollama pull gemma3:1b
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Start ollama serve in the background, then preload the model so it's ready for queries
+# Create directories with proper permissions
+RUN mkdir -p /root && \
+    chmod 755 /root && \
+    mkdir -p /root/.ollama && \
+    chmod 755 /root/.ollama && \
+    mkdir -p /root/.ollama/models && \
+    chmod 755 /root/.ollama/models
+
+# Set environment variables  
+ENV OLLAMA_MODELS=/root/.ollama/models
+ENV OLLAMA_HOST=0.0.0.0
+ENV OLLAMA_ORIGINS=*
+ENV OLLAMA_KEEP_ALIVE=24h
+
+# Start ollama in background, pull model, and ensure it's properly saved
+RUN ollama serve & \
+    OLLAMA_PID=$! && \
+    sleep 10 && \
+    echo "Pulling gemma3:1b model..." && \
+    ollama pull gemma3:1b && \
+    echo "Model pulled successfully" && \
+    ollama list && \
+    echo "Stopping ollama server..." && \
+    kill $OLLAMA_PID && \
+    wait $OLLAMA_PID 2>/dev/null || true && \
+    echo "Verifying model files exist..." && \
+    ls -la /root/.ollama/models/ && \
+    find /root/.ollama/models -name "*gemma*" -type f
+
+# Create startup script that preloads the model
+RUN echo '#!/bin/bash\n\
+echo "Starting Ollama server..."\n\
+ollama serve &\n\
+OLLAMA_PID=$!\n\
+\n\
+# Wait for server to be ready\n\
+echo "Waiting for Ollama server to be ready..."\n\
+for i in {1..30}; do\n\
+  if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then\n\
+    echo "Ollama server is ready"\n\
+    break\n\
+  fi\n\
+  echo "Attempt $i: Waiting for server..."\n\
+  sleep 2\n\
+done\n\
+\n\
+# Verify model is available\n\
+echo "Verifying model availability..."\n\
+ollama list\n\
+\n\
+# Preload the model to make it ready for inference\n\
+echo "Preloading gemma3:1b model..."\n\
+echo "Hello" | ollama run gemma3:1b > /dev/null 2>&1 || echo "Model preload completed"\n\
+\n\
+echo "Ollama is ready with gemma3:1b model"\n\
+\n\
+# Keep the container running\n\
+wait $OLLAMA_PID\n' > /root/start.sh && \
+    chmod +x /root/start.sh
+
+EXPOSE 11434
+
+# Use the startup script as entrypoint
 ENTRYPOINT ["/bin/sh", "-c"]
 CMD ["ollama serve & sleep 5 && ollama run gemma3:1b || true && tail -f /dev/null"]
 EOF
@@ -246,59 +308,6 @@ spec:
   type: ClusterIP
 EOF
 
-    cat <<EOF | oc apply -f -
-apiVersion: v1
-stringData:
-  apitoken: bla
-kind: Secret
-metadata:
-  labels:
-    app: openshift-lightspeed
-    app.kubernetes.io/component: lightspeed-w-rag
-    app.kubernetes.io/instance: lightspeed-w-rag
-    app.kubernetes.io/name: lightspeed-w-rag
-    app.kubernetes.io/part-of: lightspeed-w-rag-app
-  name: ollama-creds
-  namespace: openshift-lightspeed
-type: Opaque
-EOF
-
-    cat <<EOF | oc apply -f -
-apiVersion: ols.openshift.io/v1alpha1
-kind: OLSConfig
-metadata:
-  name: cluster
-  labels:
-    app.kubernetes.io/created-by: lightspeed-operator
-    app.kubernetes.io/instance: olsconfig-sample
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: olsconfig
-    app.kubernetes.io/part-of: lightspeed-operator
-spec:
-  llm:
-    providers:
-      - credentialsSecretRef:
-          name: ollama-creds
-        models:
-          - name: gemma3:1b
-        name: ollama
-        type: openai
-        url: http://ollama-service.ollama.svc.cluster.local:11434/v1
-  ols:
-    defaultModel: gemma3:1b
-    defaultProvider: ollama
-    deployment:
-      replicas: 1
-    logLevel: DEBUG
-    queryFilters:
-      - name: foo_filter
-        pattern: '\b(?:foo)\b'
-        replaceWith: "deployment"
-      - name: bar_filter
-        pattern: '\b(?:bar)\b'
-        replaceWith: "openshift"
-EOF
-
     # Wait for the deployment to be ready
     run_command "oc rollout status deployment/ollama -n ollama --timeout=300s"
     
@@ -307,7 +316,7 @@ EOF
     # Test the connection
     run_command "oc get pods -n ollama"
     run_command "oc get svc -n ollama"
-
+    return 0
 }
 
 run_command "oc whoami"
