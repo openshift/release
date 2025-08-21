@@ -36,6 +36,7 @@ oc label managedcluster local-cluster cluster.open-cluster-management.io/cluster
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 
+
 if [[ -f "${AWSCRED}" ]]; then
 
   AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
@@ -55,9 +56,9 @@ if [[ -f "${AWSCRED}" ]]; then
             aws_access_key_id: "${AWS_ACCESS_KEY_ID}"
             aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
             baseDomain: "${BASE_DOMAIN}"
-            pullSecret: "$CLUSTER_PROFILE_DIR/config.json"
-            ssh-privatekey: "$CLUSTER_PROFILE_DIR/ssh-privatekey"
-            ssh-publickey: "$CLUSTER_PROFILE_DIR/ssh-publickey"
+            pullSecret: $(cat "${CLUSTER_PROFILE_DIR}/config.json")
+            ssh-privatekey: $(cat "${CLUSTER_PROFILE_DIR}/ssh-privatekey")
+            ssh-publickey: $(cat "${CLUSTER_PROFILE_DIR}/ssh-publickey")
             httpProxy: ""
             httpsProxy: ""
             noProxy: ""
