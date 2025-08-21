@@ -3,6 +3,10 @@ base_images:
     name: brew
     namespace: microshift
     tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
 build_root:
   image_stream_tag:
     name: release
@@ -170,6 +174,17 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SUITE: ai-model-serving
     workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-tests-private-nightly
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;~StressTest&
+      FORCE_SUCCESS_EXIT: "no"
+      MICROSHIFT_OS: rhel-9.6
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&
+      TEST_SCENARIOS: Microshift
+    workflow: openshift-microshift-e2e-tests-private
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
