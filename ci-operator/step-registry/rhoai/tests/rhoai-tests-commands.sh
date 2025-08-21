@@ -47,4 +47,8 @@ export NAME_4
 export NAME_5
 
 # running RHOAI tests
-./run_interop.sh
+if [ "${STOP_ON_FAILURE}" = "false" ]; then
+  ./run_interop.sh || true
+else
+  ./run_interop.sh
+fi
