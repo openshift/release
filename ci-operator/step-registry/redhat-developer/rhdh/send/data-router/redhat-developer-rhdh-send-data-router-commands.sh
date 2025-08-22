@@ -14,9 +14,8 @@ REPORTPORTAL_HOSTNAME=$(cat /tmp/secrets/REPORTPORTAL_HOSTNAME)
 DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD="0.9"
 DATA_ROUTER_PROJECT="main"
 METADATA_OUTPUT="data_router_metadata_output.json"
-JUNIT_RESULTS_DIR="junit-results"
 
-export RELEASE_BRANCH_NAME DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD DATA_ROUTER_PROJECT DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD REPORTPORTAL_HOSTNAME METADATA_OUTPUT JUNIT_RESULTS_DIR
+export RELEASE_BRANCH_NAME DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD DATA_ROUTER_PROJECT DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD REPORTPORTAL_HOSTNAME METADATA_OUTPUT
 
 # Validate required variables
 validate_required_vars() {
@@ -134,9 +133,9 @@ main() {
     for ((i = 1; i <= max_attempts; i++)); do
       echo "Attempt ${i} of ${max_attempts} to send test results through Data Router."
 
-      # Check if JUNIT_RESULTS_DIR exists and contains files
-      if [[ ! -d "${SHARED_DIR}/${JUNIT_RESULTS_DIR}" ]] || [[ -z "$(ls -A "${SHARED_DIR}/${JUNIT_RESULTS_DIR}" 2>/dev/null)" ]]; then
-        echo "ERROR: JUnit results directory ${SHARED_DIR}/${JUNIT_RESULTS_DIR} is empty or does not exist"
+      # Check if JUnit results files exist in SHARED_DIR
+      if [[ -z "$(ls -A "${SHARED_DIR}/" | grep "junit-.*\.xml" 2>/dev/null)" ]]; then
+        echo "ERROR: No JUnit results files (junit-*.xml) found in ${SHARED_DIR}"
         save_status_data_router_failed true
         return
       fi
@@ -145,7 +144,7 @@ main() {
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
-          --results "${SHARED_DIR}/${JUNIT_RESULTS_DIR}/*.xml" \
+          --results "${SHARED_DIR}/junit-*.xml" \
           --verbose --wirelog 2>&1) && \
         DATA_ROUTER_REQUEST_ID=$(echo "$output" | grep "request:" | awk '{print $2}') &&
         [ -n "$DATA_ROUTER_REQUEST_ID" ]; then
