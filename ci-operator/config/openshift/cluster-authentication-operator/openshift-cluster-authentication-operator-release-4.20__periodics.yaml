@@ -1,0 +1,204 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.20_base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel7
+  inputs:
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: cluster-authentication-operator
+promotion:
+  to:
+  - disabled: true
+    name: "4.20"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-external-oidc-configure-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        reverting to IntegratedOAuth
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-aws
+  timeout: 5h0m0s
+- as: e2e-azure-external-oidc-configure-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        reverting to IntegratedOAuth
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-azure
+  timeout: 5h0m0s
+- as: e2e-gcp-external-oidc-configure-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        reverting to IntegratedOAuth
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-gcp
+  timeout: 5h0m0s
+- as: e2e-vsphere-external-oidc-configure-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        reverting to IntegratedOAuth
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-vsphere
+  timeout: 5h0m0s
+- as: e2e-aws-external-oidc-rollback-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        external IdP is configured
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-aws
+  timeout: 5h0m0s
+- as: e2e-azure-external-oidc-rollback-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        external IdP is configured
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-azure
+  timeout: 5h0m0s
+- as: e2e-gcp-external-oidc-rollback-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        external IdP is configured
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-gcp
+  timeout: 5h0m0s
+- as: e2e-vsphere-external-oidc-rollback-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        external IdP is configured
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-vsphere
+  timeout: 5h0m0s
+- as: e2e-aws-external-oidc-uid-extra-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDC\]
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-aws
+  timeout: 5h0m0s
+- as: e2e-azure-external-oidc-uid-extra-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDC\]
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-azure
+  timeout: 5h0m0s
+- as: e2e-gcp-external-oidc-uid-extra-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDC\]
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-gcp
+  timeout: 5h0m0s
+- as: e2e-vsphere-external-oidc-uid-extra-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDC\]
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: openshift-e2e-vsphere
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift
+  repo: cluster-authentication-operator
+  variant: periodics

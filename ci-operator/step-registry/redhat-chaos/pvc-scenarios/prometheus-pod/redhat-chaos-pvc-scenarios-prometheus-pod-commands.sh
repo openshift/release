@@ -42,8 +42,8 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
 
-ES_PASSWORD=$(cat "/secret/es/password" || "")
-ES_USERNAME=$(cat "/secret/es/username" || "")
+ES_PASSWORD=$(cat "/secret/es/password" || true)
+ES_USERNAME=$(cat "/secret/es/username" || true)
 
 export ES_PASSWORD
 export ES_USERNAME

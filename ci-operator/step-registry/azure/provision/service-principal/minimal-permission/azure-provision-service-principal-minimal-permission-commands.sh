@@ -43,8 +43,8 @@ function run_cmd_with_retries_save_output()
 
 function run_cmd_with_retries()
 {
-    local cmd="$1" retries="${2}" print_cmd="${3:-${cmd}}"
-    local try=0 ret=0
+	local cmd="$1" try=0 ret=0
+    local retries="${2}" print_cmd="${3:-${cmd}}"
     [[ -z ${retries} ]] && max="20" || max=${retries}
     echo "Trying ${max} times max to run '${print_cmd}'"
 
