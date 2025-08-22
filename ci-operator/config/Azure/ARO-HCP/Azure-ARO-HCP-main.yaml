@@ -57,6 +57,23 @@ tests:
     test:
     - chain: aro-hcp-provision-create-functional-cluster
 - always_run: false
+  as: create-aro-hcp-in-prod
+  optional: true
+  run_if_changed: ^(demo)
+  steps:
+    env:
+      CLUSTER_NAME: premerge-prod-cluster
+      CUSTOMER_RESOURCE_GROUP_PREFIX: premerge-prod-customer-rg
+      LOCATION: uksouth
+      SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    pre:
+    - ref: aro-hcp-provision-generate-resource-group-name
+    test:
+    - chain: aro-hcp-provision-create-functional-cluster
+- always_run: false
   as: integration-e2e-parallel
   optional: true
   run_if_changed: ^(test|demo)
@@ -78,6 +95,20 @@ tests:
     env:
       ARO_HCP_SUITE_NAME: stage/parallel
       CUSTOMER_SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- always_run: false
+  as: prod-e2e-parallel
+  optional: true
+  run_if_changed: ^(test|demo)
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
       LOCATION: uksouth
     post:
     - ref: aro-hcp-provision-aro-hcp-gather-extra
