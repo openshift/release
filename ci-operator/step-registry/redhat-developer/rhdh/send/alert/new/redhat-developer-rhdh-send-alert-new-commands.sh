@@ -120,6 +120,10 @@ main() {
     echo "This job is not a nightly job, skipping alert."
     exit 0
   fi
+  if [[ "${JOB_NAME}" == *rehearse* ]]; then
+    echo "This job is a rehearse job, skipping alert."
+    exit 0
+  fi
 
   echo "Reading status from $SHARED_DIR"
   local status_variables=(
