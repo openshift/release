@@ -3,28 +3,30 @@
 set +o errexit
 set +o nounset
 
-# Load required variables from secrets
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+
+# Load required variables from secrets
 DATA_ROUTER_URL=$(cat /tmp/secrets/DATA_ROUTER_URL)
 DATA_ROUTER_USERNAME=$(cat /tmp/secrets/DATA_ROUTER_USERNAME)
 DATA_ROUTER_PASSWORD=$(cat /tmp/secrets/DATA_ROUTER_PASSWORD)
-DATA_ROUTER_PROJECT="main"
-DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD=$(cat /tmp/secrets/DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD)
-DATA_ROUTER_NEXUS_HOSTNAME=$(cat /tmp/secrets/DATA_ROUTER_NEXUS_HOSTNAME)
 REPORTPORTAL_HOSTNAME=$(cat /tmp/secrets/REPORTPORTAL_HOSTNAME)
+
+DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD="0.9"
+DATA_ROUTER_PROJECT="main"
 METADATA_OUTPUT="data_router_metadata_output.json"
 JUNIT_RESULTS_DIR="${SHARED_DIR}/junit-results"
-export RELEASE_BRANCH_NAME DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD DATA_ROUTER_PROJECT DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD DATA_ROUTER_NEXUS_HOSTNAME REPORTPORTAL_HOSTNAME METADATA_OUTPUT JUNIT_RESULTS_DIR
+
+export RELEASE_BRANCH_NAME DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD DATA_ROUTER_PROJECT DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD REPORTPORTAL_HOSTNAME METADATA_OUTPUT JUNIT_RESULTS_DIR
 
 # Validate required variables
 validate_required_vars() {
   local required_vars=(
     "DATA_ROUTER_URL"
-    "DATA_ROUTER_USERNAME" 
+    "DATA_ROUTER_USERNAME"
     "DATA_ROUTER_PASSWORD"
     "REPORTPORTAL_HOSTNAME"
   )
-  
+
   for var in "${required_vars[@]}"; do
     if [[ -z "${!var}" ]]; then
       echo "ERROR: Required variable ${var} is not set"
@@ -120,7 +122,7 @@ save_data_router_metadata() {
 main() {
   # Validate required variables before proceeding
   validate_required_vars
-  
+
   save_data_router_metadata
 
   # Send test results through DataRouter and save the request ID.
@@ -128,17 +130,17 @@ main() {
     local wait_seconds_step=1
     local output=""
     local DATA_ROUTER_REQUEST_ID=""
-    
+
     for ((i = 1; i <= max_attempts; i++)); do
       echo "Attempt ${i} of ${max_attempts} to send test results through Data Router."
-      
+
       # Check if JUNIT_RESULTS_DIR exists and contains files
       if [[ ! -d "${SHARED_DIR}/${JUNIT_RESULTS_DIR}" ]] || [[ -z "$(ls -A "${SHARED_DIR}/${JUNIT_RESULTS_DIR}" 2>/dev/null)" ]]; then
         echo "ERROR: JUnit results directory ${SHARED_DIR}/${JUNIT_RESULTS_DIR} is empty or does not exist"
         save_status_data_router_failed true
         return
       fi
-      
+
       if output=$(droute send --metadata "$(get_metadata_output_path)" \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
@@ -172,20 +174,20 @@ main() {
       local wait_seconds=2
       local DATA_ROUTER_REQUEST_OUTPUT=""
       local REPORTPORTAL_LAUNCH_URL=""
-      
+
       for ((i = 1; i <= max_attempts; i++)); do
         echo "Attempt ${i} of ${max_attempts}: Checking Data Router request completion..."
-        
+
         # Get DataRouter request information.
         DATA_ROUTER_REQUEST_OUTPUT=$(droute request get \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
           "${DATA_ROUTER_REQUEST_ID}")
-          
+
         # Try to extract the ReportPortal launch URL from the request. This fails if it doesn't contain the launch URL.
         REPORTPORTAL_LAUNCH_URL=$(echo "$DATA_ROUTER_REQUEST_OUTPUT" | yq e '.targets[0].events[] | select(.component == "reportportal-connector") | .message | fromjson | .[0].launch_url' -)
-        
+
         if [[ -n "$REPORTPORTAL_LAUNCH_URL" ]]; then
           echo "ReportPortal launch URL found: ${REPORTPORTAL_LAUNCH_URL}"
           save_status_url_reportportal "$REPORTPORTAL_LAUNCH_URL"
@@ -198,7 +200,7 @@ main() {
           fi
         fi
       done
-      
+
       echo "Warning: Could not retrieve ReportPortal launch URL after ${max_attempts} attempts"
     fi
 }
