@@ -387,6 +387,10 @@ function fix_xmls() {
 
     # when process openshift-extended-test-longduration/artifacts/junit/import-Workloads.xml
     # we got: 413 Request Entity Too Large
+    # Note: Do NOT replace +10240k with +10M as 'M' is invalid
+    # find --help
+    #      -size N[bck]    File size is N (c:bytes,k:kbytes,b:512 bytes(def.))
+    #                      +/-N: file size is bigger/smaller than N
     large_xml_files="$(find "$LOCAL_DIR_RST" -size +10240k)" || true
     if [[ -n "$large_xml_files" ]]
     then
