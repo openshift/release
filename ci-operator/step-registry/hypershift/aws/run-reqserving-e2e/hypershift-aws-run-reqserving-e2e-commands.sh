@@ -18,18 +18,16 @@ export E2E_ARTIFACT_DIR="${ARTIFACT_DIR:-./artifacts}"
 export E2E_LATEST_RELEASE_IMAGE="${OCP_IMAGE_LATEST}"
 export E2E_PREVIOUS_RELEASE_IMAGE="${OCP_IMAGE_PREVIOUS:-}"
 export E2E_HYPERSHIFT_OPERATOR_LATEST_IMAGE="${CI_HYPERSHIFT_OPERATOR:-}"
-export E2E_BASE_DOMAIN="ci.hypershift.devcluster.openshift.com"
 export E2E_EXTERNAL_DNS_DOMAIN="service.ci.hypershift.devcluster.openshift.com"
-export E2E_PULL_SECRET_FILE="/etc/ci-pull-credentials/.dockerconfigjson"
+export E2E_PULL_SECRET_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
 
 # AWS specific configuration
-export E2E_AWS_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
-export E2E_AWS_PRIVATE_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
-export E2E_AWS_PRIVATE_REGION="us-east-1"
+export E2E_AWS_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export E2E_AWS_PRIVATE_REGION="${LEASED_RESOURCE}"
 export E2E_AWS_OIDC_S3_CREDENTIALS="/etc/hypershift-pool-aws-credentials/credentials"
 export E2E_AWS_OIDC_S3_REGION="us-east-1"
-export E2E_AWS_REGION="us-east-1"
-export E2E_AWS_ZONES="us-east-1a,us-east-1b,us-east-1c"
+export E2E_AWS_REGION="${LEASED_RESOURCE}"
 
 # Set AWS OIDC S3 bucket
 export E2E_AWS_OIDC_S3_BUCKET_NAME="${AWS_OIDC_S3_BUCKET_NAME:-hypershift-ci-oidc}"
