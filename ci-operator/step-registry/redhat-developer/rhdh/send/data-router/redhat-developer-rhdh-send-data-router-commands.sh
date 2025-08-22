@@ -3,6 +3,11 @@
 set +o errexit
 set +o nounset
 
+if [[ "${JOB_NAME}" == *rehearse* ]]; then
+  echo "This job is a rehearse job, skipping Data Router."
+  return 0
+fi
+
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 
 # Load required variables from secrets
@@ -68,9 +73,6 @@ get_job_url() {
 }
 
 save_data_router_metadata() {
-  if [[ "${OPENSHIFT_CI}" != "true" ]]; then return 0; fi
-  if [[ "${JOB_NAME}" == *rehearse* ]]; then return 0; fi
-
   JOB_URL=$(get_job_url)
 
   # Generate the metadata file for Data Router from the template
@@ -123,6 +125,8 @@ main() {
   validate_required_vars
 
   save_data_router_metadata
+
+  ls -la "${SHARED_DIR}"
 
   # Send test results through DataRouter and save the request ID.
     local max_attempts=10
