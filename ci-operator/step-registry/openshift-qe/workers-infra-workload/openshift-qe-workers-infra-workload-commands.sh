@@ -550,6 +550,34 @@ then
 	exit 0
 fi
 
+# Patch in older RHCOS to current 4.20 payload
+echo "VCHALLA Patching rhcos version back to a version without Kubelet 1.33"
+# Apply the changes
+oc apply -f- <<EOF
+apiVersion: v1
+items:
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: worker
+    name: os-layer-custom-worker
+  spec:
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:2ea08b5d4790448ea2041d6308893a79cee99b5a2337e7fddb2b889a356a3f32
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: master
+    name: os-layer-custom-master
+  spec:
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:2ea08b5d4790448ea2041d6308893a79cee99b5a2337e7fddb2b889a356a3f32
+kind: List
+metadata:
+  resourceVersion: ""
+EOF
+
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
