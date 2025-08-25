@@ -57,8 +57,7 @@ save_status_url_reportportal() {
 
 get_metadata_output_path() {
   local metadata_output="data_router_metadata_output.json"
-  mkdir -p "${ARTIFACT_DIR}/data-router/"
-  echo "${ARTIFACT_DIR}/data-router/${metadata_output}"
+  echo "${ARTIFACT_DIR}/${metadata_output}"
 }
 
 get_job_url() {
