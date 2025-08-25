@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nested-podman-data
+  namespace: ci
+data:
+  entrypoint.sh: |
+    #!/usr/bin/env bash
+
+    # Create Home directory
+    if [ ! -d "${HOME}" ]
+    then
+      mkdir -p "${HOME}"
+    fi
+
+    # Create Podman configuration
+    if [ ! -d "${HOME}/.config/containers" ]; then
+      mkdir -p ${HOME}/.config/containers
+      (echo 'unqualified-search-registries = [';echo '  "registry.access.redhat.com",';echo '  "registry.redhat.io",';echo '  "docker.io"'; echo ']'; echo 'short-name-mode = "permissive"') > ${HOME}/.config/containers/registries.conf
+      if [ -c "/dev/fuse" ] && [ -f "/usr/bin/fuse-overlayfs" ]; then
+        (echo '[storage]';echo 'driver = "overlay"';echo 'graphroot = "/tmp/graphroot"';echo '[storage.options.overlay]';echo 'mount_program = "/usr/bin/fuse-overlayfs"') > ${HOME}/.config/containers/storage.conf
+      else
+        (echo '[storage]';echo 'driver = "vfs"') > "${HOME}"/.config/containers/storage.conf
+      fi
+    fi
+
+    # Create User ID
+    if ! whoami &> /dev/null
+    then
+      if [ -w /etc/passwd ]
+      then
+        echo "${USER_NAME:-user}:x:$(id -u):0:${USER_NAME:-user} user:${HOME}:/bin/bash" >> /etc/passwd
+        echo "${USER_NAME:-user}:x:$(id -u):" >> /etc/group
+      fi
+    fi
+
+    # Create subuid/gid entries for the user
+    USER=$(whoami)
+    START_ID=$(( $(id -u)+1 ))
+    END_ID=$(( 65536-${START_ID} ))
+    echo "${USER}:${START_ID}:${END_ID}" > /etc/subuid
+    echo "${USER}:${START_ID}:${END_ID}" > /etc/subgid
+
+    exec "$@"
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: nested-podman
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_nested-podman_latest
+  source:
+    configMaps:
+    - configMap:
+        name: nested-podman-data
+      destinationDir: nested-podman-data
+    dockerfile: |
+      FROM registry.access.redhat.com/ubi9:9.5
+
+      ARG USER_HOME_DIR="/home/user"
+      ARG WORK_DIR="/projects"
+      ARG INSTALL_PACKAGES="podman shadow-utils"
+
+      ENV HOME=${USER_HOME_DIR}
+      ENV BUILDAH_ISOLATION=chroot
+
+      COPY --chown=0:0 nested-podman-data/entrypoint.sh /
+
+      RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm ; \
+        dnf install -y ${INSTALL_PACKAGES} ; \
+        dnf update -y ; \
+        dnf clean all ; \
+        mkdir -p /usr/local/bin ; \
+        mkdir -p ${WORK_DIR} ; \
+        chgrp -R 0 /home ; \
+        chmod -R g=u /home ${WORK_DIR} ; \
+        chmod +rx /entrypoint.sh ; \
+        chown 0:0 /etc/passwd ; \
+        chown 0:0 /etc/group ; \
+        chmod g=u /etc/passwd /etc/group ; \
+        # Setup for rootless podman
+        setcap cap_setuid+ep /usr/bin/newuidmap ; \
+        setcap cap_setgid+ep /usr/bin/newgidmap ; \
+        touch /etc/subgid /etc/subuid ; \
+        chown 0:0 /etc/subgid ; \
+        chown 0:0 /etc/subuid ; \
+        chmod -R g=u /etc/subuid /etc/subgid ;
+
+      USER 1000
+      WORKDIR ${WORK_DIR}
+      ENTRYPOINT ["/usr/libexec/podman/catatonit","--","/entrypoint.sh"]
+      CMD [ "tail", "-f", "/dev/null" ]
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+    - type: ConfigChange
