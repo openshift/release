@@ -80,6 +80,8 @@ if [[ "$OADP_TEST_FOCUS" == "--focus=ALL_TESTS" ]]; then
   OADP_TEST_FOCUS=""
 fi
 # export NUM_OF_OADP_INSTANCES=3
+
+sleep 20000
 export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
 export TESTS_FOLDER="/alabama/cspi/e2e" &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
