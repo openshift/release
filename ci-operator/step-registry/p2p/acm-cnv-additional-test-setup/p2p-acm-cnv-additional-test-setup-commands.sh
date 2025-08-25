@@ -57,9 +57,9 @@ if [[ -f "${AWSCRED}" ]]; then
             aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
             baseDomain: "${BASE_DOMAIN}"
             pullSecret: "$(cat "${CLUSTER_PROFILE_DIR}/config.json")"
-            ssh-privatekey:|-
+            ssh-privatekey: |-
              "$(cat "${CLUSTER_PROFILE_DIR}/ssh-privatekey")"
-            ssh-publickey:|-
+            ssh-publickey: |-
              "$(cat "${CLUSTER_PROFILE_DIR}/ssh-publickey")"
             httpProxy: ""
             httpsProxy: ""
