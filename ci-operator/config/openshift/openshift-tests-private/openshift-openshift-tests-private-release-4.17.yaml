@@ -344,16 +344,37 @@ tests:
 - as: debug-winc-nutanix-ipi
   optional: true
   run_if_changed: test/extended/winc/
+  reporter_config:
+    github:
+      context: ci/prow/debug-winc-nutanix-ipi
   steps:
     cluster_profile: nutanix-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
+      TEST_SCENARIOS: "33612"
+      TEST_TIMEOUT: "1550"
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
+
+- as: debug-winc-vsphere-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  reporter_config:
+    github:
+      context: ci/prow/debug-winc-vsphere-ipi
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: 33612|31276|48873|54711
+      TEST_TIMEOUT: "1550"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+
 zz_generated_metadata:
   branch: release-4.17
   org: openshift
