@@ -15,13 +15,14 @@ export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID 
 echo "$RANDOM$RANDOM" > ${SHARED_DIR}/CORRELATE_MAPT
 CORRELATE_MAPT=$(cat ${SHARED_DIR}/CORRELATE_MAPT)
 
+# TODO: re-enable spot after https://github.com/redhat-developer/mapt/issues/573 is fixed
+  # --spot \
+  # --spot-eviction-tolerance "low" \
+  # --spot-excluded-regions "centralindia" \
 mapt azure aks create \
   --project-name "aks" \
   --backed-url "azblob://${AZURE_STORAGE_BLOB}/aks-${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
   --version 1.31 \
   --vmsize "Standard_D4as_v6" \
-  --spot \
-  --spot-eviction-tolerance "low" \
-  --spot-excluded-regions "centralindia" \
   --enable-app-routing
