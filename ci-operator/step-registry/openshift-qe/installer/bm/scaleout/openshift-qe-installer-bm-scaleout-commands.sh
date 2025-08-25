@@ -6,7 +6,6 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
-KUBECONFIG_SRC=""
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
@@ -39,23 +38,13 @@ envsubst < /tmp/scale_out.yml > /tmp/scale_out-updated.yml
 scp -q ${SSH_ARGS} /tmp/all-before-scaleout.yml root@${bastion}:${SAVED_JETLAG_REPO_PATH}/ansible/vars/all.yml
 scp -q ${SSH_ARGS} /tmp/scale_out-updated.yml root@${bastion}:${SAVED_JETLAG_REPO_PATH}/ansible/vars/scale_out.yml
 
-if [[ ${TYPE} == 'sno' ]]; then
-  KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
-else
-  KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
-fi
-
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
    cd ${SAVED_JETLAG_REPO_PATH}
-   source .ansible/bin/activate
+   source bootstrap.sh
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-scale-out.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
-   mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
-   ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-scale-out.yml -v | tee /tmp/ansible-mno-scaleout-$(date +%s)
    deactivate
    rm -rf .ansible
 "
-
-scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig ${SHARED_DIR}/kubeconfig
