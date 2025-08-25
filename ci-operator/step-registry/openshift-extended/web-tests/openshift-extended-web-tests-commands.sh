@@ -15,7 +15,10 @@ if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
 fi
 
 if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
-  if [[ $E2E_RUN_TAGS =~ @rosa ]] ; then
+  if [[ "$E2E_RUN_TAGS" =~ @rosa && "$E2E_RUN_TAGS" =~ @critical ]]; then
+    echo "Run on ROSA hypershift hosted cluster - Only Critical"
+    ./console-test-frontend-hypershift.sh --tags @hypershift-hosted-critical || true
+  elif [[ "$E2E_RUN_TAGS" =~ @rosa ]] ; then
     echo "Run on ROSA hypershift hosted cluster"
     ./console-test-frontend-hypershift.sh --tags @hypershift-hosted+@rosa || true
   else
@@ -25,26 +28,26 @@ if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
 else
   export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
   echo "E2E_RUN_TAGS is: ${E2E_RUN_TAGS}"
-  if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
+  if [[ "$E2E_RUN_TAGS" =~ @osd_ccs|@rosa ]] ; then
     echo "Run against online cluster"
     ./console-test-managed-service.sh || true
-  elif [[ $E2E_RUN_TAGS =~ @level0 ]]; then
+  elif [[ "$E2E_RUN_TAGS" =~ @level0 ]]; then
     echo "only run level0 scenarios"
     ./console-test-frontend.sh --tags @level0 || true
   elif [[ "X${E2E_RUN_TAGS}X" == 'XNetwork_ObservabilityX' ]]; then
     # not using --grepTags here since cypress in 4.12 doesn't have that plugin
     echo "Running Network_Observability tests"
     ./console-test-frontend.sh --spec tests/netobserv/* || true
-  elif [[ $E2E_RUN_TAGS =~ @wrs ]]; then
+  elif [[ "$E2E_RUN_TAGS" =~ @wrs ]]; then
     echo 'Run WRS testing'
     ./console-test-frontend.sh --tags @wrs || true
-  elif [[ $E2E_RUN_TAGS =~ @complianceoperator ]]; then
+  elif [[ "$E2E_RUN_TAGS" =~ @complianceoperator ]]; then
     echo "run all compliance-operator scenarios"
     ./console-test-frontend.sh --spec tests/securityandcompliance/compliance-operator.cy.ts || true
-  elif [[ $E2E_RUN_TAGS =~ @fio ]]; then
+  elif [[ "$E2E_RUN_TAGS" =~ @fio ]]; then
     echo "run all file-integrity-operator scenarios"
     ./console-test-frontend.sh --spec tests/securityandcompliance/file-integirty-operator.cy.ts || true
-  elif [[ $E2E_RUN_TAGS =~ @spo ]]; then
+  elif [[ "$E2E_RUN_TAGS" =~ @spo ]]; then
     echo "run all security profiles operator scenarios"
     ./console-test-frontend.sh --spec tests/securityandcompliance/security-profiles-operator.cy.ts || true
   elif [[ "X${FEATURE_SET}X" == 'XTechPreviewNoUpgradeX' ]]; then
