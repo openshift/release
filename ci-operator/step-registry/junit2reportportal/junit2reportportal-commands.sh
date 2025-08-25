@@ -139,6 +139,15 @@ function generate_attribute_cloud_provider() {
   fi
 }
 
+function generate_attribute_env_disconnected() {
+  env_disconnected='no'
+  if [[ "$JOB_NAME_SAFE" =~ disconnected|-disc- ]]
+  then
+    env_disconnected='yes'
+  fi
+  write_attribute env_disconnected "$env_disconnected"
+}
+
 function generate_attribute_env_fips() {
   env_fips='no'
   if [[ "$JOB_NAME_SAFE" =~ fips ]]
@@ -248,6 +257,7 @@ function generate_attribute_version_installed() {
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
+  generate_attribute_env_disconnected
   generate_attribute_env_fips
   generate_attribute_job_type
   generate_attribute_install
