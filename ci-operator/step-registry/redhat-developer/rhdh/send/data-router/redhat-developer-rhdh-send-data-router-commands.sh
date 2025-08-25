@@ -150,7 +150,7 @@ main() {
           --password "${DATA_ROUTER_PASSWORD}" \
           --results "${SHARED_DIR}/junit-*.xml" \
           --verbose --wirelog 2>&1) && \
-        DATA_ROUTER_REQUEST_ID=$(echo "$output" | grep "request:" | awk '{print $2}') &&
+        DATA_ROUTER_REQUEST_ID="$(echo "$output" | tr -d '\000' | grep "request:" | awk '{print $2}')" &&
         [ -n "$DATA_ROUTER_REQUEST_ID" ]; then
         echo "Test results successfully sent through Data Router."
         echo "Request ID: $DATA_ROUTER_REQUEST_ID"
