@@ -78,9 +78,97 @@ elif [ "$platform" = "VSphere" ]; then
     export VSPHERE_USERNAME
     VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
     export VSPHERE_PASSWORD
+elif [ "$platform" = "None" ] || [ "$platform" = "bm" ] || [ "$platform" = "baremetal" ]; then
+    # Get a node that matches the LABEL_SELECTOR using oc command
+    target_node=$(oc get nodes -l "${LABEL_SELECTOR}" --no-headers | head -1 | awk '{print $1}')
+    
+    echo "Target node for baremetal testing: ${target_node}"
+    
+    # Extract BMC credentials from hosts.yaml for the target node
+    if [ -f "${SHARED_DIR}/hosts.yaml" ] && [ -n "$target_node" ]; then
+        echo "Found hosts.yaml, extracting BMC credentials..."
+        for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+            # shellcheck disable=SC1090
+            . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+            
+            if [[ "${target_node}" == "${name}"* ]]; then
+                # shellcheck disable=SC2154
+                export BMC_USER="${bmc_user}"
+                # shellcheck disable=SC2154
+                export BMC_PASSWORD="${bmc_pass}"
+                # shellcheck disable=SC2154
+                export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+                # shellcheck disable=SC2154
+                export NODE_NAME="${target_node}"
+                
+                # Install ipmitool if not available (required for baremetal operations)
+                if ! command -v ipmitool >/dev/null 2>&1; then
+                    # Check common locations where ipmitool might be installed
+                    if [ -f "/usr/bin/ipmitool" ]; then
+                        export PATH="/usr/bin:$PATH"
+                        echo "Found ipmitool in /usr/bin, added to PATH"
+                    elif [ -f "/usr/sbin/ipmitool" ]; then
+                        export PATH="/usr/sbin:$PATH"
+                        echo "Found ipmitool in /usr/sbin, added to PATH"
+                    elif [ -f "/opt/ipmitool/bin/ipmitool" ]; then
+                        export PATH="/opt/ipmitool/bin:$PATH"
+                        echo "Found ipmitool in /opt/ipmitool/bin, added to PATH"
+                    else
+                        echo "Installing ipmitool for baremetal operations..."
+                        if command -v yum >/dev/null 2>&1; then
+                            yum install -y OpenIPMI-tools || {
+                                echo "ERROR: Failed to install OpenIPMI-tools via yum"
+                                echo "WARNING: ipmitool not available - baremetal operations may fail"
+                                echo "Continuing anyway in case ipmitool is available elsewhere..."
+                            }
+                        elif command -v apt-get >/dev/null 2>&1; then
+                            apt-get update && apt-get install -y ipmitool || {
+                                echo "ERROR: Failed to install ipmitool via apt-get"
+                                echo "WARNING: ipmitool not available - baremetal operations may fail"
+                                echo "Continuing anyway in case ipmitool is available elsewhere..."
+                            }
+                        elif command -v dnf >/dev/null 2>&1; then
+                            dnf install -y OpenIPMI-tools || {
+                                echo "ERROR: Failed to install OpenIPMI-tools via dnf"
+                                echo "WARNING: ipmitool not available - baremetal operations may fail"
+                                echo "Continuing anyway in case ipmitool is available elsewhere..."
+                            }
+                        else
+                            echo "ERROR: Cannot install ipmitool - no supported package manager found"
+                            echo "Supported package managers: yum, apt-get, dnf"
+                            echo "WARNING: ipmitool not available - baremetal operations may fail"
+                            echo "Continuing anyway in case ipmitool is available elsewhere..."
+                        fi
+                    fi
+                fi
+                
+                # Final check if ipmitool is available
+                if command -v ipmitool >/dev/null 2>&1; then
+                    echo "ipmitool is available and ready for baremetal operations"
+                else
+                    echo "WARNING: ipmitool still not available after installation attempts"
+                    echo "Baremetal node operations may fail"
+                fi
+                
+                break
+            fi
+        done
+    else
+        echo "ERROR: hosts.yaml not found or target node not identified"
+        echo "Available nodes:"
+        oc get nodes -l "${LABEL_SELECTOR}" --no-headers || true
+        echo "Contents of SHARED_DIR:"
+        ls -la "${SHARED_DIR}" || true
+        exit 1
+    fi
+    
+    export NODE_NAME="$target_node"
+
+    # Run the node scenario
+    echo "Starting node stop/start scenario for baremetal node..."
+    ./node-disruptions/prow_run.sh
 fi
 
-./node-disruptions/prow_run.sh
 rc=$?
 
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
