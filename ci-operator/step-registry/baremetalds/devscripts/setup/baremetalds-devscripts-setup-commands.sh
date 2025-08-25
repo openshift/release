@@ -430,16 +430,13 @@ if [[ "${ENABLE_SSHUTTLE:-false}" == "true" ]]; then
 
     # Ensure sshuttle is installed on the local machine
     if ! command -v sshuttle &> /dev/null; then
-        echo "sshuttle not found, installing..."
-        if command -v dnf &> /dev/null; then
-            dnf install -y sshuttle
-        elif command -v apt &> /dev/null; then
-            apt update
-            apt install -y sshuttle
-        else
-            echo "Package manager not detected, please install sshuttle manually"
-            exit 1
-        fi
+      echo "sshuttle not found, installing..."
+      if command -v dnf &> /dev/null; then
+          dnf install -y sshuttle
+      else
+          echo "dnf not available, please install sshuttle manually"
+          exit 1
+      fi
     fi
     # Add entries from dnsmasq config to /etc/hosts
     DNSMASQ_CONF="/etc/NetworkManager/dnsmasq.d/openshift-ostest.conf"
