@@ -27,7 +27,7 @@ function mapTestsForComponentReadiness() {
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
             echo "Mapping Test Suite Name To: CNV-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+            yq eval -px -ox -iI0 '.testsuite."+@name" = "CNV-lp-interop"' $results_file
         fi
     fi
 }
@@ -76,8 +76,8 @@ make deploy_test || exit_code=$?
 
 set +x
 
-# Map tests if needed for related use cases
-# mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
+ # Map tests if needed for related use cases
+ mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
