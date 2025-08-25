@@ -401,6 +401,7 @@ function check_resources() {
 }
 
 function destroy_resources() {
+  echo "HAMZY"; ls -l ${POWERVS_AUTH_FILEPATH} || true; if [ -f ${POWERVS_AUTH_FILEPATH} ]; then cat ${POWERVS_AUTH_FILEPATH}; echo; fi
   #
   # Create a fake cluster metadata file
   #
@@ -772,6 +773,7 @@ cat > "/tmp/powervs-config.json" << EOF
 EOF
 cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
 export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
+echo "HAMZY"; ls -l ${POWERVS_AUTH_FILEPATH} || true; if [ -f ${POWERVS_AUTH_FILEPATH} ]; then cat ${POWERVS_AUTH_FILEPATH}; echo; fi
 
 init_ibmcloud
 
@@ -800,6 +802,7 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
 
+echo "HAMZY"; ls -l ${POWERVS_AUTH_FILEPATH} || true; if [ -f ${POWERVS_AUTH_FILEPATH} ]; then cat ${POWERVS_AUTH_FILEPATH}; echo; fi
 openshift-install version
 
 # Add ignition configs
@@ -921,6 +924,7 @@ export TF_LOG=debug
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+echo "HAMZY"; ls -l ${POWERVS_AUTH_FILEPATH} || true; if [ -f ${POWERVS_AUTH_FILEPATH} ]; then cat ${POWERVS_AUTH_FILEPATH}; echo; fi
 openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
