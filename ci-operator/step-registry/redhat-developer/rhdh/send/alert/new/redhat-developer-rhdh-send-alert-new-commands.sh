@@ -3,10 +3,10 @@
 set -o errexit
 set +o nounset
 
-if [[ "$JOB_TYPE" != "periodic" ]]; then
-  echo "This job is not a nightly job, skipping alert."
-  exit 0
-fi
+# if [[ "$JOB_TYPE" != "periodic" ]]; then
+#   echo "This job is not a nightly job, skipping alert."
+#   exit 0
+# fi
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
