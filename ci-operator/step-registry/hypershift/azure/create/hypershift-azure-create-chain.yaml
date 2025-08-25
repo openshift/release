@@ -381,3 +381,81 @@ chain:
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST
+  - as: create-hostedcluster-post
+    cli: latest
+    env:
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
+      default: "false"
+      documentation: "If true, patch the ${SHARED_DIR}/hypershift_create_cluster_render.yaml and apply."
+    - name: DYNAMIC_ADDITIONAL_TRUST_BUNDLE_ENABLED
+      default: "false"
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: ""
+      documentation: "Specifies the cluster SDN provider."
+    commands: |-
+      set -exuo pipefail
+
+      if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "false" ]]; then
+        echo "SKIP ..."
+        exit 0
+      fi
+      if [ ! -f "${SHARED_DIR}"/hypershift_create_cluster_render.yaml ]; then
+        echo "Error: 'hypershift_create_cluster_render.yaml' file not found."
+        exit 1
+      fi
+      cp "${SHARED_DIR}"/hypershift_create_cluster_render.yaml "${SHARED_DIR}"/hypershift_create_cluster_render_final.yaml
+
+      # patch the rendered yaml file based on the setup
+
+      # This comes from cucushift-hypershift-extended-enable-additional-trust-bundle
+      if [[ "$DYNAMIC_ADDITIONAL_TRUST_BUNDLE_ENABLED" == "true" && -f "${SHARED_DIR}"/hc_additional_trust_bundle_name ]]; then
+        additional_trust_bundle_name=$(<"${SHARED_DIR}"/hc_additional_trust_bundle_name)
+        yq-v4  "select(.kind == \"HostedCluster\").spec.additionalTrustBundle = {\"name\": \"${additional_trust_bundle_name}\"}" "${SHARED_DIR}"/hypershift_create_cluster_render.yaml > "${SHARED_DIR}"/hypershift_create_cluster_render_final.yaml
+      fi
+
+      # Create the hosted cluster after patch
+      echo "Applying the rendered hosted cluster yaml file to finish hosted cluster creation"
+      oc apply -f "${SHARED_DIR}"/hypershift_create_cluster_render_final.yaml
+
+      CLUSTER_NAME=$(oc get hostedclusters -n clusters -o jsonpath='{.items[0].metadata.name}')
+      echo "Waiting for cluster: ${CLUSTER_NAME} to become available"
+      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+      echo "Cluster became available, creating kubeconfig"
+      secret_name=$(oc get hostedcluster "${CLUSTER_NAME}" -n clusters -o jsonpath='{.status.kubeconfig.name}')
+      oc get secret -n clusters $secret_name -o jsonpath='{.data.kubeconfig}' |base64 -d > "${SHARED_DIR}"/nested_kubeconfig
+      echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+      # In case of BYO CNI, the HC will never be ready before CNI components are up and running
+      if [[ $HYPERSHIFT_NETWORK_TYPE == "Other" || $HYPERSHIFT_NETWORK_TYPE == "Calico" ]]; then
+        echo "Waiting for nodes to join the hosted cluster"
+        num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        set +e
+        while true; do
+          num_nodes=$(oc get nodes --no-headers | wc -l | xargs)
+          if (( num_nodes == num_nodes_expected )); then
+            break
+          fi
+
+          echo "$num_nodes/$num_nodes_expected have joined the HC"
+          sleep 15s
+        done
+        exit 0
+      fi
+
+      echo "Waiting for clusteroperators to be ready"
+      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+      until \
+        oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
+          echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+          oc get clusterversion 2>/dev/null || true
+          sleep 10s
+      done
+      echo "clusteroperators are ready"
+    from: upi-installer
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m0s
