@@ -60,6 +60,28 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-proxy-sts-logging-konflux-build-f999
+  cron: 30 3 29 2 *
+  steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~AZMonitor&;~GCL&;~Upgrade&;
+      TEST_IMPORTANCE: Critical
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - ref: openshift-logging-install-operators-from-bundles
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 zz_generated_metadata:
   branch: release-4.19
   org: openshift
