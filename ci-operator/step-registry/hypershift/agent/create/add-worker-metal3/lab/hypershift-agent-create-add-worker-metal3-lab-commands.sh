@@ -34,7 +34,7 @@ spec:
 EOF
 
 # Wait until ISO is generated for InfraEnv
-oc wait --for=condition=ImageCreated infraenv/${HOSTED_CLUSTER_NAME} -n ${AGENT_NAMESPACE}--timeout=5m
+oc wait --for=condition=ImageCreated infraenv/${HOSTED_CLUSTER_NAME} -n ${AGENT_NAMESPACE} --timeout=5m
 
 # shellcheck disable=SC2154
 # We use the additional workers implemented for heterogeneous clusters as nodes for the hypershift hosted cluster
