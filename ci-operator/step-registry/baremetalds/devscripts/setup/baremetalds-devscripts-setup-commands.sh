@@ -432,20 +432,15 @@ if [[ "${ENABLE_SSHUTTLE:-false}" == "true" ]]; then
     if ! command -v sshuttle &> /dev/null; then
         echo "sshuttle not found, installing..."
         if command -v dnf &> /dev/null; then
-            sudo dnf install -y sshuttle
+            dnf install -y sshuttle
         elif command -v apt &> /dev/null; then
-            sudo apt update
-            sudo apt install -y sshuttle
+            apt update
+            apt install -y sshuttle
         else
             echo "Package manager not detected, please install sshuttle manually"
             exit 1
         fi
     fi
-# --- CUSTOM POST-COMMANDS + WAIT ---
-if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
-    echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds"
-    sleep "${CUSTOM_POST_TIMEOUT}"
-fi
     # Add entries from dnsmasq config to /etc/hosts
     DNSMASQ_CONF="/etc/NetworkManager/dnsmasq.d/openshift-ostest.conf"
     if [[ -f "$DNSMASQ_CONF" ]]; then
@@ -463,15 +458,15 @@ fi
         echo "DNSMasq config $DNSMASQ_CONF not found"
     fi
 
+    # --- CUSTOM POST-COMMANDS + WAIT ---
+    if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
+        echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds"
+        sleep "${CUSTOM_POST_TIMEOUT}"
+    fi
+
     # Run sshuttle to forward the baremetal cluster subnet
     echo "Starting sshuttle to forward cluster network..."
     sshuttle -r "root@${VIRTHOST}" 192.168.111.0/24 --dns
-fi
-
-# --- CUSTOM POST-COMMANDS + WAIT ---
-if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
-    echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds"
-    sleep "${CUSTOM_POST_TIMEOUT}"
 fi
 
 # Copy dev-scripts variables to be shared with the test step
