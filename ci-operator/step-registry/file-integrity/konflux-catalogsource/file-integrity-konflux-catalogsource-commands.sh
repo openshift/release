@@ -63,6 +63,7 @@ spec:
   - mirrors:
     - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-must-gather-${TEST_TYPE}
     source: registry.redhat.io/compliance/openshift-compliance-must-gather-rhel8
+  - mirrors:
     - quay.io/redhat-user-workloads/ocp-isc-tenant/security-profiles-operator-bundle-${TEST_TYPE}
     source: registry.redhat.io/compliance/openshift-security-profiles-operator-bundle
   - mirrors:
