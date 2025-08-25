@@ -164,7 +164,7 @@ EOF
       return 1
     }
     
-
+    run_command "dnf -y install podman"
     # Install ollama
     run_command "podman login ${MIRROR_REGISTRY_HOST} --tls-verify=false"
     
@@ -217,7 +217,7 @@ for i in {1..30}; do\n\
     echo "Ollama server is ready"\n\
     break\n\
   fi\n\
-  echo "Attempt $i: Waiting for server..."\n\
+  echo "Waiting for server..."\n\
   sleep 2\n\
 done\n\
 \n\
@@ -246,7 +246,7 @@ EOF
     run_command "podman push ${MIRROR_REGISTRY_HOST}/ollama/gemma3:1b --tls-verify=false"
 
     # Deploy ollama to OpenShift cluster
-    run_command "oc create namespace ollama --dry-run=client -o yaml | oc apply -f -"
+    run_command "oc create namespace ollama"
     # Create a Deployment for ollama
     cat <<EOF | oc apply -f -
 apiVersion: apps/v1

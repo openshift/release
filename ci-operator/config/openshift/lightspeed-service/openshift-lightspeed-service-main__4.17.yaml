@@ -139,27 +139,16 @@ tests:
     - as: e2e
       cli: latest
       commands: |
-        export BAM_PROVIDER_KEY_PATH=/var/run/bam/token
-        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
-        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
-        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
-        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
-        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
-        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
-        export AWS_BUCKET_PATH=/var/run/aws-bucket/aws-bucket
-        export AWS_ACCESS_KEY_ID_PATH=/var/run/aws-access-key-id/aws-access-key-id
-        export AWS_REGION_PATH=/var/run/aws-region/aws-region
-        export AWS_SECRET_ACCESS_KEY_PATH=/var/run/aws-secret-access-key/aws-secret-access-key
+        export SUITE_ID=ollama
+        export PROVIDER=ollama
+        export MODEL=gemma3:1b
+        export DISCONNECTED=true
 
-        export PROVIDER_KEY_PATH=/var/run/openai/token
-        export PROVIDER=openai
-        export MODEL=gpt-3.5-turbo-1106
-
-        export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
-
-        export DISCONNECTED="true"
-
-        tests/scripts/test-e2e-cluster-periodics.sh
+        dnf -y install make
+        make install-deps && make install-deps-test
+        export ARTIFACT_DIR="/tmp"
+        pdm run pytest tests/e2e -s -k 'test_readiness' --durations=0 -o junit_suite_name="${SUITE_ID}" --junit-prefix="${SUITE_ID}" --junit-xml="${ARTIFACT_DIR}/junit_e2e_${SUITE_ID}.xml" \
+        --eval_out_dir ${ARTIFACT_DIR}
       credentials:
       - collection: ""
         mount_path: /var/run/azure_openai
