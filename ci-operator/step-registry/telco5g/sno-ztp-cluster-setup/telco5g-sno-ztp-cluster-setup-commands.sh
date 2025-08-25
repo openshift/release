@@ -110,7 +110,8 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: echo test
+    #command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
@@ -319,7 +320,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e ztphub_wait_install_timeout=90 \
     -e disconnected_env=true \
     -e disconnected_env_pull_secret=/home/kni/pull-secret.txt \
-    -e ztphub_wait_install_timeout=150 $PLAYBOOK_ARGS || status=$?
+    -e ztphub_wait_install_timeout=90 $PLAYBOOK_ARGS || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
