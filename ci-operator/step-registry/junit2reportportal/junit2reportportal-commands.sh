@@ -420,12 +420,24 @@ function debug_info() {
 
 function droute_send() {
   /droute version
-  /droute send --url="https://datarouter.ccitredhat.com" \
-               --username="$(< /var/run/datarouter/username)" \
-               --password="$(< /var/run/datarouter/password)" \
-               --metadata="$DATAROUTER_JSON" \
-               --results="${LOCAL_DIR_RST}/*" \
-               --wait
+  droute_send_cmd='/droute send --url="https://datarouter.ccitredhat.com"
+                                --username="$(< /var/run/datarouter/username)"
+                                --password="$(< /var/run/datarouter/password)"
+                                --metadata="$DATAROUTER_JSON"
+                                --results="${LOCAL_DIR_RST}/*"
+                                --wait
+                  '
+  for (( i=1; i<=3; i++ ))
+  do
+    output="$(eval $droute_send_cmd)"
+    echo "$output"
+    if (grep -q 'request' <<< "$output")
+    then
+      break
+    fi
+    echo "Retry 'droute send' after sleep $i minutes"
+    sleep ${i}m
+  done
 }
 
 export INSTALL_RESULT="fail"
