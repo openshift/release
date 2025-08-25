@@ -137,7 +137,15 @@ main() {
       echo "Attempt ${i} of ${max_attempts} to send test results through Data Router."
 
       # Check if JUnit results files exist in SHARED_DIR
-      if [[ -z "$(ls -A "${SHARED_DIR}/" | grep "junit-.*\.xml" 2>/dev/null)" ]]; then
+      local junit_files_found=false
+      for file in "${SHARED_DIR}"/junit-*.xml; do
+        if [[ -f "$file" ]]; then
+          junit_files_found=true
+          break
+        fi
+      done
+
+      if [[ "$junit_files_found" == false ]]; then
         echo "ERROR: No JUnit results files (junit-*.xml) found in ${SHARED_DIR}"
         save_status_data_router_failed true
         return
