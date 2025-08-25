@@ -37,6 +37,8 @@ echo "  HUGEPAGES_DEFAULT_SIZE=${HUGEPAGES_DEFAULT_SIZE}"
 echo "  HUGEPAGES_PAGES=${HUGEPAGES_PAGES}"
 echo "  HIGH_POWER_CONSUMPTION=${HIGH_POWER_CONSUMPTION}"
 echo "  PER_POD_POWER_MANAGEMENT=${PER_POD_POWER_MANAGEMENT}"
+echo "  LABEL_FILTER=${LABEL_FILTER}"
+
 
 echo "Configure compute and NTO cluster settings"
 cd /eco-ci-cd/
@@ -48,6 +50,9 @@ EXTRA_VARS="${EXTRA_VARS} rt_kernel=${RT_KERNEL}"
 EXTRA_VARS="${EXTRA_VARS} high_power_consumption=${HIGH_POWER_CONSUMPTION}"
 EXTRA_VARS="${EXTRA_VARS} per_pod_power_management=${PER_POD_POWER_MANAGEMENT}"
 EXTRA_VARS="${EXTRA_VARS} artifacts_folder=${ARTIFACT_DIR}"
+if [[ "${LABEL_FILTER}" != "" ]]; then
+    EXTRA_VARS="${EXTRA_VARS} label_filter=${LABEL_FILTER}"
+fi
 
 # Handle hugepages configuration
 if [[ "${HUGEPAGES_PAGES}" != "[]" && -n "${HUGEPAGES_PAGES}" ]]; then
