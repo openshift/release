@@ -1,4 +1,8 @@
 base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -322,6 +326,24 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-vsphere
+- as: e2e-baremetal-techpreview-ipv4
+  cluster: build05
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CUSTOM_POST_TIMEOUT: 1h
+      DEVSCRIPTS_CONFIG: |
+        FEATURE_SET=TechPreviewNoUpgrade
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      ENABLE_SSHUTTLE: "true"
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: insights-live
+    test:
+    - ref: baremetalds-e2e-test
+  timeout: 8h0m0s
 - as: gcp-insights-runtime-extractor-tests
   cron: 0 0 * * *
   steps:
