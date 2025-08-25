@@ -139,6 +139,15 @@ function generate_attribute_cloud_provider() {
   fi
 }
 
+function generate_attribute_env_disconnected() {
+  env_disconnected='no'
+  if [[ "$JOB_NAME_SAFE" =~ disconnected|-disc- ]]
+  then
+    env_disconnected='yes'
+  fi
+  write_attribute env_disconnected "$env_disconnected"
+}
+
 function generate_attribute_env_fips() {
   env_fips='no'
   if [[ "$JOB_NAME_SAFE" =~ fips ]]
@@ -248,6 +257,7 @@ function generate_attribute_version_installed() {
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
+  generate_attribute_env_disconnected
   generate_attribute_env_fips
   generate_attribute_job_type
   generate_attribute_install
@@ -387,6 +397,10 @@ function fix_xmls() {
 
     # when process openshift-extended-test-longduration/artifacts/junit/import-Workloads.xml
     # we got: 413 Request Entity Too Large
+    # Note: Do NOT replace +10240k with +10M as 'M' is invalid
+    # find --help
+    #      -size N[bck]    File size is N (c:bytes,k:kbytes,b:512 bytes(def.))
+    #                      +/-N: file size is bigger/smaller than N
     large_xml_files="$(find "$LOCAL_DIR_RST" -size +10240k)" || true
     if [[ -n "$large_xml_files" ]]
     then
@@ -406,12 +420,24 @@ function debug_info() {
 
 function droute_send() {
   /droute version
-  /droute send --url="https://datarouter.ccitredhat.com" \
-               --username="$(< /var/run/datarouter/username)" \
-               --password="$(< /var/run/datarouter/password)" \
-               --metadata="$DATAROUTER_JSON" \
-               --results="${LOCAL_DIR_RST}/*" \
-               --wait
+  droute_send_cmd='/droute send --url="https://datarouter.ccitredhat.com"
+                                --username="$(< /var/run/datarouter/username)"
+                                --password="$(< /var/run/datarouter/password)"
+                                --metadata="$DATAROUTER_JSON"
+                                --results="${LOCAL_DIR_RST}/*"
+                                --wait
+                  '
+  for (( i=1; i<=3; i++ ))
+  do
+    output="$(eval $droute_send_cmd)"
+    echo "$output"
+    if (grep -q 'request' <<< "$output")
+    then
+      break
+    fi
+    echo "Retry 'droute send' after sleep $i minutes"
+    sleep ${i}m
+  done
 }
 
 export INSTALL_RESULT="fail"
