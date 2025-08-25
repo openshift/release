@@ -423,12 +423,6 @@ exit \$rv
 
 EOF
 
-# --- CUSTOM POST-COMMANDS + WAIT ---
-if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
-    echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds"
-    sleep "${CUSTOM_POST_TIMEOUT}"
-fi
-
 # --- SSHUTTLE SUPPORT ---
 # Only execute if ENABLE_SSHUTTLE is set
 if [[ "${ENABLE_SSHUTTLE:-false}" == "true" ]]; then
@@ -447,7 +441,11 @@ if [[ "${ENABLE_SSHUTTLE:-false}" == "true" ]]; then
             exit 1
         fi
     fi
-
+# --- CUSTOM POST-COMMANDS + WAIT ---
+if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
+    echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds"
+    sleep "${CUSTOM_POST_TIMEOUT}"
+fi
     # Add entries from dnsmasq config to /etc/hosts
     DNSMASQ_CONF="/etc/NetworkManager/dnsmasq.d/openshift-ostest.conf"
     if [[ -f "$DNSMASQ_CONF" ]]; then
@@ -468,6 +466,12 @@ if [[ "${ENABLE_SSHUTTLE:-false}" == "true" ]]; then
     # Run sshuttle to forward the baremetal cluster subnet
     echo "Starting sshuttle to forward cluster network..."
     sshuttle -r "root@${VIRTHOST}" 192.168.111.0/24 --dns
+fi
+
+# --- CUSTOM POST-COMMANDS + WAIT ---
+if [ -n "${CUSTOM_POST_TIMEOUT:-}" ]; then
+    echo "Waiting for ${CUSTOM_POST_TIMEOUT} seconds"
+    sleep "${CUSTOM_POST_TIMEOUT}"
 fi
 
 # Copy dev-scripts variables to be shared with the test step
