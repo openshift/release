@@ -1,22 +1,14 @@
 base_images:
-  cerberus:
-    name: cerberus
-    namespace: chaos
-    tag: cerberus-prow
   cli:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: cli
-  ocp-qe-perfscale-ci:
-    name: ocp-qe-perfscale-ci
-    namespace: ci
-    tag: latest
   tools:
-    name: "4.9"
+    name: "4.20"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -30,7 +22,7 @@ releases:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -79,6 +71,25 @@ tests:
     workflow: baremetal-lab-upi
   timeout: 6h0m0s
 - always_run: false
+  as: network-perf-3nodes
+  capabilities:
+  - intranet
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      ADDITIONAL_WORKERS_DAY2: "false"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      architecture: arm64
+      masters: "3"
+      workers: "1"
+    test:
+    - chain: openshift-qe-network-perf
+    workflow: baremetal-lab-upi
+  timeout: 6h0m0s
+- always_run: false
   as: control-plane-3nodes-ipv6-static
   capabilities:
   - intranet
@@ -100,8 +111,41 @@ tests:
     - chain: openshift-qe-crd-scale
     - chain: openshift-qe-node-density
     workflow: baremetal-lab-ipi-virtual-media-ipv6-static
+- always_run: false
+  as: node-density-heavy-3nodes-ipv6-static
+  cluster: build05
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      PPROF: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "3"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: baremetal-lab-ipi-virtual-media-ipv6-static
+  timeout: 6h0m0s
+- always_run: false
+  as: network-perf-3nodes-ipv6-static
+  cluster: build05
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "3"
+    test:
+    - chain: openshift-qe-network-perf
+    workflow: baremetal-lab-ipi-virtual-media-ipv6-static
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: metal-4.19-nightly-multi
+  variant: metal-4.20-nightly-multi
