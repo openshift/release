@@ -189,7 +189,7 @@ main() {
           "${DATA_ROUTER_REQUEST_ID}")
 
         # Try to extract the ReportPortal launch URL from the request. This fails if it doesn't contain the launch URL.
-        REPORTPORTAL_LAUNCH_URL=$(echo "$DATA_ROUTER_REQUEST_OUTPUT" | yq e '.targets[0].events[] | select(.component == "reportportal-connector") | .message | fromjson | .[0].launch_url' -)
+        REPORTPORTAL_LAUNCH_URL=$(echo "$DATA_ROUTER_REQUEST_OUTPUT" | grep -o 'https://[^"]*')
 
         if [[ -n "$REPORTPORTAL_LAUNCH_URL" ]]; then
           echo "ReportPortal launch URL found: ${REPORTPORTAL_LAUNCH_URL}"
