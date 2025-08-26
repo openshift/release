@@ -10,38 +10,39 @@ LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
-if [[ "$NUM_WORKER_NODES" == "" ]]; then
-  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
-  export NUM_WORKER_NODES
-fi
+
+# Get the number of current dedicatedworker nodes in the cluster
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+NUM_CURRENT_WORKER_NODES=$(oc get nodes | grep worker | grep -v -c master)
+export NUM_CURRENT_WORKER_NODES
 
 # Calculate the number of scaleout worker nodes
-NUM_SCALEOUT_WORKER_NODES=$(($NUM_TARGET_WORKER_NODES-$NUM_WORKER_NODES))
+NUM_SCALEOUT_WORKER_NODES=$(($NUM_TARGET_WORKER_NODES-$NUM_CURRENT_WORKER_NODES))
 export NUM_SCALEOUT_WORKER_NODES
 
 echo "Starting SCALEOUT deployment on lab $LAB, cloud $LAB_CLOUD ..."
-SAVED_JETLAG_REPO_PATH=$(cat ${SHARED_DIR}/jetlag_repo)
-export SAVED_JETLAG_REPO_PATH
+JETLAG_REPO_PATH=$(cat ${SHARED_DIR}/jetlag_repo)
+export JETLAG_REPO_PATH
 
 # Add Nodes to Worker Inventory for Scaleout deployment
-scp -q ${SSH_ARGS} root@${bastion}:${SAVED_JETLAG_REPO_PATH}/ansible/vars/all.yml /tmp/all-before-scaleout.yml
+scp -q ${SSH_ARGS} root@${bastion}:${JETLAG_REPO_PATH}/ansible/vars/all.yml /tmp/all-before-scaleout.yml
 sed -i "s/^worker_node_count: [0-9]*/worker_node_count: $NUM_TARGET_WORKER_NODES/" /tmp/all-before-scaleout.yml
 
 cat <<EOF >>/tmp/scale_out.yml
 ---
-current_worker_count: $NUM_WORKER_NODES
+current_worker_count: $NUM_CURRENT_WORKER_NODES
 scale_out_count: $NUM_SCALEOUT_WORKER_NODES
 EOF
 
 envsubst < /tmp/scale_out.yml > /tmp/scale_out-updated.yml
 
-scp -q ${SSH_ARGS} /tmp/all-before-scaleout.yml root@${bastion}:${SAVED_JETLAG_REPO_PATH}/ansible/vars/all.yml
-scp -q ${SSH_ARGS} /tmp/scale_out-updated.yml root@${bastion}:${SAVED_JETLAG_REPO_PATH}/ansible/vars/scale_out.yml
+scp -q ${SSH_ARGS} /tmp/all-before-scaleout.yml root@${bastion}:${JETLAG_REPO_PATH}/ansible/vars/all.yml
+scp -q ${SSH_ARGS} /tmp/scale_out-updated.yml root@${bastion}:${JETLAG_REPO_PATH}/ansible/vars/scale_out.yml
 
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
-   cd ${SAVED_JETLAG_REPO_PATH}
+   cd ${JETLAG_REPO_PATH}
    source bootstrap.sh
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-scale-out.yml -v | tee /tmp/ansible-mno-scaleout-$(date +%s)
