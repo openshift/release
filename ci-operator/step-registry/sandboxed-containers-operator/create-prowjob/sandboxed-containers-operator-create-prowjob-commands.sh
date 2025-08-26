@@ -200,7 +200,8 @@ else # GA
 fi
 
 # Generate output file path
-OUTPUT_FILE="openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_VERSION}.yaml"
+OCP_PROWJOB_VERSION=$(echo "${OCP_VERSION}" | tr -d '.' )
+OUTPUT_FILE="openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_PROWJOB_VERSION}.yaml"
 echo "Generating prowjob configuration..."
 
 # Backup existing file if it exists
