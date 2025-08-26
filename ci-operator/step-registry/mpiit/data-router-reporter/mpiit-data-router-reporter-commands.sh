@@ -3,6 +3,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 30m
+
 export OCP_VERSION
 export DATAROUTER_RESULTS="${SHARED_DIR}/results/*.xml"
 export REPORTPORTAL_HOSTNAME
