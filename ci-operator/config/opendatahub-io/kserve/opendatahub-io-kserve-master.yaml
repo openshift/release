@@ -26,6 +26,12 @@ images:
 - dockerfile_path: agent.Dockerfile
   from: ubi_minimal
   to: kserve-agent
+- dockerfile_path: localmodel.Dockerfile
+  from: ubi_minimal
+  to: kserve-localmodel-controller
+- dockerfile_path: localmodel-agent.Dockerfile
+  from: ubi_minimal
+  to: kserve-localmodelnode-agent
 - context_dir: .
   dockerfile_path: router.Dockerfile
   to: kserve-router
@@ -67,6 +73,8 @@ promotion:
   - excluded_images:
     - kserve-controller
     - kserve-agent
+    - kserve-localmodel-controller
+    - kserve-localmodelnode-agent
     - kserve-router
     - kserve-storage-initializer
     - sklearn-serving-runtime
@@ -346,6 +354,28 @@ tests:
       SOURCE_IMAGE_REF: kserve-controller
     env:
       IMAGE_REPO: kserve-controller
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-localmodel-controller
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-localmodel-controller
+    env:
+      IMAGE_REPO: kserve-localmodel-controller
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-kserve-localmodelnode-agent
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-localmodelnode-agent
+    env:
+      IMAGE_REPO: kserve-localmodelnode-agent
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
