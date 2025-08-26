@@ -12,6 +12,7 @@ images:
     RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
     RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
     RUN dnf install -y azure-cli libicu
+    RUN az bicep install
   from: src
   to: src-plus-az
 resources:
@@ -162,6 +163,15 @@ tests:
     - chain: aro-hcp-provision-teardown-cluster
     test:
     - ref: aro-hcp-tests-run-aro-hcp-tests
+- as: create-dev-env
+  cron: 0 */4 * * *
+  steps:
+    env:
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+    post:
+    - ref: aro-hcp-provision-delete-dev-env
+    test:
+    - ref: aro-hcp-provision-create-dev-env
 zz_generated_metadata:
   branch: main
   org: Azure
