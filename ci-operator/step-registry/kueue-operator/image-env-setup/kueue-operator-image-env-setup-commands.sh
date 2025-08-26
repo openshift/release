@@ -47,7 +47,7 @@ export OPERATOR_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/${OPE
 echo "export OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> "${SHARED_DIR}/env"
 
 REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/${BUNDLE_COMPONENT}"
-BUNDLE_IMAGE=$(skopeo list-tags docker://$REPO | jq -r '.Tags[]' | grep -E '^[a-f0-9]{40}$' | while read -r tag; do
+BUNDLE_IMAGE=$(skopeo list-tags docker://$REPO | jq -r '.Tags[]' | grep -E '(on-pr-)?[a-f0-9]{40}$' | grep ${REVISION} | while read -r tag; do
     created=$(skopeo inspect docker://$REPO:$tag 2>/dev/null | jq -r '.Created')
     if [ "$created" != "null" ] && [ -n "$created" ]; then echo "$created $tag"; fi
 done | sort | tail -n1 | awk -v repo="$REPO" '{print repo ":" $2}')
