@@ -141,6 +141,53 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-operator-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.19"
+  steps:
+    dependency_overrides:
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.14
+    env:
+      OO_PACKAGE: openshift-cert-manager-operator
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_TARGET_NAMESPACES: '!install'
+      INITIAL_CHANNEL: stable-v1
+      INITIAL_CSV: cert-manager-operator.v1.11.1
+      OO_CHANNEL: stable-v1
+      OO_LATEST_CSV: cert-manager-operator.v1.16.1
+    test:
+    - ref: optional-operators-subscribe
+    - ref: optional-operators-ci-upgrade
+    workflow: generic-claim
+- as: e2e-operator-upgrade-fixed
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.19"
+  steps:
+    dependency_overrides:
+      OO_INDEX: quay.io/redhat-user-workloads/cert-manager-oape-tenant/cert-manager-operator-4-14/cert-manager-operator-index-4-14:on-pr-c366b77baf790cec8228d9e5a441f54da5dfe76b
+    env:
+      OO_PACKAGE: openshift-cert-manager-operator
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_TARGET_NAMESPACES: '!install'
+      INITIAL_CHANNEL: stable-v1
+      INITIAL_CSV: cert-manager-operator.v1.11.1
+      OO_CHANNEL: stable-v1
+      OO_LATEST_CSV: cert-manager-operator.v1.16.1
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: optional-operators-subscribe
+    - ref: optional-operators-ci-upgrade
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift
