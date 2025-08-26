@@ -147,7 +147,6 @@ main() {
 
       if [[ "$junit_files_found" == false ]]; then
         echo "ERROR: No JUnit results files (junit-*.xml) found in ${SHARED_DIR}"
-        save_status_data_router_failed true
         return
       fi
 
