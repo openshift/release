@@ -163,6 +163,11 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     fi
 fi
 
+echo "--- check image registry config ---"
+oc get configs.imageregistry.operator.openshift.io -oyaml
+oc get validatingadmissionpolicies.admissionregistration.k8s.io -oyaml
+oc get validatingadmissionpolicybindings.admissionregistration.k8s.io -oyaml
+
 echo "check mgmt cluster's HyperShift part"
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
@@ -177,6 +182,7 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 echo "check guest cluster"
+
 print_clusterversion
 check_node_status || exit 1
 retry check_cluster_operators || exit 1
