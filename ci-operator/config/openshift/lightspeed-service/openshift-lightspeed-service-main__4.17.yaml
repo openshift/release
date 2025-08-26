@@ -16,7 +16,7 @@ build_root:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
-      RUN dnf install -y podman
+      RUN dnf install -y podman make
 releases:
   latest:
     candidate:
@@ -144,7 +144,6 @@ tests:
         export MODEL=gemma3:1b
         export DISCONNECTED=true
 
-        dnf -y install make
         make install-deps && make install-deps-test
         export ARTIFACT_DIR="/tmp"
         pdm run pytest tests/e2e -s -k 'test_readiness' --durations=0 -o junit_suite_name="${SUITE_ID}" --junit-prefix="${SUITE_ID}" --junit-xml="${ARTIFACT_DIR}/junit_e2e_${SUITE_ID}.xml" \
@@ -190,9 +189,6 @@ tests:
         mount_path: /var/run/aws-secret-access-key
         name: aws-secret-access-key
         namespace: test-credentials
-      dependencies:
-      - env: OLS_IMAGE
-        name: lightspeed-service-api
       from: src
       resources:
         requests:
