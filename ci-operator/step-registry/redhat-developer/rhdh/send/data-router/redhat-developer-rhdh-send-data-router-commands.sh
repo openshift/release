@@ -91,9 +91,9 @@ save_data_router_metadata() {
 
   # Set cluster_type based on IS_OPENSHIFT
   if [[ "$IS_OPENSHIFT" == "true" ]]; then
-    cluster_type="ocp"
+    cluster_type="openshift"
   else
-    cluster_type="k8s"
+    cluster_type="kubernetes"
   fi
 
   # Generate the metadata file for Data Router from the template
