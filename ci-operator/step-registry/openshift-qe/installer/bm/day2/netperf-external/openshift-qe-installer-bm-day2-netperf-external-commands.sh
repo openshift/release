@@ -15,5 +15,5 @@ ssh ${SSH_ARGS} root@${bastion}
 
 ip link add name dummy0 type dummy
 ip link set dummy0 up
-ip addr add 172.31.0.1/24 dev dummy0
-podman run -d --rm --network=host quay.io/cloud-bulldozer/k8s-netperf:latest netserver -D -L 172.31.0.1
+ip addr add $EXTERNAL_SERVER_ADDRESS/24 dev dummy0
+podman run -d --rm --network=host quay.io/cloud-bulldozer/k8s-netperf:latest netserver -D -L $EXTERNAL_SERVER_ADDRESS
