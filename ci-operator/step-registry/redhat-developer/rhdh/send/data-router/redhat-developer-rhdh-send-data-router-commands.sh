@@ -20,7 +20,9 @@ DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD="0.9"
 DATA_ROUTER_PROJECT="main"
 METADATA_OUTPUT="data_router_metadata_output.json"
 
-export RELEASE_BRANCH_NAME DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD DATA_ROUTER_PROJECT DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD REPORTPORTAL_HOSTNAME METADATA_OUTPUT
+IS_OPENSHIFT=$(cat $SHARED_DIR/IS_OPENSHIFT.txt)
+
+export RELEASE_BRANCH_NAME DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD DATA_ROUTER_PROJECT DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD REPORTPORTAL_HOSTNAME METADATA_OUTPUT IS_OPENSHIFT
 
 # Validate required variables
 validate_required_vars() {
@@ -73,6 +75,22 @@ get_job_url() {
 
 save_data_router_metadata() {
   JOB_URL=$(get_job_url)
+  local install_method
+  local cluster_type
+
+  # Set install_method based on job name
+  if [[ "$JOB_NAME" == *operator* ]]; then
+    install_method="operator"
+  else
+    install_method="helm-chart"
+  fi
+
+  # Set cluster_type based on IS_OPENSHIFT
+  if [[ "$IS_OPENSHIFT" == "true" ]]; then
+    cluster_type="ocp"
+  else
+    cluster_type="k8s"
+  fi
 
   # Generate the metadata file for Data Router from the template
   jq -n \
@@ -84,6 +102,8 @@ save_data_router_metadata() {
     --arg pr "$GIT_PR_NUMBER" \
     --arg job_name "$JOB_NAME" \
     --arg tag_name "$TAG_NAME" \
+    --arg install_method "$install_method" \
+    --arg cluster_type "$cluster_type" \
     --argjson auto_finalization_threshold "$DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD" \
     '{
       "targets": {
@@ -103,7 +123,9 @@ save_data_router_metadata() {
                 {"key": "job_type", "value": $job_type},
                 {"key": "pr", "value": $pr},
                 {"key": "job_name", "value": $job_name},
-                {"key": "tag_name", "value": $tag_name}
+                {"key": "tag_name", "value": $tag_name},
+                {"key": "install_method", "value": $install_method},
+                {"key": "cluster_type", "value": $cluster_type}
               ]
             },
             "tfa": {
