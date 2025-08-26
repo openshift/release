@@ -522,12 +522,14 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$control_plane_memory =  $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})
 \$control_plane_num_cpus = $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
+\$control_plane_cores_per_socket = $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
 \$control_plane_count = ${CONTROL_PLANE_REPLICAS}
 \$control_plane_ip_addresses = $(echo "${control_plane_ip_addresses}" | tr -d '[]')
 \$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
 
 \$compute_memory =  $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})
 \$compute_num_cpus = $(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
+\$compute_cores_per_socket = $(jq -r '.spec.compute.coresPerSocket' ${SPEC_CONFIG})
 \$compute_count = ${COMPUTE_NODE_REPLICAS}
 \$compute_ip_addresses = $(echo "${compute_ip_addresses}" | tr -d '[]')
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
