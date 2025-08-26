@@ -12,8 +12,6 @@ source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
     LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
-elif [[ $TAG == "main" ]]; then
-    LATEST_TAG="main"
 else
     LATEST_TAG=$TAG
 fi
