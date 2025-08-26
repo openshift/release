@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# TODO: should use configurable branch instead of 'devel'?
-podvm_img_url="https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/devel/config/peerpods/podvm/"
 configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
 
 # TODO: still needed? 600 seconds will cause the step timeout?
@@ -10,8 +8,7 @@ configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
 
 create_catsrc() {
   local catsrc_name="$1"
-  local catsrc_version="$2"
-  local catsrc_image="$3"
+  local catsrc_image="$2"
   local catsrc_path="${SHARED_DIR:-$(pwd)}/catsrc_${catsrc_name}.yaml"
 
   echo "Create a custom catalogsource named ${catsrc_name} for internal builds"
@@ -24,12 +21,36 @@ create_catsrc() {
     namespace: openshift-marketplace
   spec:
     displayName: QE
-    image: "${catsrc_image}:${catsrc_version}"
+    image: "${catsrc_image}"
     publisher: QE
     sourceType: grpc
 EOF
 
   oc apply -f "${catsrc_path}"
+}
+
+# The default catalog image doesn't have a "latest" tag associated with, so
+# we search in quay.io for the latest built tag.
+latest_catsrc_image_tag() {
+    local page=1
+    while true; do
+        local resp
+        resp=$(curl -sf "https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/?limit=100&page=$page")
+
+        if ! jq -e '.tags | length > 0' <<< "$resp" >/dev/null; then
+            break
+        fi
+
+        latest_tag=$(echo "$resp" | \
+          jq -r '.tags[]? | select(.name | test("^osc-test-fbc-on-push-.*-build-image-index$")) | "\(.start_ts) \(.name)"' | \
+          sort -nr | head -n1 | awk '{print $2}')
+        if [ -n "${latest_tag}" ]; then
+            echo "${latest_tag}"
+            break
+        fi
+
+        ((page++))
+    done
 }
 
 mirror_konflux() {
@@ -69,6 +90,10 @@ spec:
     - mirrors:
         - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
       source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
+      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
+
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -100,6 +125,9 @@ spec:
     - mirrors:
         - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
       source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
+    - mirrors:
+        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
+      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
@@ -139,8 +167,20 @@ EOF
 
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   mirror_konflux
-  create_catsrc "${CATALOG_SOURCE_NAME}" "${OPERATOR_INDEX_VERSION}" "${OPERATOR_INDEX_IMAGE}"
-  create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_INDEX_VERSION}" "${TRUSTEE_INDEX_IMAGE}"
+
+  default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
+  if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
+    catsrc_image_tag=$(latest_catsrc_image_tag)
+    CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
+  fi
+
+  create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
+  create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
+else
+  if [[ -n "$CATALOG_SOURCE_IMAGE" || -n "$TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
+    echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
+    exit 1
+  fi
 fi
 
 cat <<EOF | tee "${configmap_path}"
@@ -151,7 +191,7 @@ metadata:
   namespace: default
 data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
-  operatorVer: "${OPERATOR_INDEX_VERSION}"
+  operatorVer: "${EXPECTED_OPERATOR_VERSION}"
   channel: "${OPERATOR_UPDATE_CHANNEL}"
   redirectNeeded: "true"
   exists: "true"
@@ -159,7 +199,7 @@ data:
   eligibility: "false"
   eligibleSingleNode: "false"
   enableGPU: "${ENABLEGPU}"
-  podvmImageUrl: "${podvm_img_url}"
+  podvmImageUrl: "${PODVM_IMAGE_URL}"
   runtimeClassName: "${RUNTIMECLASS}"
   trusteeCatalogSourcename: "${TRUSTEE_CATALOG_SOURCE_NAME}"
   trusteeUrl: "${TRUSTEE_URL}"

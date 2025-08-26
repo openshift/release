@@ -349,6 +349,11 @@ EOF
     fi
     cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
+    if [ "W${DEBUG}W" == "WtrueW" ] || [ "W${DEBUG}W" == "WTrueW" ] ; then
+        echo "Sleep 2 hour, so we can login the cluster"
+        sleep 2h
+    fi
+
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
@@ -383,7 +388,7 @@ function handle_filters {
     done
 
     echo "handle AND logical"
-    for filter in ${filters_and[*]}
+    for filter in "${filters_and[@]}"
     do
         echo "handle filter_and ${filter}"
         handle_and_filter "${filter}"
@@ -391,7 +396,7 @@ function handle_filters {
 
     echo "handle OR logical"
     rm -fr ./case_selected_or
-    for filter in ${filters_or[*]}
+    for filter in "${filters_or[@]}"
     do
         echo "handle filter_or ${filter}"
         handle_or_filter "${filter}"

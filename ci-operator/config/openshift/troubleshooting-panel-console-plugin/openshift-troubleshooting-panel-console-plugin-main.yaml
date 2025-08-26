@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
+    tag: rhel-8-golang-1.24-openshift-4.20
 build_root:
   image_stream_tag:
     name: release
@@ -11,9 +11,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
   to: troubleshooting-panel-console-plugin
 - dockerfile_path: Dockerfile.test
   to: troubleshooting-panel-console-plugin-test
@@ -27,10 +27,10 @@ promotion:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 6Gi
 tests:
 - as: lint
   commands: make lint-frontend
@@ -42,6 +42,10 @@ tests:
       SCAN_IMAGE: troubleshooting-panel-console-plugin
     test:
     - ref: fips-check-image-scan
+- as: unit
+  commands: make test-frontend
+  container:
+    from: troubleshooting-panel-console-plugin-test
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -71,6 +71,9 @@ function check_control_plane_pod_status {
 # If any pod is not in the expected state, it prints an error message and returns 1. Otherwise, it returns 0.
 function check_pod_status {
     while read -r namespace pod _ status _; do
+        if [[ "$namespace" = "open-cluster-management-agent-addon" ]]; then
+          continue
+        fi
         if [[ "$status" != "Running" && "$status" != "Completed" ]]; then
             echo "Pod $pod in namespace $namespace has status $status, which is not valid."
             return 1

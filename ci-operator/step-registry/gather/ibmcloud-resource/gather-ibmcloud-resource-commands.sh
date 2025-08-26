@@ -82,7 +82,9 @@ function gather_lb_resources {
             echo -e "\n\n\n# ibmcloud is lb-ps ${lb}\n"
             "${IBMCLOUD_CLI}" is lb-ps "${lb}"
             echo -e "\n\n\n# ibmcloud is lb-p ${lb} <pool>\n"
-	    "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-p ${lb} %"
+            "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-p ${lb} %"
+            echo -e "\n\n\n# ibmcloud is lb-pms ${lb} <pool>\n"
+            "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-pms ${lb} %"
         } > "${RESOURCE_DUMP_DIR}/load-balancer-${lb}.txt"
     done
 }

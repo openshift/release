@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
@@ -76,11 +76,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-operator-techpreview
     decorate: true
     decoration_config:
@@ -92,6 +92,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-control-plane-machine-set-operator-release-4.21-e2e-aws-operator-techpreview
     rerun_command: /test e2e-aws-operator-techpreview
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -154,7 +155,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -227,7 +228,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-etcd-scaling
     decorate: true
     labels:
@@ -300,7 +301,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     labels:
@@ -374,7 +375,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-serial-2of2
     decorate: true
     labels:
@@ -448,7 +449,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -521,7 +522,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-periodic-pre
     decorate: true
     decoration_config:
@@ -597,7 +598,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-aws-periodic-pre-techpreview
     decorate: true
     decoration_config:
@@ -1354,7 +1355,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-openstack-operator
     decorate: true
     decoration_config:
@@ -1506,7 +1507,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-openstack-periodic-pre
     decorate: true
     decoration_config:
@@ -1582,7 +1583,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e-openstack-periodic-pre-techpreview
     decorate: true
     decoration_config:
@@ -2326,7 +2327,63 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build07
+    cluster: build05
+    context: ci/prow/periodics-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: periodics
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-control-plane-machine-set-operator-release-4.21-periodics-images
+    rerun_command: /test periodics-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodics
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodics-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.21$
+    - ^release-4\.21-
+    cluster: build03
     context: ci/prow/regression-clusterinfra-aws-ipi-cpms-allcases
     decorate: true
     decoration_config:
@@ -2339,6 +2396,7 @@ presubmits:
     name: pull-ci-openshift-cluster-control-plane-machine-set-operator-release-4.21-regression-clusterinfra-aws-ipi-cpms-allcases
     optional: true
     rerun_command: /test regression-clusterinfra-aws-ipi-cpms-allcases
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:

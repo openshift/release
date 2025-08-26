@@ -185,11 +185,15 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
   tasks:
 
   - name: Remove last run for ${CLUSTER_NAME}_ci
-    shell: kcli delete plan --yes ${CLUSTER_NAME}_ci
+    shell: |
+        kcli delete plan --yes ${CLUSTER_NAME}_ci
+        kcli delete plan --yes ${CLUSTER_NAME}
     ignore_errors: yes
 
   - name: Remove last run for ${ADD_BM_HOST:-empty}_ci
-    shell: kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
+    shell: |
+        kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
+        kcli delete plan --yes ${ADD_BM_HOST:-empty}
     ignore_errors: yes
 
 EOF
@@ -253,9 +257,9 @@ else
     SNO_CLUSTER_API_PORT="6443"
 fi
 
-if [[ "$T5CI_VERSION" == "4.19" ]] || [[ "$T5CI_VERSION" == "4.20" ]]; then
-    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
-    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
+if [[ "$T5CI_VERSION" == "4.20" ]] || [[ "$T5CI_VERSION" == "4.21" ]]; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.19"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.19"
 fi
 
 cat << EOF > ~/fetch-kubeconfig.yml
@@ -326,7 +330,9 @@ EOF
 if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf-nrop"* ]]; then
     PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST"
 fi
-
+if [[ "$JOB_NAME" != *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+    PLAYBOOK_ARGS+=" -e image_override=quay.io/hypershift/hypershift-operator:latest "
+fi
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
@@ -340,7 +346,6 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e sno_tag=$MGMT_VERSION \
     -e vsno_wait_minutes=150 \
     -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
-    -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
     -e hcp_release=$T5CI_JOB_HCP_RELEASE_TYPE $PLAYBOOK_ARGS || status=$?
 

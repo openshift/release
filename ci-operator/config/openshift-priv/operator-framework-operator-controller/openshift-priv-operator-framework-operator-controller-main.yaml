@@ -128,7 +128,9 @@ tests:
     test:
     - as: upstream-e2e
       cli: latest
-      commands: make -C openshift test-e2e
+      commands: |
+        make -C openshift test-e2e
+        make -C openshift test-experimental-e2e
       dependencies:
       - env: E2E_REGISTRY_IMAGE
         name: e2e-test-registry
@@ -165,6 +167,30 @@ tests:
       resources:
         requests:
           cpu: 100m
+- as: tests-extension
+  run_if_changed: ^(openshift/tests-extension/)
+  steps:
+    test:
+    - as: sanity
+      commands: |
+        cd openshift/tests-extension
+        make verify
+        make build
+        make verify-metadata
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-aws-techpreview-olmv1-ext
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/all
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift-priv
