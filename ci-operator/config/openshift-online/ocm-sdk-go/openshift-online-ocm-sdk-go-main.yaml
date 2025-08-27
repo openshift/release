@@ -4,16 +4,16 @@ build_root:
     namespace: openshift
     tag: golang-1.23
 images:
-- dockerfile_literal: "FROM src\n# RUN subscription-manager repos --enable codeready-builder-for-rhel-9-x86_64-rpms\n#
-    found via https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/
-    and https://docs.fedoraproject.org/en-US/epel/available-packages/\nRUN dnf install
-    -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm\nRUN
-    dnf install -y pass || true\nRUN dnf install -y qrencode || true\nRUN dnf install
-    -y https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm
-    https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm
-    https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-7.el9.noarch.rpm
-    || true\nRUN dnf install -y podman \nRUN dnf clean all\n"
-  from: src
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY /src /opt/app-root/src
+    WORKDIR /opt/app-root/src
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-online/ocm-sdk-go
   to: golang-plus-pass
 resources:
   '*':
