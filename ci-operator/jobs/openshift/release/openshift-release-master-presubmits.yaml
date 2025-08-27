@@ -1644,6 +1644,37 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build10
+    context: ci/prow/tide-config-manager-verified
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-tide-config-manager-verified
+    rerun_command: /test tide-config-manager-verified
+    run_if_changed: ^(core-services/verified/.*)
+    spec:
+      containers:
+      - args:
+        - --lifecycle-phase=verified
+        - --verified-opt-in=./core-services/verified/opt-in.yaml
+        - --verified-opt-out=./core-services/verified/opt-out.yaml
+        - --ci-operator-config-dir=./ci-operator/config
+        - --prow-config-dir=./core-services/prow/02_config
+        - --sharded-prow-config-base-dir=./core-services/prow/02_config
+        command:
+        - tide-config-manager
+        image: quay.io/openshift/ci-public:ci_tide-config-manager_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )tide-config-manager-verified,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/build-farm/vsphere02-dry
     decorate: true
