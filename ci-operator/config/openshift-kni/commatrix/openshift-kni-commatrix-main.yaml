@@ -79,20 +79,7 @@ tests:
     test:
     - as: commatrix-e2e-tests
       commands: |
-        # Install krew
-        OS="$(uname | tr '[:upper:]' '[:lower:]')"
-        ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/' -e 's/armv7l/arm/')"
-        KREW="krew-${OS}_${ARCH}"
-
         mkdir -p /tmp
-        curl -fsSL "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" -o /tmp/${KREW}.tar.gz
-        mkdir -p /tmp/krew
-        tar -xvzf /tmp/${KREW}.tar.gz -C /tmp/krew
-
-        /tmp/krew/${KREW} install krew
-        export KREW_ROOT="${KREW_ROOT:-$HOME/.krew}"
-        export PATH="${KREW_ROOT}/bin:$PATH"
-
         # Install the commatrix krew plugin
         go mod vendor
         make build
@@ -107,7 +94,7 @@ tests:
           memory: 200Mi
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: security
   optional: true
   steps:
