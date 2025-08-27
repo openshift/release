@@ -1645,31 +1645,26 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build10
-    context: ci/prow/tide-config-manager-verified
+    context: ci/prow/verified-config
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-tide-config-manager-verified
-    rerun_command: /test tide-config-manager-verified
-    run_if_changed: ^(core-services/verified/.*)
+    name: pull-ci-openshift-release-master-verified-config
+    rerun_command: /test verified-config
+    run_if_changed: ^core-services/verified/.*
     spec:
       containers:
       - args:
-        - --lifecycle-phase=verified
-        - --verified-opt-in=./core-services/verified/opt-in.yaml
-        - --verified-opt-out=./core-services/verified/opt-out.yaml
-        - --ci-operator-config-dir=./ci-operator/config
-        - --prow-config-dir=./core-services/prow/02_config
-        - --sharded-prow-config-base-dir=./core-services/prow/02_config
+        - ./
         command:
-        - tide-config-manager
+        - hack/validate-verified-config.sh
         image: quay.io/openshift/ci-public:ci_tide-config-manager_latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
-    trigger: (?m)^/test( | .* )tide-config-manager-verified,?($|\s.*)
+    trigger: (?m)^/test( | .* )verified-config,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
