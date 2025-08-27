@@ -102,7 +102,7 @@ copy_junit_files() {
     target_files=$(ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
         "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${S614} 'ls -la ${REMOTE_JUNIT_DIR}/*.xml 2>/dev/null'" || echo "")
     
-    file_count=$(echo "$target_files" | grep -c "\.xml$" || echo "0")
+    file_count=$(echo "$target_files" | wc -l)
     
     if [[ "$file_count" -gt 0 ]]; then
         echo "Found $file_count XML files on target server:"
@@ -247,7 +247,8 @@ infra_hosts:
 END_VARS
 
 # DEBUG issue with EDU_PTP
-scp -i "${SSH_KEY}" "${SSHOPTS[@]}" slcm_vars.yml ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}:/tmp/debug_edu_ptp_slcm_vars.yml
+DT=$(date "+%Y-%m-%d_%H-%M-%S")
+scp -i "${SSH_KEY}" "${SSHOPTS[@]}" slcm_vars.yml ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}:/tmp/debug_edu_ptp_slcm_vars-${DT}.yml
 # END DEBUG
 
 ansible-galaxy collection install ansible.posix
@@ -259,14 +260,24 @@ set -e
 
 if [[ $ANSIBLE_EXIT_CODE -ne 0 ]]; then
     echo "SLCM playbook failed with exit code $ANSIBLE_EXIT_CODE, but continuing to evaluate test results..."
+else
+    echo "SLCM playbook succeded."
 fi
 
-copy_junit_files
-check_test_failures
+if [[ $COPY_TO_PROW == "true" ]]; then
+    echo "Copy junit files."
+    copy_junit_files
 
-if ! check_test_failures; then
-  echo "Failed: either test failures detected or no test results found!"
-  exit 1
+    echo "Check for test failures."
+    check_test_failures
+    CHECK_FAILURES=$?
+
+    if [[ $CHECK_FAILURES -ne 0 ]]; then
+      echo "Failed: either test failures detected or no test results found!"
+      exit 1
+    else
+      echo "All tests passed!"
+    fi
 else
-  echo "All tests passed!"
+    echo "Copy junit files skipped."
 fi
