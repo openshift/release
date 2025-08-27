@@ -52,7 +52,7 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
             'name': 'release-controller-signer',
             'namespace': 'ci',
             'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image"}]'
+                'image.openshift.io/triggers': '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image"}]'
             }
         },
         'spec': {
@@ -88,7 +88,7 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                     }],
                     'containers': [{
                         'name': 'controller',
-                        'image': 'release-controller:latest',
+                        'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
                         'volumeMounts': [{
                             'name': 'publisher',
                             'mountPath': '/etc/release-controller/publisher',

@@ -181,7 +181,7 @@ def _deployment_resources(gendoc, namespaces):
             'kind': 'Deployment',
             'metadata': {
                 'annotations': {
-                    'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-mirror-cleanup-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                    'image.openshift.io/triggers': '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_release-mirror-cleanup-controller_latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
                 },
                 'name': 'release-mirror-cleanup-controller',
                 'namespace': context.config.rc_deployment_namespace,
@@ -218,7 +218,7 @@ def _deployment_resources(gendoc, namespaces):
                                                '-v=4',
                                                '--credentials-namespace='+context.jobs_namespace,
                                            ] + _namespace_list(namespaces),
-                                'image': 'release-mirror-cleanup-controller:latest',
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-mirror-cleanup-controller_latest',
                                 'name': 'controller',
                             }
                         ],

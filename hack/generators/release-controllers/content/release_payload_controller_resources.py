@@ -203,7 +203,7 @@ def _deployment_resources(gendoc):
             'kind': 'Deployment',
             'metadata': {
                 'annotations': {
-                    'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-payload-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                    'image.openshift.io/triggers': '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_release-payload-controller_latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
                 },
                 'name': 'release-payload-controller',
                 'namespace': context.config.rc_deployment_namespace,
@@ -240,7 +240,7 @@ def _deployment_resources(gendoc):
                                     '--namespace=ci',
                                     '-v=6',
                                 ],
-                                'image': 'release-payload-controller:latest',
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-payload-controller_latest',
                                 'name': 'controller',
                             }
                         ],

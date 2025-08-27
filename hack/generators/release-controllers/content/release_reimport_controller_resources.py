@@ -145,7 +145,7 @@ def _deployment_resources(gendoc, namespaces):
             'kind': 'Deployment',
             'metadata': {
                 'annotations': {
-                    'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-reimport-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                    'image.openshift.io/triggers': '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_release-reimport-controller_latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
                 },
                 'name': 'release-reimport-controller',
                 'namespace': context.config.rc_deployment_namespace,
@@ -181,7 +181,7 @@ def _deployment_resources(gendoc, namespaces):
                                                'start',
                                                '-v=4',
                                            ] + _namespace_list(namespaces),
-                                'image': 'release-reimport-controller:latest',
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-reimport-controller_latest',
                                 'name': 'controller',
                             }
                         ],

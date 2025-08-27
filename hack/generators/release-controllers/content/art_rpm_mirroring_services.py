@@ -53,7 +53,7 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
             'kind': 'Deployment',
             'metadata': {
                 'annotations': {
-                    'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"mirror\\")].image"}]'
+                    'image.openshift.io/triggers': '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_content-mirror_latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"mirror\\")].image"}]'
                 },
                 'labels': {
                     'app': service_name
@@ -88,7 +88,7 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                         '/tmp/repos',
                                         "/tmp/key",
                                         "/tmp/mirror-enterprise-basic-auth"],
-                            'image': ' ',
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_content-mirror_latest',
                             'name': 'mirror',
                             'ports': [{
                                 'containerPort': 8080,

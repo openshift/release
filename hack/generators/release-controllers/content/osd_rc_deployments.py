@@ -266,7 +266,7 @@ def get_oc_prepare_container():
             DURATION=$SECONDS
             echo "Took: $(($DURATION / 60))m $(($DURATION % 60))s"
                         """],
-            "image": "release-controller:latest",
+            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest",
             "volumeMounts": get_oc_volume_mounts(),
             "env": get_oc_env_vars(),
         }
@@ -287,7 +287,7 @@ def _add_osd_rc_deployment(gendoc):
         'kind': 'Deployment',
         'metadata': {
             'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                'image.openshift.io/triggers': '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
             },
             'name': f'release-controller-{context.is_namespace}',
             'namespace': context.config.rc_deployment_namespace,
@@ -383,7 +383,7 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--art-suffix={context.art_suffix}',
                                         "--manifest-list-mode"
                                         ],
-                            'image': 'release-controller:latest',
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(),
                             'env': get_oc_env_vars(),
@@ -417,7 +417,7 @@ def _add_osd_rc_deployment(gendoc):
         'kind': 'Deployment',
         'metadata': {
             'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                'image.openshift.io/triggers': '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
             },
             'name': f'release-controller-api-{context.is_namespace}',
             'namespace': context.config.rc_deployment_namespace,
@@ -460,7 +460,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--jira-endpoint=https://issues.redhat.com',
                                         '--jira-bearer-token-file=/etc/jira/api',
                                         ],
-                            'image': 'release-controller-api:latest',
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
                             'name': 'controller',
                             'volumeMounts': get_rcapi_volume_mounts(),
                             'env': get_oc_env_vars(),
