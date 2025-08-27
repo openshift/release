@@ -65,7 +65,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-multi
+- as: e2e-aws-multi-x-ax
   cron: 0 2 * * *
   steps:
     cluster_profile: hypershift
@@ -83,6 +83,18 @@ tests:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-multi-x-ax
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      AZURE_MULTI_ARCH: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   capabilities:
   - build-tmpfs
@@ -98,12 +110,15 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
+      PUBLIC_ONLY: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
   cron: 0 2 * * *
   steps:
     cluster_profile: hypershift
+    env:
+      PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *

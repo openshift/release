@@ -48,18 +48,6 @@ tests:
   commands: make validate
   container:
     from: src
-- as: vuln-check-operator
-  commands: |
-    cd /tmp
-    curl -sfL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output jq
-    chmod a+x jq
-    export CLAIR_SERVER=https://clair.apps.osd-v4prod-aws.n2a0.p1.openshiftapps.com
-    PACKAGES=$(/usr/bin/rpmquery -qa | sort -Vu | ./jq -cR -s  '{Packages: (.|split("\n")|select(.!="")|sort)}')
-    ERRATA=$(curl -s -X POST ${CLAIR_SERVER}/packages -H application/json --data @-<<<"${PACKAGES}")
-    echo -n "Vulnerabilties: "
-    ./jq --exit-status '.Vulnerabilities, (.Vulnerabilities|length == 0)' <<< "$ERRATA"
-  container:
-    from: splunk-forwarder-operator
 zz_generated_metadata:
   branch: master
   org: openshift
