@@ -18,7 +18,7 @@ echo "Gathering node core dumps ..."
 
 mkdir -p ${ARTIFACT_DIR}/core-dumps
 
-oc adm must-gather --dest-dir="${ARTIFACT_DIR}/core-dumps" -- sh -c "/usr/bin/gather_core_dumps || true"
+oc adm must-gather  --volume-percentage=100 --dest-dir="${ARTIFACT_DIR}/core-dumps" -- sh -c "/usr/bin/gather_core_dumps || true"
 
 find ${ARTIFACT_DIR}/core-dumps/*/ -type f -name '*_core_dump'
 CORE_DUMPS="$(find ${ARTIFACT_DIR}/core-dumps/*/ -type f -name '*_core_dump')"

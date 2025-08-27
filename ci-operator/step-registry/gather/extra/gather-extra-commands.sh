@@ -166,7 +166,7 @@ done
 # change to the network artifact dir
 mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
 pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
-oc get node -oname | xargs oc adm must-gather -- /usr/bin/gather_multus_logs
+oc get node -oname | xargs oc adm must-gather --volume-percentage=100 -- /usr/bin/gather_multus_logs
 popd || return
 
 # If the tcpdump-service or conntrackdump-service step was used, grab the files.
