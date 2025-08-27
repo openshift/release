@@ -7,42 +7,57 @@ RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
 export RELEASE_BRANCH_NAME SLACK_NIGHTLY_WEBHOOK_URL
 
-get_job_url() {
-  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
-  local job_complete_url
-  if [ -n "${PULL_NUMBER:-}" ]; then
-    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-  else
-    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
-  fi
-  echo "${job_complete_url}"
-}
+# Download and source the reporting.sh file from RHDH repository
+REPORTING_SCRIPT_URL="https://raw.githubusercontent.com/redhat-developer/rhdh/${RELEASE_BRANCH_NAME}/.ibm/pipelines/reporting.sh"
+REPORTING_SCRIPT_TMP="/tmp/reporting.sh"
 
-# Align this function with the one in https://github.com/redhat-developer/rhdh/blob/main/.ibm/pipelines/reporting.sh
-get_artifacts_url() {
-  local project="${1:-""}"
+echo "💾 Downloading reporting.sh from ${REPORTING_SCRIPT_URL}"
+if curl -f -s -o "${REPORTING_SCRIPT_TMP}" "${REPORTING_SCRIPT_URL}"; then
+  echo "🟢 Successfully downloaded reporting.sh, sourcing it..."
+  # shellcheck source=/dev/null
+  source "${REPORTING_SCRIPT_TMP}"
+  rm -f "${REPORTING_SCRIPT_TMP}"
+  echo "✅ Successfully sourced reporting.sh from upstream"
+else
+  echo "⚠️ Warning: Failed to download reporting.sh from ${REPORTING_SCRIPT_URL}, using local implementation"
+  # Define fallback functions if download fails
+  get_job_url() {
+    local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
+    local job_complete_url
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+    echo "${job_complete_url}"
+  }
+  
+  get_artifacts_url() {
+    local project="${1:-""}"
 
-  local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
-  local artifacts_complete_url
+    local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+    local artifacts_complete_url
 
-    local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}" # e.g. "e2e-tests-aks-helm-nightly"
-    local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}" # e.g. "aks-helm-nightly"
-    local part_2="redhat-developer-rhdh-${suite_name}" # e.g. "redhat-developer-rhdh-aks-helm-nightly"
-    # Override part_2 based for specific cases that do not follow the standard naming convention.
-    case "$JOB_NAME" in
-      *osd-gcp*)
-      part_2="redhat-developer-rhdh-osd-gcp-nightly"
-      ;;
-      *auth-providers*)
-      part_2="redhat-developer-rhdh-auth-providers-nightly"
-      ;;
-      *ocp-v*)
-      part_2="redhat-developer-rhdh-nightly"
-      ;;
-    esac
-    artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${project}"
-  echo "${artifacts_complete_url}"
-}
+      local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}" # e.g. "e2e-tests-aks-helm-nightly"
+      local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}" # e.g. "aks-helm-nightly"
+      local part_2="redhat-developer-rhdh-${suite_name}" # e.g. "redhat-developer-rhdh-aks-helm-nightly"
+      # Override part_2 based for specific cases that do not follow the standard naming convention.
+      case "$JOB_NAME" in
+        *osd-gcp*)
+        part_2="redhat-developer-rhdh-osd-gcp-nightly"
+        ;;
+        *auth-providers*)
+        part_2="redhat-developer-rhdh-auth-providers-nightly"
+        ;;
+        *ocp-v*)
+        part_2="redhat-developer-rhdh-nightly"
+        ;;
+      esac
+      artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${project}"
+    echo "${artifacts_complete_url}"
+  }
+  echo "📋 Using local fallback functions"
+fi
 
 get_slack_alert_text() {
   URL_CI_RESULTS=$(get_job_url)
