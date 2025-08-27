@@ -42,10 +42,23 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: c5n.metal
+      MAP_TESTS: "true"
+      ODF_OPERATOR_CHANNEL: stable-4.19
+      ODF_VERSION_MAJOR_MINOR: "4.19"
       REPORTPORTAL_CMP: CNV-lp-interop
+      USER_TAGS: |
+        scenario cnv
+    post:
+    - chain: ipi-aws-post
     pre:
     - ref: install-operators-verify
+    - chain: ipi-aws-pre
     test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
     - ref: mpiit-data-router-reporter
   timeout: 6h0m0s
 zz_generated_metadata:
