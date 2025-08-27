@@ -88,9 +88,19 @@ DATAROUTER_JSON="${LOCAL_DIR}/datarouter.json"
 mkdir --parents "$LOCAL_DIR" "$LOCAL_DIR_ORI" "$LOCAL_DIR_RST"
 
 function download_logs() {
-  logfile_name="${ARTIFACT_DIR}/rsync.log"
   export PATH="$PATH:/opt/google-cloud-sdk/bin"
-  gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private
+  gcloud_auth_cmd='gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private 2>&1'
+  for (( i=1; i<=3; i++ ))
+  do
+    output="$(eval $gcloud_auth_cmd)"
+    if ! (grep -q 'ERROR' <<< "$output")
+    then
+      break
+    fi
+    echo "Retry 'gcloud auth' after sleep $i minutes"
+    sleep ${i}m
+  done
+  logfile_name="${ARTIFACT_DIR}/rsync.log"
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
   gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
   #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
