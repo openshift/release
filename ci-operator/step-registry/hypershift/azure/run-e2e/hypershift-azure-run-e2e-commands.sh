@@ -87,7 +87,7 @@ fi
 
 KMS_ARGS=""
 if [[ "${ENABLE_AKS_KMS:-}" == "true" ]]; then
-    KMS_ARGS+="--e2e.azure-encryption-key-id=${AKS_KMS_KEY}"
+    KMS_ARGS+="--e2e.azure-encryption-key-id=${AKS_KMS_KEY} "
     KMS_ARGS+="--e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET}"
 fi
 
