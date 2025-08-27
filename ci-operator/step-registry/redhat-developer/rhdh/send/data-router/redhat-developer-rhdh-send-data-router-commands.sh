@@ -3,11 +3,6 @@
 set +o errexit
 set +o nounset
 
-if [[ "${JOB_NAME}" == *rehearse* ]]; then
-  echo "This job is a rehearse job, skipping Data Router."
-  return 0
-fi
-
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 export RELEASE_BRANCH_NAME
 
