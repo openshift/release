@@ -61,6 +61,7 @@ else
 fi
 
 if [[ -n "$ORION_CONFIG" ]]; then
+    # If URL
     if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
         fileBasename="${ORION_CONFIG##*/}"
         if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
@@ -69,6 +70,7 @@ if [[ -n "$ORION_CONFIG" ]]; then
             echo "Error: Failed to download $ORION_CONFIG" >&2
             exit 1
         fi
+    # If regular path
     else
         export CONFIG="$ORION_CONFIG"
     fi
