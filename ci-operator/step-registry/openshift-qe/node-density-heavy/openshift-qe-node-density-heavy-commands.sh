@@ -39,10 +39,6 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-heavy
 
-# A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50  --pod-ready-threshold=2m" ./run.sh
-
-# The measurable run
 EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS}"
 
 export CLEANUP_WHEN_FINISH=true
@@ -52,7 +48,6 @@ export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.j
 export GEN_CSV=true
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
-echo ${SHARED_DIR}
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
