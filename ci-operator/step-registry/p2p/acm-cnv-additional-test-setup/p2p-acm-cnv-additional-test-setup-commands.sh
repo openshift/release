@@ -33,51 +33,45 @@ EOF
 
 oc label managedcluster local-cluster cluster.open-cluster-management.io/clusterset=managed-cluster-set --overwrite
 
+
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
-ssh_priv_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-privatekey")
-pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+
+
+
+
+if [[ -f "${AWSCRED}" ]]; then
+
+  AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
+  AWS_SECRET_ACCESS_KEY=$(cat "${AWSCRED}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
+
+  oc create -f - <<EOF
+  apiVersion: v1
+  kind: Secret
+  type: Opaque
+  metadata:
+    name: acm-aws-secret
+    namespace: ocm
+    labels:
+        cluster.open-cluster-management.io/type: aws
+        cluster.open-cluster-management.io/credentials: ""
+  stringData:
+    aws_access_key_id: "${AWS_ACCESS_KEY_ID}"
+    aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+    baseDomain: "${BASE_DOMAIN}"
+    httpProxy: ""
+    httpsProxy: ""
+    noProxy: ""
+    additionalTrustBundle: ""
+EOF
+
+  echo "secret created"
+else
+  echo "Did not find compatible cloud provider cluster_profile"
+  exit 1
+fi
+
 
 sleep 14400
-
-
-# if [[ -f "${AWSCRED}" ]]; then
-
-#   AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
-#   AWS_SECRET_ACCESS_KEY=$(cat "${AWSCRED}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
-
-#   oc create -f - <<EOF
-#   apiVersion: v1
-#   kind: Secret
-#   type: Opaque
-#   metadata:
-#     name: acm-aws-secret
-#     namespace: ocm
-#     labels:
-#         cluster.open-cluster-management.io/type: aws
-#         cluster.open-cluster-management.io/credentials: ""
-#   stringData:
-#     aws_access_key_id: "${AWS_ACCESS_KEY_ID}"
-#     aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
-#     baseDomain: "${BASE_DOMAIN}"
-#     pullSecret: >
-#       ${pull_secret}
-#     ssh-privatekey: |
-#       ${ssh_priv_key}
-#     ssh-publickey: |
-#       ${ssh_pub_key}
-#     httpProxy: ""
-#     httpsProxy: ""
-#     noProxy: ""
-#     additionalTrustBundle: ""
-# EOF
-
-#   echo "secret created"
-# else
-#   echo "Did not find compatible cloud provider cluster_profile"
-#   exit 1
-# fi
-
 PULLSPEC="$(curl -fsSl "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4.20.0-0.nightly/latest" | jq -r '.pullSpec')"
 echo $PULLSPEC
 
