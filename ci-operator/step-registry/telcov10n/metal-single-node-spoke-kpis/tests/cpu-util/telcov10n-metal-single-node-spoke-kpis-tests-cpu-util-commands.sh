@@ -93,7 +93,7 @@ EOF
 function make_up_ansible_playbook {
   ansible_playbook="/tmp/ansible_playbook_for_telco_kpi_tests.yml"
 
-  test_results_artifacts_append=${SHARED_DIR}/telco_kpi_results
+  test_results_artifacts_append=${SHARED_DIR}/telco_${TELCO_KPI_TEST_NAME}_kpi_results
 
   cat << EO-playbook >| ${ansible_playbook}
 ---
