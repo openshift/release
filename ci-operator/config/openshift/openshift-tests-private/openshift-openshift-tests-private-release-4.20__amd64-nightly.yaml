@@ -117,7 +117,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      NO_REPORTPORTAL: "true"
+      VERSION: "4.20"
     test:
     - ref: olmv1-performance
     - ref: openshift-qe-orion-olmv1
@@ -1404,6 +1404,84 @@ tests:
     - ref: rosa-cluster-upgrade-hcp
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-shared-vpc-advanced-int-f7
+  cron: 2 4 1,8,15,22 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_PROFILE: ocpe2e-rosa-hcp-shared-vpc-advanced
+      VERSION: "4.20"
+    test:
+    - chain: multiarch-tuning-operator
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-advanced-int-f7
+  cron: 23 7 2,9,16,23 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_PROFILE: ocpe2e-rosa-hcp-advanced
+      VERSION: "4.20"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-external-auth-int-full-f7
+  cron: 2 7 8,15,22,29 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_PROFILE: ocpe2e-rosa-hcp-external-auth
+      VERSION: "4.20"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-lifecycle-external-auth-advanced
+- as: aws-rosa-hcp-pl-int-f7
+  cron: 20 22 6,13,22,29 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      REGION: us-west-2
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_PROFILE: ocpe2e-rosa-hcp-pl
+      VERSION: "4.20"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-private-advanced
+- as: aws-rosa-hcp-zero-egress-int-f7
+  cron: 56 15 6,13,20,27 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: integration
+      REGION: us-west-2
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_PROFILE: ocpe2e-rosa-hcp-zero-egress
+      VERSION: "4.20"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-private-advanced
 - as: aws-sc2s-ipi-disc-priv-fips-f7
   cron: 33 6 6,15,22,29 * *
   steps:
@@ -1657,7 +1735,7 @@ tests:
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      OS_IMAGE_VERSION: 4.17.2024100419
+      OS_IMAGE_VERSION: 4.18.2025031114
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
@@ -1794,6 +1872,21 @@ tests:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-install
+- as: aws-ipi-ovn-hypershift-guest-disable-caps-f14
+  capabilities:
+  - intranet
+  cron: 26 14 11,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HC_DISABLED_CAPS: ImageRegistry,Insights,NodeTuning,baremetal,openshift-samples,Ingress,Console
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: azure-ipi-private-fips-f28-disasterrecovery
   cron: 35 19 25 * *
   steps:
@@ -3858,8 +3951,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
-      FEATURE_GATES: '["VSphereMultiDisk=true"]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi
@@ -3869,8 +3960,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
-      FEATURE_GATES: '["VSphereMultiDisk=true"]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi
@@ -3879,8 +3968,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
-      FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
     test:
     - chain: openshift-e2e-test-qe-automated-release
@@ -3890,8 +3977,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
-      FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -4132,8 +4217,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
-      FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
     test:
     - chain: openshift-e2e-test-qe-automated-release
@@ -4143,8 +4226,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
-      FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -4524,6 +4605,28 @@ tests:
     - ref: cucushift-installer-check-realtime
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-ipv6-static
+- as: baremetal-sno-ipv4-disk-etcd-encrypt-disk-mirror-day2-f7
+  capabilities:
+  - intranet
+  cron: 38 18 4,11,18,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      ENABLE_DISK_MIRRORING: "true"
+      ENABLE_ETCD_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      VENDOR: hpe
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

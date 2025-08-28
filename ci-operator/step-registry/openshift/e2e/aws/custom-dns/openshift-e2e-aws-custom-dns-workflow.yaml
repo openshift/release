@@ -1,0 +1,27 @@
+workflow:
+  as: openshift-e2e-aws-custom-dns
+  steps:
+    env:
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-usage-info
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install
+    - ref: aws-provision-public-custom-dns
+    - ref: gcp-provision-public-dns-zone-record-sets
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - ref: cucushift-installer-check-user-provisioned-dns
+    - chain: cucushift-installer-check
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - ref: gcp-deprovision-public-dns-zone-record-sets
+  documentation: |-
+    The Openshift E2E AWS workflow executes the common end-to-end test suite on an AWS configuration with custom security groups.
