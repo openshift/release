@@ -65,6 +65,7 @@ chainsaw test \
 --test-dir \
 tests/e2e \
 tests/e2e-autoscale \
+tests/e2e-crd-validations \
 tests/e2e-openshift \
 tests/e2e-prometheuscr \
 tests/e2e-instrumentation \
@@ -73,6 +74,7 @@ tests/e2e-opampbridge \
 tests/e2e-otel \
 tests/e2e-multi-instrumentation \
 tests/e2e-targetallocator-cr \
+tests/e2e-sidecar \
 tests/e2e-native-sidecar \
 tests/e2e-targetallocator || any_errors=true
 
