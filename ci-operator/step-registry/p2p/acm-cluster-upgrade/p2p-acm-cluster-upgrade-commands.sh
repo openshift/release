@@ -115,3 +115,5 @@ subjects:
     kind: Policy
     apiGroup: policy.open-cluster-management.io
 EOF
+
+sleep 14400
