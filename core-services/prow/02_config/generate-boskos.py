@@ -295,7 +295,6 @@ CONFIG = {
     'libvirt-s390x-vpn-quota-slice': {
         'libvirt-s390x-0-1': 1
     },
-    'libvirt-ppc64le-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -579,10 +578,6 @@ CONFIG = {
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-# Excluding Mihawk0,Mihawk1 from lease pool due to S2S migration
-for i in range(2, 3):
-    for j in range(4):
-        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
 for i in range(0, 2):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
