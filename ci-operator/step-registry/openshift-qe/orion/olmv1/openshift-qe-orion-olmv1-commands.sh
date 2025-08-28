@@ -1,14 +1,37 @@
 #!/bin/bash
-set -x
 
-if [ ${RUN_ORION} == false ]; then
-  exit 0
+echo "Current dir: $(pwd)"
+ls -al ../
+
+REPO_ROOT="/go/src/github.com/openshift/release"
+ls -l $REPO_ROOT
+"$REPO_ROOT/ci-operator/step-registry/openshift-qe/orion/openshift-qe-orion-commands.sh"
+
+if [[ "$OUTPUT_FORMAT" == "JUNIT" ]]; then
+  # Remove timestamps field since RP doesn't support it, 
+  # details: https://redhat-internal.slack.com/archives/CH76YSYSC/p1754418769901119?thread_ts=1754385612.115479&cid=CH76YSYSC
+  python3 <<'EOF'
+import xml.etree.ElementTree as ET
+
+artifact_dir = os.environ.get("ARTIFACT_DIR", ".")
+file_path = f"{artifact_dir}/junit_olmv1-GCP.xml"
+print(file_path)
+try:
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    for testcase in root.findall('.//testcase'):
+        testcase.attrib.pop("timestamp", None)
+
+    tree.write(file_path, encoding='utf-8', xml_declaration=True)
+    print(f"Successfully removed timestamps and saved to {file_path}")
+
+except ET.ParseError as e:
+    print(f"Error parsing XML file: {e}")
+except IOError as e:
+    print(f"Error reading or writing file: {e}")
+EOF
 fi
-
-python --version
-pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 send_slack_notification() {
   local jobID="$1"
@@ -75,129 +98,4 @@ notify_slack_if_failure() {
   fi
 }
 
-if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
-else
-    LATEST_TAG=$TAG
-fi
-git clone --branch $LATEST_TAG $ORION_REPO --depth 1
-pushd orion
-
-pip install -r requirements.txt
-
-case "$ES_TYPE" in
-  qe)
-    ES_PASSWORD=$(<"/secret/qe/password")
-    ES_USERNAME=$(<"/secret/qe/username")
-    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-    ;;
-  quay-qe)
-    ES_PASSWORD=$(<"/secret/quay-qe/password")
-    ES_USERNAME=$(<"/secret/quay-qe/username")
-    ES_HOST=$(<"/secret/quay-qe/hostname")
-    ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
-    ;;
-  *)
-    ES_PASSWORD=$(<"/secret/internal/password")
-    ES_USERNAME=$(<"/secret/internal/username")
-    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
-    ;;
-esac
-
-export ES_SERVER
-
-pip install .
-export EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
-
-if [[ ! -z "$UUID" ]]; then
-    export EXTRA_FLAGS+=" --uuid ${UUID}"
-fi
-
-if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
-    export EXTRA_FLAGS+=" --output-format junit"
-    export EXTRA_FLAGS+=" --save-output-path=junit.xml"
-elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
-    export EXTRA_FLAGS+=" --output-format json"
-elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
-    export EXTRA_FLAGS+=" --output-format text"
-else
-    echo "Unsupported format: ${OUTPUT_FORMAT}"
-    exit 1
-fi
-
-if [[ -n "$ORION_CONFIG" ]]; then
-    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
-        fileBasename="${ORION_CONFIG##*/}"
-        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
-            export CONFIG="$ARTIFACT_DIR/$fileBasename"
-        else
-            echo "Error: Failed to download $ORION_CONFIG" >&2
-            exit 1
-        fi
-    else
-        export CONFIG="$ORION_CONFIG"
-    fi
-fi
-
-if [[ ! -z "$ACK_FILE" ]]; then
-    # Download the latest ACK file
-    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
-    export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
-fi
-
-if [ ${COLLAPSE} == "true" ]; then
-    export EXTRA_FLAGS+=" --collapse"
-fi
-
-if [[ -n "${ORION_ENVS}" ]]; then
-    ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
-    IFS=',' read -r -a env_array <<< "$ORION_ENVS"
-    for env_pair in "${env_array[@]}"; do
-      env_pair=$(echo "$env_pair" | xargs)
-      env_key=$(echo "$env_pair" | cut -d'=' -f1)
-      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
-      export "$env_key"="$env_value"
-    done
-fi
-
-if [[ -n "${LOOKBACK_SIZE}" ]]; then
-    export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
-fi
-
-set +e
-set -o pipefail
-FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
-orion_exit_status=$?
-set -e
-
-if [[ "$OUTPUT_FORMAT" == "JUNIT" ]]; then
-  # Remove timestamps field since RP doesn't support it, 
-  # details: https://redhat-internal.slack.com/archives/CH76YSYSC/p1754418769901119?thread_ts=1754385612.115479&cid=CH76YSYSC
-  python3 <<'EOF'
-import xml.etree.ElementTree as ET
-
-file_path = "junit_olmv1-GCP.xml"
-
-try:
-    tree = ET.parse(file_path)
-    root = tree.getroot()
-
-    for testcase in root.findall('.//testcase'):
-        testcase.attrib.pop("timestamp", None)
-
-    tree.write(file_path, encoding='utf-8', xml_declaration=True)
-    print(f"Successfully removed timestamps and saved to {file_path}")
-
-except ET.ParseError as e:
-    print(f"Error parsing XML file: {e}")
-except IOError as e:
-    print(f"Error reading or writing file: {e}")
-EOF
-  mkdir -p "${ARTIFACT_DIR}"
-  cp *.csv *.xml ${ARTIFACT_DIR}/ 
-fi
-
 notify_slack_if_failure "junit_olmv1-GCP.xml"
-
-exit $orion_exit_status
