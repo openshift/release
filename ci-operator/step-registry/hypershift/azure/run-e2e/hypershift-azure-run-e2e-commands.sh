@@ -15,6 +15,8 @@ AZURE_DATA_PLANE_IDENTITIES_LOCATION="/etc/hypershift-ci-jobs-azurecreds/datapla
 AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-azurecreds/serviceaccount-signer.private"
 AZURE_OIDC_ISSUER_URL_LOCATION="/etc/hypershift-ci-jobs-azurecreds/oidc-issuer-url.json"
 AZURE_OIDC_ISSUER_URL="$(<"${AZURE_OIDC_ISSUER_URL_LOCATION}" jq -r .oidcIssuerURL)"
+AKS_KMS_KEY="etc/hypershift-ci-jobs-azurecreds/aks-kms-key"
+AKS_KMS_CREDENTIALS_SECRET="etc/hypershift-ci-jobs-azurecreds/aks-kms-credentials-secret"
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
@@ -83,6 +85,12 @@ if [[ "${AZURE_MULTI_ARCH:-}" == "true" ]]; then
   AZURE_MULTI_ARCH_PARAMS="--e2e.azure-multi-arch=true"
 fi
 
+KMS_ARGS=""
+if [[ "${ENABLE_AKS_KMS:-}" == "true" ]]; then
+    KMS_ARGS+="--e2e.azure-encryption-key-id=${AKS_KMS_KEY} "
+    KMS_ARGS+="--e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET}"
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -100,6 +108,7 @@ hack/ci-test-e2e.sh -test.v \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
+    ${KMS_ARGS:-} \
   --e2e.azure-marketplace-publisher "azureopenshift" \
   --e2e.azure-marketplace-offer "aro4" \
   --e2e.azure-marketplace-sku "aro_419" \
