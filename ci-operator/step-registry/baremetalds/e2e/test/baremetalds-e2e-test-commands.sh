@@ -40,6 +40,8 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
   # new image coming in k8s 1.32
   "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
+  # new image coming in k8s 1.33.4
+  "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-24-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
   # new image coming in k8s 1.29.11. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
   "registry.k8s.io/etcd:3.5.16-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-16-0-ExW1ETJqOZa6gx2F"
   # new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)

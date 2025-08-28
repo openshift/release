@@ -28,6 +28,6 @@ else
 fi
 
 mkdir -p "${ARTIFACT_DIR}/audit-logs"
-oc adm must-gather $MUST_GATHER_IMAGE --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs
+oc adm must-gather $MUST_GATHER_IMAGE  --volume-percentage=100 --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs
 tar -czC "${ARTIFACT_DIR}/audit-logs" -f "${ARTIFACT_DIR}/audit-logs.tar.gz" .
 rm -rf "${ARTIFACT_DIR}/audit-logs"
