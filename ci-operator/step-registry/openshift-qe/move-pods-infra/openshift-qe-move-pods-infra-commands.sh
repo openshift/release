@@ -556,7 +556,7 @@ node_arch=$(echo $node_arch | tr -s " " "\n"| sort|uniq -u)
 #ingress/registry/monitoring
 
 export OPENSHIFT_PROMETHEUS_RETENTION_PERIOD=15d
-export OPENSHIFT_PROMETHEUS_STORAGE_SIZE=100Gi
+export OPENSHIFT_PROMETHEUS_STORAGE_SIZE=200Gi
 export OPENSHIFT_ALERTMANAGER_STORAGE_SIZE=2Gi
 
 case ${platform_type} in
