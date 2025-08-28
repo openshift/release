@@ -1,7 +1,7 @@
 base_images:
   ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
+    name: 4.20-priv
+    namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
@@ -10,6 +10,7 @@ base_images:
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
+canonical_go_repository: github.com/openshift/cluster-kube-controller-manager-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
@@ -22,18 +23,18 @@ images:
   to: cluster-kube-controller-manager-operator
 promotion:
   to:
-  - name: "4.20"
-    namespace: ocp
+  - name: 4.20-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: "4.20"
-      namespace: ocp
+      name: 4.20-priv
+      namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
-      namespace: ocp
+      name: 4.20-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -98,8 +99,8 @@ tests:
       commands: |
         echo "Build binary cluster-kube-controller-manager-operator-tests-ext"
         make tests-ext-build
-        echo "Running ./cluster-kube-controller-manager-operator-tests-ext with suite"
-        ./cluster-kube-controller-manager-operator-tests-ext run-suite openshift/cluster-kube-controller-manager-operator/all -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+        echo "Running ./cluster-kube-controller-manager-operator-tests-ext with sanity test"
+        ./cluster-kube-controller-manager-operator-tests-ext run-test -n "[Jira:kube-controller-manager][sig-api-machinery] sanity test should always pass [Suite:openshift/cluster-kube-controller-manager-operator/conformance/parallel]"
       from: src
       resources:
         requests:
@@ -110,6 +111,6 @@ tests:
   steps:
     workflow: openshift-ci-security
 zz_generated_metadata:
-  branch: master
-  org: openshift
+  branch: main
+  org: openshift-priv
   repo: cluster-kube-controller-manager-operator
