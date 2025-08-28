@@ -253,11 +253,6 @@ infra_hosts:
   s614: "${S614}"
 END_VARS
 
-# DEBUG issue with EDU_PTP
-DT=$(date "+%Y-%m-%d_%H-%M-%S")
-scp -i "${SSH_KEY}" "${SSHOPTS[@]}" slcm_vars.yml ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}:/tmp/debug_edu_ptp_slcm_vars-${DT}.yml
-# END DEBUG
-
 ansible-galaxy collection install ansible.posix
 
 set +e
