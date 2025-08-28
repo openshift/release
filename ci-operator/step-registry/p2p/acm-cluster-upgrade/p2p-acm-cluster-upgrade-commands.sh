@@ -10,15 +10,15 @@ cp -L $KUBECONFIG /tmp/kubeconfig
 
 export KUBECONFIG=/tmp/kubeconfig
 
-sleep 1800
-
 OCP_VERSION="4.20"
 
 PULLSPEC="$(curl -fsSl "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${OCP_VERSION}.0-0.nightly/latest" | jq -r '.pullSpec')"
 echo $PULLSPEC
 
-oc create -f - <<EOF
 
+sleep 14400
+
+oc create -f - <<EOF
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
@@ -46,7 +46,7 @@ spec:
                 spec:
                   channel: ""
                   desiredUpdate:
-                    image: ${PULLSPEC}
+                    image: $PULLSPEC
                     force: true
               complianceType: musthave
           remediationAction: enforce
