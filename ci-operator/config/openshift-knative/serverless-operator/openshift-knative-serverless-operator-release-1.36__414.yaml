@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli-artifacts
+  ocp_4.18_cli-artifacts:
+    name: "4.18"
+    namespace: ocp
+    tag: cli-artifacts
   ocp_ubi-minimal_8:
     name: ubi-minimal
     namespace: ocp
@@ -31,12 +35,8 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.23-openshift-4.19
-  origin_scos-4.20_cli-artifacts:
-    name: scos-4.20
-    namespace: origin
-    tag: cli-artifacts
-  origin_scos-4.20_operator-registry:
-    name: scos-4.20
+  origin_4.18_operator-registry:
+    name: "4.18"
     namespace: origin
     tag: operator-registry
 build_root:
@@ -66,9 +66,9 @@ images:
     ocp_ubi-minimal_9:
       as:
       - registry.access.redhat.com/ubi9/ubi-minimal
-    origin_scos-4.20_operator-registry:
+    origin_4.18_operator-registry:
       as:
-      - registry.ci.openshift.org/origin/scos-4.20:operator-registry
+      - registry.ci.openshift.org/origin/4.18:operator-registry
   to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   inputs:
@@ -88,6 +88,9 @@ images:
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   inputs:
+    ocp_4.18_cli-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.18:cli-artifacts
     openshift_eventing-istio-src_knative-v1.16:
       as:
       - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.16
@@ -100,9 +103,6 @@ images:
     openshift_knative-serving-src_knative-v1.16:
       as:
       - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.16
-    origin_scos-4.20_cli-artifacts:
-      as:
-      - registry.ci.openshift.org/origin/scos-4.20:cli-artifacts
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
@@ -126,7 +126,7 @@ promotion:
   to:
   - additional_images:
       serverless-operator-src: src
-    name: release-1.36.1
+    name: release-1.36.0
     namespace: knative
 releases:
   latest:
@@ -141,8 +141,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: kitchensink-e2e
+- as: kitchensink-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -228,8 +227,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: kitchensink-upgrade
+- as: kitchensink-upgrade
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -315,8 +313,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: mesh-e2e
+- as: mesh-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -402,8 +399,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: mesh-upgrade
+- as: mesh-upgrade
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -489,8 +485,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: operator-e2e
+- as: operator-e2e
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -575,8 +570,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: test-soak
+- as: test-soak
   optional: true
   run_if_changed: test/soak
   steps:
@@ -663,8 +657,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: test-upgrade
+- as: test-upgrade
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -749,8 +742,7 @@ tests:
       timeout: 1h30m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: ui-e2e
+- as: ui-e2e
   optional: true
   run_if_changed: test/ui
   steps:
@@ -837,8 +829,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: upstream-e2e
+- as: upstream-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -924,8 +915,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- always_run: false
-  as: upstream-e2e-kafka
+- as: upstream-e2e-kafka
   optional: true
   steps:
     allow_best_effort_post_steps: true

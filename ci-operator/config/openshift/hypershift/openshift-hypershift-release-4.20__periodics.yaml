@@ -57,12 +57,6 @@ releases:
       product: ocp
       stream: nightly
       version: "4.20"
-  s390x-latest:
-    candidate:
-      architecture: s390x
-      product: ocp
-      stream: nightly
-      version: "4.20"
 resources:
   '*':
     limits:
@@ -82,23 +76,11 @@ tests:
       AWS_MULTI_ARCH: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aks
-  cron: 0 3 * * *
+  cron: 0 */6 * * *
   steps:
     cluster_profile: hypershift
     env:
       AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-    workflow: hypershift-azure-aks-e2e
-- as: e2e-aks-multi-x-ax
-  cron: 0 2 * * *
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:multi-latest
-      OCP_IMAGE_PREVIOUS: release:multi-initial
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      AZURE_MULTI_ARCH: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
@@ -116,15 +98,12 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
-      PUBLIC_ONLY: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
   cron: 0 2 * * *
   steps:
     cluster_profile: hypershift
-    env:
-      PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
@@ -164,15 +143,6 @@ tests:
         UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
         the local DNS endpoint \[Suite:openshift/conformance/parallel\]
     workflow: hypershift-aws-conformance-cilium
-- as: e2e-aws-external-oidc
-  minimum_interval: 8h
-  steps:
-    cluster_profile: hypershift
-    env:
-      CI_TESTS_RUN: TestExternalOIDCTechPreview
-      OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-external-oidc
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:
@@ -227,7 +197,7 @@ tests:
     cluster_profile: aws
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
-  cron: 0 */2 * * *
+  cron: 0 2 * * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-azure-aks-conformance
@@ -330,13 +300,6 @@ tests:
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-openstack-nested-conformance
-- as: e2e-ibmz-s390x-mgmt-ovn-conformance
-  cron: 0 4 * * *
-  steps: 
-    env:
-      MCE_VERSION: "2.10"
-      CLUSTER_VERSION: "4.20"
-    workflow: hypershift-mce-ibmz-conformance-s390x_mgmt 
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

@@ -46,13 +46,7 @@ DriverInfo:
     multiplePVsSameID: true
 EOF
 else
-  ARG=(--kubeconfig "$KUBECONFIG" --local-aws-creds=true --namespace openshift-cluster-csi-drivers)
-  if [[ ${EFS_ENABLE_SINGLE_ZONE} == "true" ]]; then
-    ZONE_NAME=$(oc get node -l node-role.kubernetes.io/worker \
-      -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')
-    ARG+=(--single-zone="$ZONE_NAME")
-  fi
-  /usr/bin/create-efs-volume start "${ARG[@]}"
+  /usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --local-aws-creds=true --namespace openshift-cluster-csi-drivers
   echo "Using storageclass ${STORAGECLASS_LOCATION}"
   cat ${STORAGECLASS_LOCATION}
 

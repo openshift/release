@@ -7,18 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-operator-init:
     name: hypershift-operator
     namespace: hypershift
     tag: "4.19"
-  hypershift-tests:
-    name: hypershift-tests
-    namespace: hypershift
-    tag: latest
   manila-csi-driver-operator-test:
     name: 4.19-priv
     namespace: ocp-private
@@ -31,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
   openstack-cinder-csi-driver-operator-test:
     name: 4.19-priv
     namespace: ocp-private
@@ -40,6 +36,11 @@ build_root:
   use_build_cache: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
+- inputs:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.19_base-rhel9:
@@ -49,10 +50,26 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: hypershift
+- dockerfile_path: Dockerfile.e2e
+  inputs:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+  to: hypershift-tests
 promotion:
   to:
-  - name: 4.19-priv
+  - excluded_images:
+    - hypershift-operator
+    - hypershift-tests
+    name: 4.19-priv
     namespace: ocp-private
+  - additional_images:
+      hypershift-operator: hypershift-operator
+    disabled: true
+    excluded_images:
+    - '*'
+    namespace: hypershift
+    tag: "4.19"
 releases:
   initial:
     candidate:
@@ -146,8 +163,8 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
-- always_run: false
-  as: e2e-aws-techpreview
+- as: e2e-aws-techpreview
+  optional: true
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -208,8 +225,7 @@ tests:
       KUBEVIRT_CSI_INFRA: gp3-csi
       SKIP_E2E_LOCAL: "true"
     workflow: hypershift-kubevirt-e2e-nested
-- always_run: false
-  as: e2e-kubevirt-aws-ovn
+- as: e2e-kubevirt-aws-ovn
   optional: true
   steps:
     cluster_profile: aws
@@ -221,8 +237,7 @@ tests:
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e-aws
-- always_run: false
-  as: e2e-kubevirt-azure-ovn
+- as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
     cluster_profile: azure4
@@ -235,21 +250,17 @@ tests:
       KUBEVIRT_CSI_INFRA: managed-csi
       ODF_BACKEND_STORAGE_CLASS: managed-csi
     workflow: hypershift-kubevirt-e2e-azure
-- always_run: false
-  as: e2e-aws-metrics
+- as: e2e-aws-metrics
   optional: true
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-metrics
-- always_run: false
-  as: e2e-conformance
+- as: e2e-conformance
+  optional: true
   steps:
     cluster_profile: hypershift
-    env:
-      PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
-- always_run: false
-  as: e2e-kubevirt-metal-conformance
+- as: e2e-kubevirt-metal-conformance
   optional: true
   steps:
     cluster_profile: equinix-ocp-hcp
@@ -257,8 +268,7 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
-- always_run: false
-  as: e2e-azure-aks-ovn-conformance
+- as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
     cluster_profile: hypershift

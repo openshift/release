@@ -93,7 +93,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/osde2e-common
-      - --secret-dir=/secrets/osde2e-credentials
       - --secret-dir=/secrets/osde2e-dev
       - --target=cleanup-dev-aws
       command:
@@ -114,9 +113,6 @@ periodics:
       - mountPath: /secrets/osde2e-common
         name: osde2e-common
         readOnly: true
-      - mountPath: /secrets/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
       - mountPath: /secrets/osde2e-dev
         name: osde2e-dev
         readOnly: true
@@ -134,9 +130,6 @@ periodics:
     - name: osde2e-common
       secret:
         secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
     - name: osde2e-dev
       secret:
         secretName: osde2e-dev
@@ -165,7 +158,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/osde2e-common
-      - --secret-dir=/secrets/osde2e-credentials
       - --secret-dir=/secrets/osde2e-hypershift-credentials
       - --target=cleanup-hypershift-aws
       command:
@@ -186,9 +178,6 @@ periodics:
       - mountPath: /secrets/osde2e-common
         name: osde2e-common
         readOnly: true
-      - mountPath: /secrets/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
       - mountPath: /secrets/osde2e-hypershift-credentials
         name: osde2e-hypershift-credentials
         readOnly: true
@@ -206,9 +195,6 @@ periodics:
     - name: osde2e-common
       secret:
         secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
     - name: osde2e-hypershift-credentials
       secret:
         secretName: osde2e-hypershift-credentials
@@ -237,7 +223,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/osde2e-common
-      - --secret-dir=/secrets/osde2e-credentials
       - --secret-dir=/secrets/osde2e-informing
       - --target=cleanup-informing-aws
       command:
@@ -258,9 +243,6 @@ periodics:
       - mountPath: /secrets/osde2e-common
         name: osde2e-common
         readOnly: true
-      - mountPath: /secrets/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
       - mountPath: /secrets/osde2e-informing
         name: osde2e-informing
         readOnly: true
@@ -278,9 +260,6 @@ periodics:
     - name: osde2e-common
       secret:
         secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
     - name: osde2e-informing
       secret:
         secretName: osde2e-informing
@@ -309,7 +288,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/osde2e-common
-      - --secret-dir=/secrets/osde2e-credentials
       - --secret-dir=/secrets/osde2e-selfservice-copy
       - --target=cleanup-selfservice-aws
       command:
@@ -330,9 +308,6 @@ periodics:
       - mountPath: /secrets/osde2e-common
         name: osde2e-common
         readOnly: true
-      - mountPath: /secrets/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
       - mountPath: /secrets/osde2e-selfservice-copy
         name: osde2e-selfservice-copy
         readOnly: true
@@ -350,9 +325,6 @@ periodics:
     - name: osde2e-common
       secret:
         secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
     - name: osde2e-selfservice-copy
       secret:
         secretName: osde2e-selfservice-copy
@@ -381,7 +353,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/osde2e-common
-      - --secret-dir=/secrets/osde2e-credentials
       - --secret-dir=/secrets/osde2e-tekton-copy
       - --target=cleanup-tekton-aws
       command:
@@ -402,9 +373,6 @@ periodics:
       - mountPath: /secrets/osde2e-common
         name: osde2e-common
         readOnly: true
-      - mountPath: /secrets/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
       - mountPath: /secrets/osde2e-tekton-copy
         name: osde2e-tekton-copy
         readOnly: true
@@ -422,9 +390,6 @@ periodics:
     - name: osde2e-common
       secret:
         secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
     - name: osde2e-tekton-copy
       secret:
         secretName: osde2e-tekton-copy
@@ -1950,7 +1915,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build07
-  cron: 8 12 * * 6
+  cron: 0 0 1 1 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2288,195 +2253,6 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=rosa-classic-sts
       - --variant=nightly-4.20
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 0 0 1 1 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-main-nightly-4.21-osd-aws
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=osd-aws
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 0 0 1 1 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-main-nightly-4.21-osd-gcp
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=osd-gcp
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 0 0 1 1 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-main-nightly-4.21-rosa-classic-sts
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts
-      - --variant=nightly-4.21
       command:
       - ci-operator
       image: ci-operator:latest

@@ -17,12 +17,6 @@ export hcp_domain
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 
-# Using s390x managment cluster kubeconfig if it is present
-# s390x_mgmt-kubeconfig will only be present in case of s390x managment ci jobs
-if [ -f "$SHARED_DIR/s390x_mgmt-kubeconfig" ]; then
-   export KUBECONFIG="$SHARED_DIR/s390x_mgmt-kubeconfig"
-fi
-
 # Installing CLI tools
 set -e
 echo "Installing required CLI tools"

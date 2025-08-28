@@ -39,21 +39,6 @@ fi
 dir=$(mktemp -d)
 pushd "${dir}"
 
-CPMS_REQUIRED_OCP_VERSION="4.13"
-version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d. -f 1,2)
-echo "OCP version: ${version}"
-
-# check if controlplanemachinesets is supported by the IaaS and the OCP version
-# return 0 if controlplanemachinesets is supported, otherwise 1
-function hasCPMS() {
-    ret=1
-
-    if [ -n "${version}" ] && [ "$(printf '%s\n' "${CPMS_REQUIRED_OCP_VERSION}" "${version}" | sort --version-sort | head -n1)" = "${CPMS_REQUIRED_OCP_VERSION}" ]; then
-        ret=0
-    fi
-    return ${ret}
-}
-
 ## The expected OS image
 url_prefix="https://www.googleapis.com/compute/v1/projects/"
 expected_compute_image=""
@@ -76,16 +61,10 @@ echo "$(date -u --rfc-3339=seconds) - INFO: The expected OS image of control-pla
 # https://issues.redhat.com/browse/OCPBUGS-57348 Cluster manages bootimages despite explicit bootimages in installconfig
 worker_machineset_osimage=$(oc get machinesets.machine.openshift.io -n openshift-machine-api -ojson | jq -r '.items[] | .spec.template.spec.providerSpec.value.disks[].image' | sort | uniq)
 worker_machineset_osimage="${url_prefix}${worker_machineset_osimage##*projects/}"
+controlplanemachineset_osimage=$(oc get controlplanemachineset.machine.openshift.io -n openshift-machine-api -ojson | jq -r '.items[] | .spec.template."machines_v1beta1_machine_openshift_io".spec.providerSpec.value.disks[].image')
+controlplanemachineset_osimage="${url_prefix}${controlplanemachineset_osimage##*projects/}"
 echo "$(date -u --rfc-3339=seconds) - INFO: OS image in Worker MachineSets: ${worker_machineset_osimage}"
-
-if hasCPMS; then
-  controlplanemachineset_osimage=$(oc get controlplanemachineset.machine.openshift.io -n openshift-machine-api -ojson | jq -r '.items[] | .spec.template."machines_v1beta1_machine_openshift_io".spec.providerSpec.value.disks[].image')
-  controlplanemachineset_osimage="${url_prefix}${controlplanemachineset_osimage##*projects/}"
-  echo "$(date -u --rfc-3339=seconds) - INFO: OS image in Control-plane MachineSet: ${controlplanemachineset_osimage}"
-else
-  controlplanemachineset_osimage=""
-  echo "$(date -u --rfc-3339=seconds) - INFO: 'controlplanemachinesets' is not supproted (OCP ${version} on GCP)."
-fi
+echo "$(date -u --rfc-3339=seconds) - INFO: OS image in Control-plane MachineSet: ${controlplanemachineset_osimage}"
 
 ## Try the validation
 ret=0
@@ -114,13 +93,11 @@ fi
 
 if [ -n "${expected_control_plane_image}" ]; then
   echo "$(date -u --rfc-3339=seconds) - Checking OS images of control-plane nodes..."
-  if [[ -n "${controlplanemachineset_osimage}" ]]; then
-    if [[ "${controlplanemachineset_osimage}" != "${expected_control_plane_image}" ]]; then
-      echo "$(date -u --rfc-3339=seconds) - FAILED: Control-plane OS image mismatch - wrong CPMS osimage."
-      ret=1
-    else
-      echo "$(date -u --rfc-3339=seconds) - PASSED: Control-plane OS image does match - correct CPMS osimage."
-    fi
+  if [[ "${controlplanemachineset_osimage}" != "${expected_control_plane_image}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED: Control-plane OS image mismatch - wrong CPMS osimage."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - PASSED: Control-plane OS image does match - correct CPMS osimage."
   fi
   readarray -t disks < <(gcloud compute disks list --filter="${CLUSTER_NAME}" --format="table(name,sourceImage)" | grep master)
   for line in "${disks[@]}"; do

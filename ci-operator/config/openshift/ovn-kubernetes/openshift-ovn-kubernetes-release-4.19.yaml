@@ -7,8 +7,8 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: "4.20"
+  ocp_4.19_base-rhel9:
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.23-openshift-4.19:
@@ -31,9 +31,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
@@ -256,7 +256,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-ibmcloud-ipi-ovn-periodic
-  cron: 54 13 * * 6
+  cron: 0 0 * * *
   steps:
     cluster_profile: ibmcloud
     env:
@@ -271,7 +271,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
-  cron: 3 1 * * 0
+  cron: 0 0 */2 * *
   steps:
     cluster_profile: aws-2
     env:
@@ -287,7 +287,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-  cron: 43 23 * * 0
+  cron: 0 0 */2 * *
   steps:
     cluster_profile: aws
     env:

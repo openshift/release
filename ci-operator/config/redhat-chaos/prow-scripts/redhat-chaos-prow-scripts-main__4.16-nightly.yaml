@@ -48,8 +48,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: krkn-hub-tests-416
+- as: krkn-hub-tests-416
+  cron: 0 4 1 * *
   steps:
     cluster_profile: aws-chaos
     env:
@@ -67,12 +67,17 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
-- always_run: false
-  as: krkn-hub-node-tests
+- as: krkn-hub-node-tests
+  cron: 0 4 2 * *
   steps:
     cluster_profile: aws-chaos
     env:
@@ -89,9 +94,12 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    test:
-    - chain: redhat-chaos-krkn-hub-node-tests
-    workflow: redhat-chaos-installer-aws
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: redhat-chaos-krkn-hub-node-tests
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-zone-tests
@@ -110,10 +118,14 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
     test:
     - ref: redhat-chaos-start-krkn
     - ref: redhat-chaos-zone-outage
-    workflow: redhat-chaos-installer-aws
 - always_run: false
   as: krkn-hub-cloud-gcp-node-tests
   steps:
@@ -164,6 +176,7 @@ tests:
     env:
       TELEMETRY_GROUP: prow-ocp-gcp-4.16
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-gcp
   timeout: 6h0m0s
@@ -184,6 +197,7 @@ tests:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-azure
   timeout: 6h0m0s

@@ -1,0 +1,122 @@
+base_images:
+  ocp_4.15_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  ocp_ubi-minimal_9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  openshift_eventing-istio-src_knative-v1.14:
+    name: eventing-istio-src
+    namespace: openshift
+    tag: knative-v1.14
+  openshift_eventing-kafka-broker-src_knative-v1.14:
+    name: eventing-kafka-broker-src
+    namespace: openshift
+    tag: knative-v1.14
+  openshift_knative-eventing-src_knative-v1.14:
+    name: knative-eventing-src
+    namespace: openshift
+    tag: knative-v1.14
+  openshift_knative-serving-src_knative-v1.14:
+    name: knative-serving-src
+    namespace: openshift
+    tag: knative-v1.14
+  openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.21-openshift-4.17
+  origin_4.15_operator-registry:
+    name: "4.15"
+    namespace: origin
+    tag: operator-registry
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: knative-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+      as:
+      - $GO_BUILDER
+  to: serverless-knative-operator
+- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  to: serverless-bundle
+- dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal
+    origin_4.15_operator-registry:
+      as:
+      - registry.ci.openshift.org/origin/4.15:operator-registry
+  to: serverless-index
+- dockerfile_path: openshift-knative-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+      as:
+      - $GO_BUILDER
+  to: serverless-openshift-knative-operator
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  inputs:
+    ocp_4.15_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:cli
+    openshift_eventing-istio-src_knative-v1.14:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.14
+    openshift_eventing-kafka-broker-src_knative-v1.14:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.14
+    openshift_knative-eventing-src_knative-v1.14:
+      as:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.14
+    openshift_knative-serving-src_knative-v1.14:
+      as:
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.14
+  to: serverless-source-image
+- dockerfile_path: serving/ingress/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.17:
+      as:
+      - $GO_BUILDER
+  to: serverless-ingress
+- dockerfile_path: serving/metadata-webhook/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.access.redhat.com/ubi8-minimal:latest
+  to: serverless-metadata-webhook
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-1.34
+  org: openshift-knative
+  repo: serverless-operator
+  variant: 415-hypershift
