@@ -359,8 +359,7 @@ EOF_JUNIT
 # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
 function generate_result_customize_prow() {
   testsuite_name='Installation'
-  # using the same junit filename as the one generated in must-gather step to overwirte installation results
-  junit_file="$LOCAL_DIR_RST/junit_install.xml"
+  junit_file="$LOCAL_DIR_RST/junit_reportportal_install.xml"
   cat > "$junit_file" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite_name}" failures="0" errors="0" skipped="0" tests="1">
@@ -377,15 +376,19 @@ EOF
 }
 
 function generate_results() {
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
-
   # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
   if [[ "$REPORTPORTAL_PROJECT" = 'prow' ]]
   then
     generate_result_customize_prow
+    # must-gather and gather-extra in post stage also generate junit, once install fails, skip the other junit.
+    if [[ "$INSTALL_RESULT" == "fail" ]]
+    then
+        return 0
+    fi
   else
     generate_result_teststeps
   fi
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
 }
 
 function fix_xmls() {
