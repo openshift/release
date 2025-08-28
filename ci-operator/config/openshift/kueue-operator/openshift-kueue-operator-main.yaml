@@ -127,18 +127,7 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
-- as: test-e2e-4-19-hypershift
-  minimum_interval: 96h
-  steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_NODE_COUNT: "2"
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e-dev-bundle
-    workflow: hypershift-hostedcluster-workflow
-- as: perfscale-payload-control-plane-6nodes
+- as: perfscale-payload-kueue-operator-10nodes-jobs
   always_run: false
   optional: true
   steps:
@@ -150,25 +139,50 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "10"
       ENABLE_LOCAL_INDEX: "true"
-      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
       ITERATION_MULTIPLIER_ENV: "15"
       ZONES_COUNT: "3"
+      WORKLOAD_TYPE: jobs
     test:
-    - ref: kueue-operator-image-env-setup
-    - as: run-sdk
-      commands: |
-        source "${SHARED_DIR}/env"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
-    - ref: kueue-operator-image-patch
-    - ref: cert-manager-install-operator
-    # TODO: add a step to install a Kueue CR
-    - chain: openshift-qe-kueue-operator
+    - chain: kueue-operator-test-perfscale
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
+- as: perfscale-payload-kueue-operator-10nodes-jobs-shared
+  always_run: false
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-0-12
+      OPERATOR_COMPONENT: kueue-operator-main
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "10"
+      ENABLE_LOCAL_INDEX: "true"
+      ITERATION_MULTIPLIER_ENV: "15"
+      ZONES_COUNT: "3"
+      WORKLOAD_TYPE: jobs-shared
+      PODS_QUOTA: "400"
+    test:
+    - chain: kueue-operator-test-perfscale
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
+- as: perfscale-payload-kueue-operator-10nodes-pods
+  always_run: false
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-0-12
+      OPERATOR_COMPONENT: kueue-operator-main
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "10"
+      ENABLE_LOCAL_INDEX: "true"
+      ITERATION_MULTIPLIER_ENV: "15"
+      ZONES_COUNT: "3"
+      WORKLOAD_TYPE: pods
+    test:
+    - chain: kueue-operator-test-perfscale
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
 zz_generated_metadata:
