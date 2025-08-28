@@ -15,9 +15,6 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 RG_NAME="${NAMESPACE}-${UNIQUE_HASH}-rg"
 
 REGION="${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}"
-if [[ -n "${CUSTOM_AZURE_REGION}" ]]; then
-    REGION="${CUSTOM_AZURE_REGION}"
-fi
 echo "Azure region: ${REGION}"
 
 # az should already be there
