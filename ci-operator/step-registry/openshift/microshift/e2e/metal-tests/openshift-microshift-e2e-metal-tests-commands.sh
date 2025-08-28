@@ -36,24 +36,66 @@ function get_source_dir() {
   fi
 }
 
-if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
-  if [[ "${JOB_NAME}" =~ .*release.* ]]; then
-    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/releases" "scenarios-bootc")
-  else
-    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/presubmits" "scenarios-bootc")
-    if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
-        SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/periodics" "scenarios-bootc")
+# Extract version from JOB_NAME, expecting format 4.## (e.g., 4.17, 4.18, 4.19, etc.)
+RELEASE_VERSION=""
+if [[ "${JOB_NAME}" =~ 4\.([0-9]+) ]]; then
+  RELEASE_VERSION="${BASH_REMATCH[1]}"
+fi
+
+IS_BOOTC=false
+IS_RELEASE=false
+IS_PERIODIC=false
+IS_NIGHTLY_PRESUBMIT=false
+IS_OLD_VERSION=false
+
+[[ "${JOB_NAME}" =~ .*bootc.* ]] && IS_BOOTC=true
+[[ "${JOB_NAME}" =~ .*release.* ]] && IS_RELEASE=true
+[[ "${JOB_NAME}" =~ .*periodic.* ]] && IS_PERIODIC=true
+[[ "${JOB_NAME}" =~ .*nightly-presubmit.* ]] && IS_NIGHTLY_PRESUBMIT=true
+if [[ -n "${RELEASE_VERSION}" && "${RELEASE_VERSION}" -le 18 ]]; then
+  IS_OLD_VERSION=true
+fi
+
+SCENARIO_MAIN=""
+SCENARIO_FALLBACK=""
+
+if $IS_BOOTC; then
+  SCENARIO_FALLBACK="scenarios-bootc"
+  if $IS_RELEASE; then
+    if $IS_OLD_VERSION; then
+      SCENARIO_MAIN="scenarios-bootc/presubmits"
+    else
+      SCENARIO_MAIN="scenarios-bootc/releases"
     fi
+  elif $IS_PERIODIC && ! $IS_NIGHTLY_PRESUBMIT; then
+    SCENARIO_MAIN="scenarios-bootc/periodics"
+  else
+    SCENARIO_MAIN="scenarios-bootc/presubmits"
   fi
 else
-  if [[ "${JOB_NAME}" =~ .*release.* ]]; then
-    SCENARIO_SOURCES=$(get_source_dir "scenarios/releases" "scenarios")
+  if $IS_PERIODIC && ! $IS_NIGHTLY_PRESUBMIT; then
+    SCENARIO_MAIN="scenarios/periodics"
+    SCENARIO_FALLBACK="scenarios-periodics"
   else
-    SCENARIO_SOURCES=$(get_source_dir "scenarios/presubmits" "scenarios")
-    if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
-        SCENARIO_SOURCES=$(get_source_dir "scenarios/periodics" "scenarios-periodics")
+    SCENARIO_FALLBACK="scenarios"
+    if $IS_RELEASE; then
+      if $IS_OLD_VERSION; then
+        SCENARIO_MAIN="scenarios/presubmits"
+      else
+        SCENARIO_MAIN="scenarios/releases"
+      fi
+    else
+      SCENARIO_MAIN="scenarios/presubmits"
     fi
   fi
+fi
+
+SCENARIO_SOURCES=$(get_source_dir "$SCENARIO_MAIN" "$SCENARIO_FALLBACK")
+
+# Check that the directory exists before proceeding
+if ! ssh "${INSTANCE_PREFIX}" "[ -d \"${SCENARIO_SOURCES}\" ]" ; then
+  echo "Error: Scenario directory ${SCENARIO_SOURCES} does not exist on remote host."
+  exit 1
 fi
 
 # Run in background to allow trapping signals before the command ends. If running in foreground
