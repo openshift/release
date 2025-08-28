@@ -330,7 +330,9 @@ EOF
 if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf-nrop"* ]]; then
     PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST"
 fi
-
+if [[ "$JOB_NAME" != *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+    PLAYBOOK_ARGS+=" -e image_override=quay.io/hypershift/hypershift-operator:latest "
+fi
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
@@ -344,7 +346,6 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e sno_tag=$MGMT_VERSION \
     -e vsno_wait_minutes=150 \
     -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
-    -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
     -e hcp_release=$T5CI_JOB_HCP_RELEASE_TYPE $PLAYBOOK_ARGS || status=$?
 
