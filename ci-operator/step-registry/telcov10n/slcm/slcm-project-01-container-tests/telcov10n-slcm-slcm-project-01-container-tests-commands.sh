@@ -24,6 +24,8 @@ PODMAN_AUTH_PATH="$(cat /var/run/${TEST_PROJECT}/slcm-container/PODMAN_AUTH_PATH
 VAULT_PASSWORD=$(cat /var/run/${TEST_PROJECT}/slcm-container/VAULT_PASSWORD)
 ECO_GOTESTS_CONTAINER="$(cat /var/run/${TEST_PROJECT}/slcm-container/ECO_GOTESTS_CONTAINER)"
 ECO_VALIDATION_CONTAINER="$(cat /var/run/${TEST_PROJECT}/slcm-container/ECO_VALIDATION_CONTAINER)"
+TB1SLCM1="$(cat /var/run/${TEST_PROJECT}/slcm-container/tb1slcm1)"
+TB2SLCM1="$(cat /var/run/${TEST_PROJECT}/slcm-container/tb2slcm1)"
 S614="$(cat /var/run/${TEST_PROJECT}/slcm-container/s614)"
 SKIP_DCI="$(cat /var/run/${TEST_PROJECT}/slcm-container/SKIP_DCI)"
 STAMP="$(cat /var/run/${TEST_PROJECT}/slcm-container/STAMP)"
@@ -47,6 +49,9 @@ VPN_PASSWORD=$(cat /var/run/bastion1/vpn-password)
 SSH_KEY_PATH=/var/run/telcov10n/ansible_ssh_private_key
 SSH_KEY=~/key
 IFNAME=tun10
+
+## LAB SERVER SELECTION
+LAB_SERVER=$S614
 
 cp $SSH_KEY_PATH $SSH_KEY
 chmod 600 $SSH_KEY
@@ -84,7 +89,7 @@ copy_junit_files() {
     
     echo "Testing connectivity from jump server to target..."
     if ! ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} -o ConnectTimeout=10 ${REMOTE_USER}@${S614} 'echo Connection successful'"; then
+        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} -o ConnectTimeout=10 ${REMOTE_USER}@${LAB_SERVER} 'echo Connection successful'"; then
         echo "ERROR: Cannot reach target server from jump server"
         return 1
     fi
@@ -100,7 +105,7 @@ copy_junit_files() {
     # Check and list files on target server
     echo "Checking for XML files on target server..."
     target_files=$(ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${S614} 'ls -la ${REMOTE_JUNIT_DIR}/*.xml 2>/dev/null'" || echo "")
+        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${LAB_SERVER} 'ls -la ${REMOTE_JUNIT_DIR}/*.xml 2>/dev/null'" || echo "")
     
     file_count=$(echo "$target_files" | wc -l)
     
@@ -243,6 +248,8 @@ COPY_TO_PROW: "${COPY_TO_PROW}"
 PROW_JUNIT_TEMP_DIR: "/tmp/prow_pipeline_${BUILD_ID}"
 ANSIBLE_SKIP_TAGS: "${ANSIBLE_SKIP_TAGS}"
 infra_hosts:
+  tb1slcm1: "${TB1SLCM1}"
+  tb2slcm1: "${TB2SLCM1}"
   s614: "${S614}"
 END_VARS
 
