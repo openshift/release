@@ -1,0 +1,40 @@
+ref:
+  as: openshift-extended-k8sgpt
+  from_image:
+    namespace: ci
+    name: k8sgpt
+    tag: master
+  cli: latest
+  env:
+  - name: PROJECT
+    default: ""
+    documentation: |-
+      The namespace that k8sgpt analyze
+  - name: ENABLE_AI
+    default: "false"
+    documentation: |-
+      Enable AI
+  - name: AI_BACKEND
+    default: ""
+    documentation: |-
+      Backend AI provider, default "openai"
+  - name: AI_MODE
+    default: ""
+    documentation: |-
+      Backend AI model, default "gpt-4o"
+  - name: AI_TOKEN_NAME
+    default: ""
+    documentation: |-
+      Backend AI password, the name in the vault
+  grace_period: 10m
+  commands: openshift-extended-k8sgpt-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: tests-private-account
+    mount_path: /var/run/vault/tests-private-account
+  documentation: |-
+    Scanning clusters, diagnosing, and triaging issues by calling OpenAI.
