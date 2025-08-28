@@ -1,38 +1,43 @@
-apiVersion: v1
-kind: List
-items:
-- apiVersion: image.openshift.io/v1
-  kind: ImageStream
-  metadata:
-    name: shellcheck
-    namespace: ci
-- apiVersion: build.openshift.io/v1
-  kind: BuildConfig
-  metadata:
-    name: shellcheck
-    namespace: ci
-    labels:
-      ci.openshift.io/source-repo: release
-  spec:
-    triggers:
-    - type: "ConfigChange"
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: shellcheck:latest
-    runPolicy: Serial
-    source:
-      dockerfile: |-
-        FROM quay.io/fedora/fedora:34-x86_64
-        RUN dnf update -y \
-          && dnf install -y \
-            make \
-            git \
-            findutils \
-            ShellCheck \
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: shellcheck
+  namespace: ci
+spec:
+  output:
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_shellcheck_latest
+  runPolicy: Serial
+  source:
+    dockerfile: |-
+      FROM quay.io/fedora/fedora:latest
+      RUN dnf install -y make git findutils ShellCheck \
           && dnf clean all
-    strategy:
-      dockerStrategy:
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
+  strategy:
+    dockerStrategy:
+      pullSecret:
+        name: registry-push-credentials-ci-images-mirror
+    type: Docker
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trigger-shellcheck-build
+  namespace: ci
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            - start-build
+            - shellcheck
+            command:
+            - oc
+            image: registry.redhat.io/openshift4/ose-cli
+            name: ose-cli
+          restartPolicy: Never
+          serviceAccount: builder
+  schedule: '30 1 1,15 * *'

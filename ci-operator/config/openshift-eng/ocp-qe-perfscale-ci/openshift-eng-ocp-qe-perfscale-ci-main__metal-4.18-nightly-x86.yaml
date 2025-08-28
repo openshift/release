@@ -1,3 +1,12 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -25,19 +34,14 @@ tests:
     env:
       BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
-      CRUCIBLE: "false"
       INFRA: "true"
-      NUM_WORKER_NODES: "6"
-      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-cluster-health
-    - chain: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
     - chain: openshift-qe-node-density
     - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 8h0m0s
 - always_run: false
   as: daily-virt-6nodes
@@ -49,22 +53,20 @@ tests:
     env:
       BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
-      CRUCIBLE: "false"
       INFRA: "true"
-      NUM_WORKER_NODES: "6"
-      PUBLIC_VLAN: "true"
       VM: "true"
       VMI_READY_THRESHOLD: "180"
       VMS_PER_NODE: "200"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-cnv
-    - chain: openshift-qe-cluster-health
-    - chain: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-installer-bm-day2-cnv
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
-    - chain: openshift-qe-virt-density
-    - chain: openshift-qe-virt-udn-density
+    - ref: openshift-qe-virt-density
+    - ref: openshift-qe-virt-udn-density
   timeout: 8h0m0s
 - always_run: false
   as: deploy-6nodes
@@ -73,13 +75,7 @@ tests:
   restrict_network_access: false
   steps:
     cluster_profile: metal-perscale-cpt
-    env:
-      CRUCIBLE: "false"
-      NUM_WORKER_NODES: "6"
-      PUBLIC_VLAN: "true"
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: deploy-sno
@@ -89,12 +85,8 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      CRUCIBLE: "false"
-      PUBLIC_VLAN: "true"
       TYPE: sno
-    test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: node-density-heavy-6nodes
@@ -105,15 +97,11 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      CRUCIBLE: "false"
       KUBE_BURNER_VERSION: 1.2.9
-      NUM_WORKER_NODES: "6"
-      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
     - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
 - always_run: false
   as: data-path-6nodes
@@ -125,17 +113,13 @@ tests:
     env:
       BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
-      CRUCIBLE: "false"
       INFRA: "true"
-      NUM_WORKER_NODES: "6"
-      PUBLIC_VLAN: "true"
       RUN_CERBERUS: "false"
       TELCO: "false"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-label
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-bm-deploy
   timeout: 8h0m0s
 - always_run: false
   as: web-burner-node-density-6nodes
@@ -146,15 +130,15 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      CRUCIBLE: "false"
       KUBE_BURNER_VERSION: 1.2.9
-      NUM_WORKER_NODES: "6"
+      PUBLIC_VLAN: "false"
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-installer-bm-day2-sriov
-    - chain: openshift-qe-web-burner
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-web-burner
 - always_run: false
   as: web-burner-cluster-density-6nodes
   capabilities:
@@ -164,17 +148,17 @@ tests:
     cluster_profile: metal-perscale-cpt
     env:
       BAREMETAL: "true"
-      CRUCIBLE: "false"
       KUBE_BURNER_VERSION: 1.2.9
       LIMIT_COUNT: "1"
-      NUM_WORKER_NODES: "6"
+      PUBLIC_VLAN: "false"
       WORKLOAD: web-burner-cluster-density
     test:
-    - chain: openshift-qe-installer-bm-ping
-    - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-installer-bm-day2-sriov
-    - chain: openshift-qe-web-burner
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-web-burner
 zz_generated_metadata:
   branch: main
   org: openshift-eng

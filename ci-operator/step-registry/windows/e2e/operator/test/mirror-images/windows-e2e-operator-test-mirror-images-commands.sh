@@ -44,7 +44,7 @@ do
   fi
   echo "Failed to mirror image, retrying"
   sleep 5
-  retries+=1
+  ((retries+=1))
 done
 
 idms_content="apiVersion: config.openshift.io/v1\n"
@@ -109,7 +109,7 @@ do
       fi
       echo "Failed to mirror image, retrying"
       sleep 5
-      retries+=1
+	  ((retries+=1))
     done
 
     source_image=$(echo "$image" | cut -d'=' -f1)

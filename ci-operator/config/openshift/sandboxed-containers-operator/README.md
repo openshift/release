@@ -24,8 +24,10 @@ usual changes to those files are::
       steps:
         env:
           # Set RPM version and checksum
+          # An test case will use that to check the expected operator
+          # version is installed
+          EXPECTED_OPERATOR_VERSION: 1.9.0
           KATA_RPM_VERSION: "3.13.0-1.rhaos4.18.el9"
-          KATA_RPM_BUILD_MD5SUM: "da576553a2d5925b67ddaf0591454e48"
           # Add sleep here if you need to do manual testing
           # connect to cluster and delete the cucushift-installer-wait pod when done
           SLEEP_DURATION: "0"

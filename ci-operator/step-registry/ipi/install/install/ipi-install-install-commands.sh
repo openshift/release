@@ -289,8 +289,8 @@ function prepare_next_steps() {
 
 function inject_promtail_service() {
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
-  export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
-  export PROMTAIL_VERSION="v2.4.1"
+  export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+  export PROMTAIL_VERSION="v3.4.3"
   export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
 
   config_dir=/tmp/promtail
@@ -702,7 +702,7 @@ set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) 
+azure4|azure-arm64)
     if [[ "${BOOT_DIAGNOSTICS:-}" == "true" ]]; then
       inject_boot_diagnostics ${dir}
     fi
@@ -752,6 +752,15 @@ do
   manifest="$( basename "${item}" )"
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
+
+echo "Will include following openshift config files:"
+find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -name "openshift_manifests_[0-9]*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  ocp_config_file="$( basename "${item}" )"
+  cp "${item}" "${dir}/openshift/${ocp_config_file##openshift_manifests_}"
+done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -name "openshift_manifests_[0-9]*.yaml" \) -print0)
 
 # Collect bootstrap logs for all azure clusters
 case "${CLUSTER_TYPE}" in

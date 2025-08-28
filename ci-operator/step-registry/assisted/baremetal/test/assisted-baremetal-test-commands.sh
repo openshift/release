@@ -44,7 +44,7 @@ SINGLE_TEST_TASKS="_run_single_test.yml"
 
 cat > "${MAIN_PLAYBOOK}" <<-EOF
 - name: Run OpenShift conformance tests across all clusters
-  hosts: all
+  hosts: primary
   gather_facts: yes
   vars:
     test_type:               "{{ lookup('env','TEST_TYPE')           | default('minimal') }}"

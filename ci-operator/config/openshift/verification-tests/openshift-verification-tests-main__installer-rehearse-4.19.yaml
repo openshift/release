@@ -44,6 +44,7 @@ tests:
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       CUSTOM_REGION_LIST: us-east-1
@@ -51,25 +52,29 @@ tests:
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
-    env:
-      COMPUTE_OSIMAGE: projects/redhat-marketplace-dev/global/images/redhat-coreos-opp-419-x86-64-20250513-02
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
-      CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-dev/global/images/redhat-coreos-opp-419-x86-64-20250513-02
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-sj2qqdk/release:latest
-      ENABLE_DES_DEFAULT_MACHINE: "true"
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+      IPSTACK: dualstack
+      SLEEP_DURATION: 1h
+    post:
+    - ref: azure-deprovision-resourcegroup
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - chain: azure-provision-bastionhost
+    test:
+    - ref: cucushift-installer-wait
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
+    allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -77,6 +82,7 @@ tests:
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
+    allow_skip_on_success: true
     cluster_profile: ibmcloud-qe-2
     env:
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.19.0-rc.5-x86_64
@@ -93,6 +99,7 @@ tests:
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:
+    allow_skip_on_success: true
     cluster_profile: vsphere-elastic
     env:
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-78j6ckb/release:latest
@@ -104,6 +111,14 @@ tests:
     - chain: cucushift-installer-rehearse-vsphere-ipi-external-lb-pre-deprovision
     pre:
     - chain: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb-provision
+- as: installer-rehearse-azurestack
+  cluster: build01
+  cron: '@yearly'
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    workflow: cucushift-installer-rehearse-azure-stack-upi
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -59,7 +59,9 @@ tests:
     make test GINKGO_ARGS='--no-color'
   container:
     from: src
-- as: horizon-operator-build-deploy
+  skip_if_only_changed: ^(renovate.json|.*\.md|tests/kuttl/.*|OWNERS.*|LICENSE.*)$
+- always_run: false
+  as: horizon-operator-build-deploy
   cluster_claim:
     architecture: amd64
     cloud: vexxhost
@@ -83,6 +85,7 @@ tests:
     pre-commit run -a --show-diff-on-failure
   container:
     from: openstack-operator-ci-pre-commit
+  skip_if_only_changed: ^renovate.json|^README.md
 - as: horizon-operator-build-deploy-kuttl
   cluster_claim:
     architecture: amd64
@@ -91,6 +94,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
+  skip_if_only_changed: ^(renovate.json|.*\.md|tests/functional/.*|OWNERS.*|LICENSE.*)$
   steps:
     env:
       CEPH_HOSTNETWORK: "false"

@@ -55,6 +55,7 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 INFRA_ID=$(jq -r .infraID "${SHARED_DIR}"/metadata.json)
 RESOURCE_GROUP=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.resourceGroupName')
@@ -71,6 +72,10 @@ echo "Expected NAT gateway id: ${nat_gateway_id}"
 check_result=0
 echo "Check on all subnets, should configure the nat gateway"
 for subnet in ${subnet_list}; do
+    if [[ "${subnet}" == "${INFRA_ID}-master-subnet" ]] && (( ocp_minor_version >= 20 )); then
+        echo "INFO: starting from 4.20, NAT gateway only set on worker nodes, skip checking on master subnet!"
+        continue
+    fi
     echo "checking on subnet ${subnet}"
     subnet_natgateway=$(az network vnet subnet show -n "${subnet}" --vnet-name "${vnet_name}" -g "${RESOURCE_GROUP}" --query 'natGateway.id' -otsv)
     if [[ "${subnet_natgateway}" == "${nat_gateway_id}" ]]; then

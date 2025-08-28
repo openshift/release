@@ -69,6 +69,7 @@ EnableIpv6="no"
 if [[ "${IPSTACK}" == "dualstack" ]]; then
     echo "IPSTACK: $IPSTACK"
     EnableIpv6="yes"
+    VpcIpv6Cidr=$(jq -r '.vpc_ipv6_cidr //"2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128"' "${SHARED_DIR}/vpc_info.json")
 fi
 
 stack_name="${CLUSTER_NAME}-bas"
@@ -82,22 +83,44 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   if [[ ! -f "${bastion_ignition_file}" ]]; then
     echo "'${bastion_ignition_file}' not found , abort." && exit 1
   fi
-  #Use 4.18 RHCOS image as the boot image of bastion by default
-  bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
-  if ! curl -sSLf --retry 3 --connect-timeout 30 --max-time 60 -o /tmp/bastion-image.json "${bastion_image_list_url}"; then
-    echo "ERROR: Failed to download RHCOS image list from ${bastion_image_list_url}" >&2
-    exit 1
-  fi
+  
+  #
+  # Use FCOS as bastion host, as systemd-resolved is only available in FCOS and it's involved in step bastion-dnsmasq,
+  #   which is used by particular features (e.g. Custom DNS feature) 
+  # But FCOS is not available in AWS GovCloud, so:
+  #  a) use fixed FCOS AMI in GovCloud regions if aws-usgov-qe profile is used, this allow to test Custom DNS feature on GovCloud
+  #  b) For other cases: aws-usgov cluster but not using aws-usgov-qe profile, still use rhcos images
+  #
+  if [[ "${CLUSTER_PROFILE_NAME:-}" == "aws-usgov-qe" ]]; then
+    # the images are copied from on Jul. 3 2025
+    # curl -sk https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r '.architectures.x86_64.artifacts.aws.formats."vmdk.xz".disk.location'
+    if [[ "${REGION}" == "us-gov-east-1" ]]; then
+      ami_id="ami-086698edfd9b6933d"
+    elif [[ "${REGION}" == "us-gov-west-1" ]]; then
+      ami_id="ami-01cdd82c43022852b"
+    fi
+  else
+    if [[ "${CLUSTER_TYPE}" == "aws-usgov" ]]; then
+        bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
+    else
+        bastion_image_list_url="https://builds.coreos.fedoraproject.org/streams/stable.json"
+    fi
+        
+    if ! curl -sSLf --retry 3 --connect-timeout 30 --max-time 60 -o /tmp/bastion-image.json "${bastion_image_list_url}"; then
+        echo "ERROR: Failed to download RHCOS image list from ${bastion_image_list_url}" >&2
+        exit 1
+    fi
+    
+    if ! jq empty /tmp/bastion-image.json &>/dev/null; then
+        echo "ERROR: Downloaded file is not valid JSON" >&2
+        exit 1
+    fi
 
-  if ! jq empty /tmp/bastion-image.json &>/dev/null; then
-    echo "ERROR: Downloaded file is not valid JSON" >&2
-    exit 1
-  fi
-
-  ami_id=$(jq -r --arg r ${REGION} '.architectures.x86_64.images.aws.regions[$r].image // ""' /tmp/bastion-image.json)
-  if [[ ${ami_id} == "" ]]; then
-    echo "Bastion host AMI was NOT found in region ${REGION}, exit now." && exit 1
-  fi
+    ami_id=$(jq -r --arg r ${REGION} '.architectures.x86_64.images.aws.regions[$r].image // ""' /tmp/bastion-image.json)
+    if [[ ${ami_id} == "" ]]; then
+        echo "Bastion host AMI was NOT found in region ${REGION}, exit now." && exit 1
+    fi
+  fi  
 
   ign_location="s3://${s3_bucket_name}/bastion.ign"
   aws --region $REGION s3 mb "s3://${s3_bucket_name}"
@@ -132,6 +155,11 @@ Parameters:
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
     Default: 10.0.0.0/16
     Description: CIDR block for VPC.
+    Type: String
+  VpcIpv6Cidr:
+    ConstraintDescription: IPv6 CIDR block parameter
+    Default: 2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128
+    Description: IPv6 CIDR block for VPC.
     Type: String
   VpcId:
     Description: The VPC-scoped resources will belong to this VPC.
@@ -226,8 +254,8 @@ Resources:
       GroupDescription: Bastion Host Security Group for ipv4
       SecurityGroupIngress:
       - IpProtocol: icmp
-        FromPort: 0
-        ToPort: 0
+        FromPort: -1
+        ToPort: -1
         CidrIp: !Ref VpcCidr
       - IpProtocol: tcp
         FromPort: 22
@@ -264,6 +292,14 @@ Resources:
     Properties:
       GroupDescription: Bastion Host Security Group for ipv6
       SecurityGroupIngress:
+      - IpProtocol: icmpv6
+        FromPort: -1
+        ToPort: -1
+        CidrIpv6: !Ref VpcIpv6Cidr
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 3128
         ToPort: 3129
@@ -346,6 +382,7 @@ aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
         ParameterKey=VpcId,ParameterValue="${VpcId}"  \
+        ParameterKey=VpcIpv6Cidr,ParameterValue="${VpcIpv6Cidr-2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128}"  \
         ParameterKey=BastionHostInstanceType,ParameterValue="${BastionHostInstanceType}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=PublicSubnet,ParameterValue="${PublicSubnet}" \

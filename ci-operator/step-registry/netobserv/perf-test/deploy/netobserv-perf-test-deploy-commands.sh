@@ -17,7 +17,18 @@ source scripts/netobserv.sh
 deploy_lokistack
 deploy_kafka
 deploy_netobserv
-createFlowCollector "-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
+
+PARAMETERS="-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
+
+if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_SAMPLING:-} ]]; then
+    PARAMETERS+=" EBPFSamplingRate=${MULTISTAGE_PARAM_OVERRIDE_SAMPLING}"
+fi
+
+if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
+    PARAMETERS+=" LokiEnable=${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE}"
+fi
+
+createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"

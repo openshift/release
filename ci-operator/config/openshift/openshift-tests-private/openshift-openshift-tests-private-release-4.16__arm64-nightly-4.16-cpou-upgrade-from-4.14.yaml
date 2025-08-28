@@ -94,7 +94,8 @@ tests:
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-azure-ipi-without-identity
 - as: baremetalds-ipi-ovn-ipv4-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 36 20 20 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -103,6 +104,8 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
+      PACKET_METRO: dc
+      PACKET_PLAN: c3.large.arm64
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
@@ -118,7 +121,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-cpou
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-equinix
 - as: gcp-ipi-private-mini-perm-f28
   cron: 26 23 4 * *
   steps:

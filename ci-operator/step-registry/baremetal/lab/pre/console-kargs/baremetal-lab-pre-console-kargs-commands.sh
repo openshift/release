@@ -22,7 +22,11 @@ function join_by_semicolon() {
 
 echo "Rendering the ignition hook from butane..."
 
-base_url="http://${INTERNAL_NET_IP}/$(<"${SHARED_DIR}/cluster_name")"
+if [[ "${ipv4_enabled:-true}" == "false" ]] && [[ "${ipv6_enabled:-false}" == "true" ]]; then
+  base_url="http://[${INTERNAL_NET_IPV6}]/$(<"${SHARED_DIR}/cluster_name")"
+else
+  base_url="http://${INTERNAL_NET_IP}/$(<"${SHARED_DIR}/cluster_name")"
+fi
 
 # We use a different console-hook ignition file for each node to allow the configuration of heterogeneous nodes
 # (i.e., nodes from different vendors)
@@ -63,9 +67,10 @@ systemd:
       [Service]
       Type=oneshot
       EnvironmentFile=/etc/os-release
-      # Ensure disks are wiped before running the installer. This should be done by the wiping steps, but since
+      # Ensure disks and RAID arrays are wiped before running the installer. This should be done by the wiping steps, but since
       # we can control installation in bm-upi, let's mitigate the risk of a previous installation that left data
       # on the disks due to the wiping step failing or being skipped.
+      ExecStartPre=-bash -c 'set -x; if [ -e /dev/md126 ]; then mdadm --stop /dev/md126; fi; if [ -e /dev/md127 ]; then mdadm --stop /dev/md127; fi; set +x'
       ExecStartPre=-bash -c 'set -x; for i in \$(lsblk -I8,259 -nd --output name); do wipefs -a /dev/\$i; done; set +x'
       ExecStartPre=/usr/bin/coreos-installer install $root_device \
         --delete-karg console=ttyS0,115200n8 $(join_by_semicolon "${console_kargs}" "--append-karg console=" "") \

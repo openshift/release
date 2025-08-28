@@ -41,6 +41,8 @@ source /usr/local/share/cert-rotation-functions.sh
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
 
+run-on-first-master "echo -n \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\" > /var/cluster-shutdown-time"
+
 # Set date for host
 sudo timedatectl status
 sudo timedatectl set-time +${SKEW}

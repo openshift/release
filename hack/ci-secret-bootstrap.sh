@@ -25,11 +25,13 @@ fi
 
 set -x
 
-$CONTAINER_ENGINE pull registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-podman}
+$CONTAINER_ENGINE login -u=$(oc --context app.ci whoami) -p=$(oc --context app.ci whoami -t) quay-proxy.ci.openshift.org --authfile /tmp/t.c
+$CONTAINER_ENGINE pull quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest --authfile /tmp/t.c
 $CONTAINER_ENGINE run --rm -v "${BASE_DIR}/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" \
   -v "${BUILD_FARM_CREDENTIALS_FOLDER}:/tmp/build-farm-credentials:z" \
   -e VAULT_TOKEN="$VAULT_TOKEN" \
-  registry.ci.openshift.org/ci/ci-secret-bootstrap:latest \
+  quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest \
   --vault-addr=${VAULT_ADDR} \
   --vault-prefix=kv \
   --config=/_config.yaml \

@@ -99,6 +99,9 @@ spec:
     logLevel: INFO
     deployment:
       replicas: 1
+    userDataCollection:
+      feedbackDisabled: true
+      transcriptsDisabled: true
 EOF
 
   # Wait for the app server deployment

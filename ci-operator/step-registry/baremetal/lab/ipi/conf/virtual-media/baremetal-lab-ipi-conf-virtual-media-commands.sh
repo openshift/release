@@ -17,6 +17,11 @@ EOF
 for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not add additional workers if we need to run them as day2 (e.g., to test cluster-api)
+    echo "{INFO} Additional worker ${name} will be added as day2 operation"
+    continue
+  fi
   cat >> "$SHARED_DIR/redfish_patch_install_config.yaml" <<EOF
     - name: ${name}
       role: ${name%%-[0-9]*}

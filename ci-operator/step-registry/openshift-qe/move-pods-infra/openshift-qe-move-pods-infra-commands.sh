@@ -40,7 +40,7 @@ function wait_for_prometheus_status() {
         echo -e "Prometheus status not ready yet, retrying $retry_times in 5s..."
         sleep 5
         if [[ $retry_times -gt $max_reties ]];then
-	      "Out of max retry times, the prometheus still not ready, please check "
+	      echo "Out of max retry times, the prometheus still not ready, please check."
 	      exit 1
         fi
         retry_times=$(( $retry_times + 1 ))

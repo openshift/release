@@ -79,7 +79,7 @@ run-on-first-master "
   oc get csr -o yaml > ${NODE_ARTIFACT_DIR}/csrs.yaml
   oc get co -o yaml > ${NODE_ARTIFACT_DIR}/cos.yaml
 
-  oc --insecure-skip-tls-verify adm must-gather --image=${MUST_GATHER_IMAGE} --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather || true
+  oc --insecure-skip-tls-verify adm must-gather --volume-percentage=100 --image=${MUST_GATHER_IMAGE} --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather || true
   tar -czf ${NODE_ARTIFACT_DIR}/must-gather.tar.gz -C ${NODE_ARTIFACT_DIR}/must-gather ${NODE_ARTIFACT_DIR}/must-gather
   rm -rf ${NODE_ARTIFACT_DIR}/must-gather
 "

@@ -4,9 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Fix UID issue (from Telco QE Team)
-~/fix_uid.sh
-
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
@@ -21,7 +18,7 @@ OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
 USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
 PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
 for i in $(curl -sSk $OCPINV | jq -r ".nodes[1:][].name"); do
-  badfish -H mgmt-$i -u $USER -p $PWD --power-off
+   podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --power-off
 done
 EOF
 envsubst '${LAB_CLOUD},${QUADS_INSTANCE}' < /tmp/poweroff.sh > /tmp/poweroff_updated-$LAB_CLOUD.sh
