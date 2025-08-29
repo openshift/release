@@ -28,6 +28,10 @@ run_command "oc version -o yaml"
 
 k8sgpt version
 
+if [ -n "${OPTIONAL_FILTERS}" ]; then
+    k8sgpt filters add ${OPTIONAL_FILTERS} > "${ARTIFACT_DIR}/k8sgpt-result"
+fi
+
 AI_FLAGS=""
 if [ -n "${AI_TOKEN_NAME}" ]; then
     ai_token=$(<"/var/run/vault/tests-private-account/${AI_TOKEN_NAME}")
@@ -45,7 +49,7 @@ fi
 EXTRA_FLAGS=""
 if [ "${ENABLE_AI}" = "true" ]; then
     EXTRA_FLAGS+=" -aed"
-    k8sgpt auth add ${AI_FLAGS} > "${ARTIFACT_DIR}/k8sgpt-result"
+    k8sgpt auth add ${AI_FLAGS} | tee -a "${ARTIFACT_DIR}/k8sgpt-result"
 fi
 
 if [ -n "${PROJECT}" ]; then
