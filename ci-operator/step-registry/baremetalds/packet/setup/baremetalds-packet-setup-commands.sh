@@ -146,6 +146,8 @@ cat > packet-setup.yaml <<-EOF
         provisioning_wait_seconds: ${PACKET_PROVISION_WAIT}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         userdata: "{{ user_data | default(omit) }}"
+        ip_addresses:
+          - type: public_ipv4
       register: hosts
       no_log: true
     - name: write device info to file
