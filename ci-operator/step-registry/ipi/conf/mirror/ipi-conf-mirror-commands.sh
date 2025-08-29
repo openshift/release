@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Debugging...."
+sleep 2m
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # mirror registry
