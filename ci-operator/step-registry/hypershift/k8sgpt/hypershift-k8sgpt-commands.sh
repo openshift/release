@@ -62,8 +62,8 @@ if [[ "${JUNIT_REPORT}" == "false" ]]; then
     exit 0
 fi
 
-result_mgmt=$(cat "${ARTIFACT_DIR}/k8sgpt-result-mgmt.json")
-result_guest=$(cat "${ARTIFACT_DIR}/k8sgpt-result-guest.json")
+result_mgmt=$(cat "${ARTIFACT_DIR}/k8sgpt-result-mgmt.json" || true)
+result_guest=$(cat "${ARTIFACT_DIR}/k8sgpt-result-guest.json" || true)
 
 mkdir -p "${ARTIFACT_DIR}/junit"
 
