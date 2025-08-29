@@ -47,7 +47,7 @@ metadata:
     machineconfiguration.openshift.io/role: ${role}
   annotations:
     user-ipsec-machine-config: "true"
-  name: 80-user-ipsec-${role}-extensions
+  name: 80-ipsec-${role}-extensions
 spec:
   osImageURL: ${IPSEC_RHCOS_LAYERED_IMAGE}
   config:
