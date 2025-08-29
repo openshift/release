@@ -48,9 +48,9 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
     fi
 fi
 
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+REPO_URL="https://github.com/rsevilla87/e2e-benchmarking/"
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+TAG_OPTION="--branch remove-pprof-logic"
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density
@@ -62,7 +62,7 @@ oc adm must-gather --timeout=3h --dest-dir "${ARTIFACT_DIR}/" -- PROFILING_NODE_
 ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
 
 # The measurable run
-EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --PPROF=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
@@ -108,4 +108,7 @@ jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+fi
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
