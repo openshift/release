@@ -1,23 +1,28 @@
-binary_build_commands: make install
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
-promotion:
-  to:
-  - name: "4.21"
-    namespace: ocp
-releases:
-  initial:
-    integration:
-      name: "4.21"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.21"
-      namespace: ocp
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY /src /opt/app-root/src
+    WORKDIR /opt/app-root/src/ocm-sdk-go
+    USER root
+    RUN dnf install -y git go make jq
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-online/ocm-sdk-go
+  to: golang-plus
 resources:
   '*':
     limits:
@@ -25,15 +30,27 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: make install
 tests:
+- as: database
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    podman run --env POSTGRES_PASSWORD=foobar-bizz-buzz --env POSTGRES_USER=access_transparency_service --publish 5432 --detach docker.io/postgres:17 -c log_destination=stderr -c log_statement=all -c logging_collector=off
+  container:
+    from: golang-plus
+  nested_podman: true
 - as: unit
   capabilities:
+  - nested-podman
   - intranet
-  commands: make test
+  commands: "unset GOFLAGS\nRH_CA_PATH=/etc/pki/ca-trust/source/anchors/Current-IT-Root-CAs.pem\nchmod
+    777 /etc/pki/ca-trust/source/anchors/\ncurl https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem
+    -o $RH_CA_PATH && update-ca-trust\ngit config --global http.sslCAInfo $RH_CA_PATH
+    \necho \"Go Version: $(go version)\"\nmake ci-test-unit\n"
   container:
-    from: src
-  optional: true
+    from: golang-plus
+  nested_podman: true
   restrict_network_access: false
 zz_generated_metadata:
   branch: main
