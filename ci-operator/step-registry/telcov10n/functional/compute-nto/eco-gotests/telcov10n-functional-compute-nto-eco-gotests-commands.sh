@@ -32,51 +32,18 @@ if [[ -f "${SHARED_DIR}/set_ocp_net_vars.sh" ]]; then
     source "${SHARED_DIR}/set_ocp_net_vars.sh"
 fi
 
+echo "Creating an artifact directory"
+  mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests/"
+
 echo "Setup compute-nto test script"
 cd /eco-ci-cd
 
 # shellcheck disable=SC2154
 set -x
 ansible-playbook ./playbooks/compute/deploy-nto-gotest.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "cluster_name=${CLUSTER_NAME} \
+    --extra-vars "cluster_name=${CLUSTER_NAME},artifact_dir=${ARTIFACT_DIR}/junit_eco_gotests/,\
     kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 set +x
-
-echo "Run NTO gotests via SSH (playbook creates files on bastion, not locally)"
-
-echo "Set bastion ssh configuration"
-grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
-
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
-
-echo "Run compute-nto eco-gotests via ssh tunnel"
-timeout -s 9 2h ssh \
-  -o ServerAliveInterval=60 \
-  -o ServerAliveCountMax=3 \
-  -o StrictHostKeyChecking=no \
-  "${BASTION_USER}@${BASTION_IP}" -i ${PROJECT_DIR}/temp_ssh_key bash -s -- << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-echo
-echo "--------------------------------------------------"
-echo "Running gotests script: /tmp/gotest/run_gotests.sh"
-echo "--------------------------------------------------"
-cat /tmp/gotest/run_gotests.sh
-echo "--------------------------------------------------"
-echo
-cd /tmp/gotest && ./run_gotests.sh || true
-EOF
-set +x
-
-echo "Gather artifacts from bastion"
-# shellcheck disable=SC2154
-mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests/"
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${PROJECT_DIR}/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/" || echo "No XML reports found on bastion"
-rm -rf "${PROJECT_DIR}/temp_ssh_key"
 
 echo "Create junit-named copies in ARTIFACT_DIR for reporter compatibility"
 for xml_file in "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml; do
@@ -90,4 +57,4 @@ for xml_file in "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml; do
 done
 
 echo "Copy junit test reports to shared directory for reporter step"
-cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/junit_*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No junit test reports found to copy to SHARED_DIR"
+cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No junit test reports found to copy to SHARED_DIR"
