@@ -1,0 +1,54 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-byo-ami-kms-cco-manual-security-token-service-provision
+  steps:
+  - ref: aws-provision-kms-key
+  - ref: aws-provision-ami
+  - chain: ipi-conf-aws
+  - ref: ipi-conf-aws-ami
+  - ref: ipi-conf-aws-kms-key
+  - ref: ipi-conf-aws-usage-info
+  - ref: ipi-conf-manual-creds
+  - chain: aws-provision-iam-user-minimal-permission
+  - ref: ipi-conf-aws-oidc-creds-provision
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-aws
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - ref: cucushift-installer-check-aws-custom-ami
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  env:
+  - name: ENABLE_AWS_AMI_DEFAULT_MACHINE
+    default: "no"
+    documentation: |-
+      If set custom AMI in default machine platform
+  - name: ENABLE_AWS_AMI_CONTROL_PLANE
+    default: "no"
+    documentation: |-
+      If set custom AMI for control plane nodes
+  - name: ENABLE_AWS_AMI_COMPUTE
+    default: "yes"
+    documentation: |-
+      If set custom AMI for compute nodes
+  - name: ENABLE_AWS_KMS_KEY_DEFAULT_MACHINE
+    default: "no"
+    documentation: |-
+      If set KMS key in default machine platform
+  - name: ENABLE_AWS_KMS_KEY_CONTROL_PLANE
+    default: "no"
+    documentation: |-
+      If set KMS key for control plane nodes
+  - name: ENABLE_AWS_KMS_KEY_COMPUTE
+    default: "yes"
+    documentation: |-
+      If set KMS key for compute nodes
+  - name: ENCRYPTED_AMI
+    default: "yes"
+    documentation: |-
+      If ENCRYPTED while copying AMI.
+  documentation: |-
+    Create an IPI cluster using BYO AMI profile on AWS for QE e2e tests.
