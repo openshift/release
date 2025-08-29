@@ -668,21 +668,134 @@ wait
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   source "${SHARED_DIR}/unset-proxy.sh"
 fi
+
+# post e2e test check - cluster operators
 # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
 curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+JQ_BIN="/tmp/jq"
 
+set +e
 mkdir -p ${ARTIFACT_DIR}/junit/
-<${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+TMP_JSON=$(mktemp)
+XML_OUTPUT="${ARTIFACT_DIR}/junit/junit_post_co_status.xml"
+CLUSTER_OPERATORS_JSON="${ARTIFACT_DIR}/clusteroperators.json"
+declare -a DEPENDENCY_ORDER=(
+  "etcd"
+  "network"
+  "cloud-credential"
+  "dns"
+  "kube-apiserver"
+  "kube-controller-manager"
+  "openshift-apiserver"
+  "openshift-controller-manager"
+  "machine-api"
+  "machine-config"
+  "ingress"
+  "storage"
+  "image-registry"
+  "authentication"
+  "console"
+)
+DEPENDENCY_ORDER_JSON=$(printf '%s\n' "${DEPENDENCY_ORDER[@]}" | ${JQ_BIN} -R . | ${JQ_BIN} -s .)
+${JQ_BIN} -r '
+.items[] | .metadata.name as $name |
+  (.status.conditions // []) as $conds |
+  (if ($conds | any(.type == "Available" and .status != "True")) then "unavailable"
+   elif ($conds | any(.type == "Degraded" and .status == "True")) then "degraded"
+   elif ($conds | any(.type == "Progressing" and .status == "True")) then "progressing"
+   else "ok"
+   end) as $status |
+  (if $status != "ok" then
+     $conds[] | select(.type=="Available" and .status!="True" or .type=="Degraded" and .status=="True" or .type=="Progressing" and .status=="True") | "\($name)|\(.type)|\(.reason)|\(.message)"
+   else
+     "\($name)|ok||"
+   end)
+' < ${CLUSTER_OPERATORS_JSON} > "$TMP_JSON"
+
+echo '<testsuite name="Operator results" tests="0" failures="0" skipped="0">' > "$XML_OUTPUT"
+
+declare -a TESTCASES
+FAILED_AT=""
+FAILURE_COUNT=0
+SKIPPED_COUNT=0
+TOTAL_COUNT=0
+
+xml_escape() {
+  local s="$1"
+  s="${s//&/\&amp;}"
+  s="${s//</\<}"
+  s="${s//>/\>}"
+  s="${s//\"/\&quot;}"
+  printf '%s' "$s"
+}
+
+for op in "${DEPENDENCY_ORDER[@]}"; do
+  if [[ -n "$FAILED_AT" ]]; then
+    msg="Precondition operator $FAILED_AT failed, skipped"
+    msg_escaped=$(xml_escape "$msg")
+    TESTCASES+=("<testcase name=\"operator conditions $op\"><skipped message=\"$msg_escaped\"></skipped></testcase>")
+    ((SKIPPED_COUNT++))
+  else
+    if grep -q "^$op|ok|" "$TMP_JSON"; then
+      TESTCASES+=("<testcase name=\"operator conditions $op\"></testcase>")
+    elif grep -q "^$op|" "$TMP_JSON"; then
+      IFS='|' read -r name type reason msg < <(grep "^$op|" "$TMP_JSON")
+      msg="${msg:-Unknown error}"
+      failure_msg="Operator $name ($type): $reason|$msg"
+      msg_escaped=$(xml_escape "$failure_msg")
+      TESTCASES+=("<testcase name=\"operator conditions $name\"><failure message=\"$msg_escaped\"></failure></testcase>")
+      FAILED_AT="$op"
+      ((FAILURE_COUNT++))
+    else
+      msg="Operator $op not found in cluster"
+      msg_escaped=$(xml_escape "$msg")
+      TESTCASES+=("<testcase name=\"operator conditions $op\"><skipped message=\"$msg_escaped\"></skipped></testcase>")
+      ((SKIPPED_COUNT++))
+    fi
+  fi
+  ((TOTAL_COUNT++))
+done
+other_ops=$(${JQ_BIN} -r --argjson main_ops "$DEPENDENCY_ORDER_JSON" '
+  .items[].metadata.name as $name |
+  if ($main_ops | index($name)) then empty else $name end
+' < ${CLUSTER_OPERATORS_JSON})
+for op in $other_ops; do
+  if [[ -n "$FAILED_AT" ]]; then
+    msg="Main dependency chain failed at operator $FAILED_AT, skipped"
+    msg_escaped=$(xml_escape "$msg")
+    TESTCASES+=("<testcase name=\"operator conditions $op\"><skipped message=\"$msg_escaped\"></skipped></testcase>")
+    ((SKIPPED_COUNT++))
+  else
+    if grep -q "^$op|ok|" "$TMP_JSON"; then
+      TESTCASES+=("<testcase name=\"operator conditions $op\"></testcase>")
+    elif grep -q "^$op|" "$TMP_JSON"; then
+      IFS='|' read -r name type reason msg < <(grep "^$op|" "$TMP_JSON")
+      msg="${msg:-Unknown error}"
+      failure_msg="Operator $name ($type): $reason|$msg"
+      msg_escaped=$(xml_escape "$failure_msg")
+      TESTCASES+=("<testcase name=\"operator conditions $name\"><failure message=\"$msg_escaped\"></failure></testcase>")
+      ((FAILURE_COUNT++))
+    else
+      msg="Parse error"
+      msg_escaped=$(xml_escape "$msg")
+      TESTCASES+=("<testcase name=\"operator conditions $op\"><failure message=\"$msg_escaped\"></failure></testcase>")
+      ((FAILURE_COUNT++))
+    fi
+  fi
+  ((TOTAL_COUNT++))
+done
+for tc in "${TESTCASES[@]}"; do
+  echo "  $tc" >> "$XML_OUTPUT"
+done
+sed -i "1s/tests=\"0\" failures=\"0\" skipped=\"0\"/tests=\"$TOTAL_COUNT\" failures=\"$FAILURE_COUNT\" skipped=\"$SKIPPED_COUNT\"/" "$XML_OUTPUT"
+echo '</testsuite>' >> "$XML_OUTPUT"
+rm -f "$TMP_JSON"
+set -e
+
 
 # This is an experimental wiring of autogenerated failure detection.
 echo "Detect known failures from symptoms (experimental) ..."
 curl -f https://gist.githubusercontent.com/liangxia/1188ce4d25f42138694e32ac8ee9a373/raw/994d3bedeb7cb4cfc679b1e27e1a659a3d845d61/symptom.sh 2>/dev/null | bash -s ${ARTIFACT_DIR} > ${ARTIFACT_DIR}/junit/junit_symptoms.xml
-
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
 
 # Create custom-link-tools.html from custom-links.txt
 REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
