@@ -238,7 +238,7 @@ for yaml_filename in $(ls -p "${creds_requests_dir}"/*.yaml | awk -F'/' '{print 
 
   echo "$(date -u --rfc-3339=seconds) - Creating IAM service account key for '${sa_email}'..."
   cmd="gcloud iam service-accounts keys create ${sa_json_file} --iam-account=${sa_email}"
-  backoff "$cmd"
+  run_command "$cmd"
   if [ -f "$sa_json_file" ]; then
     echo "$(date -u --rfc-3339=seconds) - Creating the credentials manifests file..."
     create_credentials_manifests "${secret_namespace}" "${secret_name}" "$(base64 ${sa_json_file} -w 0)" "${creds_manifests_dir}"
