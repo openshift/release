@@ -573,6 +573,9 @@ CONFIG = {
         'eastus': 10,
         'eastus2': 10,
     },
+    'aws-lp-chaos-quota-slice': {
+        'us-west-2': 10,
+    },
 }
 
 for i in range(2,7):
