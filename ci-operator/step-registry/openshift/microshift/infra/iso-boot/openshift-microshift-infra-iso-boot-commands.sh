@@ -33,32 +33,6 @@ if [ "${JOB_TYPE}" == "presubmit" ]; then
 fi
 
 SCENARIO_TYPE=${SCENARIO_TYPE:-presubmits}
-declare -A SCENARIO_DIRS=(
-  [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
-  [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
-  [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
-  [releases]="scenarios/releases:scenarios"
-  [presubmits]="scenarios/presubmits:scenarios"
-  [periodics]="scenarios/periodics:scenarios-periodics"
-)
-
-# Implement scenario directory check with fallbacks. Simplify or remove the
-# function when the structure is homogenised in all the active releases.
-function get_source_dir() {
-  local -r scenario_type=$1
-  local -r dirs="${SCENARIO_DIRS[$scenario_type]}"
-  local -r fdir=$(echo "$dirs" | cut -d: -f1)
-  local -r ndir=$(echo "$dirs" | cut -d: -f2)
-
-  # We need the variable to expand on the client side
-  # shellcheck disable=SC2029
-  if ssh "${INSTANCE_PREFIX}" "[ -d \"${ndir}\" ]" ; then
-    echo "${ndir}"
-  else
-    echo "${fdir}"
-  fi
-}
-
 SCENARIO_SOURCES=$(get_source_dir "${SCENARIO_TYPE}")
 
 # Run in background to allow trapping signals before the command ends. If running in foreground
