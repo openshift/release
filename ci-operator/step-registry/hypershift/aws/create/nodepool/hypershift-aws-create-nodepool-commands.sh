@@ -42,6 +42,7 @@ eval "/usr/bin/hypershift create nodepool aws \
   --node-count ${ADDITIONAL_HYPERSHIFT_NODE_COUNT} \
   --instance-type ${ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE} \
   --arch ${ADDITIONAL_HYPERSHIFT_NODE_ARCH} \
+  --node-upgrade-type ${HYPERSHIFT_NODE_UPGRADE_TYPE} \
   --release-image ${NODEPOOL_RELEASE_IMAGE_LATEST} $(config_nodepool)"
 
 echo "Wait additional nodepool ready..."
