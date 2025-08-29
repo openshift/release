@@ -69,7 +69,7 @@ function make_up_remote_test_command {
 
 # Test ENV setup
 mkdir -pv \${HOME}/.local/bin
-export PATH=\$PATH:\${HOME}/.local/bin
+export PATH=\$PATH:\${HOME}/.local/bin:\${HOME}/bin:\$(go env GOPATH)/bin
 export RAN_METRICS_URL="${TELCO_KPI_RAN_METRICS_END_POINT_URL}"
 echo "insecure" >| \${HOME}/.curlrc
 
@@ -77,13 +77,13 @@ set -x
 kpi_tests_repo=\$(dirname \${SCRIPTS_DIR})
 export GIT_SSL_NO_VERIFY=true
 git clone ${TELCO_KPI_COMMON_REPO} \${kpi_tests_repo}
-git clone ${TELCO_KPI_TEST_REPO} \${kpi_tests_repo}
+git clone ${TELCO_KPI_TEST_REPO} \${kpi_tests_repo}/cnf-gotests
 cd \${kpi_tests_repo}
 set +x
 ls -rtlhZ
 pwd
 set -x
-bash \${SCRIPTS_DIR}/test_cpu_util.sh cpu_util=1h
+bash \${SCRIPTS_DIR}/test_cpu_util.sh cpu_util=\${DURATION}
 set +x
 EOF
 
@@ -147,7 +147,9 @@ function make_up_ansible_playbook {
         ansible.builtin.shell: |
           cat << EO-Containerfile > {{ _remote_container_file }}
           FROM quay.io/centos/centos:stream9
-          RUN dnf -y install binutils diffutils skopeo git python3 python3-pip python3-devel jq && \
+          RUN dnf -y install binutils diffutils skopeo git \
+                python3 python3-pip python3-devel jq \
+                wget which golang && \
             dnf clean all && \
             curl -sSLO {{ _oc_bin_url }} && \
             tar -zxvf {{ _oc_bin_url | basename }} && \
