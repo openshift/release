@@ -439,12 +439,11 @@ function droute_send() {
                                 --metadata="$DATAROUTER_JSON"
                                 --results="${LOCAL_DIR_RST}/*"
                                 --wait
+                   2>&1
                   '
   for (( i=1; i<=3; i++ ))
   do
-    output="$(eval $droute_send_cmd)"
-    echo "$output"
-    if (grep -q 'request' <<< "$output")
+    if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
       break
     fi
