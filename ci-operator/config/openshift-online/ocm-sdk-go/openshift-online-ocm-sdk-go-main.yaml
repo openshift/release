@@ -35,12 +35,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: database-example
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    podman run --env POSTGRES_PASSWORD=foo --publish 5432 --detach docker.io/postgres:14 -c log_destination=stderr -c log_statement=all -c logging_collector=off
+  container:
+    from: golang-plus-pass
+  nested_podman: true
 - as: unit
   capabilities:
   - nested-podman
   commands: |
     unset GOFLAGS
-    HOME=${ARTIFACT_DIR} make test
+    make test
   container:
     from: golang-plus-pass
   nested_podman: true
