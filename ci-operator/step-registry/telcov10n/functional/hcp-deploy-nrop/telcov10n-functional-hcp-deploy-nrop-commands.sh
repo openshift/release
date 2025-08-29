@@ -85,9 +85,9 @@ echo "Status of Ansible playbook to install certificates required for internal r
 
 # Install NUMAResources Operator Playbook
 ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/install_nrop.yml \
--e nrop_hosted_kubeconfig="${T5CI_HCP_HOSTED_KUBECONFIG}" \
--e nrop_mgmt_kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" \
--e install_method="${T5CI_NROP_SOURCE}" || ansible_playbook_status=$?
+-e hosted_kubeconfig="${T5CI_HCP_HOSTED_KUBECONFIG}" \
+-e mgmt_kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" \
+-e install_sources="${T5CI_NROP_SOURCE}" || ansible_playbook_status=$?
 
 echo "Status of Ansible playbook to deploy NROP operator is: ${ansible_playbook_status}"
 
