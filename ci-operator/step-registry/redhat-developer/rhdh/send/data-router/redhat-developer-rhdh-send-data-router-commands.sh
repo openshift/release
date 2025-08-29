@@ -175,7 +175,7 @@ main() {
         return
       fi
 
-      if output=$(/droute send --metadata "$(get_metadata_output_path)" \
+      if output=$(droute send --metadata "$(get_metadata_output_path)" \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
@@ -213,7 +213,7 @@ main() {
         echo "Attempt ${i} of ${max_attempts}: Checking Data Router request completion..."
 
         # Get DataRouter request information.
-        DATA_ROUTER_REQUEST_OUTPUT=$(/droute request get \
+        DATA_ROUTER_REQUEST_OUTPUT=$(droute request get \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
