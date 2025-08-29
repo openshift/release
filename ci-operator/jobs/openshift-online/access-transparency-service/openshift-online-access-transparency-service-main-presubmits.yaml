@@ -1,25 +1,30 @@
-postsubmits:
-  openshift/hypershift-logging-operator:
+presubmits:
+  openshift-online/access-transparency-service:
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
-    cluster: build05
+    - ^main-
+    cluster: build07
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-hypershift-logging-operator-main-publish-coverage
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-online-access-transparency-service-main-unit
+    optional: true
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/hypershift-logging-operator-codecov-token
-        - --target=publish-coverage
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -32,8 +37,8 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /secrets/hypershift-logging-operator-codecov-token
-          name: hypershift-logging-operator-codecov-token
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -46,9 +51,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: hypershift-logging-operator-codecov-token
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
-          secretName: hypershift-logging-operator-codecov-token
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -58,3 +63,4 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
