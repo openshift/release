@@ -61,16 +61,47 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      IPSTACK: dualstack
-      SLEEP_DURATION: 1h
-    post:
-    - ref: azure-deprovision-resourcegroup
-    pre:
-    - ref: azure-provision-resourcegroup
-    - ref: azure-provision-vnet
-    - chain: azure-provision-bastionhost
-    test:
-    - ref: cucushift-installer-wait
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ls_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v5
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+- as: installer-rehearse-azure-1
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v6
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_E8as_v5
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+- as: installer-rehearse-azure-2
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_M32ms_v2
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_E4as_v6
+      CUSTOM_AZURE_REGION: centralus
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+- as: installer-rehearse-azure-3
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_M12s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_L8s_v3
+      CUSTOM_AZURE_REGION: eastus
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
