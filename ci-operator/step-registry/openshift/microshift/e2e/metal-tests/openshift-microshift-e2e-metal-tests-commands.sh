@@ -20,7 +20,6 @@ if [ "${JOB_TYPE}" == "presubmit" ]; then
   EXCLUDE_CNCF_CONFORMANCE=true
 fi
 
-SCENARIO_TYPE=${SCENARIO_TYPE:-presubmits}
 SCENARIO_SOURCES=$(get_source_dir "${SCENARIO_TYPE}")
 
 # Run in background to allow trapping signals before the command ends. If running in foreground
