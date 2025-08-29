@@ -16,6 +16,9 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+# Skip external tests
+export OPENSHIFT_SKIP_EXTERNAL_TESTS=1
+
 function run_mirror_test_images_ssh_commands() {
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash -ux << EOF
