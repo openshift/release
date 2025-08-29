@@ -65,6 +65,7 @@ tests:
   container:
     from: src
 - as: commatrix-e2e-tests
+  shard_count: 2
   steps:
     cluster_profile: aws-telco
     env:
@@ -93,12 +94,36 @@ tests:
         export KREW_ROOT="${KREW_ROOT:-$HOME/.krew}"
         export PATH="${KREW_ROOT}/bin:$PATH"
 
+        export ADDITIONAL_NFTABLES_RULES_FILE_PATH="/tmp/additional-nftables-rules"
+
+        echo "# Allow host level services dynamic port range
+        tcp dport 9000-9999 accept
+        udp dport 9000-9999 accept
+        # Allow Kubernetes node ports dynamic port range
+        tcp dport 30000-32767 accept
+        udp dport 30000-32767 accept
+        # Keep port open for origin test
+        # https://github.com/openshift/origin/blob/master/vendor/k8s.io/kubernetes/test/e2e/network/service.go#L2622
+        tcp dport 10180 accept
+        udp dport 10180 accept
+
+        tcp dport 10256 accept
+
+        tcp dport 443 accept
+        udp dport 443 accept
+
+        # Keep port open for origin test
+        # https://github.com/openshift/origin/blob/master/vendor/k8s.io/kubernetes/test/e2e/network/service.go#L2724
+        tcp dport 80 accept
+        udp dport 80 accept" > ${ADDITIONAL_NFTABLES_RULES_FILE_PATH}
+
         # Install the commatrix krew plugin
         go mod vendor
         make build
         make install INSTALL_DIR=/tmp/bin/
         # run the make e2e-test
-        PATH="/tmp/bin:$PATH" make e2e-test
+        PATH="/tmp/bin:$PATH" EXTRA_NFTABLES_MASTER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}" EXTRA_NFTABLES_WORKER_FILE="${ADDITIONAL_NFTABLES_RULES_FILE_PATH}"  make e2e-test
+        oc delete ns openshift-commatrix-debug
       from: cli-with-git
       resources:
         requests:
@@ -106,6 +131,7 @@ tests:
           memory: 200Mi
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 6h0m0s
 - as: security
   optional: true
   steps:
