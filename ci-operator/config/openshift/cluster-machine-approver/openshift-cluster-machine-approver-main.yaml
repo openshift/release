@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   ocp_4.20_base-rhel9:
     name: "4.20"
     namespace: ocp
@@ -7,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
 build_root:
   from_repository: true
 images:
@@ -61,6 +69,28 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: regression-clusterinfra-aws-ipi-all
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_SCENARIOS: Cluster_Infrastructure CMA
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+- as: regression-clusterinfra-gcp-ipi-all
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SCENARIOS: Cluster_Infrastructure CMA
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 8h0m0s
 - as: e2e-azure-operator
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
