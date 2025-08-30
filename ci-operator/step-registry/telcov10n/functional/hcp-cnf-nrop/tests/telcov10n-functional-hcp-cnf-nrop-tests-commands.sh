@@ -18,7 +18,7 @@ export E2E_NROP_DEVICE_TYPE_2=example.com/deviceB
 export E2E_NROP_DEVICE_TYPE_3=example.com/deviceC
 
 # local variables
-NROP_REPO="https://github.com/openshift/numaresources-operator.git"
+NROP_REPO="https://github.com/openshift-kni/numaresources-operator.git"
 NROP_BRANCH="main"
 GINKGO_LABEL="tier0 && !reboot_required && !openshift"
 GINKGO_SUITES="test/e2e/serial/"
@@ -42,13 +42,13 @@ pushd "${NROP_REPO_DIR}"
 
 # Set go version
 if [[ "${T5CI_VERSION}" == "4.12" ]] || [[ "${T5CI_VERSION}" == "4.13" ]]; then
-    source "${HOME}"/golang-1.19
+  source "${HOME}"/golang-1.19
 elif [[ "${T5CI_VERSION}" == "4.14" ]] || [[ "${T5CI_VERSION}" == "4.15" ]]; then
-    source "${HOME}"/golang-1.20
+  source "${HOME}"/golang-1.20
 elif [[ "${T5CI_VERSION}" == "4.16" ]]; then
-    source "${HOME}"/golang-1.21.11
+  source "${HOME}"/golang-1.21.11
 else
-    source "${HOME}"/golang-1.22.4
+  source "${HOME}"/golang-1.23.11
 fi
 
 echo "Go version: $(go version)"
