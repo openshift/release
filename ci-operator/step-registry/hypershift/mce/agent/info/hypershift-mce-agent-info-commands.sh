@@ -6,6 +6,12 @@ if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   source "${SHARED_DIR}/packet-conf.sh"
 fi
 
+# Using s390x managment cluster kubeconfig if it is present
+# s390x_mgmt-kubeconfig will only be present in case of s390x managment ci jobs
+if [ -f "$SHARED_DIR/s390x_mgmt-kubeconfig" ]; then
+   export KUBECONFIG="$SHARED_DIR/s390x_mgmt-kubeconfig"
+fi
+
 echo "**MGMT cluster**"
 echo "HyperShift repo commit id"
 oc logs -n hypershift -l app=operator --tail=-1 | head -1

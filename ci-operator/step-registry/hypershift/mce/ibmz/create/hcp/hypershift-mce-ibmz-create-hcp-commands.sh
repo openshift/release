@@ -15,6 +15,13 @@ ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 ssh_key=$(cat ${ssh_key_file})
 export ssh_key
 
+# Using s390x managment cluster kubeconfig if it is present
+# s390x_mgmt-kubeconfig will only be present in case of s390x managment ci jobs
+if [ -f "$SHARED_DIR/s390x_mgmt-kubeconfig" ]; then
+   export KUBECONFIG="$SHARED_DIR/s390x_mgmt-kubeconfig"
+fi
+
+
 # Creating cluster imageset
 cat <<EOF | oc create -f -
 apiVersion: hive.openshift.io/v1

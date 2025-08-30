@@ -6,6 +6,12 @@ export HC_NAME
 hcp_ns="${HC_NS}-${HC_NAME}"
 export hcp_ns
 
+# Using s390x managment cluster kubeconfig if it is present
+# s390x_mgmt-kubeconfig will only be present in case of s390x managment ci jobs
+if [ -f "$SHARED_DIR/s390x_mgmt-kubeconfig" ]; then
+   export KUBECONFIG="$SHARED_DIR/s390x_mgmt-kubeconfig"
+fi
+
 echo "$(date) Scaling down nodepool ${HC_NS} to 0"
 oc -n ${HC_NS} scale nodepool ${HC_NAME} --replicas 0
 
