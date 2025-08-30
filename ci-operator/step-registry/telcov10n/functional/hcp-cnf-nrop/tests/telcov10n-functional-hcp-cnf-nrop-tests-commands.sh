@@ -51,8 +51,40 @@ elif [[ "${T5CI_VERSION}" == "4.14" ]] || [[ "${T5CI_VERSION}" == "4.15" ]]; the
   source "${HOME}"/golang-1.20
 elif [[ "${T5CI_VERSION}" == "4.16" ]]; then
   source "${HOME}"/golang-1.21.11
+elif [[ "${T5CI_VERSION}" == "4.17" ]] || [[ "${T5CI_VERSION}" == "4.18" ]]; then
+  source "${HOME}"/golang-1.22.4
 else
-  source "${HOME}"/golang-1.23
+  # For 4.19+ check if golang-1.23.x is available, install if not
+  if ls "${HOME}"/golang-1.23* 1> /dev/null 2>&1; then
+    # Find the latest golang-1.23.x version available
+    LATEST_GOLANG_123=$(ls "${HOME}"/golang-1.23* | sort -V | tail -1)
+    echo "Using pre-installed golang: ${LATEST_GOLANG_123}"
+    source "${LATEST_GOLANG_123}"
+  else
+    # Install golang-1.23 manually in ${HOME} to be consistent
+    echo "Installing golang-1.23 for OpenShift ${T5CI_VERSION}"
+    GO_VERSION="1.23.6"
+    GO_ARCH="linux-amd64"
+
+    # Download and install Go 1.23 in ${HOME}
+    cd /tmp
+    curl -LO "https://go.dev/dl/go${GO_VERSION}.${GO_ARCH}.tar.gz"
+    tar -C "${HOME}" -xzf "go${GO_VERSION}.${GO_ARCH}.tar.gz"
+    rm "go${GO_VERSION}.${GO_ARCH}.tar.gz"
+
+    # Create environment setup script for golang-1.23.6
+    cat > "${HOME}/golang-1.23.6" << 'EOF'
+#!/bin/bash
+export GOROOT="${HOME}/go"
+export PATH="${GOROOT}/bin:${PATH}"
+export GOPATH="${HOME}/go-workspace"
+export GOBIN="${GOPATH}/bin"
+EOF
+    chmod +x "${HOME}/golang-1.23.6"
+
+    # Source the newly created golang-1.23.6 script
+    source "${HOME}/golang-1.23.6"
+  fi
 fi
 
 echo "Go version: $(go version)"
