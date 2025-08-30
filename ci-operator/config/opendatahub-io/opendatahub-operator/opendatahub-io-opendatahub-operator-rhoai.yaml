@@ -76,9 +76,33 @@ tests:
     - as: e2e
       cli: latest
       commands: |
+        echo "Starting comprehensive background monitoring to prevent HCP controller timing issues"
+
+        # Start cluster-wide watch connections to keep API server and controllers active
+        # This mimics having the OpenShift console open which prevents the timing issue
+        
+        # Watch all deployments cluster-wide (catches everything)
+        oc get deployments --all-namespaces -w > /tmp/all-deployments-watch.log 2>&1 &
+        ALL_DEPLOY_WATCH_PID=$!
+        
+        # Watch events cluster-wide (shows controller activity)
+        oc get events --all-namespaces -w > /tmp/all-events-watch.log 2>&1 &
+        ALL_EVENTS_WATCH_PID=$!
+        
+        # Watch ODH custom resources (DataScienceCluster, etc.)
+        oc get datascienceclusters --all-namespaces -w > /tmp/dsc-watch.log 2>&1 &
+        DSC_WATCH_PID=$!
+        
+        # Ensure cleanup on exit
+        trap 'kill $ALL_DEPLOY_WATCH_PID $ALL_EVENTS_WATCH_PID $DSC_WATCH_PID 2>/dev/null || true' EXIT
+
+        # Give watch connections time to establish and warm up controllers
+        sleep 10
+
         unset GOFLAGS
         make e2e-test -e OPERATOR_NAMESPACE=redhat-ods-operator
       from: src
+      grace_period: 30s
       resources:
         requests:
           cpu: 2000m
