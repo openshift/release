@@ -144,36 +144,39 @@ else
 fi
 
 export SL_BUILD_SESSION_ID
+SL_BUILD_SESSION_ID=32e0c34b-7b9e-49ab-9ac1-b6d6e24d3d8d
+# if [[ "$JOB_NAME" == *sealight* ]]; then
+#     # Create a directory for cosign
+#     mkdir -p /tmp/cosign-client
+#     curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 && chmod +x /tmp/cosign-client/cosign
+#     export PATH=/tmp/cosign-client:$PATH
 
-if [[ "$JOB_NAME" == *sealight* ]]; then
-    # Create a directory for cosign
-    mkdir -p /tmp/cosign-client
-    curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 && chmod +x /tmp/cosign-client/cosign
-    export PATH=/tmp/cosign-client:$PATH
+#     COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
+#     cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
+#     SL_BUILD_SESSION_ID="$(jq -r \
+#             '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
+#             select(.invocation.environment.labels."konflux-ci/sealights" == "true")
+#             | .results[] | select(.name == "sealights-bsid") | .value' \
+#             cosign_metadata.json)"
+#     echo "SL_BSID: $SL_BUILD_SESSION_ID"
+#     SL_CONTAINER_IMAGE="$(jq -r '
+#             .payload
+#             | @base64d
+#             | fromjson
+#             | first(
+#               .predicate.buildConfig.tasks[]
+#               | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
+#               | .invocation.parameters.IMAGE
+#               )
+#           ' cosign_metadata.json)"
+#     echo "SL_CONTAINER_IMAGE: $SL_CONTAINER_IMAGE"
 
-    COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
-    cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
-    SL_BUILD_SESSION_ID="$(jq -r \
-            '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
-            select(.invocation.environment.labels."konflux-ci/sealights" == "true")
-            | .results[] | select(.name == "sealights-bsid") | .value' \
-            cosign_metadata.json)"
-    echo "SL_BSID: $SL_BUILD_SESSION_ID"
-    SL_CONTAINER_IMAGE="$(jq -r '
-            .payload
-            | @base64d
-            | fromjson
-            | first(
-              .predicate.buildConfig.tasks[]
-              | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
-              | .invocation.parameters.IMAGE
-              )
-          ' cosign_metadata.json)"
-    echo "SL_CONTAINER_IMAGE: $SL_CONTAINER_IMAGE"
+#     QUAY_REPO=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f1 | sed 's|quay.io/||' | head -n1)
+#     TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2 | head -n1)
+# fi
 
-    QUAY_REPO=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f1 | sed 's|quay.io/||' | head -n1)
-    TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2 | head -n1)
-fi
+QUAY_REPO=rhdh/rhdh-hub-rhel9-sealights
+TAG_NAME=on-pr-ccf0ab57a6502770dd15d24b316652dcddb73311
 
 echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
