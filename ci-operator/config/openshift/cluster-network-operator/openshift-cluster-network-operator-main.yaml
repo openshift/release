@@ -16,8 +16,8 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
@@ -26,7 +26,6 @@ base_images:
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
 - dockerfile_path: Dockerfile
   inputs:
@@ -39,18 +38,18 @@ images:
   to: cluster-network-operator
 promotion:
   to:
-  - name: 4.20-priv
-    namespace: ocp-private
+  - name: "4.20"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -261,6 +260,20 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws-3
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-cidr-expansion
+- as: e2e-aws-ovn-subnet-configs
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws-3
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: ovn-subnet-configs
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
@@ -450,6 +463,6 @@ tests:
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
   timeout: 5h0m0s
 zz_generated_metadata:
-  branch: master
-  org: openshift-priv
+  branch: main
+  org: openshift
   repo: cluster-network-operator
