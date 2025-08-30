@@ -1,0 +1,94 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  fedora:
+    name: fedora
+    namespace: openshift
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- dockerfile_literal: "FROM base \nWORKDIR /tmp/src\nRUN dnf install -y git &&\\\ngit
+    clone https://github.com/amp-rh/openshift-fusion-access-operator.git .\n"
+  from: base
+  to: git-src
+- dockerfile_literal: |
+    FROM fedora
+    WORKDIR /tmp/src/console
+    COPY --from=git-src /tmp/src/console .
+    ENV PATH $PATH:/cli:/tmp/src/console/node_modules/.bin
+    ENV npm_config_cache /tmp/src/cache
+    ENV CYPRESS_CACHE_FOLDER /tmp/src/cache/cypress
+    ENV KUBECONFIG $SHARED_DIR/kubeconfig
+    RUN dnf install jq ps at-spi2-atk npm xorg-x11-server-Xvfb npm xauth nss alsa-lib unzip cups-libs gtk3-devel git -y
+    RUN dnf clean all
+    RUN npm set progress=false
+    RUN npm install --save-dev
+    RUN cypress verify
+    RUN chgrp -R 0 /tmp/src/
+    RUN chmod -R g+w /tmp/src/
+  from: fedora
+  inputs:
+    git-src:
+      as:
+      - git-src
+  to: fusion-access-test-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: fusion-access-operator-ipi-ocp420
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp", "self-managed-lp", "fusion-access-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mbaldess@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+          { "name": "openshift-fusion-access-operator", "source": "certified-operators", "channel": "!default", "install_namespace": "", "target_namespaces": "!install" }
+        ]
+      RE_TRIGGER_ON_FAILURE: "false"
+      USER_TAGS: |
+        scenario fusion-access
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts/installer/auth &&\
+        cp "$SHARED_DIR/kubeadmin-password" /tmp/artifacts/installer/auth/kubeadmin-password &&\
+        scripts/test-integration.sh
+      from: fusion-access-test-runner
+      resources:
+        requests:
+          cpu: 200m
+          memory: 4Gi
+    workflow: firewatch-ipi-aws
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: fusion-access-operator-ocp4.20-lp-interop
