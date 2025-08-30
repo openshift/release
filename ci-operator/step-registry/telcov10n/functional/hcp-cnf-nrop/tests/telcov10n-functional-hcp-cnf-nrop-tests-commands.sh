@@ -40,6 +40,10 @@ echo "Running on branch ${NROP_BRANCH}"
 git clone -b "${NROP_BRANCH}" "${NROP_REPO}" "${NROP_REPO_DIR}"
 pushd "${NROP_REPO_DIR}"
 
+echo "================Golang versions================="
+ls -ltR "${HOME}"
+ls -la "${HOME}"/golang-*
+
 # Set go version
 if [[ "${T5CI_VERSION}" == "4.12" ]] || [[ "${T5CI_VERSION}" == "4.13" ]]; then
   source "${HOME}"/golang-1.19
@@ -48,7 +52,7 @@ elif [[ "${T5CI_VERSION}" == "4.14" ]] || [[ "${T5CI_VERSION}" == "4.15" ]]; the
 elif [[ "${T5CI_VERSION}" == "4.16" ]]; then
   source "${HOME}"/golang-1.21.11
 else
-  source "${HOME}"/golang-1.23.11
+  source "${HOME}"/golang-1.23
 fi
 
 echo "Go version: $(go version)"
