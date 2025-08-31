@@ -68,7 +68,6 @@ while IFS= read -r file; do
         # Extract delivery_repo_names using yq
         DELIVERY_REPOS=$(yq eval '.delivery.delivery_repo_names[]?' "${file}" 2>/dev/null || echo "")
         if [ -n "${DELIVERY_REPOS}" ]; then
-            echo "📄 File: ${file}"
             MISSING_REPOS=""
             while IFS= read -r repo; do
                 if [ -n "${repo}" ]; then
@@ -80,17 +79,17 @@ while IFS= read -r file; do
                 fi
             done <<< "${DELIVERY_REPOS}"
             
+            # Only show files with missing repos
             if [ -n "${MISSING_REPOS}" ]; then
+                echo "📄 File: ${file}"
                 echo "❌ Missing from GitLab release data:"
                 printf "%s" "${MISSING_REPOS}" | while read -r missing_repo; do
                     if [ -n "${missing_repo}" ]; then
                         echo "  - ${missing_repo}"
                     fi
                 done
-            else
-                echo "✅ All delivery repos found in GitLab release data"
+                echo ""
             fi
-            echo ""
         fi
     fi
 done <<< "${IMAGE_FILES}"
@@ -98,7 +97,7 @@ done <<< "${IMAGE_FILES}"
 echo "=== Summary ==="
 if [ -n "${ALL_MISSING_REPOS}" ]; then
     echo "❌ Total missing repositories in GitLab release data:"
-    printf "%s" "${ALL_MISSING_REPOS}" | while read -r missing_entry; do
+    echo -e "${ALL_MISSING_REPOS}" | while read -r missing_entry; do
         if [ -n "${missing_entry}" ]; then
             echo "  - ${missing_entry}"
         fi
