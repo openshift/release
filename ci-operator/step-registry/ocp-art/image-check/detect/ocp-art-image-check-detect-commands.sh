@@ -19,7 +19,7 @@ fi
 
 # Get the base commit to compare against
 # For PRs, this should be the target branch HEAD
-BASE_SHA=$(git merge-base HEAD origin/$(git rev-parse --abbrev-ref HEAD))
+BASE_SHA=$(git merge-base HEAD "origin/$(git rev-parse --abbrev-ref HEAD)")
 
 echo "Comparing against base commit: ${BASE_SHA}"
 
