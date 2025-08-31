@@ -47,7 +47,6 @@ fi
 # Extract all repository names from GitLab files and strip registry prefix
 GITLAB_REPOS_STAGE=$(yq eval '.spec.data.mapping.components[].repository' /tmp/gitlab-stage.yaml 2>/dev/null | sed 's|^[^/]*/||' || echo "")
 GITLAB_REPOS_PROD=$(yq eval '.spec.data.mapping.components[].repository' /tmp/gitlab-prod.yaml 2>/dev/null | sed 's|^[^/]*/||' || echo "")
-GITLAB_REPOS=$(printf "%s\n%s" "${GITLAB_REPOS_STAGE}" "${GITLAB_REPOS_PROD}" | sort -u | grep -v '^$')
 
 # Find all YAML files in the images directory
 IMAGE_FILES=$(find images/ -name '*.yml' -o -name '*.yaml' 2>/dev/null || true)
@@ -70,18 +69,25 @@ while IFS= read -r file; do
         BUNDLE_DELIVERY_REPO=$(yq eval '.delivery.bundle_delivery_repo_name' "${file}" 2>/dev/null | grep -v '^null$' || echo "")
         
         HAS_REPOS=false
-        MISSING_DELIVERY_REPOS=""
-        MISSING_BUNDLE_REPO=""
+        MISSING_DELIVERY_REPOS_STAGE=""
+        MISSING_DELIVERY_REPOS_PROD=""
+        MISSING_BUNDLE_REPO_STAGE=""
+        MISSING_BUNDLE_REPO_PROD=""
         
         # Check delivery_repo_names
         if [ -n "${DELIVERY_REPOS}" ]; then
             HAS_REPOS=true
             while IFS= read -r repo; do
                 if [ -n "${repo}" ]; then
-                    # Check if repo exists in GitLab files
-                    if ! echo "${GITLAB_REPOS}" | grep -q "^${repo}$"; then
-                        MISSING_DELIVERY_REPOS="${MISSING_DELIVERY_REPOS}${repo}\n"
-                        ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${repo} (from ${file})\n"
+                    # Check if repo exists in stage
+                    if ! echo "${GITLAB_REPOS_STAGE}" | grep -q "^${repo}$"; then
+                        MISSING_DELIVERY_REPOS_STAGE="${MISSING_DELIVERY_REPOS_STAGE}${repo}\n"
+                        ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${repo} (from ${file} - missing in stage)\n"
+                    fi
+                    # Check if repo exists in prod
+                    if ! echo "${GITLAB_REPOS_PROD}" | grep -q "^${repo}$"; then
+                        MISSING_DELIVERY_REPOS_PROD="${MISSING_DELIVERY_REPOS_PROD}${repo}\n"
+                        ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${repo} (from ${file} - missing in prod)\n"
                     fi
                 fi
             done <<< "${DELIVERY_REPOS}"
@@ -90,28 +96,48 @@ while IFS= read -r file; do
         # Check bundle_delivery_repo_name
         if [ -n "${BUNDLE_DELIVERY_REPO}" ]; then
             HAS_REPOS=true
-            if ! echo "${GITLAB_REPOS}" | grep -q "^${BUNDLE_DELIVERY_REPO}$"; then
-                MISSING_BUNDLE_REPO="${BUNDLE_DELIVERY_REPO}"
-                ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${BUNDLE_DELIVERY_REPO} (from ${file})\n"
+            # Check if repo exists in stage
+            if ! echo "${GITLAB_REPOS_STAGE}" | grep -q "^${BUNDLE_DELIVERY_REPO}$"; then
+                MISSING_BUNDLE_REPO_STAGE="${BUNDLE_DELIVERY_REPO}"
+                ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${BUNDLE_DELIVERY_REPO} (from ${file} - missing in stage)\n"
+            fi
+            # Check if repo exists in prod
+            if ! echo "${GITLAB_REPOS_PROD}" | grep -q "^${BUNDLE_DELIVERY_REPO}$"; then
+                MISSING_BUNDLE_REPO_PROD="${BUNDLE_DELIVERY_REPO}"
+                ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${BUNDLE_DELIVERY_REPO} (from ${file} - missing in prod)\n"
             fi
         fi
         
         # Only show files with missing repos
-        if [ "${HAS_REPOS}" = "true" ] && ([ -n "${MISSING_DELIVERY_REPOS}" ] || [ -n "${MISSING_BUNDLE_REPO}" ]); then
+        if [ "${HAS_REPOS}" = "true" ] && ([ -n "${MISSING_DELIVERY_REPOS_STAGE}" ] || [ -n "${MISSING_DELIVERY_REPOS_PROD}" ] || [ -n "${MISSING_BUNDLE_REPO_STAGE}" ] || [ -n "${MISSING_BUNDLE_REPO_PROD}" ]); then
             echo "📄 File: ${file}"
             
-            if [ -n "${MISSING_DELIVERY_REPOS}" ]; then
-                echo "❌ Missing delivery_repo_names from GitLab release data:"
-                printf "%s" "${MISSING_DELIVERY_REPOS}" | while read -r missing_repo; do
+            if [ -n "${MISSING_DELIVERY_REPOS_STAGE}" ]; then
+                echo "❌ Missing delivery_repo_names from GitLab STAGE release data:"
+                printf "%s" "${MISSING_DELIVERY_REPOS_STAGE}" | while read -r missing_repo; do
                     if [ -n "${missing_repo}" ]; then
                         echo "  - ${missing_repo}"
                     fi
                 done
             fi
             
-            if [ -n "${MISSING_BUNDLE_REPO}" ]; then
-                echo "❌ Missing bundle_delivery_repo_name from GitLab release data:"
-                echo "  - ${MISSING_BUNDLE_REPO}"
+            if [ -n "${MISSING_DELIVERY_REPOS_PROD}" ]; then
+                echo "❌ Missing delivery_repo_names from GitLab PROD release data:"
+                printf "%s" "${MISSING_DELIVERY_REPOS_PROD}" | while read -r missing_repo; do
+                    if [ -n "${missing_repo}" ]; then
+                        echo "  - ${missing_repo}"
+                    fi
+                done
+            fi
+            
+            if [ -n "${MISSING_BUNDLE_REPO_STAGE}" ]; then
+                echo "❌ Missing bundle_delivery_repo_name from GitLab STAGE release data:"
+                echo "  - ${MISSING_BUNDLE_REPO_STAGE}"
+            fi
+            
+            if [ -n "${MISSING_BUNDLE_REPO_PROD}" ]; then
+                echo "❌ Missing bundle_delivery_repo_name from GitLab PROD release data:"
+                echo "  - ${MISSING_BUNDLE_REPO_PROD}"
             fi
             echo ""
         fi
@@ -129,7 +155,7 @@ if [ -n "${ALL_MISSING_REPOS}" ]; then
     echo ""
     echo "=== Test Failed ==="
     echo "Some delivery repositories are missing from GitLab release data."
-    echo "Please add the missing repositories to the GitLab configuration."
+    echo "Please add the missing repositories to the stage/prod ReleasePlanAdmissions here: https://gitlab.cee.redhat.com/releng/konflux-release-data/-/tree/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art"
     exit 1
 else
     echo "✅ All delivery repositories are present in GitLab release data"
