@@ -59,6 +59,7 @@ else
     # Find the latest golang-1.23.x version available
     LATEST_GOLANG_123=$(ls "${HOME}"/golang-1.23* | sort -V | tail -1)
     echo "Using pre-installed golang: ${LATEST_GOLANG_123}"
+    # shellcheck disable=SC1090
     source "${LATEST_GOLANG_123}"
   else
     # Install golang-1.23 manually in ${HOME} to be consistent
