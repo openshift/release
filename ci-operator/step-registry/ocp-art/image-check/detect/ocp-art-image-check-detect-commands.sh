@@ -7,6 +7,13 @@ set -o pipefail
 echo "=== OCP ART Image Check ==="
 echo "Scanning all image definition files and checking against GitLab release data..."
 
+# Check if OCP_VERSION is provided
+if [ -z "${OCP_VERSION:-}" ]; then
+    echo "❌ Error: OCP_VERSION environment variable is required but not set"
+    echo "Please set OCP_VERSION to the target OCP version (e.g., 4.19, 4.20)"
+    exit 1
+fi
+
 # Install yq if not available
 if ! command -v yq &> /dev/null; then
     echo "Installing yq..."
@@ -18,19 +25,26 @@ if ! command -v yq &> /dev/null; then
 fi
 
 # Fetch GitLab YAML files
-echo "Fetching GitLab release data..."
-GITLAB_STAGE_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-stage-4-20.yaml"
-GITLAB_PROD_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-prod-4-20.yaml"
+OCP_VERSION_DASH=$(echo "${OCP_VERSION}" | tr '.' '-')
+echo "Fetching GitLab release data for OCP version ${OCP_VERSION}..."
+GITLAB_STAGE_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-stage-${OCP_VERSION_DASH}.yaml"
+GITLAB_PROD_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-prod-${OCP_VERSION_DASH}.yaml"
 
-curl -s "${GITLAB_STAGE_URL}" -o /tmp/gitlab-stage.yaml || {
-    echo "⚠️  Failed to fetch GitLab stage file"
+echo "Attempting to fetch: ${GITLAB_STAGE_URL}"
+HTTP_CODE=$(curl -s -w "%{http_code}" "${GITLAB_STAGE_URL}" -o /tmp/gitlab-stage.yaml)
+if [ "${HTTP_CODE}" != "200" ]; then
+    echo "⚠️  Failed to fetch GitLab stage file (HTTP ${HTTP_CODE})"
+    echo "URL: ${GITLAB_STAGE_URL}"
     exit 1
-}
+fi
 
-curl -s "${GITLAB_PROD_URL}" -o /tmp/gitlab-prod.yaml || {
-    echo "⚠️  Failed to fetch GitLab prod file"
+echo "Attempting to fetch: ${GITLAB_PROD_URL}"
+HTTP_CODE=$(curl -s -w "%{http_code}" "${GITLAB_PROD_URL}" -o /tmp/gitlab-prod.yaml)
+if [ "${HTTP_CODE}" != "200" ]; then
+    echo "⚠️  Failed to fetch GitLab prod file (HTTP ${HTTP_CODE})"
+    echo "URL: ${GITLAB_PROD_URL}"
     exit 1
-}
+fi
 
 # Extract all repository names from GitLab files
 GITLAB_REPOS_STAGE=$(yq eval '.. | select(has("repository")) | .repository' /tmp/gitlab-stage.yaml 2>/dev/null || echo "")
