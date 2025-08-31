@@ -47,8 +47,8 @@ if [ "${HTTP_CODE}" != "200" ]; then
 fi
 
 # Extract all repository names from GitLab files
-GITLAB_REPOS_STAGE=$(yq eval '.. | select(has("repository")) | .repository' /tmp/gitlab-stage.yaml 2>/dev/null || echo "")
-GITLAB_REPOS_PROD=$(yq eval '.. | select(has("repository")) | .repository' /tmp/gitlab-prod.yaml 2>/dev/null || echo "")
+GITLAB_REPOS_STAGE=$(yq eval '.spec.data.mapping.components[].repository' /tmp/gitlab-stage.yaml 2>/dev/null || echo "")
+GITLAB_REPOS_PROD=$(yq eval '.spec.data.mapping.components[].repository' /tmp/gitlab-prod.yaml 2>/dev/null || echo "")
 GITLAB_REPOS=$(printf "%s\n%s" "${GITLAB_REPOS_STAGE}" "${GITLAB_REPOS_PROD}" | sort -u | grep -v '^$')
 
 # Find all YAML files in the images directory
