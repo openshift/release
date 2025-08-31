@@ -65,31 +65,55 @@ echo ""
 ALL_MISSING_REPOS=""
 while IFS= read -r file; do
     if [ -n "$file" ] && [ -f "${file}" ]; then
-        # Extract delivery_repo_names using yq
+        # Extract delivery_repo_names and bundle_delivery_repo_name using yq
         DELIVERY_REPOS=$(yq eval '.delivery.delivery_repo_names[]?' "${file}" 2>/dev/null || echo "")
+        BUNDLE_DELIVERY_REPO=$(yq eval '.delivery.bundle_delivery_repo_name' "${file}" 2>/dev/null | grep -v '^null$' || echo "")
+        
+        HAS_REPOS=false
+        MISSING_DELIVERY_REPOS=""
+        MISSING_BUNDLE_REPO=""
+        
+        # Check delivery_repo_names
         if [ -n "${DELIVERY_REPOS}" ]; then
-            MISSING_REPOS=""
+            HAS_REPOS=true
             while IFS= read -r repo; do
                 if [ -n "${repo}" ]; then
                     # Check if repo exists in GitLab files
                     if ! echo "${GITLAB_REPOS}" | grep -q "^${repo}$"; then
-                        MISSING_REPOS="${MISSING_REPOS}${repo}\n"
+                        MISSING_DELIVERY_REPOS="${MISSING_DELIVERY_REPOS}${repo}\n"
                         ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${repo} (from ${file})\n"
                     fi
                 fi
             done <<< "${DELIVERY_REPOS}"
+        fi
+        
+        # Check bundle_delivery_repo_name
+        if [ -n "${BUNDLE_DELIVERY_REPO}" ]; then
+            HAS_REPOS=true
+            if ! echo "${GITLAB_REPOS}" | grep -q "^${BUNDLE_DELIVERY_REPO}$"; then
+                MISSING_BUNDLE_REPO="${BUNDLE_DELIVERY_REPO}"
+                ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${BUNDLE_DELIVERY_REPO} (from ${file})\n"
+            fi
+        fi
+        
+        # Only show files with missing repos
+        if [ "${HAS_REPOS}" = "true" ] && ([ -n "${MISSING_DELIVERY_REPOS}" ] || [ -n "${MISSING_BUNDLE_REPO}" ]); then
+            echo "📄 File: ${file}"
             
-            # Only show files with missing repos
-            if [ -n "${MISSING_REPOS}" ]; then
-                echo "📄 File: ${file}"
-                echo "❌ Missing from GitLab release data:"
-                printf "%s" "${MISSING_REPOS}" | while read -r missing_repo; do
+            if [ -n "${MISSING_DELIVERY_REPOS}" ]; then
+                echo "❌ Missing delivery_repo_names from GitLab release data:"
+                printf "%s" "${MISSING_DELIVERY_REPOS}" | while read -r missing_repo; do
                     if [ -n "${missing_repo}" ]; then
                         echo "  - ${missing_repo}"
                     fi
                 done
-                echo ""
             fi
+            
+            if [ -n "${MISSING_BUNDLE_REPO}" ]; then
+                echo "❌ Missing bundle_delivery_repo_name from GitLab release data:"
+                echo "  - ${MISSING_BUNDLE_REPO}"
+            fi
+            echo ""
         fi
     fi
 done <<< "${IMAGE_FILES}"
