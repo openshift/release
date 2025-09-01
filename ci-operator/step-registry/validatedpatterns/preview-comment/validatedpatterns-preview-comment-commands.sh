@@ -4,7 +4,7 @@ GITHUB_AUTH_TOKEN=$(cat /tmp/vault/validatedpatterns-github-secret/GITHUB_AUTH_T
 
 export GITHUB_AUTH_TOKEN
 
-PREVIEW_URL="https://${PULL_NUMBER}--${PREVIEW_SITE}.netlify.app"
+PREVIEW_URL="https://${PULL_NUMBER}--patternsdocs-pr.netlify.app"
 
 COMMENT_DATA="🤖 $(date +'%a %b %d %T') - The preview is ready at:\n${PREVIEW_URL}"
 
