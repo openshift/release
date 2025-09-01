@@ -49,8 +49,9 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
     fi
 fi
 
-REPO_URL="https://github.com/rsevilla87/e2e-benchmarking/"
-TAG_OPTION="--branch remove-pprof-logic"
+REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=cluster-density-v2
