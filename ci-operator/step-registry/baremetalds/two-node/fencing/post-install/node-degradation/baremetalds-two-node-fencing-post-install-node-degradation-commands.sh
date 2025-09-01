@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "baremetalds-two-node-fencing-post-install-node-degredation starting..."
+echo "baremetalds-two-node-fencing-post-install-node-degradation starting..."
 
 # Check if DEGRADED_NODE is unset or empty
 if [[ -z "${DEGRADED_NODE:-}" ]]; then
