@@ -83,7 +83,7 @@ function check_private() {
   else
     logger "INFO" "check_private: Cluster API Listening is '${api_lisening}'"
   fi
-
+  sleep 7200
   # 2. check on GCP the DNS record-sets
   ret=0
   gcloud_auth
