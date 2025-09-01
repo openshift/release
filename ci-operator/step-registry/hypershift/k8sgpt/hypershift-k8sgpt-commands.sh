@@ -47,14 +47,34 @@ active_filters_str=$(echo "${active_filters[@]}" | tr ' ' ',')
 
 common_params=(--output json --anonymize --with-doc "$explain_arg" --filter "$active_filters_str")
 
-# Run the scan on the management cluster
-k8sgpt --kubeconfig="$KUBECONFIG" analyze "${common_params[@]}" | \
-    tee -a "${ARTIFACT_DIR}/k8sgpt-result-mgmt.json" || true
+mkdir -p "${ARTIFACT_DIR}/namespaces" "${ARTIFACT_DIR}/hostedcluster"
 
+CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}')
+
+mgmt_fail=false
+# Collect only hypershift-related namespaces from the management cluster.
+for namespace in hypershift "${HOSTED_CLUSTER_NS}" "${HOSTED_CLUSTER_NS}-${CLUSTER_NAME}"; do
+    mkdir -p "${ARTIFACT_DIR}/namespaces/$namespace"
+    # Run the scan on the management cluster
+    result_file="${ARTIFACT_DIR}/namespaces/$namespace/result.json"
+    k8sgpt --kubeconfig="$KUBECONFIG" analyze --namespace "$namespace" "${common_params[@]}" | \
+        tee "$result_file" || true
+    if [[ -f "$result_file" ]]; then
+        if ! grep "problems\": 0" "$result_file" &>/dev/null; then
+            mgmt_fail=true
+        fi
+    fi
+done
+
+guest_fail=false
 # Run the scan on the guest cluster
 if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
     k8sgpt --kubeconfig="${SHARED_DIR}/nested_kubeconfig" analyze "${common_params[@]}" | \
-        tee -a "${ARTIFACT_DIR}/k8sgpt-result-guest.json" || true
+        tee "${ARTIFACT_DIR}/hostedcluster/result.json" || true
+    if ! grep "problems\": 0" "${ARTIFACT_DIR}/hostedcluster/result.json" &>/dev/null; then
+        guest_fail=true
+    fi
 fi
 
 # Optionally generate a JUnit report.
@@ -62,20 +82,19 @@ if [[ "${JUNIT_REPORT}" == "false" ]]; then
     exit 0
 fi
 
-result_mgmt=$(cat "${ARTIFACT_DIR}/k8sgpt-result-mgmt.json" || true)
-result_guest=$(cat "${ARTIFACT_DIR}/k8sgpt-result-guest.json" || true)
-
 mkdir -p "${ARTIFACT_DIR}/junit"
 
 testcase_mgmt="<testcase name=\"scanning management cluster\"/>"
 testcase_guest="<testcase name=\"scanning guest cluster\"/>"
 
-np="No problems detected"
-
 failures=0
 
-if [[ ! ${result_mgmt} =~ $np ]]; then
+if [[ "${mgmt_fail}" == "true" ]]; then
     failures=$((failures + 1))
+    result_mgmt=""
+    for namespace in hypershift "${HOSTED_CLUSTER_NS}" "${HOSTED_CLUSTER_NS}-${CLUSTER_NAME}"; do
+        result_mgmt+=$(cat "${ARTIFACT_DIR}/namespaces/$namespace/result.json")
+    done
     testcase_mgmt=$(cat <<EOF
 <testcase name="scanning management cluster">
     <failure message="">problems detected</failure>
@@ -87,8 +106,9 @@ EOF
     )
 fi
 
-if [[ ! ${result_guest} =~ $np ]]; then
+if [[ "${guest_fail}" == "true" ]]; then
     failures=$((failures + 1))
+    result_guest=$(cat "${ARTIFACT_DIR}/hostedcluster/result.json")
     testcase_guest=$(cat <<EOF
 <testcase name="scanning guest cluster">
     <failure message="">problems detected</failure>
