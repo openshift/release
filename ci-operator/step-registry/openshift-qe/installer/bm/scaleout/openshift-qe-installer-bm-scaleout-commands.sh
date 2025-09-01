@@ -11,7 +11,7 @@ export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
 
-# Get the number of current dedicatedworker nodes in the cluster
+# Get the number of current dedicated worker nodes in the cluster
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 NUM_CURRENT_WORKER_NODES=$(oc get nodes | grep worker | grep -v -c master)
 export NUM_CURRENT_WORKER_NODES
@@ -45,7 +45,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    cd ${JETLAG_REPO_PATH}
    source bootstrap.sh
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-scale-out.yml -v | tee /tmp/ansible-mno-scaleout-$(date +%s)
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-scale-out.yml -vvv | tee /tmp/ansible-mno-scaleout-$(date +%s)
    deactivate
    rm -rf .ansible
 "
