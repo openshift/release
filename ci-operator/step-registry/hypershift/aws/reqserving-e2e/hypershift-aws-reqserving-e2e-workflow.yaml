@@ -2,8 +2,13 @@ workflow:
   as: hypershift-aws-reqserving-e2e
   documentation: |-
     The HyperShift aws reqserving e2e workflow executes tests against a standalone
-    OCP cluster. Administrative access to the control plane is provided
-    via the `KUBECONFIG` environment variable.
+    OCP cluster with fixed AWS region and zones using custom AWS credentials.
+    Administrative access to the control plane is provided via the `KUBECONFIG` environment variable.
+
+    This workflow uses the hypershift-standalone-aws-pre chain which allows:
+    - Fixed AWS region and zone specification via FIXED_AWS_REGION and FIXED_AWS_ZONES
+    - Custom AWS credentials support via STANDALONE_AWS_CREDS_FILE
+    - Guaranteed zone allocation (no dynamic resource leasing dependencies)
 
     For now, please direct all questions and comments to:
 
@@ -18,7 +23,7 @@ workflow:
   steps:
     allow_best_effort_post_steps: true
     pre:
-    - chain: ipi-aws-pre
+    - chain: hypershift-standalone-aws-pre
     test:
     - ref: hypershift-aws-run-reqserving-e2e
     post:
