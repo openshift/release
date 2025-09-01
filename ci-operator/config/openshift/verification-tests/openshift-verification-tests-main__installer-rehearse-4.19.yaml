@@ -24,14 +24,27 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
   latest:
     candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.19"
   multi-latest:
     candidate:
       architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  target:
+    candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.19"
@@ -60,12 +73,15 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       AZURE_VNET_ENABLE_ENCRYPTION: "true"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4as_v6
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8als_v6
+      COMPUTE_NODE_TYPE: Standard_D4ps_v6
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_E8ps_v6
+      OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
 - as: installer-rehearse-azure-1
   cron: '@yearly'
@@ -75,8 +91,9 @@ tests:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       AZURE_VNET_ENABLE_ENCRYPTION: "true"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_E4as_v6
+      COMPUTE_NODE_TYPE: Standard_M32ms_v2
       CONTROL_PLANE_INSTANCE_TYPE: Standard_F8als_v6
+      CUSTOM_AZURE_REGION: "centralus"
     workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
 - as: installer-rehearse-azure-2
   cron: '@yearly'
