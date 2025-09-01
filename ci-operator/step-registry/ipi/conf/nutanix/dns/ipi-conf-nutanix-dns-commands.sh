@@ -10,6 +10,14 @@ cluster_name="${NAMESPACE}-${UNIQUE_HASH}"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
+if [[ "${HIVE_NUTANIX_RESOURCE}" == "true" ]]; then
+  HIVE_CLUSTER_NAME="${cluster_name}-hive"
+  echo "export HIVE_CLUSTER_NAME=\"${HIVE_CLUSTER_NAME}\"" >> "${SHARED_DIR}/nutanix_context.sh" || {
+    echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to set HIVE_CLUSTER_NAME in nutanix_context.sh"
+    exit 1
+  }
+fi
+
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/nutanix/.awscred
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
@@ -48,72 +56,61 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+echo "$(date -u --rfc-3339=seconds) - Creating DNS records ..."
+DNS_RECORD_FILE="${SHARED_DIR}/dns-create.json"
+
+if [[ ! -f "${DNS_RECORD_FILE}" ]]; then
+  cat > "${DNS_RECORD_FILE}" <<EOF
+{
+  "Comment": "Upsert records for ${cluster_domain}",
+  "Changes": []
+}
+EOF
+fi
+
+add_dns_record() {
+  local file=$1
+  local action=$2
+  local name=$3
+  local ip=$4
+  local ttl=${5:-60}
+
+  local record_type
+  if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    record_type="A"
+  else
+    record_type="AAAA"
+  fi
+
+  jq --arg action "$action" --arg name "$name" --arg type "$record_type" --argjson ttl "$ttl" --arg ip "$ip" \
+    '.Changes += [{
+      "Action": $action,
+      "ResourceRecordSet": {
+        "Name": $name,
+        "Type": $type,
+        "TTL": $ttl,
+        "ResourceRecords": [{"Value": $ip}]
+      }
+    }]' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+}
+
 # api-int record is needed just for Windows nodes
 # TODO: Remove the api-int entry in future
-echo "$(date -u --rfc-3339=seconds) - Creating DNS records ..."
-cat > "${SHARED_DIR}"/dns-create.json <<EOF
-{
-"Comment": "Create OpenShift DNS records for Nutanix IPI CI install",
-"Changes": [{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "api.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "api-int.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "*.apps.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${INGRESS_VIP}"}]
-      }
-}]}
-EOF
+add_dns_record "${SHARED_DIR}/dns-create.json" "UPSERT" "api.${cluster_domain}." "${API_VIP}"
+add_dns_record "${SHARED_DIR}/dns-create.json" "UPSERT" "api-int.${cluster_domain}." "${API_VIP}"
+add_dns_record "${SHARED_DIR}/dns-create.json" "UPSERT" "*.apps.${cluster_domain}." "${INGRESS_VIP}"
 
-echo "$(date -u --rfc-3339=seconds) - Creating batch file to destroy DNS records"
+if [[ "${HIVE_NUTANIX_RESOURCE}" == "true" ]]; then
+  if [[ -z "${HIVE_API_VIP:-}" || -z "${HIVE_INGRESS_VIP:-}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: HIVE API or Ingress VIP not found in nutanix_context.sh"
+    exit 1
+  fi
+  echo "$(date -u --rfc-3339=seconds) - Adding Hive DNS records..."
+  add_dns_record "${SHARED_DIR}/dns-create.json" "UPSERT" "api.${HIVE_CLUSTER_NAME}.${base_domain}." "${HIVE_API_VIP}"
+  add_dns_record "${SHARED_DIR}/dns-create.json" "UPSERT" "ingress.${HIVE_CLUSTER_NAME}.${base_domain}." "${HIVE_INGRESS_VIP}"
+fi
 
-# api-int record is needed for Windows nodes
-# TODO: Remove the api-int entry in future
-cat > "${SHARED_DIR}"/dns-delete.json <<EOF
-{
-"Comment": "Delete public OpenShift DNS records for Nutanix IPI CI install",
-"Changes": [{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "api.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "api-int.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "*.apps.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${INGRESS_VIP}"}]
-      }
-}]}
-EOF
+echo "$(date -u --rfc-3339=seconds) - Creating batch file to destroy DNS records..."
 
 id=$(aws route53 change-resource-record-sets --hosted-zone-id "${hosted_zone_id}" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 

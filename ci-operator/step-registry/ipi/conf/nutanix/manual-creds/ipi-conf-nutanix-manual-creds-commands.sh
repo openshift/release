@@ -21,6 +21,7 @@ credentials:
       password: ${NUTANIX_PASSWORD}
     prismElements: null
 EOF
+echo "Created credentials file at ${SHARED_DIR}/credentials"
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
