@@ -286,6 +286,41 @@ function check_clusteroperators_status() {
     echo "$(date) - all clusteroperators are done progressing."
 }
 
+function check_imagestreams() {
+  # Set a reasonable timeout for the controller to process the objects in each project.
+ local TIMEOUT="1m"
+
+  echo "INFO: Starting basic health check for ImageStreams in user-defined projects..."
+  echo "INFO: This verifies that the ImageStream controller is processing objects."
+  echo "INFO: Per-project timeout is set to ${TIMEOUT}."
+  echo "---"
+
+  # Get project names and filter out system projects.
+  for project in $(oc get projects -o jsonpath='{.items[*].metadata.name}' | tr " " "\n" | grep -v -E "^openshift-|^kube-"); do
+    echo "Checking project: ${project}"
+
+    # Run oc wait, targeting all imagestreams in the project.
+    # The JSONPath now waits for a core status field to be populated by the controller.
+    oc wait imagestreams --all \
+      --for=jsonpath='{.status.dockerImageRepository}' \
+      -n "${project}" \
+      --timeout=${TIMEOUT}
+
+    # Check the exit code of the wait command to report status.
+    if [ $? -eq 0 ]; then
+      echo "SUCCESS: ImageStream controller appears healthy in project '${project}'."
+    else
+      # To make the script stop on the first failure, add 'exit 1' here.
+      echo "WARNING: Timed out waiting for ImageStream controller to process objects in project '${project}'. Continuing..."
+    fi
+    echo "---"
+  done
+
+  echo "INFO: All user projects have been checked."
+}
+
+
+
 TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
 
 case "${CLUSTER_TYPE}" in
@@ -387,13 +422,8 @@ for _ in {1..11}; do
 done
 
 # Check for imagestreams availability
-for _ in {1..11}; do
-  if ! oc get imagestreams --all-namespaces; then
-    sleep 30
-  else
-    echo "$(date) - Imagestreams are available"
-    break
-  fi
+for _ in {1..3}; do
+  check_imagestreams
 done
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
