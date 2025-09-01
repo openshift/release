@@ -116,8 +116,9 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
-    TIMEOUT=3000         # Maximum wait time of 50 mins (3000 seconds)
-    INTERVAL=60             # Check every 60 seconds
+    # Timeout configuration for waiting for Docker image availability
+    MAX_WAIT_TIME_SECONDS=$((55*60))    # Maximum wait time of 55 minutes
+    POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
     ELAPSED_TIME=0
 
@@ -134,13 +135,13 @@ else
         fi
 
         # Wait for the interval duration
-        sleep $INTERVAL
+        sleep $POLL_INTERVAL_SECONDS
 
         # Increment the elapsed time
-        ELAPSED_TIME=$(($ELAPSED_TIME + $INTERVAL))
+        ELAPSED_TIME=$(($ELAPSED_TIME + $POLL_INTERVAL_SECONDS))
 
         # If the elapsed time exceeds the timeout, exit with an error
-        if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME_SECONDS ]; then
             echo "Timed out waiting for Docker image $IMAGE_NAME. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
             exit 1
         fi
