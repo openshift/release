@@ -22,6 +22,8 @@ export QUAY_PASSWORD="$QUAY_PASSWORD"
 export DOCKER_USERNAME="$DOCKER_USERNAME"
 export DOCKER_PASSWORD="$DOCKER_PASSWORD"
 
+python3 --version
+sleep 30m
 python3 utility/quayio_test_push_images.py -n 20 > $ARTIFACT_DIR/quayio_push_image_report 
 
 #Clone Quay-test repo to get the local test images
