@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
+# debug
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
 cat <<EOF >"${SKIP_TESTS_FILE}"
@@ -513,6 +513,10 @@ if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
     git submodule foreach --recursive "checkout_submodules"
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
+
+echo "Changing namespace"
+sed -i "s/openshift-marketplace/default/g" hack/setup-build-index-image.sh
+
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"
