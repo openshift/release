@@ -79,7 +79,12 @@ run-on-first-master "
   oc get csr -o yaml > ${NODE_ARTIFACT_DIR}/csrs.yaml
   oc get co -o yaml > ${NODE_ARTIFACT_DIR}/cos.yaml
 
-  oc --insecure-skip-tls-verify adm must-gather --volume-percentage=100 --image=${MUST_GATHER_IMAGE} --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather || true
+  VOLUME_PERCENTAGE_FLAG=""
+  if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+     VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+  fi
+
+  oc --insecure-skip-tls-verify adm must-gather $VOLUME_PERCENTAGE_FLAG --image=${MUST_GATHER_IMAGE} --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather || true
   tar -czf ${NODE_ARTIFACT_DIR}/must-gather.tar.gz -C ${NODE_ARTIFACT_DIR}/must-gather ${NODE_ARTIFACT_DIR}/must-gather
   rm -rf ${NODE_ARTIFACT_DIR}/must-gather
 "

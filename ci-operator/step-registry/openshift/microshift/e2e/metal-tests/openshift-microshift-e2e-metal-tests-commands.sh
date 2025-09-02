@@ -37,7 +37,7 @@ function get_source_dir() {
 }
 
 if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
-  if [[ "${JOB_NAME}" =~ .*release.* ]]; then
+  if [[ "${JOB_NAME}" =~ .*e2e-aws-tests.*release.* ]]; then
     SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/releases" "scenarios-bootc")
   else
     SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/presubmits" "scenarios-bootc")
@@ -46,7 +46,7 @@ if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
     fi
   fi
 else
-  if [[ "${JOB_NAME}" =~ .*release.* ]]; then
+  if [[ "${JOB_NAME}" =~ .*e2e-aws-tests.*release.* ]]; then
     SCENARIO_SOURCES=$(get_source_dir "scenarios/releases" "scenarios")
   else
     SCENARIO_SOURCES=$(get_source_dir "scenarios/presubmits" "scenarios")
