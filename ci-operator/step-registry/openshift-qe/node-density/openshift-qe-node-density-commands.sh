@@ -58,11 +58,7 @@ export WORKLOAD=node-density
 RANDOM_WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | shuf -n1)
 oc adm must-gather --timeout=3h --dest-dir "${ARTIFACT_DIR}/" -- PROFILING_NODE_SECONDS=60 gather_profiling_node $RANDOM_WORKER_NODE &
 
-# A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
-
-# The measurable run
-EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --PPROF=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
