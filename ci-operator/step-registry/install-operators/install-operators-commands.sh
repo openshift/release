@@ -182,7 +182,7 @@ EOF
             echo "Try ${i}/${RETRIES}: can't get the ${operator_name} yet. Checking again in 30 seconds"
             sleep 30
         fi
-
+	sleep 4h
         if [[ $(oc get csv -n ${operator_install_namespace} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
             echo "${operator_name} is deployed"
             break
