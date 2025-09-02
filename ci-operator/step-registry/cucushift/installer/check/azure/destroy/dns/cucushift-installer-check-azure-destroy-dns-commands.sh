@@ -48,14 +48,16 @@ infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 metadata_str="{'kubernetes.io_cluster.${infra_id}':'owned'}"
 check_result=0
 
+# https://github.com/openshift/installer/pull/9711
+# original installer PR 9365 is reverted, and no plan to fix it so far
 # case-1: ensure all cluster dns records are cleaned, even cluster resource group is removed prior to destoyer
-dns_record_after_destroy=$(mktemp)
-run_command "az network dns record-set list -g ${base_domain_rg} -z ${base_domain} --query '[?contains(name, \`$cluster_name\`) && !contains(name, \`mirror-registry\`)]' -o json | tee ${dns_record_after_destroy}"
-dns_record_set_len=$(jq '.|length' "${dns_record_after_destroy}")
-if [[ ${dns_record_set_len} -ne 0 ]]; then
-    echo "Some cluter dns records are left after cluster is destroyed, something is wrong, please check!"
-    exit 1
-fi
+# dns_record_after_destroy=$(mktemp)
+#run_command "az network dns record-set list -g ${base_domain_rg} -z ${base_domain} --query '[?contains(name, \`$cluster_name\`) && !contains(name, \`mirror-registry\`)]' -o json | tee ${dns_record_after_destroy}"
+#dns_record_set_len=$(jq '.|length' "${dns_record_after_destroy}")
+#if [[ ${dns_record_set_len} -ne 0 ]]; then
+#    echo "Some cluter dns records are left after cluster is destroyed, something is wrong, please check!"
+#    exit 1
+#	fi
 
 if [[ "${EXTEND_AZURE_DESTROY_DNS_CHECK}" == "no" ]]; then
     echo "No extend testing for azure destroy dns check"
@@ -98,6 +100,6 @@ fi
 check_destroy_dns "api.${cluster_name}" "cname" "a.b.com" || check_result=1
 check_destroy_dns "*.apps.${cluster_name}" "a" "1.1.2.2" || check_result=1
 # OCPBUGS-51094
-#check_destroy_dns "*.test.${cluster_name}" "a" "1.1.3.3" || check_result=1
+check_destroy_dns "*.test.${cluster_name}" "a" "1.1.3.3" || check_result=1
 
 exit ${check_result}
