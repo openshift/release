@@ -119,9 +119,6 @@ spec:
     name: ${name}-network-config-secret
     namespace: ${AGENT_NAMESPACE}
 EOF
-done
-
-nodepool_expected_size=$(yq e '[.[] | select(.name|test("worker-a"))]|length' "${SHARED_DIR}/hosts.yaml")
 
 retries=30
 for i in $(seq 1 ${retries}) max; do
@@ -130,13 +127,17 @@ for i in $(seq 1 ${retries}) max; do
         exit 1
     fi
     count="$(oc get -n "${AGENT_NAMESPACE}" --no-headers --ignore-not-found agents.agent-install.openshift.io | wc -l)"
-    if [ "${count}" == "${nodepool_expected_size}" ] ; then
+    if [ "${count}" == "1" ] ; then
         echo "[INFO] Agent objects exist. Continuing"
         break
     fi
     echo "[WARN] The agent objects did not reconcile yet. Waiting for 60 seconds. Attempt ${i}/${retries}"
     sleep 60
 done
+
+done
+
+nodepool_expected_size=$(yq e '[.[] | select(.name|test("worker-a"))]|length' "${SHARED_DIR}/hosts.yaml")
 
 oc wait -n "${AGENT_NAMESPACE}" agents.agent-install.openshift.io --all=true --for=condition=RequirementsMet
 
