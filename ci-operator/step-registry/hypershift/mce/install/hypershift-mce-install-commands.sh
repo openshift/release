@@ -7,12 +7,6 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Using s390x managment cluster kubeconfig if it is present
-# s390x_mgmt-kubeconfig will only be present in case of s390x managment ci jobs
-if [ -f "$SHARED_DIR/s390x_mgmt-kubeconfig" ]; then
-   export KUBECONFIG="$SHARED_DIR/s390x_mgmt-kubeconfig"
-fi
-
 if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
     MCE_VERSION="$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION"
 fi
