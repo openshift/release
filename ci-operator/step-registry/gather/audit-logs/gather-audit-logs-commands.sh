@@ -28,6 +28,11 @@ else
 fi
 
 mkdir -p "${ARTIFACT_DIR}/audit-logs"
-oc adm must-gather $MUST_GATHER_IMAGE  --volume-percentage=100 --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs
+VOLUME_PERCENTAGE_FLAG=""
+if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+fi
+
+oc adm must-gather $MUST_GATHER_IMAGE $VOLUME_PERCENTAGE_FLAG --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs
 tar -czC "${ARTIFACT_DIR}/audit-logs" -f "${ARTIFACT_DIR}/audit-logs.tar.gz" .
 rm -rf "${ARTIFACT_DIR}/audit-logs"

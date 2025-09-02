@@ -20,7 +20,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"DockerImage","name":"quay-proxy.ci.openshift.org/openshift/ci:ci_gpu-scheduling-webhook_latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"webhook\")].image"}]'
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"gpu-scheduling-webhook:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"webhook\")].image"}]'
   labels:
     app: gpu-scheduling-webhook
   name: gpu-scheduling-webhook
@@ -40,7 +40,7 @@ spec:
       - key: node-role.kubernetes.io/infra
         operator: Exists
       containers:
-      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_gpu-scheduling-webhook_latest
+      - image: image-registry.openshift-image-registry.svc:5000/ci/gpu-scheduling-webhook:latest
         command:
         - /usr/bin/gpu-scheduling-webhook
         args:

@@ -23,7 +23,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 KUBE_DIR=${KUBE_DIR:-/tmp}
 EXTRA_FLAGS=${EXTRA_FLAGS:-}
-ITERATIONS=${ITERATIONS:-300}
+ITERATIONS=${ITERATIONS:-50}
 
 # cannot clone openshift-tests-private repo directly, so use tests-private-burner image
 # copy olm-metrics.yml and extended-metrics.yml 

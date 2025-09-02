@@ -15,8 +15,8 @@ AZURE_DATA_PLANE_IDENTITIES_LOCATION="/etc/hypershift-ci-jobs-azurecreds/datapla
 AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-azurecreds/serviceaccount-signer.private"
 AZURE_OIDC_ISSUER_URL_LOCATION="/etc/hypershift-ci-jobs-azurecreds/oidc-issuer-url.json"
 AZURE_OIDC_ISSUER_URL="$(<"${AZURE_OIDC_ISSUER_URL_LOCATION}" jq -r .oidcIssuerURL)"
-AKS_KMS_KEY="etc/hypershift-ci-jobs-azurecreds/aks-kms-key"
-AKS_KMS_CREDENTIALS_SECRET="etc/hypershift-ci-jobs-azurecreds/aks-kms-credentials-secret"
+AKS_KMS_KEY="/etc/hypershift-ci-jobs-azurecreds/aks-kms-key"
+AKS_KMS_CREDENTIALS_SECRET="/etc/hypershift-ci-jobs-azurecreds/aks-kms-credentials-secret"
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
