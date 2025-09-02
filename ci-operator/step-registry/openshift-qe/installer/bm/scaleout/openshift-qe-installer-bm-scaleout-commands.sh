@@ -49,3 +49,21 @@ ssh ${SSH_ARGS} root@${bastion} "
    deactivate
    rm -rf .ansible
 "
+# Verification for Scale Out Deployment
+oc version
+oc get node
+oc adm wait-for-stable-cluster --minimum-stable-period=${MINIMUM_STABLE_PERIOD} --timeout=${TIMEOUT}
+
+# Validate that the current worker nodes count matches the target
+FINAL_WORKER_COUNT=$(oc get nodes | grep worker | grep -v -c master)
+export FINAL_WORKER_COUNT
+echo "Final worker node count: $FINAL_WORKER_COUNT"
+echo "Target worker node count: $NUM_TARGET_WORKER_NODES"
+
+if [ "$FINAL_WORKER_COUNT" -eq "$NUM_TARGET_WORKER_NODES" ]; then
+    echo "SUCCESS: Scale-out completed successfully. Current worker nodes ($FINAL_WORKER_COUNT) matches target ($NUM_TARGET_WORKER_NODES)"
+    exit 0
+else
+    echo "FAILURE: Scale-out validation failed. Current worker nodes ($FINAL_WORKER_COUNT) does not match target ($NUM_TARGET_WORKER_NODES)"
+    exit 1
+fi
