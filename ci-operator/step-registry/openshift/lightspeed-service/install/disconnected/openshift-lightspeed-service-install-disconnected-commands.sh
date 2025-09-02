@@ -163,7 +163,7 @@ EOF
 
       return 1
     }
-    run_command "oc image mirror quay.io/jfula/ollama:latest ${MIRROR_REGISTRY_HOST}/ollama/gemma3:1b --insecure=true"
+    run_command "oc image mirror quay.io/openshift-lightspeed/ols-qe:gemma3 ${MIRROR_REGISTRY_HOST}/ollama/gemma3:1b --insecure=true"
 
     # Deploy ollama to OpenShift cluster
     run_command "oc create namespace ollama"
