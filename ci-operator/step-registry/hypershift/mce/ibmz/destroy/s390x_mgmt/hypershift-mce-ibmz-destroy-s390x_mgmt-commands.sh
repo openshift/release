@@ -46,13 +46,18 @@ sed -i "s/^REGION=.*/REGION=\"$REGION\"/" "$VARS_FILE"
 sed -i "s/^RESOURCE_GROUP=.*/RESOURCE_GROUP=\"$RESOURCE_GROUP\"/" "$VARS_FILE"
 sed -i "s/^IC_API_KEY=.*/IC_API_KEY=\"$IC_API_KEY\"/" "$VARS_FILE"
 
-# Run the create-cluster.sh script to create the OCP cluster in IBM cloud VPC
-if [[ -x ./create-cluster.sh ]]; then
-    ./create-cluster.sh
+# Run the install-prerequisites.sh script to delete the OCP cluster in IBM cloud VPC
+if [[ -x ./scripts/0-install-prerequisites.sh ]]; then
+    ./scripts/0-install-prerequisites.sh
 else
-    echo "create-cluster.sh not found or not executable"
+    echo "install-prerequisites.sh not found or not executable"
     exit 1
 fi
 
-echo "Copying kubeconfig into SHARED_DIR"
-cp $HOME/$CLUSTER_NAME/auth/kubeconfig $SHARED_DIR/kubeconfig
+# Run the delete-cluster.sh script to delete the OCP cluster in IBM cloud VPC
+if [[ -x ./delete-cluster.sh ]]; then
+    ./delete-cluster.sh
+else
+    echo "delete-cluster.sh not found or not executable"
+    exit 1
+fi
