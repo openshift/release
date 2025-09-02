@@ -38,7 +38,6 @@ NROP_REPO_DIR=${NROP_REPO_DIR:-"$(mktemp -d -t nto-XXXXX)/numaresources-operator
 mkdir -p "${NROP_REPO_DIR}"
 echo "Running on branch ${NROP_BRANCH}"
 git clone -b "${NROP_BRANCH}" "${NROP_REPO}" "${NROP_REPO_DIR}"
-pushd "${NROP_REPO_DIR}"
 
 echo "================Golang versions================="
 ls -ltR "${HOME}"
@@ -88,13 +87,27 @@ EOF
   fi
 fi
 
+pushd "${NROP_REPO_DIR}"
+
 echo "Go version: $(go version)"
 export GOPATH="${HOME}"/go
-export GOBIN="${GOPATH}"/bin
+export GOBIN="${GOPATH}/bin"
 
 # Deploy and install ginkgo
 GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@latest
 export PATH=$PATH:$GOBIN
+
+# Ensure we're in the NROP repository directory before running Go module commands
+echo "Current directory: $(pwd)"
+echo "Checking for go.mod file..."
+if [[ ! -f "go.mod" ]]; then
+    echo "Error: go.mod file not found in current directory"
+    echo "Directory contents:"
+    ls -la
+    exit 1
+fi
+
+echo "Found go.mod file, proceeding with Go module operations..."
 go get github.com/onsi/gomega@latest
 go mod tidy
 go mod vendor

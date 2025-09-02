@@ -77,9 +77,10 @@ echo "Hosted cluster kubeconfig file: ${T5CI_HCP_HOSTED_KUBECONFIG}"
 ansible_playbook_status=0
 
 # Install certificates required for internal registries
-export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/ansible-automation/ansible.cfg
-ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_registry_certs.yml \
--e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" || ansible_playbook_status=$?
+# Not required due to konflux changes
+# export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/ansible-automation/ansible.cfg
+# ansible-playbook -i "${SHARED_DIR}"/inventory -vv "${SHARED_DIR}"/repos/ansible-automation/playbooks/apply_registry_certs.yml \
+# -e kubeconfig="${T5CI_HCP_MGMT_KUBECONFIG}" || ansible_playbook_status=$?
 
 echo "Status of Ansible playbook to install certificates required for internal registires is: ${ansible_playbook_status}"
 
