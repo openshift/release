@@ -69,3 +69,10 @@ if [ ! -z "$CONFLICTING_DOMAINS" ] || [ ! -z "$CONFLICTING_POOLS" ] || [ ! -z "$
   echo "Conflicting networks: $CONFLICTING_NETWORKS"
   exit 1
 fi
+
+echo "Gathering interface details..."
+ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' | while read -r iface; do
+  echo "=== Interface: $iface ==="
+  ip -s link show dev "$iface"
+  echo
+done
