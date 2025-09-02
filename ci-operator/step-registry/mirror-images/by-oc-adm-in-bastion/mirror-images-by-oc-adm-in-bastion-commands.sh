@@ -69,6 +69,8 @@ echo "readable_version: $readable_version"
 target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 target_release_image_repo="${target_release_image%:*}"
 target_release_image_repo="${target_release_image_repo%@sha256*}"
+# add nested level for testing !!
+target_release_image_repo="${target_release_image_repo}/first/second/third"
 # ensure mirror release image by tag name, refer to https://github.com/openshift/oc/pull/1331
 target_release_image="${target_release_image_repo}:${readable_version}"
 
