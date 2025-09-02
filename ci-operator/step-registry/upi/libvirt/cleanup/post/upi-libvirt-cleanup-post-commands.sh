@@ -103,3 +103,11 @@ if [ ! -z "${STALE_IPI_VOLUMES}" ]; then
   echo "Stale IPI volumes remain..."
   echo "Stale volumes: ${STALE_IPI_VOLUMES}"
 fi
+
+echo "Gathering interface details..."
+ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' | while read -r iface; do
+  echo "=== Interface: $iface ==="
+  ip -s link show dev "$iface"
+  echo
+done
+
