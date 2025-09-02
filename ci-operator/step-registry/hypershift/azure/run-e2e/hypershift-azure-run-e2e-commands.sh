@@ -91,6 +91,32 @@ if [[ "${ENABLE_AKS_KMS:-}" == "true" ]]; then
     KMS_ARGS+="--e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET}"
 fi
 
+OAUTH_EXTERNAL_OIDC_PARAM=""
+if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
+  case "${OAUTH_EXTERNAL_OIDC_PROVIDER}" in
+    "keycloak")
+      # idp-external-oidc-keycloak-server-commands.sh
+      source "${SHARED_DIR}/runtime_env"
+      OAUTH_EXTERNAL_OIDC_PARAM="--e2e.external-oidc-provider=${OAUTH_EXTERNAL_OIDC_PROVIDER} \
+      --e2e.external-oidc-cli-client-id=${KEYCLOAK_CLI_CLIENT_ID} \
+      --e2e.external-oidc-console-client-id=${CONSOLE_CLIENT_ID} \
+      --e2e.external-oidc-issuer-url=${KEYCLOAK_ISSUER} \
+      --e2e.external-oidc-console-secret=${CONSOLE_CLIENT_SECRET_VALUE} \
+      --e2e.external-oidc-ca-bundle-file=${KEYCLOAK_CA_BUNDLE_FILE}  \
+      --e2e.external-oidc-test-users=${KEYCLOAK_TEST_USERS}"
+      ;;
+    "azure")
+      #todo
+      echo "azure is not supported yet"
+      exit 1
+      ;;
+    *)
+      echo "unsupported OAUTH_EXTERNAL_OIDC_PROVIDER ${OAUTH_EXTERNAL_OIDC_PROVIDER}"
+      exit 1
+      ;;
+  esac
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -114,5 +140,6 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.azure-marketplace-sku "aro_419" \
   --e2e.azure-marketplace-version "419.6.20250523" \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
+  ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!
