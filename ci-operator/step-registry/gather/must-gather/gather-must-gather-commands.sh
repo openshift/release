@@ -271,7 +271,11 @@ mkdir -p ${ARTIFACT_DIR}/must-gather
 if [ -n "$MUST_GATHER_IMAGE" ]; then
     EXTRA_MG_ARGS="${EXTRA_MG_ARGS} ${MUST_GATHER_IMAGE}"
 fi
-oc --insecure-skip-tls-verify adm must-gather --timeout="$MUST_GATHER_TIMEOUT" --dest-dir "${ARTIFACT_DIR}/must-gather" ${EXTRA_MG_ARGS} > "${ARTIFACT_DIR}/must-gather/must-gather.log"
+VOLUME_PERCENTAGE_FLAG=""
+if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+fi
+oc --insecure-skip-tls-verify adm must-gather $VOLUME_PERCENTAGE_FLAG --timeout="$MUST_GATHER_TIMEOUT" --dest-dir "${ARTIFACT_DIR}/must-gather" ${EXTRA_MG_ARGS} > "${ARTIFACT_DIR}/must-gather/must-gather.log"
 find "${ARTIFACT_DIR}/must-gather" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
 installCamgi
