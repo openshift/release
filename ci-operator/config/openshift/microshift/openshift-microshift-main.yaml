@@ -80,7 +80,7 @@ tests:
     workflow: openshift-ci-security
 - as: test-rebase
   optional: true
-  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod|vendor/.*|deps/.*)$
   steps:
     env:
       DRY_RUN: "y"
@@ -227,6 +227,38 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SUITE: ai-model-serving
     workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-tests-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-bootc-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -54,21 +54,19 @@ resources:
       memory: 1Gi
 tests:
 - as: azure-ipi-oidc-mixarch-f28-logging
-  cron: 45 14 5 * *
+  cron: 45 14 29 2 *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       FORCE_SUCCESS_EXIT: "true"
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.0
+      LOGGING_TEST_VERSION: "6.0"
       OCP_ARCH: arm64
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~GCL&
       TEST_IMPORTANCE: Critical|High|Medium
@@ -76,7 +74,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity

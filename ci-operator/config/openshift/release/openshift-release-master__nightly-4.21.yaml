@@ -805,15 +805,14 @@ tests:
       TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-upi-hybrid-env
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-disk-setup
+- as: e2e-vsphere-ovn-disk-setup-techpreview
   cron: 50 21 * * 2
   steps:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
       DISK_SETUP: "true"
-      FEATURE_GATES: '[MultiDiskSetup=true]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
@@ -977,7 +976,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-cgroupsv2
 - as: e2e-aws-driver-toolkit
-  cron: 0 */8 * * *
+  interval: 48h
   steps:
     cluster_profile: aws-2
     observers:
@@ -1003,7 +1002,7 @@ tests:
         CNF_E2E_TESTS=false
         CNF_ORIGIN_TESTS=true
       T5CI_JOB_TYPE: origintests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1011,7 +1010,7 @@ tests:
 - as: e2e-telco5g-cnftests
   capabilities:
   - intranet
-  cron: 00 10 */1 * 1-5
+  cron: 00 22 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -1019,7 +1018,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1036,7 +1035,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1050,7 +1049,7 @@ tests:
     env:
       SKIP_OCP_INSTALL: "false"
       T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1066,7 +1065,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1082,7 +1081,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: sno-ztp-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1090,7 +1089,7 @@ tests:
 - as: e2e-telco5g-mno-ztp-cnftests
   capabilities:
   - intranet
-  cron: 10 20 */1 * 1-5
+  cron: 10 08 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -1098,7 +1097,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: mno-ztp-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1110,7 +1109,7 @@ tests:
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-bm
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1122,7 +1121,7 @@ tests:
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-single-node-bm
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1252,13 +1251,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-gcp-custom-dns
+- as: e2e-gcp-custom-dns-techpreview
   interval: 168h
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNSInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
     observers:
       enable:
@@ -1963,13 +1967,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-sts-conformance
-  timeout: 6h0m0s
-- as: e2e-rosa-sts-hypershift-ovn
-  cluster: build10
-  cron: '@daily'
-  steps:
-    cluster_profile: aws-perfscale-qe
-    workflow: rosa-aws-sts-hcp-conformance
   timeout: 6h0m0s
 - as: e2e-osd-ccs-gcp
   cluster: build10
