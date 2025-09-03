@@ -54,6 +54,9 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY}/hypershift/hypershift-operator
     source: quay.io/hypershift/hypershift-operator
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}/hypershift/hypershift-operator
+    source: quay.io/rhn_engineering_lgao/hypershift-operator
 EOF
 
 run_command "oc apply -f ${ipho_file}"

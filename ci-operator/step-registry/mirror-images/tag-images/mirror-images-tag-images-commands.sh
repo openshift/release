@@ -19,6 +19,7 @@ registry.redhat.io/rhscl/mysql-80-rhel7:latest=MIRROR_REGISTRY_PLACEHOLDER/rhscl
 registry.redhat.io/rhel8/mysql-80:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/mysql-80:latest
 registry.redhat.io/rhel8/httpd-24:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/httpd-24:latest
 quay.io/hypershift/hypershift-operator:latest=MIRROR_REGISTRY_PLACEHOLDER/hypershift/hypershift-operator:latest
+quay.io/rhn_engineering_lgao/hypershift-operator:4.18=MIRROR_REGISTRY_PLACEHOLDER/hypershift/hypershift-operator:4.18
 " > ${tag_images_list}
 
     sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_PROXY_REGISTRY}/g" "${tag_images_list}"

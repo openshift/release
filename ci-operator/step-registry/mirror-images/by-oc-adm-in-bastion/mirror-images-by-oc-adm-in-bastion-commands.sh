@@ -196,3 +196,6 @@ set -x
 if [[ -f "/var/run/secrets/ci.openshift.io/cluster-profile/.awscred" ]]; then
     cp /var/run/secrets/ci.openshift.io/cluster-profile/.awscred "${SHARED_DIR}/awscredentials"
 fi
+if [[ -f "/var/run/secrets/ci.openshift.io/cluster-profile/.awscred_shared_account" ]]; then
+    cp /var/run/secrets/ci.openshift.io/cluster-profile/.awscred_shared_account "${SHARED_DIR}/awscredentials_shared"
+fi
