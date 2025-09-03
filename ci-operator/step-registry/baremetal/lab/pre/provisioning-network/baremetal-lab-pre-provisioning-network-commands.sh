@@ -30,6 +30,10 @@ IFS=, read -r -a SWITCH_PORTS <<< \
 # Copy other_switch_ports to bastion host for use in cleanup
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/other-switch-ports" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
+# Temporary hardcoding paramiko version to avoid ncclient failure accessing
+# removed 'DSSKey' attribute
+pip3 install paramiko==2.10.1
+
 echo "[INFO] Configuring the VLAN tags on the switches' ports"
 python3 - \
   "${SSH_KEY_PATH}" "${CLUSTER_NAME}" "${VLAN_ID}" "${SWITCH_PORTS[@]}" <<'EOF'

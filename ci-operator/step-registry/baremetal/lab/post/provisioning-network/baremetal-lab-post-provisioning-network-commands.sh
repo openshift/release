@@ -31,6 +31,10 @@ SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-key"
 IFS=, read -r -a SWITCH_PORTS <<< \
   "$(yq e '[.[].switch_port_v2]|@csv' < "${SHARED_DIR:-.}"/hosts.yaml),$(<"${CLUSTER_PROFILE_DIR}/other-switch-ports")"
 
+# Temporary hardcoding paramiko version to avoid ncclient failure accessing
+# removed 'DSSKey' attribute
+pip3 install paramiko==2.10.1
+
 echo "[INFO] Configuring the VLAN tags on the switches' ports"
 python3 - \
   "${SSH_KEY_PATH}" "${CLUSTER_NAME}" "${VLAN_ID}" "${SWITCH_PORTS[@]}" <<'EOF'
