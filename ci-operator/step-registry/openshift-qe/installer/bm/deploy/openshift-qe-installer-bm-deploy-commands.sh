@@ -152,8 +152,11 @@ fi
 
 collect_ai_logs() {
   echo "Collecting AI logs ..."
-  AI_CLUSTER_ID=$(curl -sS http://$bastion2:8080/api/assisted-install/v2/clusters/  | jq -r .[0].id)
-  curl -Lo "${ARTIFACT_DIR}/ai-cluster-logs-$AI_CLUSTER_ID.tar"  http://$bastion2:8080/api/assisted-install/v2/clusters/$AI_CLUSTER_ID/logs
+  ssh ${SSH_ARGS} root@${bastion} "
+    AI_CLUSTER_ID=\$(curl -sS http://$bastion2:8080/api/assisted-install/v2/clusters/  | jq -r .[0].id)
+    curl -Lo "/tmp/ai-cluster-logs.tar"  http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
+  "
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-cluster-logs.tar ${ARTIFACT_DIR}/ai-cluster-logs.tar
 }
 
 trap 'collect_ai_logs' EXIT
