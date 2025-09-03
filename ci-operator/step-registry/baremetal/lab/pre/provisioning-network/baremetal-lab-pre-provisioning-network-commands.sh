@@ -30,6 +30,8 @@ IFS=, read -r -a SWITCH_PORTS <<< \
 # Copy other_switch_ports to bastion host for use in cleanup
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/other-switch-ports" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
+pip3 install --upgrade --force-reinstall ncclient junos-eznc
+
 echo "[INFO] Configuring the VLAN tags on the switches' ports"
 python3 - \
   "${SSH_KEY_PATH}" "${CLUSTER_NAME}" "${VLAN_ID}" "${SWITCH_PORTS[@]}" <<'EOF'
