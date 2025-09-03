@@ -1,6 +1,6 @@
 base_images:
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
@@ -23,17 +23,17 @@ images:
   to: cluster-kube-storage-version-migrator-operator
 promotion:
   to:
-  - name: 4.20-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -74,6 +74,21 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws
+- as: e2e-tests-extension
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary cluster-kube-storage-version-migrator-operator-tests-ext"
+        make tests-ext-build
+        echo "Running ./cluster-kube-storage-version-migrator-operator-tests-ext with suite"
+        ./cluster-kube-storage-version-migrator-operator-tests-ext run-suite openshift/cluster-kube-storage-version-migrator-operator/all -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-serial
 zz_generated_metadata:
   branch: main
   org: openshift-priv

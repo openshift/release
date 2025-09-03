@@ -63,8 +63,7 @@ images:
   to: custom-verify-src
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - hypershift-operator
     - hypershift-tests
     name: 4.20-priv
@@ -142,6 +141,20 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_AKS_KMS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-4-19
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-419
+      OCP_IMAGE_N1: release:latest-418
+      OCP_IMAGE_N2: release:latest-417
+      OCP_IMAGE_PREVIOUS: release:initial-419
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
