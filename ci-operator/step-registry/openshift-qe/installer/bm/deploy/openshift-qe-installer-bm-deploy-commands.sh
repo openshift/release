@@ -23,6 +23,12 @@ LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
+LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
+# For metal-perfscale-jetlag profile, temporarily set till this is not needed
+if [[ ${TYPE} == 'vmno' ]]; then
+BASTION_CP_INTERFACE="ens1f0"
+LAB_INTERFACE="eno1np0"
+fi
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
   NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".num_worker_nodes")
   export NUM_WORKER_NODES
@@ -100,6 +106,43 @@ oc --kubeconfig=${SHARED_DIR}/kubeconfig config set-cluster "$(oc config current
 
 trap 'cleanup_ssh' EXIT
 PROXY_EOF
+fi
+
+if [[ ${TYPE} == 'vmno' ]]; then
+  cat <<EOF >>/tmp/all.yml
+hv_ssh_pass: $LOGIN
+hv_ip_offset: 0
+hv_vm_ip_offset: 20
+EOF
+fi
+
+if [[ ${TYPE} == 'vmno' && $VMNO_HV_VM_JETLAG_DEFAULTS == "true" ]]; then
+  cat <<EOF >>/tmp/all.yml
+hv_vm_cpu_count: $HV_VM_CPU_COUNT
+hv_vm_memory_size: $HV_VM_MEMORY_SIZE
+hv_vm_disk_size: $HV_VM_DISK_SIZE
+hw_vm_counts:
+  $LAB:
+    $HV_HW_NAME:
+      $HV_VM_DISK1_CONFIG
+      $HV_VM_DISK2_CONFIG
+      $HV_VM_DISK3_CONFIG
+EOF
+fi
+
+if [[ ${TYPE} == 'vmno' ]]; then
+  cat <<EOF >>/tmp/hv.yml
+install_tc: true
+lab: $LAB
+ssh_public_key_file: ~/.ssh/id_rsa.pub
+setup_coredns: false
+use_bastion_registry: false
+setup_hv_vm_dhcp: false
+compact_cluster_dns_count: 0
+standard_cluster_dns_count: 0
+hv_vm_generate_manifests: true
+sno_cluster_count: 0
+EOF
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
