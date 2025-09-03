@@ -231,6 +231,17 @@ function generate_attribute_pr_author() {
   fi
 }
 
+function generate_attribute_version() {
+  if [[ "$JOB_NAME" =~ release-(4[.][0-9]+)- ]]
+  then
+    version="${BASH_REMATCH[1]}"
+    if [[ -n "$version" ]]
+    then
+      write_attribute version "$version"
+    fi
+  fi
+}
+
 function generate_attribute_version_installed() {
   version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
@@ -274,6 +285,7 @@ function generate_attributes() {
   generate_attribute_install_method
   generate_attribute_profilename
   generate_attribute_pr_author
+  generate_attribute_version
   generate_attribute_version_installed
 }
 
