@@ -487,41 +487,9 @@ tests:
     workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
   cluster: build05
-  cron: 0 */6 * * *
+  cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
-    workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-arbiter-ipv6-techpreview
-  cluster: build05
-  cron: 0 */6 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        NUM_MASTERS=2
-        MASTER_MEMORY=32768
-        NUM_ARBITERS=1
-        ARBITER_MEMORY=16384
-        NUM_WORKERS=0
-        ENABLE_ARBITER=true
-        FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-arbiter-dualstack-techpreview
-  cluster: build05
-  cron: 0 */6 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NUM_MASTERS=2
-        MASTER_MEMORY=32768
-        NUM_ARBITERS=1
-        ARBITER_MEMORY=16384
-        NUM_WORKERS=0
-        ENABLE_ARBITER=true
-        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter-techpreview
 - as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
   cluster: build05
@@ -1134,6 +1102,7 @@ tests:
     - ref: network-flow-matrix-tests
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: aws-ovn-network-flow-matrix-single-node
   cron: 0 23 * * 2,5
   steps:
@@ -1263,6 +1232,7 @@ tests:
         for a Gateway object \| The HAProxy router should pass the http2 tests \|
         The HAProxy router should pass the gRPC interoperability tests \| Services
         should fail health check node port if there are only terminating endpoints
+        \| egressfirewall
       USER_PROVISIONED_DNS: "yes"
     observers:
       enable:
@@ -1371,12 +1341,12 @@ tests:
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend-sno
-- as: e2e-metal-ovn-sno-cert-rotation-suspend-360d
+- as: e2e-metal-ovn-sno-cert-rotation-suspend-1y
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-30d
   cron: 0 8 * * Fri
@@ -1407,7 +1377,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "365"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-2y-age-90d
@@ -1415,8 +1385,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "730"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "731"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-3y-age-90d
@@ -1424,8 +1394,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1100"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1096"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1434,8 +1404,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1470"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1462"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1444,8 +1414,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1830"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1827"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1454,8 +1424,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "2190"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "2191"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1464,8 +1434,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "2560"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "2557"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1474,8 +1444,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "2930"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "2925"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1485,7 +1455,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3290"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1495,7 +1465,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3650"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
   timeout: 6h0m0s
@@ -1505,7 +1475,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "365"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-2y-age-90d
@@ -1513,8 +1483,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "730"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "731"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-3y-age-90d
@@ -1522,8 +1492,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1100"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1096"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
   timeout: 6h0m0s
@@ -1533,7 +1503,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1470"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
   timeout: 6h0m0s
@@ -1543,7 +1513,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1830"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
   timeout: 6h0m0s
@@ -1553,7 +1523,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "2190"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
   timeout: 6h0m0s
@@ -1563,7 +1533,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "2560"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
   timeout: 6h0m0s
@@ -1573,7 +1543,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "2930"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
   timeout: 6h0m0s
@@ -1583,7 +1553,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3290"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
   timeout: 6h0m0s
@@ -1593,7 +1563,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3650"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
@@ -1617,12 +1587,12 @@ tests:
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-- as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-1y
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-30d
   cron: 0 8 * * Fri
@@ -1652,12 +1622,12 @@ tests:
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend
-- as: e2e-metal-ovn-ha-cert-rotation-suspend-360d
+- as: e2e-metal-ovn-ha-cert-rotation-suspend-1y
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-30d
   cron: 0 8 * * Fri

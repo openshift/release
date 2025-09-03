@@ -5,9 +5,13 @@ build_root:
     tag: rhel-9-release-golang-1.21-openshift-4.17
 images:
 - dockerfile_path: Containerfile.assisted-chat
-  to: assisted-chat
+  to: rh-ecosystem-edge-assisted-chat-install
 - dockerfile_path: test/prow/Dockerfile
-  to: test
+  to: rh-ecosystem-edge-assisted-chat-test
+promotion:
+  to:
+  - name: assisted-chat-img
+    namespace: edge-infrastructure
 releases:
   latest:
     integration:
@@ -31,10 +35,12 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
+  optional: true
   steps:
     allow_best_effort_post_steps: true
     dependencies:
-      ASSISTED_CHAT_IMG: assisted-chat
+      ASSISTED_CHAT_IMG: rh-ecosystem-edge-assisted-chat-install
+      ASSISTED_CHAT_TEST: rh-ecosystem-edge-assisted-chat-test
     workflow: rh-ecosystem-edge-assisted-chat
 zz_generated_metadata:
   branch: main

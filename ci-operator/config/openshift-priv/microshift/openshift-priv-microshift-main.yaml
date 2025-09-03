@@ -26,25 +26,25 @@ promotion:
   to:
   - excluded_images:
     - microshift-test-rpm
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
   nightly-amd64:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -203,6 +203,38 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SUITE: ai-model-serving
     workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-tests-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-bootc-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-tests
 zz_generated_metadata:
   branch: main
   org: openshift-priv

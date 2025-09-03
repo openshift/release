@@ -38,6 +38,8 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk"
   # new image coming in k8s 1.31
   "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
+  # new image coming in k8s 1.31.12
+  "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-26-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
   # new image coming in k8s 1.32
   "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
   # new image coming in k8s 1.33.4
