@@ -2,24 +2,22 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ci
-  to: kubernetes-sigs-jobset
+  to: kubernetes-sigs-lws
 promotion:
   to:
-  - name: "4.20"
+  - name: "4.19"
     namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.20"
+  name: "4.19"
   namespace: ocp
 tests:
 - as: verify
-  commands: HOME=$( mktemp -d ) GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
     make -f Makefile-ocp.mk verify verify-ocp
   container:
     from: src
@@ -31,11 +29,11 @@ tests:
   commands: GOFLAGS='-mod=readonly' make test
   container:
     from: src
-- as: fips-image-scan-kubernetes-sigs-jobset
+- as: fips-image-scan-kubernetes-sigs-lws
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     dependencies:
-      SCAN_IMAGE: kubernetes-sigs-jobset
+      SCAN_IMAGE: kubernetes-sigs-lws
     test:
     - ref: fips-check-image-scan
 - as: security
@@ -44,6 +42,6 @@ tests:
   steps:
     workflow: openshift-ci-security
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.19
   org: openshift
-  repo: kubernetes-sigs-jobset
+  repo: kubernetes-sigs-lws
