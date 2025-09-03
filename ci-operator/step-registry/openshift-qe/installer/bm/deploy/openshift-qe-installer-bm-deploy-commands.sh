@@ -154,7 +154,7 @@ collect_ai_logs() {
   echo "Collecting AI logs ..."
   ssh ${SSH_ARGS} root@${bastion} "
     AI_CLUSTER_ID=\$(curl -sS http://$bastion2:8080/api/assisted-install/v2/clusters/  | jq -r .[0].id)
-    curl -Lo "/tmp/ai-cluster-logs.tar"  http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
+    curl -Lo /tmp/ai-cluster-logs.tar http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
   "
   scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-cluster-logs.tar ${ARTIFACT_DIR}/ai-cluster-logs.tar
 }
