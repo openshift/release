@@ -1,0 +1,69 @@
+ref:
+  as: redhat-chaos-kubevirt-outage
+  from_image:
+    namespace: chaos
+    name: prow-scripts
+    tag: latest
+  commands: redhat-chaos-kubevirt-outage-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/es
+  env:
+    - name: DURATION
+      default: "600"
+    - name: VM_NAME
+      default: "."
+    - name: TARGET_NAMESPACE
+      default: "virt-density"
+    - name: WAIT_DURATION
+      default: "300"
+    - name: RETRY_WAIT
+      default: "60"
+    - name: ENABLE_ALERTS
+      default: "True"
+    - name: ALERTS_PATH
+      default: "/home/krkn/kraken/config/alerts_openshift.yaml"
+    - name: CHECK_CRITICAL_ALERTS
+      default: "True"
+    - name: TELEMETRY_ENABLED
+      default: "True"
+    - name: TELEMETRY_API_URL
+      default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+    - name: TELEMETRY_USERNAME
+      default: "redhat-chaos"
+    - name: TELEMETRY_GROUP
+      default: "prow"
+    - name: TELEMETRY_RUN_TAG
+      default: "kubevirt-outage"
+    - name: TELEMETRY_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMTRY_BACKUP_THREADS
+      default: "5"
+    - name: TELEMETRY_ARCHIVE_PATH
+      default: "/tmp"
+    - name: TELEMETRY_MAX_RETRIES
+      default: "0"
+    - name: TELEMETRY_ARCHIVE_SIZE
+      default: "1000000"
+    - name: TELEMETRY_LOGS_BACKUP
+      default: "True"
+    - name: TELEMTRY_CLI_PATH
+      default: "/usr/local/bin/oc"
+    - name: TELEMETRY_EVENTS_BACKUP
+      default: "True"
+    - name: ENABLE_ES
+      default: "True"
+    - name: METRICS_PATH
+      default: "/home/krkn/kraken/config/metrics-report.yaml"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This workflow runs the krkn-hub config workload in the deployed cluster and introduces network latency, packet loss, bandwidth restriction in the egress traffic of a Node's interface using the tc and Netem.
