@@ -1,0 +1,35 @@
+workflow:
+  as: opendatahub-io-hypershift
+  documentation: |-
+    Enhanced HyperShift workflow for OpenDataHub operator testing that provides
+    fast cluster provisioning and comprehensive debugging capabilities.
+    
+    This workflow provides:
+    - Fast HyperShift hosted cluster provisioning on AWS
+    - Direct operator bundle installation using operator-sdk (no OLM catalog required)
+    - Operator installation on the hosted cluster (not management cluster)
+    - Complete standard gather-extra collection from hosted cluster
+    - Comprehensive debugging artifacts including pod logs, metrics, and cluster state
+    - Graceful failure handling with best-effort artifact collection
+    
+    Key features:
+    - Uses operator-sdk for faster installation compared to subscription-based workflows
+    - Targets hosted cluster via USE_HOSTED_KUBECONFIG for realistic testing
+    - Collects full OpenShift debugging data from hosted cluster using standard gather-extra
+    - Maintains compatibility with existing OpenDataHub e2e test infrastructure
+    - Optimized for PR validation with quick feedback and comprehensive failure analysis
+    
+    Use this workflow for reliable HyperShift-based operator testing with production-grade
+    debugging capabilities while maintaining fast CI feedback cycles.
+  steps:
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-rbac
+    - chain: hypershift-hostedcluster-create
+    - ref: optional-operators-operator-sdk
+    post:
+    - ref: opendatahub-io-hypershift-gather-extra
+      best_effort: true
+      optional_on_success: true
+    - chain: hypershift-hostedcluster-dump
+    - chain: hypershift-hostedcluster-destroy
