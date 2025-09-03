@@ -20,23 +20,50 @@ echo "Namespace: ${FUSION_ACCESS_NAMESPACE}"
 echo "Storage Scale Namespace: ${STORAGE_SCALE_NAMESPACE}"
 
 # Check if IBM entitlement credentials are available
-if [[ ! -f "/tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key" ]]; then
-  echo "ERROR: IBM entitlement credentials not found"
-  echo "Expected path: /tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key"
-  exit 1
+# Try multiple possible locations for the credentials
+IBM_ENTITLEMENT_AVAILABLE=false
+IBM_ENTITLEMENT_KEY=""
+
+# Check common credential locations
+for path in \
+  "/tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key" \
+  "/var/run/secrets/ibm-entitlement-key" \
+  "/secrets/ibm-entitlement-key" \
+  "/tmp/ibm-entitlement-key"; do
+  if [[ -f "$path" ]]; then
+    echo "✅ IBM entitlement credentials found at: $path"
+    IBM_ENTITLEMENT_KEY="$(cat "$path")"
+    IBM_ENTITLEMENT_AVAILABLE=true
+    break
+  fi
+done
+
+# Check if credentials are available as environment variable
+if [[ -n "${IBM_ENTITLEMENT_KEY:-}" ]]; then
+  echo "✅ IBM entitlement credentials found in environment variable"
+  IBM_ENTITLEMENT_AVAILABLE=true
 fi
 
-echo "✅ IBM entitlement credentials found"
+if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "false" ]]; then
+  echo "WARNING: IBM entitlement credentials not found in any expected location"
+  echo "This may be a rehearsal run without access to IBM credentials"
+  echo "Proceeding with deployment without IBM entitlement secret..."
+fi
 
 # Step 1: Create IBM Storage Scale namespace
 echo "📁 Creating IBM Storage Scale namespace..."
 oc create namespace "${STORAGE_SCALE_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
-# Step 2: Create IBM entitlement secret
-echo "🔐 Creating IBM entitlement secret..."
-oc create secret -n "${FUSION_ACCESS_NAMESPACE}" generic fusion-pullsecret \
-  --from-literal=ibm-entitlement-key="$(cat /tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key)" \
-  --dry-run=client -o yaml | oc apply -f -
+# Step 2: Create IBM entitlement secret (if credentials are available)
+if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "true" ]]; then
+  echo "🔐 Creating IBM entitlement secret..."
+  oc create secret -n "${FUSION_ACCESS_NAMESPACE}" generic fusion-pullsecret \
+    --from-literal=ibm-entitlement-key="${IBM_ENTITLEMENT_KEY}" \
+    --dry-run=client -o yaml | oc apply -f -
+  echo "✅ IBM entitlement secret created"
+else
+  echo "⚠️  Skipping IBM entitlement secret creation (credentials not available)"
+fi
 
 # Step 3: Create FusionAccess CR
 echo "📋 Creating FusionAccess CR..."

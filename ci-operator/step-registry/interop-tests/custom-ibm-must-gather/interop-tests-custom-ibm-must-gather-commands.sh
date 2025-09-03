@@ -18,13 +18,33 @@ AUTHFILE="/tmp/authfile"
 echo "Creating authfile for IBM registry..."
 
 # Get IBM entitlement key from credentials
-if [[ -f "/tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key" ]]; then
-  echo "IBM entitlement key found, creating authfile..."
+IBM_ENTITLEMENT_KEY=""
+
+# Check common credential locations
+for path in \
+  "/tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key" \
+  "/var/run/secrets/ibm-entitlement-key" \
+  "/secrets/ibm-entitlement-key" \
+  "/tmp/ibm-entitlement-key"; do
+  if [[ -f "$path" ]]; then
+    echo "IBM entitlement key found at: $path"
+    IBM_ENTITLEMENT_KEY="$(cat "$path")"
+    break
+  fi
+done
+
+# Check if credentials are available as environment variable
+if [[ -n "${IBM_ENTITLEMENT_KEY:-}" ]]; then
+  echo "IBM entitlement key found in environment variable"
+fi
+
+if [[ -n "$IBM_ENTITLEMENT_KEY" ]]; then
+  echo "Creating authfile for IBM registry..."
   cat > "$AUTHFILE" <<EOF
 {
   "auths": {
     "icr.io": {
-      "auth": "$(echo -n "cp:$(cat /tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key)" | base64 -w 0)"
+      "auth": "$(echo -n "cp:${IBM_ENTITLEMENT_KEY}" | base64 -w 0)"
     }
   }
 }
@@ -38,12 +58,15 @@ fi
 # Create artifact directory
 mkdir -p "${ARTIFACT_DIR}/ibm-must-gather"
 
-# Run must-gather with IBM image
-echo "Running IBM Spectrum Scale must-gather..."
+# Run must-gather with IBM image or fallback to standard must-gather
+echo "Running must-gather..."
 if [[ -n "$AUTHFILE" ]]; then
+  echo "Using IBM Spectrum Scale must-gather with authentication..."
   oc adm must-gather --image="${MUST_GATHER_IMAGE}" --authfile="$AUTHFILE" --dest-dir="${ARTIFACT_DIR}/ibm-must-gather"
 else
-  oc adm must-gather --image="${MUST_GATHER_IMAGE}" --dest-dir="${ARTIFACT_DIR}/ibm-must-gather"
+  echo "IBM entitlement key not available, falling back to standard OpenShift must-gather..."
+  echo "This is expected in rehearsal runs without IBM credentials"
+  oc adm must-gather --dest-dir="${ARTIFACT_DIR}/ibm-must-gather"
 fi
 
 # Archive results

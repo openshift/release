@@ -55,7 +55,7 @@ resources:
       memory: 400Mi
 tests:
 - as: fusion-access-operator-ipi-ocp420
-  cron: 0 23 31 2 *
+  cron: 0 23 28 2 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -64,6 +64,7 @@ tests:
       CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
       CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp
       CUSTOM_SECURITY_GROUP_SOURCES: ""
+      FIPS_ENABLED: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp", "self-managed-lp", "fusion-access-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mbaldess@redhat.com
@@ -79,17 +80,7 @@ tests:
             "channel": "alpha",
             "install_namespace": "ibm-fusion-access",
             "target_namespaces": "!install",
-            "catalog_source": {
-              "name": "test-fusion-access-operator",
-              "namespace": "openshift-marketplace",
-              "image": "quay.io/openshift-storage-scale/openshift-fusion-access-catalog:stable",
-              "display_name": "Test Storage Scale Operator"
-            },
-            "operator_group": {
-              "name": "storage-scale-operator-group",
-              "namespace": "ibm-fusion-access",
-              "upgrade_strategy": "Default"
-            }
+            "operator_group": "storage-scale-operator-group"
           }
         ]
       RE_TRIGGER_ON_FAILURE: "false"
@@ -103,7 +94,12 @@ tests:
         scenario fusion-access
     post:
     - ref: interop-tests-custom-ibm-must-gather
+    - chain: ipi-aws-post
+    pre:
+    - ref: install-operators-verify
+    - chain: ipi-aws-pre
     test:
+    - chain: cucushift-installer-check-cluster-health
     - ref: install-operators
     - ref: interop-tests-configure-aws-security-groups
     - ref: interop-tests-deploy-fusion-access
