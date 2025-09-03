@@ -37,3 +37,23 @@ run_command "oc -n openshift-ingress-operator get ingresscontroller -oyaml"
 run_command "oc -n openshift-ingress get service"
 run_command "oc -n openshift-marketplace get catalogsources.operators.coreos.com"
 set -e
+
+set -x
+
+MIRROR_PROXY_REGISTRY=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
+echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
+
+ipho_file="/$(mktemp -d)/image-policy-ho.yaml"
+cat <<EOF > "$ipho_file"
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: image-policy-ho
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}/hypershift/hypershift-operator
+    source: quay.io/hypershift/hypershift-operator
+EOF
+
+run_command "oc apply -f ${ipho_file}"

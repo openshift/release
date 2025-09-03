@@ -47,19 +47,6 @@ args=(
 
 prepare_tag_images_list
 
-ipho_file="/$(mktemp -d)/image-policy-ho.yaml"
-cat <<EOF > "$ipho_file"
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: image-policy-ho
-spec:
-  imageTagMirrors:
-  - mirrors:
-    - ${MIRROR_PROXY_REGISTRY}/hypershift/hypershift-operator
-    source: quay.io/hypershift/hypershift-operator
-EOF
-
 if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
     # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
     # to be able to SSH.
@@ -122,10 +109,6 @@ if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
     echo "Remote Command: ${cmd}"
     # shellcheck disable=SC2090
     ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${cmd}"
-
-    # deal with idms
-    scp ${ssh_options} "${ipho_file}" ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/image-policy-ho.yaml
-    ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${OC_BIN} apply -f /tmp/image-policy-ho.yaml"
 else
     args+=(--registry-config="${new_pull_secret}")
     args+=(--filename="${tag_images_list}")
@@ -139,6 +122,4 @@ else
     fi
     cmd="${OC_BIN} image mirror ${args[*]}"
     run_command "${cmd}"
-
-    run_command "${OC_BIN} apply -f ${ipho_file}"
 fi
