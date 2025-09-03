@@ -22,7 +22,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ci
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.ci
   inputs:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
@@ -31,7 +33,9 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: kueue-operator
-- dockerfile_literal: |
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
   from: src
@@ -103,6 +107,25 @@ tests:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
       OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-4-18-arm64
+  cluster_claim:
+    architecture: arm64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-0-12
       OPERATOR_COMPONENT: kueue-operator-main
     post:
     - chain: kueue-operator-post
