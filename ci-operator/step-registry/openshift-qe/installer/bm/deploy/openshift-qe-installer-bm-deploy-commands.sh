@@ -41,6 +41,7 @@ enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
+smcipmitool_url: "file:///root/smcipmitool.tar.gz"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
 bastion_controlplane_interface: $BASTION_CP_INTERFACE
 bastion_lab_interface: $LAB_INTERFACE
