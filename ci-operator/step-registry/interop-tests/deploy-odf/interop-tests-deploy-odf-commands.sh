@@ -181,10 +181,16 @@ done
 echo "⏳ Wait for OCS Operator deployment to be ready"
 sleep 90
 
-oc wait deployment ocs-operator \
-  --namespace="${ODF_INSTALL_NAMESPACE}" \
-  --for=condition='Available' \
-  --timeout='5m'
+for _ in {1..60}; do
+      if [[ "$(oc -n "$ODF_INSTALL_NAMESPACE" get deployment ocs-operator -o jsonpath='{.status.conditions[*].status}')" == *"False"* ]]; then
+          echo "OCS Operator not ready"
+          oc -n "$ODF_INSTALL_NAMESPACE" get deployment ocs-operator -o yaml
+      else
+        echo "OCS Operator ready"
+        break
+      fi
+    sleep 30
+done
 
 echo "🏷️ Preparing Nodes"
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \

@@ -1,0 +1,133 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  krkn.prow:
+    name: krkn
+    namespace: chaos
+    tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cnv-aws-interop
+  cron: 0 3,15 * * *
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      GC: "false"
+      COMPUTE_NODE_TYPE: c5n.metal
+      ODF_OPERATOR_CHANNEL: stable-4.19
+      ODF_VERSION_MAJOR_MINOR: "4.19"
+    post:
+    - ref: kubevirt-gather
+    - chain: ipi-aws-post
+    pre:
+    - ref: install-operators-verify
+    - chain: ipi-aws-pre
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-cnv-tests-e2e-deploy
+    - ref: openshift-qe-virt-density
+    - ref: redhat-chaos-kubevirt-outage
+  timeout: 6h0m0s
+- always_run: false
+  as: aws-virt-operator
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      GC: "false"
+      SIZE_VARIANT: xlarge
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.20
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+    test:
+    - ref: kubevirt-install
+    - ref: openshift-qe-virt-density
+    - ref: redhat-chaos-kubevirt-outage
+    post: 
+    - ref: kubevirt-gather
+    - chain: ipi-aws-post
+    workflow: ipi-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: gcp-virt
+  steps:
+    cluster_profile: gcp-chaos
+    env:
+      GC: "false"
+      SIZE_VARIANT: xlarge
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.20
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: n2-standard-4
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+    test:
+    - ref: kubevirt-install
+    - ref: openshift-qe-virt-density
+    - ref: redhat-chaos-kubevirt-outage
+    post: 
+    - ref: kubevirt-gather
+    - chain: ipi-gcp-post
+    workflow: ipi-gcp
+  timeout: 6h0m0s
+- always_run: false
+  as: gcp-virt-interop
+  steps:
+    cluster_profile: gcp-chaos
+    env:
+      GC: "false"
+      SIZE_VARIANT: xlarge
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.20
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: n2-standard-4
+      FEATURE_SET: TechPreviewNoUpgrade
+      ODF_OPERATOR_CHANNEL: stable-4.19
+      ODF_VERSION_MAJOR_MINOR: "4.19"
+    test:
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-deploy-cnv
+    - ref: openshift-qe-virt-density
+    - ref: redhat-chaos-kubevirt-outage
+    workflow: ipi-gcp
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: 4.20-nightly
