@@ -92,8 +92,7 @@ function download_logs() {
   gcloud_auth_cmd='gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private 2>&1'
   for (( i=1; i<=3; i++ ))
   do
-    output="$(eval $gcloud_auth_cmd)"
-    if ! (grep -q 'ERROR' <<< "$output")
+    if (eval $gcloud_auth_cmd | grep -q -i 'Activated service account')
     then
       break
     fi
