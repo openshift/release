@@ -1,31 +1,31 @@
-postsubmits:
-  openshift-priv/openshift-tests-private:
+presubmits:
+  openshift-priv/ocp-build-data:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build07
+    - ^openshift-4\.13$
+    - ^openshift-4\.13-
+    context: ci/prow/art-konflux-delivery-repo-check
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
+      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
-    max_concurrency: 1
-    name: branch-ci-openshift-priv-openshift-tests-private-master-images
-    path_alias: github.com/openshift/openshift-tests-private
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-ocp-build-data-openshift-4.13-art-konflux-delivery-repo-check
+    optional: true
+    path_alias: github.com/openshift-eng/ocp-build-data
+    rerun_command: /test art-konflux-delivery-repo-check
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=art-konflux-delivery-repo-check
         command:
         - ci-operator
         image: ci-operator:latest
@@ -47,9 +47,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -64,9 +61,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-konflux-delivery-repo-check,?($|\s.*)
