@@ -37,6 +37,32 @@ function record_cluster() {
   fi
 }
 
+oc_retry() {
+  local retries=${OC_RETRIES:-5}       # configurable, default 5
+  local delay=${OC_RETRY_DELAY:-15}    # configurable, default 15s
+  local max_delay=${OC_RETRY_MAX_DELAY:-300}  # cap the backoff (default 5m)
+  local count=0
+  local exit_code=0
+
+  until oc "$@"; do
+    exit_code=$?
+    count=$((count + 1))
+    if [ $count -lt $retries ]; then
+      log "oc $* failed with exit code $exit_code. Retrying in ${delay}s... (${count}/${retries})"
+      sleep $delay
+      # exponential backoff with max cap
+      delay=$(( delay * 2 ))
+      if [ $delay -gt $max_delay ]; then
+        delay=$max_delay
+      fi
+    else
+      log "oc $* failed after $retries attempts with exit code $exit_code. Exiting."
+      return $exit_code
+    fi
+  done
+  return 0
+}
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         log "setting the proxy"
@@ -79,7 +105,16 @@ function get_recommended_version_for_machinepool () {
 
 # check_admin_gates function for ROSA
 function check_admin_gates() {
-    check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')
+    # Attempt to fetch the admin gates data. Redirect stderr to suppress "not found" errors.
+    check_admin_gates=$(oc_retry -n openshift-config-managed get configmap admin-gates -o json 2>/dev/null | jq -r '.data')
+
+    # Check if the command failed, or if the data is null or empty.
+    if [[ "$check_admin_gates" == "null" || -z "$check_admin_gates" ]]; then
+        log "No admin gates found that require acknowledgement. Skipping patch."
+        return 0 # Exit the function successfully
+    fi
+
+    # If we get here, there are gates to process.
     log -e "Admin ack required for these:\n$check_admin_gates"
 
     ack_list=$(echo $check_admin_gates | jq -r 'keys[]')
@@ -87,7 +122,7 @@ function check_admin_gates() {
       # $ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.18-kube-1.32-api-removals-in-4.19":"true"}}' --type=merge
       # https://access.redhat.com/articles/7112216
       log "Patch Admin-acks configmap with ${item}: true"
-      oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${item}"'": "true"}}' --type=merge
+      oc_retry -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${item}"'": "true"}}' --type=merge
     done
 }
 
@@ -144,8 +179,8 @@ function upgrade_cluster_to () {
   set_proxy
   if [[ "$HOSTED_CP" == "false" ]]; then
     log "Force restarting the MUO pod to speed up the upgrading process."
-    muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
-    oc delete pod $muo_pod -n openshift-managed-upgrade-operator
+    muo_pod=$(oc_retry get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
+    oc_retry delete pod $muo_pod -n openshift-managed-upgrade-operator
   fi
   unset_proxy
 
@@ -159,7 +194,7 @@ function upgrade_cluster_to () {
         ocm get /api/clusters_mgmt/v1/clusters/"$cluster_id"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/kubeconfig-$cluster_id"
         set_proxy
         log "oc patch mcp worker with maxUnavailable to ${NP_MAX_UNAVAILABLE}"
-        oc --kubeconfig "${SHARED_DIR}/kubeconfig-$cluster_id" patch mcp worker --patch '{"spec":{"maxUnavailable": "'"${NP_MAX_UNAVAILABLE}"'"}}' --type=merge
+        oc_retry --kubeconfig "${SHARED_DIR}/kubeconfig-$cluster_id" patch mcp worker --patch '{"spec":{"maxUnavailable": "'"${NP_MAX_UNAVAILABLE}"'"}}' --type=merge
         unset_proxy
       else
         if [[ "${NP_MAX_SURGE}" == "" ]]; then
@@ -183,7 +218,7 @@ function upgrade_cluster_to () {
       log "Upgrade the cluster $cluster_id to the openshift version $recommended_version successfully after $(( $(date +"%s") - ${start_time} )) seconds"
       set_proxy
       log "Cluster state after upgrade"
-      oc get clusteroperators
+      oc_retry get clusteroperators
       unset_proxy
       break
     fi
@@ -199,7 +234,7 @@ function upgrade_cluster_to () {
     if (( $(date +"%s") - $start_time >= $CLUTER_UPGRADE_TIMEOUT )); then
       log "error: Timed out while waiting for the cluster upgrading to be ready"
       set_proxy
-      oc get clusteroperators
+      oc_retry get clusteroperators
       exit 1
     fi
   done
@@ -249,14 +284,14 @@ function upgrade_machinepool_to () {
 # check if the nodes are Ready status
 function check_node() {
     local node_number ready_number
-    node_number=$(oc get node --no-headers | grep -cv STATUS)
-    ready_number=$(oc get node --no-headers | awk '$2 == "Ready"' | wc -l)
+    node_number=$(oc_retry get node --no-headers | grep -cv STATUS)
+    ready_number=$(oc_retry get node --no-headers | awk '$2 == "Ready"' | wc -l)
     if (( node_number == ready_number )); then
         echo "All nodes status Ready"
         return 0
     else
         echo "Find Not Ready worker nodes, node recreated"
-        oc get no
+        oc_retry get no
         exit 1
     fi
 }
@@ -264,7 +299,7 @@ function check_node() {
 function check_worker_node_not_changed() {
   check_node
   # ensure the worker node UIDs are not changed
-  current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+  current_uids=$(oc_retry get nodes -o jsonpath='{.items[*].metadata.uid}')
   IFS=' ' read -r -a current_array <<< "$current_uids"
   sorted_current_uids=$(printf "%s\n" "${current_array[@]}" | sort | tr '\n' ' ')
 
@@ -332,11 +367,11 @@ initial_uids=""
 sorted_initial_uids=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   set_proxy
-  initial_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+  initial_uids=$(oc_retry get nodes -o jsonpath='{.items[*].metadata.uid}')
   IFS=' ' read -r -a initial_array <<< "$initial_uids"
   sorted_initial_uids=$(printf "%s\n" "${initial_array[@]}" | sort | tr '\n' ' ')
   echo "initial worker node uids: $sorted_initial_uids"
-  oc get no -owide
+  oc_retry get no -owide
   unset_proxy
 fi
 

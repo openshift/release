@@ -691,6 +691,7 @@ cmd="rosa create cluster -y \
 ${STS_SWITCH} \
 ${HYPERSHIFT_SWITCH} \
 --cluster-name ${CLUSTER_NAME} \
+--pod-cidr 10.128.0.0/10 \
 --region ${CLOUD_PROVIDER_REGION} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
