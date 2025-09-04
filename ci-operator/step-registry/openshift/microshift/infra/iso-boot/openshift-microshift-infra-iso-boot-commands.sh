@@ -32,41 +32,7 @@ if [ "${JOB_TYPE}" == "presubmit" ]; then
   EXCLUDE_CNCF_CONFORMANCE=true
 fi
 
-# Implement scenario directory check with fallbacks. Simplify or remove the
-# function when the structure is homogenised in all the active releases.
-function get_source_dir() {
-  local -r base="/home/${HOST_USER}/microshift/test"
-  local -r ndir="${base}/$1"
-  local -r fdir="${base}/$2"
-
-  # We need the variable to expand on the client side
-  # shellcheck disable=SC2029
-  if ssh "${INSTANCE_PREFIX}" "[ -d \"${ndir}\" ]" ; then
-    echo "${ndir}"
-  else
-    echo "${fdir}"
-  fi
-}
-
-if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
-  if [[ "${JOB_NAME}" =~ .*e2e-aws-tests.*release.* ]]; then
-    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/releases" "scenarios-bootc")
-  else
-    SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/presubmits" "scenarios-bootc")
-    if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
-        SCENARIO_SOURCES=$(get_source_dir "scenarios-bootc/periodics" "scenarios-bootc")
-    fi
-  fi
-else
-  if [[ "${JOB_NAME}" =~ .*e2e-aws-tests.*release.* ]]; then
-    SCENARIO_SOURCES=$(get_source_dir "scenarios/releases" "scenarios")
-  else
-    SCENARIO_SOURCES=$(get_source_dir "scenarios/presubmits" "scenarios")
-    if [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
-        SCENARIO_SOURCES=$(get_source_dir "scenarios/periodics" "scenarios-periodics")
-    fi
-  fi
-fi
+SCENARIO_SOURCES=$(get_source_dir "${SCENARIO_TYPE}")
 
 # Run in background to allow trapping signals before the command ends. If running in foreground
 # then TERM is queued until the ssh completes. This might be too long to fit in the grace period
