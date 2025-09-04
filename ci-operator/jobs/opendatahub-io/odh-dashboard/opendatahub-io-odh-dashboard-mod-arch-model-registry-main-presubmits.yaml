@@ -1,0 +1,63 @@
+presubmits:
+  opendatahub-io/odh-dashboard:
+  - agent: kubernetes
+    always_run: false
+    run_if_changed: ^packages/model-registry/.*
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/odh-mod-arch-model-registry-pr-image-mirror
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-odh-dashboard-main__mod-arch-model-registry-odh-mod-arch-model-registry-pr-image-mirror
+    rerun_command: /test odh-mod-arch-model-registry-pr-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=odh-mod-arch-model-registry-pr-image-mirror
+        - --variant=mod-arch-model-registry
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: gcs-credentials
+        secret:
+          secretName: gcs-upload
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )odh-mod-arch-model-registry-pr-image-mirror,?($|\s.*)
