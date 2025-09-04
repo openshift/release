@@ -527,6 +527,10 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$netmask ="${netmask}"
 
 \$bootstrap_ip_address = "${bootstrap_ip_address}"
+
+\$lb_memory =  $(jq -r '.spec.lb.memoryMB' ${SPEC_CONFIG})
+\$lb_num_cpus = $(jq -r '.spec.lb.cpus' ${SPEC_CONFIG})
+\$lb_cores_per_socket = $(jq -r '.spec.lb.coresPerSocket' ${SPEC_CONFIG})
 \$lb_ip_address = "${lb_ip_address}"
 
 \$control_plane_memory =  $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})
