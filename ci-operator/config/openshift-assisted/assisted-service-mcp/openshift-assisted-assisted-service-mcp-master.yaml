@@ -1,3 +1,12 @@
+base_images:
+  rh-ecosystem-edge-assisted-chat-install:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: rh-ecosystem-edge-assisted-chat-install
+  rh-ecosystem-edge-assisted-chat-test:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: rh-ecosystem-edge-assisted-chat-test
 build_root:
   project_image:
     dockerfile_literal: |
@@ -30,6 +39,23 @@ tests:
     make test
   container:
     from: src
+- always_run: true
+  as: eval-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    dependencies:
+      ASSISTED_CHAT_IMG: rh-ecosystem-edge-assisted-chat-install
+      ASSISTED_CHAT_TEST: rh-ecosystem-edge-assisted-chat-test
+      ASSISTED_MCP_IMG: assisted-service-mcp
+    workflow: rh-ecosystem-edge-assisted-chat
 zz_generated_metadata:
   branch: master
   org: openshift-assisted
