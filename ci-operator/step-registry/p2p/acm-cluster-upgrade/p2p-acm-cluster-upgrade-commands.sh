@@ -23,7 +23,7 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
   name: upgrade-cluster
-  namespace: ocm
+  namespace: default
   annotations:
     policy.open-cluster-management.io/categories: CM Configuration Management
     policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
@@ -91,7 +91,7 @@ apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
   name: upgrade-cluster-placement
-  namespace: ocm
+  namespace: default
 spec:
   tolerations:
     - key: cluster.open-cluster-management.io/unreachable
@@ -105,7 +105,7 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
 metadata:
   name: upgrade-cluster-placement
-  namespace: ocm
+  namespace: default
 placementRef:
   name: upgrade-cluster-placement
   kind: Placement
