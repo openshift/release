@@ -291,11 +291,11 @@ function check_imagestreams() {
  local TIMEOUT="1m"
 
   # Wait for imagestreams API to be available (max 1 minute)
-  if ! oc api-resources | grep -q imagestreams; then
+  if ! oc get imagestreams --all-namespaces --dry-run=server >/dev/null 2>&1; then
     echo "INFO: Waiting for imagestreams API to be available..."
     local api_timeout=30  # 30 iterations * 2 seconds = 60 seconds max
     local api_count=0
-    while ! oc api-resources | grep -q imagestreams; do
+    while ! oc get imagestreams --all-namespaces --dry-run=server >/dev/null 2>&1; do
       sleep 2
       api_count=$((api_count + 1))
       if [ $api_count -ge $api_timeout ]; then
