@@ -127,3 +127,42 @@ echo "************ Starting NROP tests ************"
 run_tests || run_tests_status=$?
 echo "Test status: ${run_tests_status}"
 popd
+
+echo "Ginkgo command failed with exit code: ${run_tests_status}"
+
+# JUnit to HTML conversion
+python3 -m venv "${SHARED_DIR}"/myenv
+source "${SHARED_DIR}"/myenv/bin/activate
+git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
+pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
+
+for junit_file in "${ARTIFACT_DIR}"/*.xml; do
+    if [ ! -e "${junit_file}" ]; then
+        echo "No XML files found in ${ARTIFACT_DIR}."
+        exit 0
+    fi
+    output_file="${junit_file%.xml}.html"
+    # Run j2html.py on the XML file
+    echo "Processing ${junit_file} -> ${output_file}"
+    python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"
+    if [[ $? -ne 0 ]]; then
+         echo "Error: Failed to process ${junit_file}."
+         exit 1;
+    fi
+
+    # create json reports
+    json_output_file="${junit_file%.xml}.json"
+    python "${SHARED_DIR}"/telco5gci/junit2json.py "${junit_file}" -o "${json_output_file}"
+done
+
+# Run junitparser merge
+xml_files=("$ARTIFACT_DIR"/*.xml)
+output_file="${ARTIFACT_DIR}"/junit.xml
+
+# Merge XML files using junitparser
+echo "Merging XML files into ${output_file}"
+junitparser merge "${xml_files[@]}" "${output_file}"
+
+rm -rf "${SHARED_DIR}"/myenv "${SHARED_DIR}"/telco5gci
+set +x
+set -e
