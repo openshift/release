@@ -55,79 +55,8 @@ presubmits:
     trigger: (?m)^/test( | .* )build,?($|\s.*)
   - agent: kubernetes
     always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build07
-    context: ci/prow/e2e-aws-capi-customnoupgrade-migration
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-capi-operator-main-e2e-aws-capi-customnoupgrade-migration
-    rerun_command: /test e2e-aws-capi-customnoupgrade-migration
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-capi-customnoupgrade-migration
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-capi-customnoupgrade-migration,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -141,7 +70,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-aws-capi-techpreview
     rerun_command: /test e2e-aws-capi-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -201,6 +129,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-capi-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -214,7 +144,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-aws-ovn
     rerun_command: /test e2e-aws-ovn
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -274,6 +203,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -287,7 +218,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-aws-ovn-serial-1of2
     rerun_command: /test e2e-aws-ovn-serial-1of2
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -348,6 +278,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -361,7 +293,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-aws-ovn-serial-2of2
     rerun_command: /test e2e-aws-ovn-serial-2of2
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -422,6 +353,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-2of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -435,7 +368,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-aws-ovn-techpreview
     rerun_command: /test e2e-aws-ovn-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -495,6 +427,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-ovn-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -508,7 +442,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-aws-ovn-techpreview-upgrade
     rerun_command: /test e2e-aws-ovn-techpreview-upgrade
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -568,6 +501,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-ovn-techpreview-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -581,7 +516,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-azure-capi-techpreview
     rerun_command: /test e2e-azure-capi-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -641,6 +575,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-azure-capi-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -655,7 +591,6 @@ presubmits:
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-azure-ovn-techpreview
     optional: true
     rerun_command: /test e2e-azure-ovn-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -715,6 +650,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-azure-ovn-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -728,7 +665,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-azure-ovn-techpreview-upgrade
     rerun_command: /test e2e-azure-ovn-techpreview-upgrade
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -788,6 +724,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-azure-ovn-techpreview-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -801,7 +739,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-gcp-capi-techpreview
     rerun_command: /test e2e-gcp-capi-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -861,6 +798,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-capi-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -874,7 +813,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-gcp-ovn-techpreview
     rerun_command: /test e2e-gcp-ovn-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -934,6 +872,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-ovn-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -949,7 +889,6 @@ presubmits:
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-metal3-capi-techpreview
     optional: true
     rerun_command: /test e2e-metal3-capi-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1009,6 +948,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-metal3-capi-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -1022,7 +963,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-openstack-capi-techpreview
     rerun_command: /test e2e-openstack-capi-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1082,6 +1022,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-openstack-capi-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -1095,7 +1037,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-openstack-ovn-techpreview
     rerun_command: /test e2e-openstack-ovn-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1155,6 +1096,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-openstack-ovn-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -1168,7 +1111,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-vsphere-capi-techpreview
     rerun_command: /test e2e-vsphere-capi-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1471,6 +1413,8 @@ presubmits:
     trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
     branches:
     - ^main$
     - ^main-
@@ -1487,7 +1431,6 @@ presubmits:
     name: pull-ci-openshift-cluster-capi-operator-main-regression-clusterinfra-aws-ipi-techpreview-capi
     optional: true
     rerun_command: /test regression-clusterinfra-aws-ipi-techpreview-capi
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
