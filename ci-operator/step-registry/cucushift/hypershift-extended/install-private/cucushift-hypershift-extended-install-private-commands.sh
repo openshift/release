@@ -4,7 +4,7 @@ set -u
 
 # Get HO image and Hypershift CLI
 HCP_CLI="bin/hypershift"
-OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
+OPERATOR_IMAGE=quay.io/jimma/hypershift-operator:4.19
 if [[ $HO_MULTI == "true" ]]; then
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
