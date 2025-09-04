@@ -16,14 +16,25 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile
+  dockerfile_path: Dockerfile.rhel
   from: origin_scos-4.21_base-stream9
   inputs:
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: insights-operator
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: etcd
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.installer
+  from: origin_scos-4.21_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: installer-etcd-artifacts
 promotion:
   to:
   - name: scos-4.21
@@ -48,7 +59,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: master
+  branch: openshift-4.21
   org: openshift
-  repo: insights-operator
+  repo: etcd
   variant: okd-scos
