@@ -80,6 +80,9 @@ chain:
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
+    - name: HC_DISABLED_CAPS
+      default: ""
+      documentation: "Disabling Capabilities in Hosted Cluster,format: 'Console,ImageRegistry...' detail see https://issues.redhat.com/browse/MGMT-20628"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -103,6 +106,7 @@ chain:
       COMMAND=(
         /usr/bin/hypershift create cluster aws
         --name ${CLUSTER_NAME}
+        --infra-id ${CLUSTER_NAME}
         --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT}
         --instance-type ${HYPERSHIFT_INSTANCE_TYPE}
@@ -165,6 +169,11 @@ chain:
         exit 0
       fi
       
+      # Disabling Hosted Cluster capabilities
+      if [[ -n "$HC_DISABLED_CAPS" ]]; then
+        COMMAND+=(--disable-cluster-capabilities "$HC_DISABLED_CAPS")
+      fi
+
       # add cluster-info tags if exists
       hosted_cluster_info_file=${SHARED_DIR}/hosted_cluster_info_file
       if [[ -f "${hosted_cluster_info_file}" ]] ; then
