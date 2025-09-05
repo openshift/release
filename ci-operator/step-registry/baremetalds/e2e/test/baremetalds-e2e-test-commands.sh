@@ -315,19 +315,24 @@ function check_imagestreams() {
   for project in $(oc get projects -o jsonpath='{.items[*].metadata.name}' | tr " " "\n" | grep -v -E "^openshift-|^kube-"); do
     echo "Checking project: ${project}"
 
-    # Run oc wait, targeting all imagestreams in the project.
-    # The JSONPath now waits for a core status field to be populated by the controller.
-    oc wait imagestreams --all \
-      --for=jsonpath='{.status.dockerImageRepository}' \
-      -n "${project}" \
-      --timeout=${TIMEOUT}
-
-    # Check the exit code of the wait command to report status.
-    if [ $? -eq 0 ]; then
-      echo "SUCCESS: ImageStream controller appears healthy in project '${project}'."
+    # Check if there are any imagestreams in the project first
+    imagestream_count=$(oc get imagestreams -n "${project}" --no-headers 2>/dev/null | wc -l)
+    
+    if [ "$imagestream_count" -eq 0 ]; then
+      echo "INFO: No imagestreams found in project '${project}'. This is normal for projects without imagestreams."
     else
-      # To make the script stop on the first failure, add 'exit 1' here.
-      echo "WARNING: Timed out waiting for ImageStream controller to process objects in project '${project}'. Continuing..."
+      echo "INFO: Found ${imagestream_count} imagestream(s) in project '${project}'. Checking status..."
+      
+      # Run oc wait, targeting all imagestreams in the project.
+      # The JSONPath now waits for a core status field to be populated by the controller.
+      if oc wait imagestreams --all \
+        --for=jsonpath='{.status.dockerImageRepository}' \
+        -n "${project}" \
+        --timeout=${TIMEOUT}; then
+        echo "SUCCESS: ImageStream controller appears healthy in project '${project}'."
+      else
+        echo "WARNING: Timed out waiting for ImageStream controller to process objects in project '${project}'. Continuing..."
+      fi
     fi
     echo "---"
   done
