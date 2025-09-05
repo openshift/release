@@ -315,7 +315,7 @@ function run {
 
     echo "final scenarios: ${test_scenarios}"
     extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+        grep -E "60351|62690|83033|21205|" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     test_filters="${hardcoded_filters};${TEST_FILTERS}"
     if [[ -n "${FILTERS_ADDITIONAL:-}" ]]; then
