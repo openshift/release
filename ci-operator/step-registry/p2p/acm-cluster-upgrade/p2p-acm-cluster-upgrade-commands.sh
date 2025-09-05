@@ -16,7 +16,7 @@ PULLSPEC="$(curl -fsSl "https://amd64.ocp.releases.ci.openshift.org/api/v1/relea
 echo $PULLSPEC
 
 
-sleep 14400
+sleep 17600
 
 oc create -f - <<EOF
 apiVersion: policy.open-cluster-management.io/v1
