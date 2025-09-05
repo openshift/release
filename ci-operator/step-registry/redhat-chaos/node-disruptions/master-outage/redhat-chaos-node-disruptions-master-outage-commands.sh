@@ -91,63 +91,27 @@ elif [ "$platform" = "None" ] || [ "$platform" = "bm" ] || [ "$platform" = "bare
             # shellcheck disable=SC1090
             . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
             
+            # shellcheck disable=SC2154
+            # shellcheck disable=SC2154
+            # shellcheck disable=SC2154
             if [[ "${target_node}" == "${name}"* ]]; then
                 # shellcheck disable=SC2154
                 export BMC_USER="${bmc_user}"
                 # shellcheck disable=SC2154
                 export BMC_PASSWORD="${bmc_pass}"
                 # shellcheck disable=SC2154
-                export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+                # Use bastion with forwarded port instead of direct BMC address for krkn YAML
+                export BMC_ADDR="${AUX_HOST}:${bmc_forwarded_port}"
                 # shellcheck disable=SC2154
                 export NODE_NAME="${target_node}"
                 
-                # Install ipmitool if not available (required for baremetal operations)
-                if ! command -v ipmitool >/dev/null 2>&1; then
-                    # Check common locations where ipmitool might be installed
-                    if [ -f "/usr/bin/ipmitool" ]; then
-                        export PATH="/usr/bin:$PATH"
-                        echo "Found ipmitool in /usr/bin, added to PATH"
-                    elif [ -f "/usr/sbin/ipmitool" ]; then
-                        export PATH="/usr/sbin:$PATH"
-                        echo "Found ipmitool in /usr/sbin, added to PATH"
-                    elif [ -f "/opt/ipmitool/bin/ipmitool" ]; then
-                        export PATH="/opt/ipmitool/bin:$PATH"
-                        echo "Found ipmitool in /opt/ipmitool/bin, added to PATH"
-                    else
-                        echo "Installing ipmitool for baremetal operations..."
-                        if command -v yum >/dev/null 2>&1; then
-                            yum install -y OpenIPMI-tools || {
-                                echo "ERROR: Failed to install OpenIPMI-tools via yum"
-                                echo "WARNING: ipmitool not available - baremetal operations may fail"
-                                echo "Continuing anyway in case ipmitool is available elsewhere..."
-                            }
-                        elif command -v apt-get >/dev/null 2>&1; then
-                            apt-get update && apt-get install -y ipmitool || {
-                                echo "ERROR: Failed to install ipmitool via apt-get"
-                                echo "WARNING: ipmitool not available - baremetal operations may fail"
-                                echo "Continuing anyway in case ipmitool is available elsewhere..."
-                            }
-                        elif command -v dnf >/dev/null 2>&1; then
-                            dnf install -y OpenIPMI-tools || {
-                                echo "ERROR: Failed to install OpenIPMI-tools via dnf"
-                                echo "WARNING: ipmitool not available - baremetal operations may fail"
-                                echo "Continuing anyway in case ipmitool is available elsewhere..."
-                            }
-                        else
-                            echo "ERROR: Cannot install ipmitool - no supported package manager found"
-                            echo "Supported package managers: yum, apt-get, dnf"
-                            echo "WARNING: ipmitool not available - baremetal operations may fail"
-                            echo "Continuing anyway in case ipmitool is available elsewhere..."
-                        fi
-                    fi
-                fi
-                
-                # Final check if ipmitool is available
+                # Verify ipmitool is available (should be built-in with krkn image)
                 if command -v ipmitool >/dev/null 2>&1; then
                     echo "ipmitool is available and ready for baremetal operations"
                 else
-                    echo "WARNING: ipmitool still not available after installation attempts"
-                    echo "Baremetal node operations may fail"
+                    echo "ERROR: ipmitool not found - this should be built-in with the krkn image"
+                    echo "Baremetal node operations will fail"
+                    exit 1
                 fi
                 
                 break
