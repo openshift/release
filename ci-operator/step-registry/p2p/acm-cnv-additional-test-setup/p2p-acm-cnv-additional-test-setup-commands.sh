@@ -10,14 +10,14 @@ cp -L $KUBECONFIG /tmp/kubeconfig
 
 export KUBECONFIG=/tmp/kubeconfig
 
-oc create -f - <<EOF
-        apiVersion: cluster.open-cluster-management.io/v1beta2
-        kind: ManagedClusterSet
-        metadata:
-          name: managed-cluster-set
-        spec: {}
+# oc create -f - <<EOF
+#         apiVersion: cluster.open-cluster-management.io/v1beta2
+#         kind: ManagedClusterSet
+#         metadata:
+#           name: managed-cluster-set
+#         spec: {}
 
-EOF
+# EOF
  
 oc create -f - <<EOF
         apiVersion: cluster.open-cluster-management.io/v1beta2
