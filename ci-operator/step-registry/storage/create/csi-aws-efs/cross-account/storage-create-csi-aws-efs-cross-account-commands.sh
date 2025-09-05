@@ -315,7 +315,9 @@ fi
 aws iam attach-role-policy \
   --role-name "${CLUSTER_NAME}"-master-role \
   --policy-arn arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess
+logger "INFO" "Cluster master role is ${CLUSTER_NAME}-master-role"
 logger "INFO" "Attach the AmazonElasticFileSystemClientFullAccesse Policy to the cluster master role in account A"
+
 
 # STEP. Create a secret with awsRoleArn as the key and ACCOUNT_B_ROLE_ARN as the value, add secret access permission for the aws-efs-csi-driver-controller-sa
 oc create -n "${EFS_CSI_DRIVER_OPERATOR_INSTALLED_NAMESPACE}" secret generic efs-csi-cross-account --from-literal=awsRoleArn="${ACCOUNT_B_ROLE_ARN}"
