@@ -303,11 +303,14 @@ function remove_kubeadmin_user() {
 
 # execute the cases
 function run {
+    extra_run_args=""
     test_scenarios=""
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
+    echo "TEST_INCLUDE_SUCCESS: \"${TEST_INCLUDE_SUCCESS}\""
+
     if [[ -n "${TEST_SCENARIOS:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENARIOS}"
         for scenario in "${scenarios[@]}"; do
@@ -389,6 +392,8 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+    [[ "${TEST_INCLUDE_SUCCESS:-no}" = "yes" ]] && extra_run_args+=" --include-success"
+
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     remove_kubeadmin_user
@@ -398,11 +403,13 @@ function run {
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
+        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" \
+        -f ./case_selected ${extra_run_args} || ret_value=$?
     else
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
+        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" \
+        -f ./case_selected ${extra_run_args} || ret_value=$?
     fi
     set +x
     set +e
