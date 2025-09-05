@@ -40,7 +40,7 @@ fi
 # Create self scheduling assignment
 echo
 echo "Create self scheduling assignment ..."
-
+set -x 
 CLOUD_OUTPUT=$(curl -fsSk -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
