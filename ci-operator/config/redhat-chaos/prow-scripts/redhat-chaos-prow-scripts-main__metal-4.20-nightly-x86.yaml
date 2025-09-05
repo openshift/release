@@ -1,0 +1,125 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+  tools:
+    name: "4.20"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-420
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- always_run: false
+  as: krkn-hub-tests-metal
+  capabilities:
+  - intranet
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      TELEMETRY_GROUP: prow-ocp-4.20
+      architecture: amd64
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: baremetal-lab-upi
+  timeout: 7h0m0s
+- always_run: false
+  as: krkn-hub-hog-tests-metal
+  capabilities:
+  - intranet
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      CHURN: "true"
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      TELEMETRY_GROUP: prow-ocp-4.20
+      architecture: amd64
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-hog-scenarios
+    workflow: baremetal-lab-upi
+  timeout: 7h0m0s
+- always_run: false
+  as: krkn-hub-node-tests-metal
+  capabilities:
+  - intranet
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      CHURN: "true"
+      CLOUD_TYPE: bm
+      EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      TELEMETRY_GROUP: prow-ocp-4.20
+      architecture: amd64
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
+    test:
+    - ref: redhat-chaos-start-krkn
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    workflow: baremetal-lab-upi
+  timeout: 7h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: metal-4.20-nightly-x86
