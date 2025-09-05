@@ -4,7 +4,11 @@ set -u
 
 # Get HO image and Hypershift CLI
 HCP_CLI="bin/hypershift"
-OPERATOR_IMAGE=quay.io/jimma/hypershift-operator:4.19
+HYPERSHIFT_RELEASE_LATEST=quay.io/jimma/hypershift-operator:4.20
+INSTALL_FROM_LATEST=true
+OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
+HCP_CLI="bin/hypershift"
+OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 if [[ $HO_MULTI == "true" ]]; then
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
@@ -12,8 +16,15 @@ if [[ $HO_MULTI == "true" ]]; then
   oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
   chmod +x /tmp/hs-cli/hypershift
   HCP_CLI="/tmp/hs-cli/hypershift"
+elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
+  echo "install from the latest: ${HYPERSHIFT_RELEASE_LATEST}"
+  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
+  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+  mkdir /tmp/hs-cli
+  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
+  chmod +x /tmp/hs-cli/hypershift
+  HCP_CLI="/tmp/hs-cli/hypershift"
 fi
-
 # Build up the hypershift install command
 COMMAND=(
     "${HCP_CLI}" install
