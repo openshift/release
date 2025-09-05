@@ -621,7 +621,7 @@ tests:
         requests:
           cpu: 100m
     workflow: rosa-aws-sts-hcp
-- as: e2e-aws-rhcos4-e8-weekly
+- as: e2e-aws-openshift-platform-compliance-weekly
   cron: 0 22 * * 3,6
   steps:
     cluster_profile: quay-aws
@@ -632,13 +632,11 @@ tests:
       cli: latest
       commands: |
         set -x
-        export PROFILE=e8
-        export PRODUCT=rhcos4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
         pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        make e2e-platform
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -647,7 +645,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-ocp4-e8-weekly
+  timeout: 4h0m0s
+- as: e2e-aws-openshift-node-compliance-weekly
   cron: 0 22 * * 3,6
   steps:
     cluster_profile: quay-aws
@@ -657,13 +656,12 @@ tests:
     - as: test
       cli: latest
       commands: |
-        export PROFILE=e8
-        export PRODUCT=ocp4
+        set -x
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
         pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        make e2e-node
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -672,33 +670,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-ocp4-moderate-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=moderate
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-moderate-weekly-arm
+  timeout: 4h0m0s
+- as: e2e-aws-openshift-platform-compliance-arm-weekly
   cron: 0 22 * * 3,6
   steps:
     cluster_profile: quay-aws
@@ -714,13 +687,12 @@ tests:
     - as: test
       cli: latest
       commands: |
-        export PROFILE=moderate
-        export PRODUCT=ocp4
+        set -x
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
         pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        make e2e-platform
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -729,33 +701,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-ocp4-moderate-node-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=moderate-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-moderate-node-weekly-arm
+  timeout: 4h0m0s
+- as: e2e-aws-openshift-node-compliance-arm-weekly
   cron: 0 22 * * 3,6
   steps:
     cluster_profile: quay-aws
@@ -771,13 +718,12 @@ tests:
     - as: test
       cli: latest
       commands: |
-        export PROFILE=moderate-node
-        export PRODUCT=ocp4
+        set -x
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
         pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        make e2e-node
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -786,503 +732,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-ocp4-cis-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=cis
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-cis-weekly-arm
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      COMPUTE_ARCH: arm64
-      CONTROL_ARCH: arm64
-      OCP_ARCH: arm64
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=cis
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-cis-node-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=cis-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-cis-node-weekly-arm
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      COMPUTE_ARCH: arm64
-      CONTROL_ARCH: arm64
-      OCP_ARCH: arm64
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=cis-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-rhcos4-moderate-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=moderate
-        export PRODUCT=rhcos4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-rhcos4-moderate-weekly-arm
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      COMPUTE_ARCH: arm64
-      CONTROL_ARCH: arm64
-      FIPS_ENABLED: "true"
-      OCP_ARCH: arm64
-    pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=moderate
-        export PRODUCT=rhcos4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-stig-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=stig
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-stig-node-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=stig-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-pci-dss-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=pci-dss
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-pci-dss-node-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=pci-dss-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-rhcos4-high-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=high
-        export PRODUCT=rhcos4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-rhcos4-stig-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=stig
-        export PRODUCT=rhcos4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-high-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=high
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-high-node-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=high-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-rosa-ocp4-cis-node-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BYO_OIDC: "true"
-      CHANNEL_GROUP: stable
-      ENABLE_BILLING_ACCOUNT: "yes"
-      OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: 4.15.48
-      REGION: us-east-2
-    test:
-    - ref: ipi-install-rbac
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=cis-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform=rosa -bypass-remediations=true
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: rosa-aws-sts-hcp
-- as: e2e-rosa-ocp4-pci-dss-node-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BYO_OIDC: "true"
-      CHANNEL_GROUP: stable
-      ENABLE_BILLING_ACCOUNT: "yes"
-      OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: 4.15.48
-      REGION: us-east-2
-    test:
-    - ref: ipi-install-rbac
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=pci-dss-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform=rosa -bypass-remediations=true
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: rosa-aws-sts-hcp
-- as: e2e-aws-ocp4-pci-dss-4-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=pci-dss-4-0
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-pci-dss-node-4-weekly
-  cron: 0 22 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=pci-dss-node-4-0
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: master
   org: ComplianceAsCode

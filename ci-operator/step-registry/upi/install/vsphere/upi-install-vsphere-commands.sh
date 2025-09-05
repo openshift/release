@@ -60,6 +60,11 @@ echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
 
+# Copy variables.ps1 to artifacts directory for debugging
+echo "variables.ps1"
+echo "-------------------"
+cat ${SHARED_DIR}/variables.ps1 | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/variables.ps1
+
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
 function gather_console_and_bootstrap() {
