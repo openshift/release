@@ -6,17 +6,15 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build07
-    context: ci/prow/4.19-e2e-ols-cluster
+    context: ci/prow/e2e-ols-cluster
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.19"
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-lightspeed-service-main-4.19-e2e-ols-cluster
-    rerun_command: /test 4.19-e2e-ols-cluster
+    name: pull-ci-openshift-lightspeed-service-main-e2e-ols-cluster
+    rerun_command: /test e2e-ols-cluster
     run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
     spec:
       containers:
@@ -27,7 +25,6 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-ols-cluster
-        - --variant=4.19
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -72,6 +69,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<< HEAD
     trigger: (?m)^/test( | .* )4.19-e2e-ols-cluster,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -204,6 +202,9 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.19-ols-evaluation,?($|\s.*)
+=======
+    trigger: (?m)^/test( | .* )e2e-ols-cluster,?($|\s.*)
+>>>>>>> 7ef1e59233d (OLS-1700: OpenShift Lightspeed Service: Moved all presubmits into openshift-lightspeed-service-main.)
   - agent: kubernetes
     always_run: false
     branches:
@@ -385,6 +386,76 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )integration,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/ols-evaluation
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lightspeed-service-main-ols-evaluation
+    rerun_command: /test ols-evaluation
+    run_if_changed: ^(Containerfile|tests/e2e/scripts/test-evaluation.sh|tests/e2e/scripts/utils.sh|Makefile|tests/e2e/evaluation/.*|ols/src/llms/providers/.*|ols/src/prompts/.*|ols/src/query_helpers/docs_summarizer.py|ols/src/rag_index/.*|ols/src/tools/.*|ols/utils/token_handler.py|ols/constants.py)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ols-evaluation
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ols-evaluation,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
