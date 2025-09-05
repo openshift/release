@@ -9,7 +9,7 @@ set -o pipefail
 cp -L $KUBECONFIG /tmp/kubeconfig
 
 export KUBECONFIG=/tmp/kubeconfig
-
+sleep 17600
 # OCP_VERSION="4.20"
 
 PULLSPEC="$(curl -fsSl "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${OCP_VERSION_TO_UPGRADE}.0-0.nightly/latest" | jq -r '.pullSpec')"
