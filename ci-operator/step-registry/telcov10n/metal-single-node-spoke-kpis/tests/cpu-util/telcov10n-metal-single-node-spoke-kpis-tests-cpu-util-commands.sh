@@ -77,7 +77,7 @@ set -x
 kpi_tests_repo=\$(dirname \${SCRIPTS_DIR})
 export GIT_SSL_NO_VERIFY=true
 git clone ${TELCO_KPI_COMMON_REPO} \${kpi_tests_repo}
-git clone -b workload-main ${TELCO_KPI_TEST_REPO} \${kpi_tests_repo}/cnf-gotests
+git clone -b ${TELCO_KPI_TEST_BRANCH} ${TELCO_KPI_TEST_REPO} \${kpi_tests_repo}/cnf-gotests
 cd \${kpi_tests_repo}
 set +x
 ls -rtlhZ
@@ -87,7 +87,7 @@ export STORAGE_CLASS=""
 export NETWORKS=""
 export ACCELERATOR_MODEL=""
 export REGISTRY=""
-export NODE_NAME="helix72.ci-op-spoke000.ztp-left-shifting.kpi.telco.lab" # Hardcoded for testing
+export NODE_NAME="\$(oc get node -ojsonpath='{.items[0].metadata.name}')"
 export ENABLE_PTP=""
 bash \${SCRIPTS_DIR}/test_cpu_util.sh cpu_util=\${DURATION}
 set +x
