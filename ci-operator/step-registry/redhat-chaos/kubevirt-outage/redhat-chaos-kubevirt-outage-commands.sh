@@ -30,7 +30,7 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 export NAMESPACE=$TARGET_NAMESPACE 
 
-
+oc get vmis -A 
 
 
 ./kubevirt-outage/prow_run.sh

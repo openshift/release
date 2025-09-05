@@ -1,0 +1,63 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  krkn.prow:
+    name: krkn
+    namespace: chaos
+    tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: pre-installed
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: metal-redhat-gs
+    workflow: external-cluster
+    test:
+    - ref: redhat-chaos-kubevirt-outage
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: cnv-odf-ocp-4.19-chaos
+
