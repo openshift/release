@@ -191,7 +191,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
     --memory "${HYPERSHIFT_NODE_MEMORY}Gi" \
     --cores "${HYPERSHIFT_NODE_CPU_CORES}" \
-    --root-volume-size 64 \
+    --root-volume-size 256 \
     --release-image "${RELEASE_IMAGE}" \
     --pull-secret "${PULL_SECRET_PATH}" \
     --generate-ssh \
@@ -209,7 +209,7 @@ else
     --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
     --memory ${HYPERSHIFT_NODE_MEMORY}Gi \
     --cores ${HYPERSHIFT_NODE_CPU_CORES} \
-    --root-volume-size 64 \
+    --root-volume-size 256 \
     --release-image ${RELEASE_IMAGE} \
     --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
