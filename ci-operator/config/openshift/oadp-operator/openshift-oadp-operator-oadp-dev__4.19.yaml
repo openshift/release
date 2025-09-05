@@ -1,3 +1,8 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
@@ -214,6 +219,36 @@ tests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
+- as: e2e-test-rosa-aws-sts-periodic
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: aws-oadp-qe
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      CLUSTER_TIMEOUT: "15000"
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: production
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - ref: optional-operators-subscribe
+    - as: e2e
+      cli: latest
+      commands: make test-e2e
+      credentials:
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: rosa-aws-sts-hcp
 zz_generated_metadata:
   branch: oadp-dev
   org: openshift
