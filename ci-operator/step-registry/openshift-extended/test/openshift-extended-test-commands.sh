@@ -160,6 +160,16 @@ then
     export CLUSTER_ID
 fi
 
+
+export PATH=/tmp/:$PATH
+which extended-platform-tests
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
 # configure environment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
