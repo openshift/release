@@ -45,12 +45,11 @@ CLOUD_OUTPUT=$(curl -fsSk -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
-    "description":\"Temporary allocation from openshift-ci: $REPO_OWNER-$REPO_NAME-$JOB_TYPE-$JOB_NAME-$PULL_TITLE-$PULL_NUMBER\",
-    "owner": "metal-perfscale-cpt",
-    "qinq": 1,
-    $([ -n \"$VLAN_ID\" ] && echo "vlan": \"$VLAN_ID\")
-    "wipe": "true"
-  }" \
+    \"description\":\"Temporary allocation from openshift-ci: $REPO_OWNER-$REPO_NAME-$JOB_TYPE-$JOB_NAME-$PULL_TITLE-$PULL_NUMBER\",
+    \"owner\":\"metal-perfscale-cpt\",
+    \"qinq\":1,
+    $([ -n "$VLAN_ID" ] && echo "\"vlan\":\"$VLAN_ID\",")
+    \"wipe\":\"true\"}" \
   "$QUADS_INSTANCE/api/v3/assignments/self")
 
 echo $CLOUD_OUTPUT | jq .
