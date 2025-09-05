@@ -8,7 +8,7 @@ if [ ${BAREMETAL} == "true" ]; then
   ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
-  oc config set-cluster bm --proxy-url=socks5://localhost:12345
+  oc config set-cluster "$(oc config current-context)" --proxy-url=socks5://localhost:12345
 fi
 
 # For disconnected environments, source proxy config if available
