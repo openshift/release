@@ -176,7 +176,7 @@ if [[ "$JOB_NAME" == *sealight* ]]; then
     TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2 | head -n1)
 fi
 
-echo "############## Current branch ##############"
+echo "############## Current branch ############## "
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
