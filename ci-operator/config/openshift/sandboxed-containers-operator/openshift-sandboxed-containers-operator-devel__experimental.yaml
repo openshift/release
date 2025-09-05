@@ -1,0 +1,37 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: experimental-baremetal-kata-test
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+    workflow: sandboxed-containers-operator-experimental-e2e-baremetal
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: experimental
