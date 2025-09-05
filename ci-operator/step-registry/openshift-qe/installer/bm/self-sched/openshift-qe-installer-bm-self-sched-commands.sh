@@ -40,12 +40,12 @@ fi
 # Create self scheduling assignment
 echo
 echo "Create self scheduling assignment ..."
-set -x 
+set -x
 CLOUD_OUTPUT=$(curl -fsSk -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
-    \"description\":\"Temporary allocation from openshift-ci: $REPO_OWNER-$REPO_NAME-$JOB_TYPE-$JOB_NAME-$PULL_TITLE-$PULL_NUMBER\",
+    \"description\":\"Temporary allocation from openshift-ci: $REPO_OWNER-$REPO_NAME-$JOB_TYPE-$PULL_NUMBER\",
     \"owner\":\"metal-perfscale-cpt\",
     \"qinq\":1,
     $([ -n "$VLAN_ID" ] && echo "\"vlan\":\"$VLAN_ID\",")
