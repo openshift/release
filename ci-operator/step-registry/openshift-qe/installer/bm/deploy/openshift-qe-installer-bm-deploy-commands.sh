@@ -158,7 +158,7 @@ collect_ai_logs() {
     mkdir -p /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE
     curl -LsSo /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
   "
-  scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-cluster-logs-$LAB-$LAB_CLOUD-$TYPE.tar ${ARTIFACT_DIR}
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar ${ARTIFACT_DIR}
 }
 
 trap 'collect_ai_logs' EXIT
