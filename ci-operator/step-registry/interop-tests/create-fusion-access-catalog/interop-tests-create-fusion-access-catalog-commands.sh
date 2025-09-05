@@ -15,9 +15,9 @@ metadata:
   name: ${CATALOG_SOURCE_NAME}
   namespace: ${CATALOG_SOURCE_NAMESPACE}
 spec:
-  displayName: OpenShift Storage Scale Operator
+  displayName: IBM Spectrum Scale Operator
   image: ${CATALOG_SOURCE_IMAGE}
-  publisher: OpenShift QE
+  publisher: IBM
   sourceType: grpc
   updateStrategy:
     registryPoll:
