@@ -1,4 +1,4 @@
-#!/bin/bash
+sudo#!/bin/bash
 
 set -o nounset
 set -o errexit
@@ -15,7 +15,7 @@ metadata:
   name: ${CATALOG_SOURCE_NAME}
   namespace: ${CATALOG_SOURCE_NAMESPACE}
 spec:
-  displayName: Test Storage Scale Operator
+  displayName: OpenShift Storage Scale Operator
   image: ${CATALOG_SOURCE_IMAGE}
   publisher: OpenShift QE
   sourceType: grpc
