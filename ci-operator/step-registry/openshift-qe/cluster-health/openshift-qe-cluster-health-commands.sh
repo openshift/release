@@ -6,6 +6,7 @@ if [ ${BAREMETAL} == "true" ]; then
   bastion="$(cat ${CLUSTER_PROFILE_DIR}/address)"
   # Setup socks proxy
   ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
+  sleep 5
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
   oc config set-cluster "$(oc config current-context)" --proxy-url=socks5://localhost:12345
