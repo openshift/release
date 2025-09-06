@@ -254,6 +254,8 @@ echo "Installer exit with code $ret"
 # copy install artifacts from bastion host to ${dir} for reference
 echo "copy back installer artifacts from bastion host"
 run_scp_from_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${REMOTE_INSTALL_DIR}" "${dir%/*}"
+echo "[DEBUG] copy back squid access log from bastion host"
+run_scp_from_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "/srv/squid/log/access.log" "${ARTIFACT_DIR}/"
 set -o errexit
 
 # debug
