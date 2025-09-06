@@ -163,6 +163,83 @@ for path in "${paths[@]}" ; do
   done < ${output_dir}.audit_logs_listing
 done
 
+set -x
+echo "INFO: running sosreport on each node and capturing packet-drop counters"
+gather_sos_and_drops() {
+  local n out_dir scr_dir
+  scr_dir="${ARTIFACT_DIR}/_gather_scripts"
+  mkdir -p "${scr_dir}"
+
+  # Script run on the host (via chroot) to emit a sosreport tarball to stdout
+  cat > "${scr_dir}/sos.sh" <<'EOS'
+set -o errexit -o nounset -o pipefail
+if command -v sos >/dev/null 2>&1; then
+  sos report --batch --tmp-dir /var/tmp --compression-type xz --name ocp-ci >/dev/null 2>&1 || true
+elif command -v sosreport >/dev/null 2>&1; then
+  sosreport --batch --tmp-dir /var/tmp --compression-type xz >/dev/null 2>&1 || true
+fi
+f=$(ls -1t /var/tmp/sosreport-*.tar.xz 2>/dev/null | head -n1 || true)
+if [[ -n "${f}" && -f "${f}" ]]; then
+  cat "${f}" || true
+  rm -f "${f}" || true
+else
+  echo "no sosreport generated" >&2
+fi
+EOS
+
+  # Script run on the host (via chroot) to emit packet/drop counters
+  cat > "${scr_dir}/drops.sh" <<'EOS'
+set -o errexit -o nounset -o pipefail
+echo "== /proc/net/dev - per-interface rx/tx including drops =="
+cat /proc/net/dev || true
+echo
+echo "== nstat kernel counters containing drop =="
+if command -v nstat >/dev/null 2>&1; then nstat -az | grep -i drop || true; else echo "nstat not present"; fi
+echo
+echo "== ip -s link: per-interface packet stats =="
+ip -s link || true
+echo
+echo "== ethtool -S: per-NIC hardware drop/error counters =="
+for d in /sys/class/net/*; do
+  nic=$(basename "$d")
+  case "$nic" in lo|br*|veth*|tap*|tun*|cni*|ovn*|docker*) continue;; esac
+  echo "--- $nic ---"
+  ethtool -S "$nic" 2>/dev/null | grep -Ei "drop|dropped|error|rx_no_buffer|rx_missed|rx_miss|rx_drop|tx_drop" || true
+done
+echo
+echo "== dmesg: network-related lines =="
+if dmesg --ctime >/dev/null 2>&1; then
+  dmesg --ctime | grep -Ei "(net|eth|mlx|ixg|bnx|enic|virtio|drop|reset|timeout)" || true
+else
+  dmesg | grep -Ei "(net|eth|mlx|ixg|bnx|enic|virtio|drop|reset|timeout)" || true
+fi
+EOS
+
+  while IFS= read -r n; do
+    out_dir="${ARTIFACT_DIR}/nodes/${n}"
+    mkdir -p "${out_dir}"
+
+    # sosreport (can take a while)
+    queue "${out_dir}/sosreport.tar.xz" bash -ceu "
+      set -o pipefail
+      oc -n default --insecure-skip-tls-verify --request-timeout=30m \
+        debug 'node/${n}' -T -- chroot /host bash -s < '${scr_dir}/sos.sh' \
+        2>'${out_dir}/sosreport.err'
+    " || true
+
+    # drop counters
+    queue "${out_dir}/packet-drops.txt" bash -ceu "
+      set -o pipefail
+      oc -n default --insecure-skip-tls-verify --request-timeout=5m \
+        debug 'node/${n}' -T -- chroot /host bash -s < '${scr_dir}/drops.sh' \
+        2>'${out_dir}/packet-drops.err'
+    " || true
+
+  done < /tmp/nodes
+}
+gather_sos_and_drops
+
+
 # change to the network artifact dir
 mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
 pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
