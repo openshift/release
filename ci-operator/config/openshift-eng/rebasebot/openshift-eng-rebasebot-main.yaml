@@ -834,6 +834,36 @@ tests:
         requests:
           cpu: 400m
           memory: 1Gi
+- as: migtools-kubevirt-velero-plugin-main
+  cron: 0 1 * * 1-5
+  steps:
+    test:
+    - as: migtools-kubevirt-velero-plugin-main
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/migtools_kubevirt_velero_plugin_main.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - collection: ""
+        mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make deps && make unittests
   container:
