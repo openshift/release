@@ -75,4 +75,10 @@ status:
   networkType: OVNKubernetes
 EOF
 
-openshift-tests run "${TEST_SUITE}" -f "${CONFORMANCE_TEST_LIST}" -v 2 --provider=none -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
+openshift-tests run "${TEST_SUITE}" \
+  -f "${CONFORMANCE_TEST_LIST}" \
+  --max-parallel-tests 10 \
+  -v 2 \
+  --provider=none \
+  -o "${ARTIFACT_DIR}/e2e.log" \
+  --junit-dir "${ARTIFACT_DIR}/junit"
