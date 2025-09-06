@@ -15,6 +15,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 binary_build_commands: make production-install
 build_root:
   from_repository: true
@@ -794,6 +798,17 @@ images:
       - destination_dir: .
         source_path: /go/bin/helpdesk-faq
   to: helpdesk-faq
+- from: nested-podman
+  dockerfile_literal: |
+    FROM nested-podman
+    COPY /src /opt/app-root/src
+    WORKDIR /opt/app-root/src
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift/ci-tools
+  to: e2e-nested-podman-img
 promotion:
   to:
   - namespace: ci
@@ -991,6 +1006,36 @@ tests:
     env:
       PROJECT_NAME: ci-tools
     workflow: openshift-ci-security
+- as: unit-nested-podman
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  commands: |
+    podman run --env=POSTGRES_PASSWORD=password --publish=5432 \
+       docker.io/postgres:14 \
+       -c log_destination=stderr \
+       -c log_statement=all \
+       -c logging_collector=off
+  container:
+    from: nested-podman
+- as: e2e-nested-podman
+  capabilities:
+  - nested-podman
+  steps:
+    test:
+    - as: nested-podman
+      nested_podman: true
+      commands: |
+        podman run --env=POSTGRES_PASSWORD=password --publish=5432 \
+          docker.io/postgres:14 \
+          -c log_destination=stderr \
+          -c log_statement=all \
+          -c logging_collector=off
+      from: e2e-nested-podman-img
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
 zz_generated_metadata:
   branch: main
   org: openshift
