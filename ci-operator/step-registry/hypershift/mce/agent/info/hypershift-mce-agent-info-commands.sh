@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+#set -x
 
 if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   source "${SHARED_DIR}/packet-conf.sh"
@@ -28,8 +28,8 @@ oc get node -o jsonpath='{range .items[*]}Node: {@.metadata.name}  InternalIP: {
 echo "AgentServiceConfig yaml"
 oc get AgentServiceConfig agent -o yaml
 
-echo "ConfigMap mirror-config yaml"
-oc get ConfigMap mirror-config -n multicluster-engine -o yaml
+#echo "ConfigMap mirror-config yaml"
+#oc get ConfigMap mirror-config -n multicluster-engine -o yaml
 
 echo "Agent State"
 oc get agent -A -o jsonpath='{range .items[*]}BMH: {@.metadata.labels.agent-install\.openshift\.io/bmh} Agent: {@.metadata.name} State: {@.status.debugInfo.state}{"\n"}{end}'
