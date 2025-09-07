@@ -98,3 +98,8 @@ export ANSIBLE_CONFIG="${SHARED_DIR}"/repos/telco-ci/ansible.cfg
 ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/performance_profile_nrop.yml -e kubeconfig="${SHARED_DIR}/mgmt-kubeconfig" -c local || ansible_playbook_status=$?
 
 echo "Status of Ansible playbook to deploy performance profile is: ${ansible_playbook_status}"
+
+# Apply sample devices for NROP
+echo "*********** Applying Sample devices *********************"
+ansible-playbook -vv "${SHARED_DIR}"/repos/telco-ci/playbooks/sample-devices.yml -e hosted_kubeconfig="${SHARED_DIR}/kubeconfig" -c local || ansible_playbook_status=$?
+
