@@ -14,6 +14,29 @@ fi
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
+install_oc_if_needed() {
+    if ! command -v oc &> /dev/null; then
+        echo "oc command not found. Installing OpenShift CLI..."
+
+        TEMP_DIR=$(mktemp -d)
+        cd "$TEMP_DIR"
+
+        LATEST_VERSION=$(curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/release.txt | grep 'Name:' | awk '{print $2}')
+
+        OC_URL="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$LATEST_VERSION/openshift-client-linux.tar.gz"
+        curl -sL "$OC_URL" -o oc.tar.gz
+        tar -xzf oc.tar.gz
+        sudo mv oc /usr/local/bin/
+
+        cd -
+        rm -rf "$TEMP_DIR"
+
+        echo "oc $LATEST_VERSION installed successfully."
+    else
+        echo "oc is already installed: $(oc version --client | head -n1)"
+    fi
+}
+
 read_profile_file() {
   local file="${1}"
   if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
@@ -54,6 +77,8 @@ while true; do
     exit 1
   fi
 done
+
+install_oc_if_needed
 
 # Config htpasswd idp
 # The expected time for the htpasswd idp configuaration is in 1 minute. But actually, we met the waiting time
