@@ -150,15 +150,29 @@ if [ "$status_code" -ne 200 ]; then
   echo "Resource not found (HTTP status: $status_code). Getting previous version..."
 
   # Get all tags from the base URL, filter for tag version, sort, and get the previous one
-  previous_version=$(curl -sSL "${catalog_soruces_url}" \
+  next_version=$(curl -sSL "${catalog_soruces_url}" \
     | grep -oP '(?<=href=")[^"]+' \
     | sort -t '-' -k2,2 -k3,3 \
     | grep "${tag_version/.0/}" \
-    | tail -1)
+    | awk -F '[-/]' -v tag_ver="$version_tag" '
+BEGIN {
+    split(tag_ver, a, "[-/]");
+    reference_ts = a[2];
+    gsub(/T|ci/, "", reference_ts);
+}
+{
+    current_ts = $2
+    gsub(/T|ci/, "", current_ts)
+    if (current_ts > reference_ts) {
+        # printf("%s > %s = ", current_ts, reference_ts)
+        print $0
+        exit
+    }
+}')
 
-  if [ -n "$previous_version" ]; then
-    echo "Previous version is: $previous_version"
-    version_tag=${previous_version}
+  if [ -n "$next_version" ]; then
+    echo "Next available version is: $next_version"
+    version_tag=${next_version}
   else
     echo "Could not find a previous version."
   fi
@@ -174,6 +188,13 @@ for f in $(curl -sSL ${catalog_soruces_url}/${version_tag}|grep -oP '(?<=href=")
   curl -sSLO ${catalog_soruces_url}/${version_tag}/${f}
   set +x
 done
+
+set -x
+if [ -n "${next_version:-}" ]; then
+  stable_img_index="quay.io/prega/prega-operator-index:${tag_version}"
+  sed -i "s#^  image:.*#  image: ${stable_img_index}#" catalogSource.yaml
+fi
+set +x
 
 popd
 EOF
