@@ -16,12 +16,18 @@ install_oc_if_needed() {
         OC_URL="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$LATEST_VERSION/openshift-client-linux.tar.gz"
         curl -sL "$OC_URL" -o oc.tar.gz
         tar -xzf oc.tar.gz
-        sudo mv oc /usr/local/bin/
+
+        USER_BIN="$HOME/bin"
+        mkdir -p "$USER_BIN"
+
+        mv oc "$USER_BIN/"
+
+        export PATH="$USER_BIN:$PATH"
 
         cd -
         rm -rf "$TEMP_DIR"
 
-        echo "oc $LATEST_VERSION installed successfully."
+        echo "oc $LATEST_VERSION installed successfully to $USER_BIN"
     else
         echo "oc is already installed: $(oc version --client | head -n1)"
     fi
