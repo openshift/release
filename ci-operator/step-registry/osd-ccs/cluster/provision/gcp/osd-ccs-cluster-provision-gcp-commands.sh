@@ -4,6 +4,29 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+install_oc_if_needed() {
+    if ! command -v oc &> /dev/null; then
+        echo "oc command not found. Installing OpenShift CLI..."
+
+        TEMP_DIR=$(mktemp -d)
+        cd "$TEMP_DIR"
+
+        LATEST_VERSION=$(curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/release.txt | grep 'Name:' | awk '{print $2}')
+
+        OC_URL="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$LATEST_VERSION/openshift-client-linux.tar.gz"
+        curl -sL "$OC_URL" -o oc.tar.gz
+        tar -xzf oc.tar.gz
+        sudo mv oc /usr/local/bin/
+
+        cd -
+        rm -rf "$TEMP_DIR"
+
+        echo "oc $LATEST_VERSION installed successfully."
+    else
+        echo "oc is already installed: $(oc version --client | head -n1)"
+    fi
+}
+
 function logger() {
   local -r log_level=$1; shift
   local -r log_msg=$1; shift
@@ -77,6 +100,8 @@ function add_iam_policy_binding()
     eval "${cmd}"
   done
 }
+
+install_oc_if_needed
 
 CLUSTER_MACHINES_CREATED=false
 function wait_for_bootstrap() {
