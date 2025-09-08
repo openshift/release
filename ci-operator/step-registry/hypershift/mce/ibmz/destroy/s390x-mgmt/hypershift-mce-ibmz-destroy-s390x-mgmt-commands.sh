@@ -48,11 +48,7 @@ sed -i "s/^REGION=.*/REGION=\"$REGION\"/" "$VARS_FILE"
 sed -i "s/^RESOURCE_GROUP=.*/RESOURCE_GROUP=\"$RESOURCE_GROUP\"/" "$VARS_FILE"
 sed -i "s/^IC_API_KEY=.*/IC_API_KEY=\"$IC_API_KEY\"/" "$VARS_FILE"
 sed -i "s/^IC_CLI_VERSION=.*/IC_CLI_VERSION=\"$IC_CLI_VERSION\"/" "$VARS_FILE"
-if grep -q "^OCP_RELEASE_IMAGE=" "$VARS_FILE"; then
-  sed -i "s/^OCP_RELEASE_IMAGE=.*/OCP_RELEASE_IMAGE=\"$OCP_RELEASE_IMAGE\"/" "$VARS_FILE"
-else
-  echo "OCP_RELEASE_IMAGE=\"$OCP_RELEASE_IMAGE\"" >> "$VARS_FILE"
-fi
+sed -i "s|^OCP_RELEASE_IMAGE=.*|OCP_RELEASE_IMAGE=\"$OCP_RELEASE_IMAGE\"|" "$VARS_FILE"
 
 # Run the install-prerequisites.sh script to delete the OCP cluster in IBM cloud VPC
 if [[ -x ./scripts/0-install-prerequisites.sh ]]; then
