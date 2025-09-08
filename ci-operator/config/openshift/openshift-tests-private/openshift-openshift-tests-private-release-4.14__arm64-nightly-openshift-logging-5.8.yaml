@@ -12,9 +12,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -35,11 +39,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     candidate:
@@ -61,32 +60,33 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-ipi-f28-disruptive
-  cron: 21 10 26 * *
+- as: aws-ipi-f999-disruptive-logging
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      CLO_SUB_CHANNEL: stable-5.8
-      CLO_TARGET_NAMESPACES: ""
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      EO_SUB_CHANNEL: stable-5.8
       FORCE_SUCCESS_EXIT: "true"
-      LO_SUB_CHANNEL: stable-5.8
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.8
       OCP_ARCH: arm64
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
       TEST_FILTERS: Disruptive;Longduration
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
     - ref: enable-qe-catalogsource-logging
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-cluster-logging-operator
-    - ref: operatorhub-subscribe-loki-operator
+    - ref: install-operators
     - chain: openshift-e2e-test-logging-qe-disruptive
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:

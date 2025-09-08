@@ -7,6 +7,10 @@ base_images:
     name: nodejs-10-rhel7
     namespace: openshift
     tag: latest
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
@@ -54,12 +58,18 @@ resources:
     requests:
       cpu: "1"
       memory: 10Gi
-test_binary_build_commands: ./build.sh
+test_binary_build_commands: |
+  ./build-frontend.sh
+  ./build-demos.sh
 tests:
 - as: backend
-  commands: ./test-backend.sh
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    mkdir -p ${ARTIFACT_DIR} ${XDG_CACHE_HOME}
+    go install -mod= github.com/jstemmer/go-junit-report@latest
+    /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: test-bin
+    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
 - as: frontend
   commands: ./test-frontend.sh
   container:
@@ -96,7 +106,8 @@ tests:
       cli: latest
       commands: ./test-prow-e2e.sh ceph
       credentials:
-      - mount_path: /var/run/operator-secret
+      - collection: ""
+        mount_path: /var/run/operator-secret
         name: operator-secret
         namespace: test-credentials
       from: pipeline:src

@@ -10,7 +10,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: latest
+    tag: "4.18"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-control-plane-machine-set-operator
@@ -26,7 +26,8 @@ images:
   to: cluster-control-plane-machine-set-operator
 promotion:
   to:
-  - disabled: true
+  - additional_images:
+      cluster-control-plane-machine-set-tests: src
     name: 4.18-priv
     namespace: ocp-private
 releases:
@@ -35,7 +36,7 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.18"
   initial:
     integration:
       name: 4.18-priv
@@ -90,7 +91,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -109,7 +110,7 @@ tests:
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       commands: |
@@ -206,6 +207,23 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-multi-vcenter-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere-multi-vcenter
 - as: e2e-openstack-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*

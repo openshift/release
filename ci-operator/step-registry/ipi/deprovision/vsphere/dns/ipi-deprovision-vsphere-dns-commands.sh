@@ -1,5 +1,9 @@
 #!/bin/bash
 
+################################################################################################
+# This file is no longer used.  It is being left behind temporarily while we migrate to python #
+################################################################################################
+
 set -o nounset
 set -o errexit
 set -o pipefail

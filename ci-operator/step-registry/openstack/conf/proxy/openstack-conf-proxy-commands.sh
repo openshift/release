@@ -17,6 +17,10 @@ export http_proxy=http://$proxy_auth@${proxy_host}:3128/
 export https_proxy=http://$proxy_auth@${proxy_host}:3128/
 export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 EOF
+    # Some steps need mirror-proxy-conf.sh instead of proxy-conf.sh because they want to differenciate
+    # API access and Mirror access. In our case, it doesn't matter, since all traffic would go through the proxy
+    # when we deploy disconnected environments.
+    cp "${SHARED_DIR}/proxy-conf.sh" "${SHARED_DIR}/mirror-proxy-conf.sh"
 }
 
 if [[ -f "${SHARED_DIR}/BASTION_FIP" ]]; then

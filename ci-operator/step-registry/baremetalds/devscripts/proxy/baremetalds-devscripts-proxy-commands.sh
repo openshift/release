@@ -26,7 +26,7 @@ if [[ "\$NAME" == "CentOS Stream" && "\$VERSION_ID" == "8" ]]; then
 fi
 set +x
 
-sudo dnf install -y podman firewalld
+sudo dnf install -y container-tools crun podman firewalld
 
 # The default "10:30:100" results in connections being rejected
 # Password auth is disabled so we can bump this up a bit and make it
@@ -36,7 +36,7 @@ sudo systemctl restart sshd
 
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
-acl cluster dstdomain .metalkube.org .ocpci.eng.rdu2.redhat.com .okd.on.massopen.cloud .p1.openshiftapps.com sso.redhat.com
+acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .okd.on.massopen.cloud .p1.openshiftapps.com sso.redhat.com
 http_access allow cluster
 http_access deny all
 http_port 8213
@@ -74,9 +74,9 @@ cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export PROXYPORT=${PROXYPORT}
 export HTTP_PROXY=http://${IP}:${PROXYPORT}/
 export HTTPS_PROXY=http://${IP}:${PROXYPORT}/
-export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,r2.cloudflarestorage.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
 export http_proxy=http://${IP}:${PROXYPORT}/
 export https_proxy=http://${IP}:${PROXYPORT}/
-export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,r2.cloudflarestorage.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF

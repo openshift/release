@@ -37,6 +37,8 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+major_version=$( echo "${version}" | awk --field-separator=. '{print $1}' )
+minor_version=$( echo "${version}" | awk --field-separator=. '{print $2}' )
 echo "get ocp version: ${version}"
 rm pull-secret
 popd
@@ -69,8 +71,13 @@ fi
 if [[ -n "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then
     master_type="${CONTROL_PLANE_INSTANCE_TYPE}"
 fi
+
+master_replicas=${CONTROL_PLANE_REPLICAS:-3}
+
 echo "Using control plane instance type: ${master_type}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
+echo "Using compute node replicas: ${workers}"
+echo "Using controlPlane node replicas: ${master_replicas}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
@@ -80,6 +87,7 @@ platform:
 controlPlane:
   architecture: ${OCP_ARCH}
   name: master
+  replicas: ${master_replicas}
   platform:
     azure:
       type: ${master_type}
@@ -95,7 +103,7 @@ EOF
 if [ -z "${OUTBOUND_TYPE}" ]; then
   echo "Outbound Type is not defined"
 else
-  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
+  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NATGatewaySingleZone" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
     echo "Writing 'outboundType: ${OUTBOUND_TYPE}' to install-config"
     PATCH="${SHARED_DIR}/install-config-outboundType.yaml.patch"
     cat > "${PATCH}" << EOF
@@ -107,6 +115,13 @@ EOF
   else
     echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
   fi
+fi
+
+# User tags went GA in 4.14. In 4.14+, tag resources with an expiration date to facilitate cleanup.
+if (( minor_version > 13 && major_version == 4 )); then
+  expiration_date=$(date -d '8 hours' --iso=minutes --utc)
+  printf 'Setting user tag expirationDate: %s\n' "${expiration_date}"
+  yq-go write -i "${CONFIG}" "platform.azure.userTags.expiration_date" "${expiration_date}"
 fi
 
 printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
@@ -136,3 +151,9 @@ EOF
 else
   echo "Omit baseDomainResourceGroupName for private cluster"
 fi
+
+# starting from 4.19, cluster sp only needs Contributor role
+#if (( minor_version > 18 && major_version == 4 )) && [[ -f "${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json" ]]; then
+#    echo "Copy Azure credential azure-sp-contributor.json to SHARED_DIR"
+#    cp ${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json ${SHARED_DIR}/azure-sp-contributor.json
+#fi

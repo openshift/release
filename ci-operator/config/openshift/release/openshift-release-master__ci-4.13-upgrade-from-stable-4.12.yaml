@@ -3,10 +3,15 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   initial:
-    release:
-      channel: candidate
+    candidate:
+      product: ocp
+      stream: ci
       version: "4.12"
   latest:
     candidate:
@@ -24,14 +29,12 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-gcp-sdn-upgrade
-  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -62,7 +65,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-ovirt
 - as: e2e-vsphere-ovn-upgrade
-  cron: 47 9 * * 6
+  cron: 20 22 * * 2
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -70,7 +73,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere
 - as: e2e-vsphere-ovn-upgrade-storage-data
-  cron: 14 12 * * 0
+  cron: 17 17 * * 4
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -82,7 +85,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -90,10 +92,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-gcp-ovn-upgrade
-  cluster: build02
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -102,7 +103,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-ovn-rt-upgrade
-  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -131,8 +131,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -145,7 +143,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       EXTERNAL_MANIFESTS_POST_INSTALL: "true"
       EXTERNAL_MANIFESTS_SHA256_HASH: 6007d0022343793a2c40cc4862337eaf9d5e0f4bd8375578b762ee2a5eb298be
       EXTERNAL_MANIFESTS_URL: https://gist.githubusercontent.com/vrutkovs/1199226040a1942fdbcbe5fa76ab4467/raw/bfc5e67eef6df45f91af76df2a211fb839ebeda9/sample_workload.yaml
@@ -159,9 +156,7 @@ tests:
 - as: e2e-aws-sdn-upgrade-infra
   interval: 168h
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch

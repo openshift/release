@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build06
     context: ci/prow/ci-index
     decorate: true
     decoration_config:
@@ -56,11 +56,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build06
     context: ci/prow/ci-job
     decorate: true
     decoration_config:
@@ -70,6 +70,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cluster-group-upgrades-operator-release-4.13-ci-job
     rerun_command: /test ci-job
+    skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -115,7 +116,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -166,7 +167,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -182,6 +183,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cluster-group-upgrades-operator-release-4.13-integration
     rerun_command: /test integration
+    skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -190,7 +192,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/integration-cluster-profile
         - --target=integration
         command:
         - ci-operator
@@ -207,8 +208,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/integration-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -232,9 +231,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-telco
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

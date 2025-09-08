@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.18"
     namespace: ocp
     tag: cli
   opm-builder:
@@ -51,10 +51,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: make gotest
+- as: functional
+  commands: |
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    export GOFLAGS=
+    make test GINKGO_ARGS='--no-color'
   container:
     from: src
+  skip_if_only_changed: ^renovate.json|^README.md
 - as: precommit-check
   commands: |
     export SKIP=no-commit-to-branch
@@ -66,6 +71,7 @@ tests:
     pre-commit run -a --show-diff-on-failure
   container:
     from: openstack-operator-ci-pre-commit
+  skip_if_only_changed: ^renovate.json|^README.md
 - as: designate-operator-build-deploy-kuttl
   cluster_claim:
     architecture: amd64
@@ -73,7 +79,8 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.16"
+    version: "4.18"
+  skip_if_only_changed: ^(renovate.json|.*\.md|tests/functional/.*|OWNERS.*|LICENSE.*)$
   steps:
     env:
       CEPH_HOSTNETWORK: "false"

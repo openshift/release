@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 python3 --version 
 export CLOUDSDK_PYTHON=python3
 
@@ -26,7 +34,7 @@ function backoff() {
   local failed=0
   echo "INFO: Running Command '$*'"
   while true; do
-    eval "$@" && failed=0 || failed=1
+    eval "$*" && failed=0 || failed=1
     if [[ $failed -eq 0 ]]; then
       break
     fi

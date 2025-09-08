@@ -11,7 +11,7 @@ else
     echo "no proxy setting."
 fi
 
-DATA_STORE_URL=$(oc -n openshift-cluster-csi-drivers get cm/vsphere-csi-config -o jsonpath='{.data.cloud\.conf}'|grep -Eo 'ds:///.*/$')
+DATA_STORE_URL=$(oc -n openshift-cluster-csi-drivers exec deployment/vmware-vsphere-csi-driver-controller -c csi-driver -- cat /etc/kubernetes/vsphere-csi-config/cloud.conf|grep -Eo 'ds:///.*/$')
 echo "Default datastore is: \"${DATA_STORE_URL}\""
 
 oc apply -f - <<EOF

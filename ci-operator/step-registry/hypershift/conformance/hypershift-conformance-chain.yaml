@@ -15,15 +15,21 @@ chain:
       trap cleanup EXIT
 
       function patch_image_streams() {
+        # with OCP <= 4.17,
         # imagestreams on the hosted cluster are ignoring
         # the CA injected at creation/(installation) time.
         # see: https://issues.redhat.com/browse/RFE-3093
         # and: https://github.com/openshift/enhancements/pull/416/commits/e46072ecf77b58c79b4bece5e0c6a5a5546a1b8a
 
-        echo "#### Add trust for the mirroring registry"
-        oc get cm -n openshift-config user-ca-bundle -o json | jq -r '.data["ca-bundle.crt"]' > /tmp/ca-bundle.crt
-        oc create configmap registry-config --from-file=${DS_REGISTRY//:/..}=/tmp/ca-bundle.crt -n openshift-config
-        oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
+        OCP_MINOR_VERSION=$(oc version | grep "Server Version" | cut -d '.' -f2)
+        if [ "$OCP_MINOR_VERSION" -le "17" ]; then
+           echo "#### Add trust for the mirroring registry"
+           oc get cm -n openshift-config user-ca-bundle -o json | jq -r '.data["ca-bundle.crt"]' > /tmp/ca-bundle.crt
+           oc create configmap registry-config --from-file=${DS_REGISTRY//:/..}=/tmp/ca-bundle.crt -n openshift-config
+           oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
+        else
+           oc --kubeconfig="${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}" patch hostedclusters -n "${HYPERSHIFT_NAMESPACE}" "${CLUSTER_NAME}" --type='merge' -p '{"spec":{"configuration":{"image":{"additionalTrustedCA":{"name": "user-ca-bundle"}}}}}'
+        fi
         sleep 60
       }
 
@@ -32,7 +38,7 @@ chain:
       
         DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
 
-        openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
+        openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} | grep ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
         scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
       
         # shellcheck disable=SC2087
@@ -41,32 +47,61 @@ chain:
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.8  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ
       EOF
 
         TEST_ARGS+=$(echo " --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} ")
 
       }
-      
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-      export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
-      export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-      export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
-      [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
-      
+
+      if [[ -z "${HOSTED_CP:-}" ]]; then
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      else
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+      fi
+
+      if [[ $MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT == "true" ]]; then
+        export RELEASE_IMAGE_LATEST="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
+        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+        mkdir /tmp/tests-cli
+        oc image extract "$(oc adm release info --image-for=tests "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}")" --path /usr/bin/openshift-tests:/tmp/tests-cli --registry-config=/tmp/.dockerconfigjson
+        chmod +x /tmp/tests-cli/openshift-tests
+        oc adm release extract --command=oc --to=/tmp/tests-cli "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}" --registry-config=/tmp/.dockerconfigjson
+        chmod +x /tmp/tests-cli/oc
+        ln -s /tmp/tests-cli/oc /tmp/tests-cli/kubectl
+        export PATH=/tmp/tests-cli:$PATH
+      else
+        # In order for openshift-tests to pull external binary images from the
+        # payload, we need access enabled to the images on the build farm. In
+        # order to do that, we need to unset the KUBECONFIG so we talk to the
+        # build farm, not the cluster under test.
+        echo "Granting access for image pulling from the build farm..."
+        KUBECONFIG_BAK=$KUBECONFIG
+        unset KUBECONFIG
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+        export KUBECONFIG=$KUBECONFIG_BAK
+      fi
+
       if [[ -n "${USE_HYPERSHIFT_AZURE_CREDS:-}" ]]; then
         export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-azurecreds/credentials.json
       fi
-      
-      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
       if [ -f "${SHARED_DIR}/ds-vars.conf" ] ; then
         source "${SHARED_DIR}/ds-vars.conf"
-      fi  
+      fi
       if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
         source "${SHARED_DIR}/packet-conf.sh"
-      fi  
+      fi
 
       CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
       case "${CLUSTER_TYPE}" in
@@ -136,12 +171,27 @@ chain:
         TEST_SKIPS="${TEST_SKIPS:+${TEST_SKIPS}\|}\[Suite:openshift/conformance/parallel\]"
         TEST_SUITE="openshift/conformance/parallel"
       fi
-      
+
+      if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
+        export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+      fi
+
+      if [[ -n "${TEST_INCLUDES}" ]]; then
+          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+          echo "${TESTS}" | grep "${TEST_INCLUDES}" >/tmp/test_includes
+      fi
+
       if [[ -n "${TEST_SKIPS}" ]]; then
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+          if [[ -n "${TEST_INCLUDES}" ]]; then
+            TEST_SKIPS_SPECIFIC=$(echo "$TEST_SKIPS" | sed 's/\\\[Suite:openshift\/conformance\/parallel\\\]$//')
+            TEST_SKIPS_SPECIFIC="${TEST_SKIPS_SPECIFIC%\\|}"
+            cat /tmp/test_includes | grep -v "${TEST_SKIPS_SPECIFIC:-placeholder_no_match}" >>/tmp/tests
+          fi
+
           echo "Skipping tests:"
-          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          echo "${TESTS}" | grep -vxFf /tmp/tests || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
 
@@ -170,6 +220,9 @@ chain:
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
       name: hypershift-ci-jobs-azurecreds
       namespace: test-credentials
+    dependencies:
+    - name: "release:latest"
+      env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
     timeout: 14400s
     grace_period: 30m0s
     env:
@@ -188,6 +241,11 @@ chain:
         It is suggested to test the regex to make sure that it matches with the available tests.
         Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
         that are printed in Prow won't exactly match the list returned by openshift-tests.
+    - name: TEST_INCLUDES
+      default: ""
+      documentation: |
+        Regular expression (POSIX basic regular expression) of tests to include,
+        even if these tests were matched in the TEST_SKIPS expression.
     - name: SKIP_MONITOR_TEST
       default: ""
       documentation: |-
@@ -202,6 +260,25 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use hypershift-ci-jobs-azurecreds secret for Azure credentials. Set to 'true' to use the secret. Set to 'false' to use the default credentials."
+    - name: TEST_CSI_DRIVER_MANIFEST
+      default: ""
+      documentation: |-
+        Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+        program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+        details. The file must be present in ${SHARED_DIR}.
+    - name: MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT
+      documentation: |-
+        Optional. Used to override openshift-tests CLI, CLI extracts from 'HOSTEDCLUSTER_RELEASE_IMAGE_LATEST'.
+        When using the Gangway API, pass it as:
+        "pod_spec_options": {
+          "envs": {
+            "MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT": "true"
+          }
+        }
+      default: ""
+    - name: HOSTED_CP
+      default: ""
+      documentation: Execute against a ROSA hosted control plane
     resources:
       requests:
         cpu: "3"

@@ -177,12 +177,13 @@ if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
   done
 fi
 
-# Copy additional dev-script configuration provided by the the job, if present
-if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
-then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
-fi
+# We always want to collect an installer log bundle for bootstrap,
+# even on success
+cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
+export OPENSHIFT_INSTALL_GATHER_BOOTSTRAP=true
+EOF
 
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 
 
 
@@ -308,7 +309,34 @@ test -f /usr/config && rm -f /usr/config || true
 # also the repo doesn't exist on equinix
 dnf config-manager --set-enabled extras-common || true
 
-dnf install -y git sysstat sos make podman python39 jq net-tools gcc
+# Packages to install
+PKGS="git sysstat sos make podman python39 jq net-tools gcc"
+
+# Number of attempts
+MAX_RETRIES=5
+# Delay between attempts (in seconds)
+DELAY=15
+
+attempt=1
+
+while (( attempt <= MAX_RETRIES )); do
+    if dnf install --nobest -y \$PKGS; then
+        echo "Packages installed successfully."
+        break
+    else
+        echo "Install failed (attempt \$attempt). Cleaning cache and retrying..."
+        dnf clean all
+        rm -rf /var/cache/dnf/*
+        sleep \$DELAY
+    fi
+
+    (( attempt++ ))
+done
+
+if (( attempt > MAX_RETRIES )); then
+    echo "ERROR: Failed to install packages after \$MAX_RETRIES attempts."
+    exit 1
+fi
 
 systemctl start sysstat
 
@@ -401,13 +429,12 @@ fi
 
 echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
-# squid needs to be restarted after network changes
-podman restart --time 1 external-squid || true
-
 set +e
 timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
 rv=\$?
 
+# squid needs to be restarted after network changes
+podman restart --time 1 external-squid || true
 
 # Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
 # This needs to happen even if dev-scripts fails so that the cluster can be accessed via the proxy

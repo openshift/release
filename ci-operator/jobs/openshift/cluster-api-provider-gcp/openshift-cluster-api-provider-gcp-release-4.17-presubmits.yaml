@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp
     decorate: true
     labels:
@@ -25,7 +25,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
         - --target=e2e-gcp
         command:
         - ci-operator
@@ -42,8 +41,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -67,13 +64,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -89,7 +79,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-capi-techpreview
     decorate: true
     labels:
@@ -109,7 +99,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-capi-techpreview-cluster-profile
         - --target=e2e-gcp-capi-techpreview
         command:
         - ci-operator
@@ -126,8 +115,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-capi-techpreview-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -151,13 +138,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -173,7 +153,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
@@ -193,7 +173,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-ovn-techpreview-cluster-profile
         - --target=e2e-gcp-ovn-techpreview
         command:
         - ci-operator
@@ -210,8 +189,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-ovn-techpreview-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -235,13 +212,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp-3
-          - configMap:
-              name: cluster-profile-gcp-3
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -257,7 +227,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-serial
     decorate: true
     labels:
@@ -277,7 +247,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
         - --target=e2e-gcp-serial
         command:
         - ci-operator
@@ -294,8 +263,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -319,13 +286,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -341,7 +301,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/images
     decorate: true
     labels:
@@ -392,11 +352,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -406,7 +366,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-gcp-release-4.17-okd-scos-images
-    optional: true
     rerun_command: /test okd-scos-images
     spec:
       containers:
@@ -455,8 +414,8 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
-    context: ci/prow/regression-clusterinfra-cucushift-rehearse-gcp-ipi-techprev
+    cluster: build04
+    context: ci/prow/regression-clusterinfra-gcp-ipi-techpreview-capi
     decorate: true
     decoration_config:
       timeout: 7h0m0s
@@ -465,10 +424,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-api-provider-gcp-release-4.17-regression-clusterinfra-cucushift-rehearse-gcp-ipi-techprev
+    name: pull-ci-openshift-cluster-api-provider-gcp-release-4.17-regression-clusterinfra-gcp-ipi-techpreview-capi
     optional: true
     path_alias: sigs.k8s.io/cluster-api-provider-gcp
-    rerun_command: /test regression-clusterinfra-cucushift-rehearse-gcp-ipi-techprev
+    rerun_command: /test regression-clusterinfra-gcp-ipi-techpreview-capi
     spec:
       containers:
       - args:
@@ -477,8 +436,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/regression-clusterinfra-cucushift-rehearse-gcp-ipi-techprev-cluster-profile
-        - --target=regression-clusterinfra-cucushift-rehearse-gcp-ipi-techprev
+        - --target=regression-clusterinfra-gcp-ipi-techpreview-capi
         command:
         - ci-operator
         image: ci-operator:latest
@@ -494,8 +452,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/regression-clusterinfra-cucushift-rehearse-gcp-ipi-techprev-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -519,9 +475,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-gcp-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -531,13 +484,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )regression-clusterinfra-cucushift-rehearse-gcp-ipi-techprev,?($|\s.*)
+    trigger: (?m)^/test( | .* )regression-clusterinfra-gcp-ipi-techpreview-capi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/security
     decorate: true
     labels:
@@ -599,7 +552,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     labels:
@@ -653,7 +606,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build02
+    cluster: build04
     context: ci/prow/verify-commits
     decorate: true
     labels:

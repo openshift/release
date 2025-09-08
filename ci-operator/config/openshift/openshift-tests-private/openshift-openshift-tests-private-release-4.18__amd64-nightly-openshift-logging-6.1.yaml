@@ -1,0 +1,72 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.17"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: gcp-ipi-fips-f14-logging
+  cron: 36 8 29 2 *
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      COMPUTE_NODE_TYPE: e2-standard-8
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_TEST_VERSION: "6.1"
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~WIF&;~STS&;~AZMonitor&;~Splunk&;~PodDisruptionBudget&
+      TEST_IMPORTANCE: ""
+      TEST_PARALLEL: "3"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - chain: openshift-logging-deploy-operators
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-openshift-logging-6.1

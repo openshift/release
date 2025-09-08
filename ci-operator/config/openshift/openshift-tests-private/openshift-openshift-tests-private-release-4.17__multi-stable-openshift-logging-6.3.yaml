@@ -1,0 +1,94 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.19"
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: azure-ipi-amd-f999-logging
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_TEST_VERSION: "6.3"
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_FILTERS: AZMonitor;74397;Longduration;Disruptive
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-logging-deploy-operators
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-amd-f7-logging-custom-tls-profile
+  cron: 0 9 * * 5
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_TEST_VERSION: "6.3"
+      LOGGING_TLS_PROFILE_CONFIG: '{"type": "Custom", "custom": { "ciphers": ["ECDHE-ECDSA-CHACHA20-POLY1305","ECDHE-RSA-CHACHA20-POLY1305","ECDHE-RSA-AES128-GCM-SHA256","ECDHE-ECDSA-AES128-GCM-SHA256"],"minTLSVersion":
+        "VersionTLS12"}}'
+      OCP_ARCH: amd64
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: Disruptive
+      TEST_IMPORTANCE: High
+      TEST_PARALLEL: "1"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: openshift-logging-patch-tlssecurityprofile-apiserver
+    - chain: openshift-logging-deploy-operators
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-azure-ipi
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-stable-openshift-logging-6.3

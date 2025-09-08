@@ -12,16 +12,20 @@ set -xeuo pipefail
 
 source /tmp/ci-functions.sh
 ci_subscription_register
+
+download_microshift_scripts
+"\${DNF_RETRY}" "install" "pcp-zeroconf jq sos"
 ci_copy_secrets "${CACHE_REGION}"
 
-sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
+sudo systemctl start pmcd
+sudo systemctl start pmlogger
 
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
-
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
-if [[ "${JOB_NAME}" =~ .*metal-cache.* ]] ; then
+export GITHUB_TOKEN="\$(cat /tmp/token-git 2>/dev/null || echo '')"
+if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
 else
     ./test/bin/ci_phase_iso_build.sh
@@ -29,7 +33,43 @@ fi
 EOF
 chmod +x /tmp/iso.sh
 
+# To clone a private branch for testing cross-repository source changes, comment
+# out the 'ci_clone_src' function call and add the following commands instead.
+#
+# GUSR=myuser
+# GBRN=mybranch
+# git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
+#
 ci_clone_src
+
+# Attempt downloading MicroShift RPMs from brew.
+# This requires VPN access, which is only enabled for the cache jobs.
+if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
+    # See BREW_RPM_SOURCE variable definition in test/bin/common.sh
+    src_path="/go/src/github.com/openshift/microshift"
+    out_path="${src_path}/_output/test-images/brew-rpms"
+    # If the current release supports brew RPM download, get the latest RPMs from
+    # brew to be included in the source repository archive
+    pushd "${src_path}" &>/dev/null
+    if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
+        y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
+        bash -x ./scripts/fetch_tools.sh brew
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}"
+
+        # Fetch brew RPMs for release regression testing
+        # Condition to skip it if manage_brew_rpms.sh script latest version is not backported to all release branches
+        if ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type'  ; then
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "rc" || true
+            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "ec" || true
+        fi
+    fi
+    popd &>/dev/null
+fi
+
+# Archive the sources, potentially including MicroShift RPMs from brew
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
@@ -37,6 +77,7 @@ scp \
     /tmp/iso.sh \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \
+    /var/run/vault/tests-private-account/token-git \
     "${CLUSTER_PROFILE_DIR}/pull-secret" \
     "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
     "${CLUSTER_PROFILE_DIR}/ssh-publickey" \
@@ -48,6 +89,11 @@ if [ -e /var/run/microshift-dev-access-keys/aws_access_key_id ] && \
     scp \
         /var/run/microshift-dev-access-keys/aws_access_key_id \
         /var/run/microshift-dev-access-keys/aws_secret_access_key \
+        "${INSTANCE_PREFIX}:/tmp"
+fi
+
+if [ -e /var/run/microshift-dev-access-keys/registry.stage.redhat.io ] ; then
+    scp /var/run/microshift-dev-access-keys/registry.stage.redhat.io \
         "${INSTANCE_PREFIX}:/tmp"
 fi
 

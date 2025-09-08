@@ -43,11 +43,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     release:
@@ -72,9 +67,10 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-ipi-disc-priv-sts-ep-f28
-  cron: 30 10 25 * *
+- as: aws-ipi-disc-priv-sts-ep-f999
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -86,9 +82,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-ovn-ipsec-to-multiarch-f28
-  cron: 23 7 4 * *
+- as: aws-ipi-ovn-ipsec-to-multiarch-f999
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -104,9 +101,10 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-proxy-sts-f28
-  cron: 14 20 7 * *
+- as: aws-ipi-proxy-sts-f999
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -118,9 +116,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-usertags-f28
-  cron: 42 11 6 * *
+- as: aws-ipi-usertags-f999
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -132,9 +131,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: azure-ipi-disc-fullyprivate-f28
-  cron: 15 7 24 * *
+- as: azure-ipi-disc-fullyprivate-f999
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -145,9 +145,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-fullyprivate-proxy-f28
-  cron: 36 13 4 * *
+- as: azure-ipi-fullyprivate-proxy-f999
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -158,9 +159,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
-- as: azure-ipi-to-multiarch-f28
-  cron: 32 4 17 * *
+- as: azure-ipi-to-multiarch-f999
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -175,10 +177,12 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: baremetal-upi-to-multiarch-f28
-  cluster: build05
-  cron: 51 17 24 * *
+- as: baremetal-upi-to-multiarch-f999
+  capabilities:
+  - intranet
+  cron: 8 8 29 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -187,13 +191,11 @@ tests:
       ADDITIONAL_WORKERS: "2"
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       SCALE_IN_ARCHITECTURES: aarch64
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
       architecture: arm64
       masters: "3"
       workers: "2"
     test:
-    - chain: openshift-upgrade-qe-test-arch-migration-upi
+    - chain: openshift-upgrade-qe-sanity-arch-migration-upi
     workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: release-4.13

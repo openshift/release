@@ -101,13 +101,15 @@ function set-cluster-version-spec-update-service() {
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
+
+  current_time=$(date +%s)
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-$(date +%s).log"
+    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
 
   # terraform may not exist now
   if [ -f "${dir}/terraform.txt" ]; then
@@ -116,7 +118,7 @@ function populate_artifact_dir() {
       s/X-Auth-Token.*/X-Auth-Token REDACTED/;
       s/UserData:.*,/UserData: REDACTED,/;
       ' "${dir}/terraform.txt"
-    tar -czvf "${ARTIFACT_DIR}/terraform-$(date +%s).tar.gz" --remove-files "${dir}/terraform.txt"
+    tar -czvf "${ARTIFACT_DIR}/terraform-${current_time}.tar.gz" --remove-files "${dir}/terraform.txt"
   fi
   case "${CLUSTER_TYPE}" in
     alibabacloud)
@@ -127,8 +129,8 @@ function populate_artifact_dir() {
   # Copy CAPI-generated artifacts if they exist
   if [ -d "${dir}/.clusterapi_output" ]; then
     echo "Copying Cluster API generated manifests..."
-    mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
-    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-$(date +%s)" 2>/dev/null
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
   fi
 }
 
@@ -182,7 +184,7 @@ function capi_envtest_monitor() {
 # useful for components like observers. In the end, the complete kubeconfig will be copies
 # as before.
 function copy_kubeconfig_minimal() {
-  local dir=${1}
+  local dir=${1} temp_dir
   echo "waiting for ${dir}/auth/kubeconfig to exist"
   while [ ! -s  "${dir}/auth/kubeconfig" ]
   do
@@ -197,7 +199,10 @@ function copy_kubeconfig_minimal() {
   echo 'api available'
 
   echo 'waiting for bootstrap to complete'
-  openshift-install --dir="${dir}" wait-for bootstrap-complete &
+  # create a temporary install working dir to avoid installer log combination
+  temp_dir=$(mktemp -d)
+  cp -rf "${dir}"/* "${temp_dir}/"
+  ${INSTALLER_BINARY} --dir="${temp_dir}" wait-for bootstrap-complete &
   wait "$!"
   ret=$?
   if [ $ret -eq 0 ]; then
@@ -234,7 +239,12 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
-
+  if [[ "${CLUSTER_TYPE}" == "vsphere" ]] && [[ -f ${SHARED_DIR}/template.yaml.patch ]]; then
+      grep -A 10 'Creating infrastructure resources...' "${dir}/.openshift_install.log" > "${SHARED_DIR}/.openshift_install.log"
+  fi
+  if [[ "${CLUSTER_TYPE}" == "nutanix" ]] && [[ -f ${SHARED_DIR}/install-config-patch-preloadedOSImageName.yaml ]]; then
+      grep -A 10 'Creating infrastructure resources...' "${dir}/.openshift_install.log" > "${SHARED_DIR}/nutanix-preload-image-openshift_install.log"
+  fi
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -279,8 +289,8 @@ function prepare_next_steps() {
 
 function inject_promtail_service() {
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
-  export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
-  export PROMTAIL_VERSION="v2.4.1"
+  export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+  export PROMTAIL_VERSION="v3.4.3"
   export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
 
   config_dir=/tmp/promtail
@@ -480,7 +490,7 @@ function inject_spot_instance_config() {
       if [[ -d ${dir}/cluster-api/machines ]]; then
         echo "Spot masters supported via CAPA"
         manifests="${dir}/cluster-api/machines/10_inframachine_*.yaml $manifests"
-      elif openshift-install list-hidden-features 2>/dev/null | grep -q terraform-spot-masters; then
+      elif ${INSTALLER_BINARY} list-hidden-features 2>/dev/null | grep -q terraform-spot-masters; then
         echo "Spot masters supported via terraform"
       else
         echo "Spot masters are not supported in this configuration!"
@@ -554,6 +564,19 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   exit 1
 fi
 
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to="/tmp" || exit 1
+  export INSTALLER_BINARY="/tmp/openshift-install"
+else
+  export INSTALLER_BINARY="openshift-install"
+fi
+
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
@@ -583,6 +606,9 @@ azure4|azuremag|azure-arm64)
     if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
         echo "Setting AZURE credential with minimal permissions for installer"
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+    elif [[ -f "${SHARED_DIR}/azure-sp-contributor.json" ]]; then
+        echo "Setting AZURE credential with Contributor role only for installer"
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure-sp-contributor.json
     else
         export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     fi
@@ -622,13 +648,23 @@ alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.i
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
+    cp /var/run/vsphere-ibmcloud-ci/vcenter-certificate /tmp/ca-bundle.pem
+    if [ -f "${SHARED_DIR}/additional_ca_cert.pem" ]; then
+      echo "additional CA bundle found, appending it to the bundle from vault"
+      echo -n $'\n' >> /tmp/ca-bundle.pem
+      cat "${SHARED_DIR}/additional_ca_cert.pem" >> /tmp/ca-bundle.pem
+    fi
+    export SSL_CERT_FILE=/tmp/ca-bundle.pem
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
 ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
-nutanix) ;;
+nutanix)
+    if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+      export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+    fi
+    ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
@@ -653,7 +689,9 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 set +o errexit
-openshift-install --dir="${dir}" create manifests &
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
+${INSTALLER_BINARY} --dir="${dir}" create manifests &
 wait "$!"
 ret="$?"
 if test "${ret}" -ne 0 ; then
@@ -664,13 +702,33 @@ set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
+azure4|azure-arm64)
+    if [[ "${BOOT_DIAGNOSTICS:-}" == "true" ]]; then
+      inject_boot_diagnostics ${dir}
+    fi
+    ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config "${dir}" "workers"
     fi
     if [[ "${SPOT_MASTERS:-}" == 'true' ]]; then
       inject_spot_instance_config "${dir}" "masters"
+    fi
+    ;;
+vsphere*)
+
+    if [[ $JOB_NAME =~ .*okd-scos.* ]]; then
+    cat >> "${dir}/openshift/99_openshift-samples-operator-config.yaml" << EOF
+apiVersion: samples.operator.openshift.io/v1
+kind: Config
+metadata:
+  name: cluster
+spec:
+  architectures:
+  - x86_64
+  skippedImagestreams:
+  - openliberty
+EOF
     fi
     ;;
 esac
@@ -695,6 +753,15 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
+echo "Will include following openshift config files:"
+find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -name "openshift_manifests_[0-9]*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  ocp_config_file="$( basename "${item}" )"
+  cp "${item}" "${dir}/openshift/${ocp_config_file##openshift_manifests_}"
+done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -name "openshift_manifests_[0-9]*.yaml" \) -print0)
+
 # Collect bootstrap logs for all azure clusters
 case "${CLUSTER_TYPE}" in
 azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true ;;
@@ -702,7 +769,7 @@ esac
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign
-  openshift-install --dir="${dir}" create ignition-configs &
+  ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
   wait "$!"
   ret="$?"
   if test "${ret}" -ne 0 ; then
@@ -723,13 +790,21 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # Cloud infrastructure problems are common, instead of failing and
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
-case $JOB_NAME in
-  *vsphere)
+case $CLUSTER_TYPE in
+  vsphere*)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;
-  *aws)
+  aws*)
     # Do not retry because aws resources can collide when re-using installer assets
+    max=1
+    ;;
+  azure*)
+    # Do not retry because azure resources always collide when re-using installer assets
+    max=1
+    ;;
+  ibmcloud*)
+    # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
     max=1
     ;;
   *)
@@ -747,7 +822,7 @@ do
   if [ $tries -gt 1 ]; then
     write_install_status
     populate_artifact_dir
-    openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    ${INSTALLER_BINARY} --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
@@ -767,8 +842,7 @@ do
 
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
-
-  openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  ${INSTALLER_BINARY} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"

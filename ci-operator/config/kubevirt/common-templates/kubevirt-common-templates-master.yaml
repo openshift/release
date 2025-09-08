@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.16"
+    name: "4.19"
     namespace: ocp
     tag: base
 build_root:
@@ -9,12 +9,12 @@ build_root:
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -55,7 +55,8 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         make go-tests
       credentials:
-      - mount_path: /tmp/secrets
+      - collection: ""
+        mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
         namespace: test-credentials
       from: src
@@ -78,7 +79,8 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=rhel7 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
+      - collection: ""
+        mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
         namespace: test-credentials
       from: src
@@ -101,7 +103,8 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=rhel8 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
+      - collection: ""
+        mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
         namespace: test-credentials
       from: src
@@ -124,7 +127,8 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=rhel9 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
+      - collection: ""
+        mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
         namespace: test-credentials
       from: src
@@ -147,8 +151,9 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=windows10 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
+      - collection: ""
+        mount_path: /tmp/secrets
+        name: windows-disk-puller
         namespace: test-credentials
       from: src
       resources:
@@ -171,8 +176,9 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=windows11 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
+      - collection: ""
+        mount_path: /tmp/secrets
+        name: windows-disk-puller
         namespace: test-credentials
       from: src
       resources:
@@ -195,8 +201,9 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=windows2016 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
+      - collection: ""
+        mount_path: /tmp/secrets
+        name: windows-disk-puller
         namespace: test-credentials
       from: src
       resources:
@@ -219,8 +226,9 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=windows2019 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
+      - collection: ""
+        mount_path: /tmp/secrets
+        name: windows-disk-puller
         namespace: test-credentials
       from: src
       resources:
@@ -243,8 +251,34 @@ tests:
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=windows2022 && make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
+      - collection: ""
+        mount_path: /tmp/secrets
+        name: windows-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-common-templates-windows2025
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e-tests-windows2025
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows2025 && make e2e-tests
+      credentials:
+      - collection: ""
+        mount_path: /tmp/secrets
+        name: windows-disk-puller
         namespace: test-credentials
       from: src
       resources:
@@ -304,44 +338,6 @@ tests:
         cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=centos6 && make e2e-tests
-      from: src
-      resources:
-        requests:
-          cpu: 200m
-          memory: 400Mi
-    workflow: ipi-gcp
-- as: e2e-gcp-common-templates-centos7
-  steps:
-    cluster_profile: gcp-virtualization
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-4
-    test:
-    - as: e2e-tests-centos7
-      commands: |
-        set -o pipefail
-        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
-        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
-        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-        export TARGET=centos7 && make e2e-tests
-      from: src
-      resources:
-        requests:
-          cpu: 200m
-          memory: 400Mi
-    workflow: ipi-gcp
-- as: e2e-gcp-common-templates-centos-stream8
-  steps:
-    cluster_profile: gcp-virtualization
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-4
-    test:
-    - as: e2e-tests-centos8
-      commands: |
-        set -o pipefail
-        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
-        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
-        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-        export TARGET=centos-stream8 && make e2e-tests
       from: src
       resources:
         requests:

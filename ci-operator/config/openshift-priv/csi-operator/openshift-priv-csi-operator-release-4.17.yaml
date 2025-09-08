@@ -7,6 +7,14 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: csi-driver-smb-test
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   livenessprobe-operand:
     name: 4.17-priv
     namespace: ocp-private
@@ -175,11 +183,11 @@ tests:
     from: src
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-csi
 - as: hypershift-aws-e2e-external
   steps:
@@ -230,9 +238,11 @@ tests:
       TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]|\[Azure-Disk-CSI-Driver-Operator\]
     workflow: openshift-e2e-azure-csi-extended
 - as: e2e-azurestack-csi
+  cluster: build01
   optional: true
+  run_if_changed: ^(Dockerfile\.azure-disk|assets\/overlays\/azure-disk\/.*|pkg\/driver\/azure-disk\/.*|pkg\/operator\/.*)
   steps:
-    cluster_profile: azurestack
+    cluster_profile: azurestack-dev
     env:
       TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack-upi-csi

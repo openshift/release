@@ -10,11 +10,14 @@ There are two types of Prow configuration files under *openshift-tests-private*:
   - These files are used to setup test environment, like creating images in image stream
   - There are two types of infrastructure files:
     - Pre-merge files: these files will be triggered when image file changes are submitted, it will generate new images or update existing images in image stream against the change in image file. Pre-merge file name like: *openshift-openshift-tests-private-release-4.15.yaml*
+      Note: medodi, xia-zhao-rh, phaow and geliu2016 are approver of presubmit job, i.e yaml files -master.yaml and -<release branch>.yaml
     - Image files: these files define images,and export images into image stream. Image file name like: *openshift-openshift-tests-private-release-4.15__images.yaml*
+      Note: qe-productivtiy team approve these yaml files.
 - Test case config file
   - We define test cases in these kind of files.
   - There are two kind of test files: E2E tests and Upgrade Tests.
   - Tests will be triggered periodically against its settings.
+    Note: qe-productivtiy team approve these yaml files.
 
 ## E2E Test File Naming
 All E2E jobs under the job configuration location should have a consistent file naming rule as openshift-openshift-tests-private-release-VERSION__ARCH-STREAM.yaml, we will break down this to detail:
@@ -50,6 +53,7 @@ Job frequency is defined by cron according to the test requirements
 - f4: every 4 days
 - f5: every 5 days
 - ...
+- f999: disable the job temporarily
 
 ~~~
 NOTE: We can use below script to generate cron settings against the frequency:
@@ -122,30 +126,5 @@ releases:
 ```
 
 
-# Trigger a new test for an existing periodic job in Prow
-Navigate to the app.ci console URL (For URL, search 'prow' in BitWarden). After logging in (via SSO) to this cluster using the console, use the link in the top right “Copy login command” to get your token.
-Run the specific periodic job you want using REST API.
-```
-TOKEN='sha256~the_token_you_get_from_above'
-GANGWAY_API='https://gangway***.com' # For API URL, search 'prow' in BitWarden
-JOB_NAME='replace-me-eg-periodic-ci-openshift-openshift-tests-private-release-4.14-amd64-nightly-gcp-ipi-sdn-migration-ovn-f7'
-$ curl -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
-{
- "id": "d7c56195-428f-4217-aab0-6f95b2f2e763",
- "job_name": "periodic-ci-openshift-openshift-tests-private-release-4.14-amd64-nightly-gcp-ipi-sdn-migration-ovn-f7",
- "job_type": "PERIODIC",
- "job_status": "TRIGGERED",
- "gcs_path": ""
-}
-```
-You should be able to find the triggered job in QE PRIVATE DECK (search 'prow' in BitWarden for the URL) via job name.
-
-If you would like to run the tests on a specific payload,
-```
-# for E2E testing,
-$ curl -X POST -d '{"job_execution_type": "1", "pod_spec_options": { "envs":  {"RELEASE_IMAGE_LATEST": "quay.io/openshift-release-dev/ocp-release:4.14.0-ec.1-x86_64"} } }' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
-# for upgrade testing,
-JOB_NAME='replace-me-eg-periodic-ci-openshift-openshift-tests-private-release-4.14-amd64-nightly-4.14-upgrade-from-stable-4.13-aws-ipi-network-mtu-localzone-f14'
-$ curl -X POST -d '{"job_execution_type": "1", "pod_spec_options": { "envs":  {"RELEASE_IMAGE_LATEST": "quay.io/openshift-release-dev/ocp-release:4.13.2-x86_64", "RELEASE_IMAGE_TARGET": "quay.io/openshift-release-dev/ocp-release:4.14.0-ec.1-x86_64"} } }' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
-```
-You can use `-v` option for curl to see detailed information about the request as well as error message.
+# Trigger a new test for an existing job in Prow
+Refer to [Triggering ProwJobs via the REST](https://docs.ci.openshift.org/docs/how-tos/triggering-prowjobs-via-rest) for more details

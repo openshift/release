@@ -18,6 +18,41 @@ CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
 export BIN_FOLDER="${LOGS_FOLDER}/bin"
 
+# Function to clean up folders
+cleanup() {
+    echo "Cleaning up..."
+    [[ -d "${CLUSTER_PATH}/auth" ]] && rm -fvr "${CLUSTER_PATH}/auth"
+}
+# Set trap to catch EXIT and run cleanup on any exit code
+trap cleanup EXIT SIGINT
+
+function install_yq_if_not_exists() {
+    # Install yq manually if not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
+        echo "Installing yq"
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+    fi
+}
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            install_yq_if_not_exists
+            echo "Mapping Test Suite Name To: CNV-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        fi
+    fi
+}
+
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
 #
@@ -60,15 +95,21 @@ START_TIME=$(date "+%s")
 run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --ocsci-conf "${LOGS_CONFIG}" \
   --collect-logs \
-  --ocs-version "${OCS_VERSION}" \
-  --ocp-version "${OCP_VERSION}" \
-  --cluster-path "${CLUSTER_PATH}" \
-  --cluster-name "${CLUSTER_NAME}" \
-  --junit-xml "${CLUSTER_PATH}/junit.xml" || /bin/true
+  --ocs-version  "${OCS_VERSION}"                    \
+  --ocp-version  "${OCP_VERSION}"                    \
+  --cluster-path "${CLUSTER_PATH}"                   \
+  --cluster-name "${CLUSTER_NAME}"                   \
+  --html         "${CLUSTER_PATH}/test-results.html" \
+  --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
+  || /bin/true
+
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
+
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""

@@ -15,14 +15,14 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: metallb-frr
-  ocp_builder_rhel-9-base-openshift-4.18:
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.18
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -32,12 +32,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.18:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.18
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: metallb-operator
 - dockerfile_path: bundleci.Dockerfile
   to: metallb-operator-bundle
@@ -47,16 +47,18 @@ operator:
     dockerfile_path: bundleci.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/openshift/origin-metallb:4.17
+  - pullspec: quay.io/openshift/origin-metallb:4.19
     with: pipeline:metallb
-  - pullspec: quay.io/openshift/origin-metallb-operator:4.17
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.19
     with: pipeline:metallb-operator
-  - pullspec: quay.io/openshift/origin-metallb-frr:4.17
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.19
     with: pipeline:metallb-frr
-  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.17
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.19
     with: pipeline:kube-rbac-proxy
 promotion:
   to:
+  - name: metallb-4.19
+    namespace: origin
   - name: "4.19"
     namespace: ocp
 releases:
@@ -84,7 +86,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.19"
   steps:
     test:
     - as: install
@@ -113,7 +115,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: metallb-e2e-metal-frrk8s
+- as: metallb-e2e-metal
   cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
@@ -123,18 +125,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       E2E_TESTS_CONFIG: |
         IP_STACK=v4
-        BGP_TYPE=frr-k8s
-    workflow: baremetalds-metallb-e2e
-- as: metallb-e2e-metal-ipi-ovn
-  cluster: build05
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
-      E2E_TESTS_CONFIG: |
-        IP_STACK=v4
+        BGP_TYPE=frr-k8s-cno
     workflow: baremetalds-metallb-e2e
 - as: security
   optional: true
@@ -143,6 +134,12 @@ tests:
       PROJECT_NAME: metallb-operator
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

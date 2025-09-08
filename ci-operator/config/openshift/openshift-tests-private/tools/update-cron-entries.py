@@ -9,7 +9,9 @@ from datetime import datetime
 
 #import yaml
 #To avoid yaml.load change doulbe-quotes values to sigle-quote, use ruamel.yaml module instead of yaml
-#yum install python3-ruamel-yaml.x86_64
+# Run any of below commands to install ruamel:
+#   yum install python3-ruamel-yaml.x86_64
+#   pip install ruamel_yaml
 from ruamel.yaml import YAML
 yaml=YAML()
 yaml.default_flow_style = False

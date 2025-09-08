@@ -5,21 +5,22 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
-    context: ci/prow/ci-index-cert-manager-operator-bundle
+    cluster: build07
+    context: ci/prow/ci-bundle-cert-manager-operator-bundle
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cert-manager-operator-master-ci-index-cert-manager-operator-bundle
-    rerun_command: /test ci-index-cert-manager-operator-bundle
+    name: pull-ci-openshift-cert-manager-operator-master-ci-bundle-cert-manager-operator-bundle
+    rerun_command: /test ci-bundle-cert-manager-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-cert-manager-operator-bundle
+        - --target=cert-manager-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -52,22 +53,94 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-cert-manager-operator-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-bundle-cert-manager-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-operator
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-e2e-operator
     rerun_command: /test e2e-operator
+    skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/e2e-operator-tech-preview
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-e2e-operator-tech-preview
+    optional: true
+    rerun_command: /test e2e-operator-tech-preview
+    skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -76,8 +149,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-operator-cluster-profile
-        - --target=e2e-operator
+        - --target=e2e-operator-tech-preview
         command:
         - ci-operator
         image: ci-operator:latest
@@ -93,8 +165,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -118,9 +188,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -130,17 +197,18 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-operator-tech-preview,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build07
     context: ci/prow/fips-image-scan-cert-manager
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-fips-image-scan-cert-manager
     rerun_command: /test fips-image-scan-cert-manager
@@ -196,11 +264,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build07
     context: ci/prow/fips-image-scan-operator
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-fips-image-scan-operator
     rerun_command: /test fips-image-scan-operator
@@ -256,11 +325,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build07
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-images
     rerun_command: /test images
@@ -309,11 +379,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build07
     context: ci/prow/unit
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-unit
     rerun_command: /test unit
@@ -362,11 +433,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build07
     context: ci/prow/verify
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-verify
     rerun_command: /test verify
@@ -415,11 +487,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build07
     context: ci/prow/verify-deps
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-verify-deps
     rerun_command: /test verify-deps

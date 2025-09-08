@@ -1,0 +1,160 @@
+base_images:
+  microshift-ci-brew:
+    name: brew
+    namespace: microshift
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  nightly-amd64:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: publish-release-notes
+  cron: 0 3 1 1 *
+  steps:
+    workflow: openshift-microshift-publish-release-notes
+- as: e2e-aws-tests-cache-nightly
+  capabilities:
+  - intranet
+  cron: 0 3 1 1 *
+  restrict_network_access: false
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-cache
+- as: e2e-aws-tests-cache-nightly-arm
+  capabilities:
+  - intranet
+  cron: 0 3 1 1 *
+  restrict_network_access: false
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-cache
+- as: e2e-aws-tests-bootc-nightly
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-arm-nightly
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-nightly
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-nightly
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-ovn-ocp-conformance
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.6
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-ovn-ocp-conformance-serial
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      MICROSHIFT_OS: rhel-9.6
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-ovn-ocp-conformance-arm64
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.6
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-ovn-ocp-conformance-serial-arm64
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.6
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-origin-conformance
+- as: clusterbot-nightly
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      MICROSHIFT_ARCH: arm64
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-clusterbot
+- as: e2e-aws-footprint-and-performance-nightly
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-ai-model-serving-nightly
+  cron: 0 3 1 1 *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: g4dn.xlarge
+      MICROSHIFT_OS: rhel-9.6
+      SUITE: ai-model-serving
+    workflow: openshift-microshift-e2e-bare-metal-tests
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: microshift
+  variant: periodics

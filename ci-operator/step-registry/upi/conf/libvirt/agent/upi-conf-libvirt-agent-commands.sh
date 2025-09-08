@@ -44,7 +44,7 @@ apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: ${CLUSTER_NAME}
-rendezvousIP: 192.168.$(leaseLookup "subnet").11
+rendezvousIP: 192.168.$(leaseLookup "subnet").10
 hosts:
   - hostname: control-0.${BASE_URL}
     role: master

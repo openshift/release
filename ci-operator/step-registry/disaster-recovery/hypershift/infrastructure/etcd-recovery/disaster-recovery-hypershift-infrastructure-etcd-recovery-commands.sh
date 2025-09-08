@@ -2,8 +2,29 @@
 
 set -euxo pipefail
 
+function check_ho_version() {
+    local ho_version
+    local ho_version_major
+    local ho_version_minor
+
+    ho_version=$(oc get cm -n hypershift supported-versions -o jsonpath='{.data.supported-versions}' | jq -r '.versions[]' | sort -r | head -n 1)
+    ho_version_major=$(cut -d . -f 1 <<< "$ho_version")
+    if (( ho_version_major != 4 )); then
+        echo "Expect HO major version to be 4 but found $ho_version_major, exiting" >&2
+        exit 1
+    fi
+    ho_version_minor=$(cut -d . -f 2 <<< "$ho_version")
+    if (( ho_version_minor < 18 )); then
+        echo "HO minor version = $ho_version_minor < 18, skipping step"
+        exit 0
+    fi
+}
+
 # Timestamp
 export PS4='[$(date "+%Y-%m-%d %H:%M:%S")] '
+
+# Check HO version, skip step if unsupported
+check_ho_version
 
 # Error out if the CP is not highly available
 cp_availability="$(oc get hc -A -o jsonpath='{.items[0].spec.controllerAvailabilityPolicy}')"

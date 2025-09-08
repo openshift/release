@@ -11,7 +11,7 @@ currentVersion=$(oc version -o yaml | grep openshiftVersion | grep -o '[0-9]*[.]
 currentPlugin=$(oc get network.config.openshift.io cluster -o jsonpath='{.status.networkType}')
 
 # Check if the current version and plugin match the expected values
-if [[ ${currentVersion} != "4.16" || ${currentPlugin} != "OpenShiftSDN" ]]; then
+if [[ ${currentVersion} != "4.16" && ${currentVersion} != "4.15" || ${currentPlugin} != "OpenShiftSDN" ]]; then
   echo "Exiting script because the version or plugin is incorrect."
   exit
 fi
@@ -41,7 +41,7 @@ oc patch Network.config.openshift.io cluster --type='merge' --patch '{"metadata"
 # Wait for the network migration to start
 co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-300s}
 timeout "$co_timeout" bash <<EOT
-until 
+until
   oc get network -o yaml | grep NetworkTypeMigrationInProgress > /dev/null
 do
   echo "Migration is not started yet"
@@ -49,8 +49,6 @@ do
 done
 EOT
 echo "Start Live Migration process now"
-
-# Wait for the live migration to fully complete
 co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-3600s}
 timeout "$co_timeout" bash <<EOT
 until 

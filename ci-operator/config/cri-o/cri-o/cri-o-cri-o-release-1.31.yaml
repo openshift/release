@@ -1,0 +1,68 @@
+base_images:
+  base-machine:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  rhel-coreos-9-base:
+    name: "4.18"
+    namespace: ocp
+    tag: rhel-coreos-9
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.18
+images:
+- dockerfile_literal: |
+    # This uses the new rhel-coreos-9 base image
+    # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+    FROM quay.io/centos/centos:stream9 as build
+    # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+    # in a container https://github.com/coreos/rpm-ostree/issues/4034
+    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download cri-o
+    # See also https://issues.redhat.com/browse/ART-4352
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
+    COPY --from=build /*.rpm /
+    # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+    RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - quay.io/centos/centos:stream9
+    rhel-coreos-9-base:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
+  to: rhel-coreos-9
+raw_steps:
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+rpm_build_commands: hack/build-rpms.sh
+tests:
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+zz_generated_metadata:
+  branch: release-1.31
+  org: cri-o
+  repo: cri-o

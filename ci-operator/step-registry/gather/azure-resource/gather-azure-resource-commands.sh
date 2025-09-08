@@ -15,6 +15,7 @@ function cli_Login() {
     AZURE_AUTH_CLIENT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientId)"
     AZURE_AUTH_CLIENT_SECRET="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientSecret)"
     AZURE_AUTH_TENANT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .tenantId)"
+    AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
     # az should already be there
     command -v az
     az version
@@ -46,20 +47,57 @@ function cli_Login() {
 
     echo "$(date -u --rfc-3339=seconds) - Logging in to Azure..."
     az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none || return 1
+    az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 }
 
 function gatherLBs() {
-    local lbs aps
+    local lbs aps name state public_ip_address private_ip_address public_ip_name temp_file backend_ids
+    echo ""
     run_command "az network lb list --resource-group $RESOURCE_GROUP > $OUTPUT_DIR/lbs.json"
-    run_command "az network lb list --resource-group $RESOURCE_GROUP -o tsv"
+    run_command "az network lb list --resource-group $RESOURCE_GROUP -o table"
     lbs="$(az network lb list -g $RESOURCE_GROUP | jq -r '.[].name')"
     for lb in $lbs; do
-        echo "loadbalance: $lb"
+        echo -e "\n=> loadbalance: $lb"
+
+        run_command "az network lb frontend-ip list --lb-name $lb -g $RESOURCE_GROUP > $OUTPUT_DIR/frontend-ips.json"
+        temp_file=$(mktemp)
+        echo -e "Name\tProvisioning State\tPublic IP Name\tPublic IP Address\tPrivate IP Address" >> "$temp_file"
+        echo -e "----\t------------------\t--------------\t----------------\t-----------------" >> "$temp_file"
+        while IFS=$'\t' read -r name state public_ip_id private_ip; do
+            public_ip_name="N/A"
+            public_ip_address="N/A"
+            private_ip_address="N/A"
+            if [[ "$public_ip_id" != "null" ]]; then
+                public_ip_name=$(basename "$public_ip_id")
+                public_ip_address=$(az network public-ip show --ids "$public_ip_id" --query ipAddress -o tsv 2>/dev/null)
+                if [[ -z "$public_ip_address" ]]; then
+                    public_ip_address="Not Found"
+                fi
+            fi
+            if [[ "$private_ip" != "null" ]]; then
+                private_ip_address="$private_ip"
+            fi
+            echo -e "$name\t$state\t$public_ip_name\t$public_ip_address\t$private_ip_address" >> "$temp_file"
+        done < <(cat "$OUTPUT_DIR/frontend-ips.json" | jq -r '.[] | [
+            .name,
+            .provisioningState,
+            (.publicIPAddress.id // .publicIpAddress.id // "null"),
+            (.privateIPAddress // .privateIpAddress // "null")
+        ] | @tsv')
+        column -t -s $'\t' "$temp_file"
+        rm "$temp_file"
+
         aps="$(az network lb address-pool list -g $RESOURCE_GROUP --lb-name ${lb} | jq -r '.[].name')"
         for ap in $aps; do
-            echo "address-pool: $ap"
+            echo -e "\n======> address-pool: $ap"
             if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-                run_command "az network lb address-pool show --lb-name $lb --name $ap --resource-group $RESOURCE_GROUP | jq -r .backendIPConfigurations[].id"
+                backend_ids=$(az network lb address-pool show --lb-name $lb --name $ap --resource-group $RESOURCE_GROUP | jq -r '(.backendIPConfigurations // [])[].id // "null"')
+                if [[ "$backend_ids" != "null" ]]; then
+                    echo "backend IDs:"
+                    echo "$backend_ids"
+                else
+                    echo "No backend found"
+                fi
             else
                 run_command "az network lb address-pool address list --lb-name $lb --pool-name $ap --resource-group $RESOURCE_GROUP -o table"
             fi
@@ -83,10 +121,19 @@ cli_Login
 OUTPUT_DIR="${ARTIFACT_DIR}"
 
 getResourceGroup
-run_command "az group show --name $RESOURCE_GROUP"
-
-run_command "az vm list --resource-group $RESOURCE_GROUP -o tsv"
-
-run_command "az resource list --resource-group $RESOURCE_GROUP -o tsv"
-
+echo ""
+run_command "az group show --name $RESOURCE_GROUP" || true
+echo ""
+run_command "az vm list --resource-group $RESOURCE_GROUP -o table" || true
+echo ""
+run_command "az resource list --resource-group $RESOURCE_GROUP -o table" || true
+echo ""
+run_command "az resource list --resource-group $RESOURCE_GROUP --query '[?sku].{Name:name, Type:type, SKU:sku.name, Tier:sku.tier, Capacity:sku.capacity}' --output table" || true
+echo ""
+run_command "az vm list-ip-addresses --resource-group $RESOURCE_GROUP --output table" || true
+echo ""
+run_command "az network public-ip list --resource-group $RESOURCE_GROUP --output table" || true
+echo ""
+run_command "az monitor activity-log list --resource-group $RESOURCE_GROUP > $OUTPUT_DIR/activity.log" || true
+echo ""
 gatherLBs

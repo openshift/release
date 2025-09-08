@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build01
-  cron: 0 1 * * *
+  cron: 35 7 14,26 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -32,7 +32,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/clusterbot-cluster-profile
       - --target=clusterbot
       command:
       - ci-operator
@@ -49,8 +48,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/clusterbot-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -74,9 +71,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -88,7 +82,80 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 0 * * *
+  cron: 19 4 4 8 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.17
+    org: openshift
+    repo: microshift
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci.openshift.io/generator: prowgen
+    job-release: "4.17"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-microshift-release-4.17-e2e-aws-nvidia-device-plugin-nightly
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-aws-nvidia-device-plugin-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 13 4 23 5 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -109,8 +176,8 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -119,7 +186,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-ovn-ocp-conformance-cluster-profile
       - --target=e2e-aws-ovn-ocp-conformance
       command:
       - ci-operator
@@ -136,8 +202,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-ovn-ocp-conformance-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -161,9 +225,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -175,7 +236,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 1 * * *
+  cron: 16 10 27 8 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -206,7 +267,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/footprint-and-performance-nightly-cluster-profile
       - --target=footprint-and-performance-nightly
       command:
       - ci-operator
@@ -223,8 +283,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/footprint-and-performance-nightly-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -248,9 +306,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -262,7 +317,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 2 * * *
+  cron: 19 14 7 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -293,7 +348,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/metal-bootc-test-nightly-cluster-profile
       - --target=metal-bootc-test-nightly
       command:
       - ci-operator
@@ -310,8 +364,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/metal-bootc-test-nightly-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -335,9 +387,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -349,7 +398,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 2 * * *
+  cron: 14 9 4 10 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -359,7 +408,7 @@ periodics:
     repo: microshift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
     ci.openshift.io/generator: prowgen
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -380,7 +429,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/metal-bootc-test-nightly-arm-cluster-profile
       - --target=metal-bootc-test-nightly-arm
       command:
       - ci-operator
@@ -397,8 +445,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/metal-bootc-test-nightly-arm-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -422,9 +468,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -436,7 +479,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 0 * * *
+  cron: 18 4 23 4 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -467,7 +510,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/microshift-metal-cache-nightly-cluster-profile
       - --target=microshift-metal-cache-nightly
       command:
       - ci-operator
@@ -484,8 +526,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/microshift-metal-cache-nightly-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -509,9 +549,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -523,7 +560,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 0 * * *
+  cron: 55 1 7 4 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -554,7 +591,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/microshift-metal-cache-nightly-arm-cluster-profile
       - --target=microshift-metal-cache-nightly-arm
       command:
       - ci-operator
@@ -571,8 +607,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/microshift-metal-cache-nightly-arm-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -596,9 +630,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -610,7 +641,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 8 * * *
+  cron: 27 19 3 10 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -631,8 +662,8 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -641,7 +672,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-conformance-rhel-eus-nightly-cluster-profile
       - --target=ocp-conformance-rhel-eus-nightly
       command:
       - ci-operator
@@ -658,8 +688,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-conformance-rhel-eus-nightly-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -683,9 +711,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -697,7 +722,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 30 8 * * *
+  cron: 11 17 22 7 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -718,8 +743,8 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -728,7 +753,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-conformance-rhel-eus-nightly-arm-cluster-profile
       - --target=ocp-conformance-rhel-eus-nightly-arm
       command:
       - ci-operator
@@ -745,8 +769,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-conformance-rhel-eus-nightly-arm-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -770,9 +792,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -784,7 +803,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 8 * * *
+  cron: 6 2 21 1 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -805,8 +824,8 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -815,7 +834,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-conformance-with-optional-rpms-rhel-eus-nightly-cluster-profile
       - --target=ocp-conformance-with-optional-rpms-rhel-eus-nightly
       command:
       - ci-operator
@@ -832,8 +850,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-conformance-with-optional-rpms-rhel-eus-nightly-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -857,9 +873,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -871,7 +884,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 30 8 * * *
+  cron: 40 8 23 6 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -881,7 +894,7 @@ periodics:
     repo: microshift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
     ci.openshift.io/generator: prowgen
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -892,8 +905,8 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -902,7 +915,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm-cluster-profile
       - --target=ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
       command:
       - ci-operator
@@ -919,8 +931,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -944,9 +954,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -958,7 +965,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 30 2 * * *
+  cron: 58 3 3 6 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -968,7 +975,7 @@ periodics:
     repo: microshift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
     ci.openshift.io/generator: prowgen
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -989,7 +996,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-metal-nightly-cluster-profile
       - --target=ocp-metal-nightly
       command:
       - ci-operator
@@ -1006,8 +1012,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-metal-nightly-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1031,9 +1035,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1045,7 +1046,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 30 2 * * *
+  cron: 8 3 21 9 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1055,7 +1056,7 @@ periodics:
     repo: microshift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
     ci.openshift.io/generator: prowgen
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1076,7 +1077,6 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-metal-nightly-arm-cluster-profile
       - --target=ocp-metal-nightly-arm
       command:
       - ci-operator
@@ -1093,8 +1093,6 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-metal-nightly-arm-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1118,9 +1116,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1132,7 +1127,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 5 * * 1-5
+  cron: 35 3 10,28 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1151,8 +1146,8 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -1201,7 +1196,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 4 * * 1-5
+  cron: 47 12 9,28 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1220,8 +1215,8 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:

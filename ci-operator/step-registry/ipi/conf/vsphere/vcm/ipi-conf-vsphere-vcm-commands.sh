@@ -39,25 +39,25 @@ MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
 
 set +o errexit
-# release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
+# release-controller always expose RELEASE_IMAGE_LATEST when job configuration defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
 # but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with
 # user specified image pullspec, to avoid auth error when accessing it, always use build farm
 # registry pullspec.
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
-# release:initial image, once that, use 'oc get istag release:inital' to workaround it.
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuration defines
+# release:initial image, once that, use 'oc get istag release:initial' to workaround it.
 echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
 if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
     tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
-    echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+    echo "Getting initial release image from RELEASE_IMAGE_INITIAL..."
 elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
     tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
-    echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+    echo "Getting initial release image from build farm imagestream: ${tmp_release_image_initial}"
 fi
 # For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
-# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
+# RELEASE_IMAGE_LATEST are pointed to different images, RELEASE_IMAGE_INITIAL has
 # higher priority than RELEASE_IMAGE_LATEST
 TESTING_RELEASE_IMAGE=""
 if [[ -n ${tmp_release_image_initial:-} ]]; then
@@ -111,6 +111,13 @@ VERSION=$(oc adm release info ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.m
 
 set -o errexit
 
+# Ensure at least 3 control planes for vSphere. Single node is not supported.
+CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS:-3}
+if [ "${CONTROL_PLANE_REPLICAS}" -lt 3 ]; then
+  echo "CONTROL_PLANE_REPLICAS must be at least 3 for vSphere"
+  exit 1
+fi
+
 Z_VERSION=1000
 
 if [ ! -z "${VERSION}" ]; then
@@ -118,6 +125,55 @@ if [ ! -z "${VERSION}" ]; then
   echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
 else
   echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+fi
+
+# Creating platform config for 4.12+
+# Add node resource configs
+SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
+CP_PLATFORM="platform:
+    vsphere:
+      cpus: $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
+      coresPerSocket: $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
+      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})"
+W_PLATFORM="platform:
+    vsphere:
+      cpus: $(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
+      coresPerSocket: $(jq -r '.spec.compute.coresPerSocket' ${SPEC_CONFIG})
+      memoryMB: $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})"
+
+# Add additional disks
+if [ -n "${ADDITIONAL_DISK}" ]; then
+  echo "$(date -u --rfc-3339=seconds) - configuring multi disk"
+  CP_PLATFORM="${CP_PLATFORM}
+      dataDisks:
+      - sizeGiB: 10
+        name: Disk1
+        provisioningMode: Thick
+      - sizeGiB: 50
+        name: Disk2
+        provisioningMode: Thin"
+  W_PLATFORM="${W_PLATFORM}
+      dataDisks:
+      - sizeGiB: 50
+        name: Disk1"
+  if [ "${DISK_SETUP}" == "true" ]; then
+    echo "$(date -u --rfc-3339=seconds) - configuring disk setup"
+    CP_PLATFORM="${CP_PLATFORM}
+  diskSetup:
+  - type: etcd
+    etcd:
+      platformDiskID: Disk1
+  - type: user-defined
+    userDefined:
+      platformDiskID: Disk2
+      mountPath: /var/lib/containers"
+    W_PLATFORM="${W_PLATFORM}
+  diskSetup:
+  - type: user-defined
+    userDefined:
+      platformDiskID: Disk1
+      mountPath: /var/lib/containers"
+  fi
 fi
 
 if [ ${Z_VERSION} -gt 9 ]; then
@@ -146,9 +202,11 @@ else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
+  ${CP_PLATFORM}
 compute:
 - name: worker
-  replicas: ${COMPUTE_NODE_REPLICAS}"
+  replicas: ${COMPUTE_NODE_REPLICAS}
+  ${W_PLATFORM}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
@@ -240,7 +298,12 @@ if [ ${Z_VERSION} -gt 9 ]; then
       fi
       if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-        cat ${PULL_THROUGH_CACHE_CONFIG} >>${CONFIG}
+        if [ "${Z_VERSION}" -lt 14 ]; then
+          echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
+          cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${CONFIG}
+        else
+          cat ${PULL_THROUGH_CACHE_CONFIG} >>${CONFIG}
+        fi
       else
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
       fi
@@ -249,3 +312,88 @@ if [ ${Z_VERSION} -gt 9 ]; then
     echo "$(date -u --rfc-3339=seconds) - pull-through cache force disabled"
   fi
 fi
+
+JOURNAL_LOGGING_ENABLED="$(cat /var/run/vault/vsphere-ibmcloud-config/journal-logging-enabled)"
+JOURNAL_LOGGING_ENABLED="${JOURNAL_LOGGING_ENABLED,,}"
+
+if [[ "${JOURNAL_LOGGING_ENABLED}" == "true" ]]; then
+  echo "Enabling journal forwarding machine config manifests..."
+
+  cat >"${SHARED_DIR}/manifest_99_jrnl_cp.yml" <<-EOF
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: journal-forwarder-master
+spec:
+  config:
+    storage:
+      files:
+      - contents:
+          source: data:;base64,IyEvYmluL3NoCgppZiBbICIkIyIgLWd0IDAgXTsgdGhlbgogICAgIyBXZSBoYXZlIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIE91dHB1dCB0aGVtIHdpdGggbmV3bGluZXMgaW4tYmV0d2Vlbi4KICAgIHByaW50ZiAnJXNcbicgIiRAIgplbHNlCiAgICAjIE5vIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIEp1c3QgcGFzcyBzdGRpbiBvbi4KICAgIGNhdApmaSB8CndoaWxlIElGUz0gcmVhZCAtciBzdHJpbmc7IGRvCiAgICBjdXJsIC1YIFBPU1QgXAogICAgIC1IICJDb250ZW50LVR5cGU6IHRleHQvcGxhaW4iIFwKICAgICAtSCAibm9kZS1pZDogJChob3N0bmFtZSkiIFwKICAgICAtZCAiJHN0cmluZyIgXAogICAgIGh0dHA6Ly9sb2ctZ2F0aGVyLnZtYy5jaS5vcGVuc2hpZnQub3JnOjgwMDAgPiAvZGV2L251bGwgMj4mMQpkb25l
+        mode: 0777
+        overwrite: true
+        path: /var/journal-gather-forwarder/forward.sh
+    
+    ignition:
+      version: 3.2.0
+    systemd:
+      units:
+        - name: journal-forwarder.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Forwards the journal to log server
+            After=network.target
+            Wants=network-online.target
+            [Service]
+            Restart=always
+            Type=simple
+            RestartSec=30
+            ExecStart=/bin/sh -c "stdbuf -oL journalctl -f | /var/journal-gather-forwarder/forward.sh"
+            Environment=
+            [Install]
+            WantedBy=multi-user.target
+EOF
+
+  cat >"${SHARED_DIR}/manifest_99_jrnl_compute.yml" <<-EOF
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: journal-forwarder-compute
+spec:
+  config:
+    storage:
+      files:
+      - contents:
+          source: data:;base64,IyEvYmluL3NoCgppZiBbICIkIyIgLWd0IDAgXTsgdGhlbgogICAgIyBXZSBoYXZlIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIE91dHB1dCB0aGVtIHdpdGggbmV3bGluZXMgaW4tYmV0d2Vlbi4KICAgIHByaW50ZiAnJXNcbicgIiRAIgplbHNlCiAgICAjIE5vIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIEp1c3QgcGFzcyBzdGRpbiBvbi4KICAgIGNhdApmaSB8CndoaWxlIElGUz0gcmVhZCAtciBzdHJpbmc7IGRvCiAgICBjdXJsIC1YIFBPU1QgXAogICAgIC1IICJDb250ZW50LVR5cGU6IHRleHQvcGxhaW4iIFwKICAgICAtSCAibm9kZS1pZDogJChob3N0bmFtZSkiIFwKICAgICAtZCAiJHN0cmluZyIgXAogICAgIGh0dHA6Ly9sb2ctZ2F0aGVyLnZtYy5jaS5vcGVuc2hpZnQub3JnOjgwMDAgPiAvZGV2L251bGwgMj4mMQpkb25l
+        mode: 0777
+        overwrite: true
+        path: /var/journal-gather-forwarder/forward.sh
+    
+    ignition:
+      version: 3.2.0
+    systemd:
+      units:
+        - name: journal-forwarder.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Forwards the journal to log server
+            After=network.target
+            Wants=network-online.target
+            [Service]
+            Restart=always
+            Type=simple
+            RestartSec=30
+            ExecStart=/bin/sh -c "stdbuf -oL journalctl -f | /var/journal-gather-forwarder/forward.sh"
+            Environment=
+            [Install]
+            WantedBy=multi-user.target
+EOF
+fi 

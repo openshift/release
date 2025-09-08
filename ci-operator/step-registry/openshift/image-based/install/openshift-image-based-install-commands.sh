@@ -56,15 +56,31 @@ podman run -v ./tmp:/tmp:Z --user root:root --rm --entrypoint='["/bin/sh","-c"]'
 sudo mv ./tmp/openshift-install /usr/bin/openshift-install
 rm -rf tmp
 
-echo "Starting the IBI cluster"
-make ibi-iso ibi-vm ibi-logs
+echo "Creating the IBI installation iso"
+SECONDS=0
+make ibi-iso
+t_ibi_iso_create=\$SECONDS
+
+echo "Installing via IBI"
+SECONDS=0
+make ibi-vm ibi-logs
+t_ibi_install=\$SECONDS
 
 echo "Attaching and configuring the cluster"
+SECONDS=0
 make imagebasedconfig.iso ibi-attach-config.iso
+t_ibi_config=\$SECONDS
 
 echo "Rebooting the cluster"
+SECONDS=0
 make ibi-reboot wait-for-ibi
+t_ibi_config_reboot=\$SECONDS
 
+echo "IBI Times:"
+echo "ISO Creation: \${t_ibi_iso_create} seconds"
+echo "Installation Time: \${t_ibi_install} seconds"
+echo "Config Time: \${t_ibi_config} seconds"
+echo "Config Reboot Time: \${t_ibi_config_reboot} seconds"
 EOF
 
 chmod +x ${SHARED_DIR}/image_based_install.sh

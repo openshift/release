@@ -9,13 +9,21 @@ ref:
   - name: ORION_REPO
     default: "https://github.com/cloud-bulldozer/orion.git"
     documentation: |-
-      Override the e2e version
+      Orion github repository
   - name: TAG
     default: "latest"
     documentation: |-
       Override branch of orion
+  - name: ES_BENCHMARK_INDEX
+    default: "ripsaw-kube-burner-*"
+    documentation:
+      Index which contains benchmark results
+  - name: ES_METADATA_INDEX
+    default: "perf_scale_ci-*"
+    documentation:
+      Index which contains metadata about runs.
   - name: ES_TYPE
-    default: "internal"
+    default: "qe"
     documentation: |-
       Set es type to internal or qe for getting data
   - name: CONFIG
@@ -26,18 +34,26 @@ ref:
     default: ""
     documentation: |-
       Default is blank, which means the uuid will not be applied to the command line args
-  - name: HUNTER_ANALYZE
-    default: "false"
-    documentation: |-
-      Use to look at regressions over time
-  - name: JUNIT
+  - name: IGNORE_JOB_ITERATIONS
     default: "false"
     documentation:
-      Export JUNIT output
+      Set orion's --node-count argument
+  - name: OUTPUT_FORMAT
+    default: "TEXT"
+    documentation:
+      Export in desired output format
+  - name: VERSION
+    default: ""
+    documentation:
+      Version of OCP to run Orion against, ex 4.18
   - name: LOOKBACK
     default: "15"
     documentation:
       Number of days orion should lookback at results.
+  - name: LOOKBACK_SIZE
+    default: ""
+    documentation:
+      Number of samples orion should consider for results.
   - name: RUN_ORION
     default: "false"
     documentation:
@@ -46,6 +62,18 @@ ref:
     default: ""
     documentation:
       Var used to tell the step which workload is calling Orion, like cluster-density, node-density, etc.
+  - name: ACK_FILE
+    default: ""
+    documentation:
+      Orion ack file name that has a list of acknowledged issues/regressions.
+  - name: COLLAPSE
+    default: "false"
+    documentation:
+      Flag to regulate displaying only changepoints vs the entire output.
+  - name: ORION_ENVS
+    default: ""
+    documentation:
+      Comma separated list of envs that needs to exported in runtime for templated configurations.
   commands: openshift-qe-orion-commands.sh
   timeout: 6h
   credentials:
@@ -55,6 +83,9 @@ ref:
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-perfscale-es-creds
     mount_path: /secret/internal
+  - namespace: test-credentials
+    name: quay-qe-elk-secret
+    mount_path: /secret/quay-qe
   resources:
     requests:
       cpu: 100m

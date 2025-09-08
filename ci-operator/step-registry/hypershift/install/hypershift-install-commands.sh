@@ -12,6 +12,17 @@ if [[ $HO_MULTI == "true" ]]; then
   oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
   chmod +x /tmp/hs-cli/hypershift
   HCP_CLI="/tmp/hs-cli/hypershift"
+elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
+  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
+  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+  mkdir /tmp/hs-cli
+  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
+  chmod +x /tmp/hs-cli/hypershift
+  HCP_CLI="/tmp/hs-cli/hypershift"
+fi
+
+if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
 fi
 
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
@@ -29,6 +40,19 @@ fi
 AZURE_EXTERNAL_DNS_DOMAIN="service.hypershift.azure.devcluster.openshift.com"
 if [ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" != "" ]; then
   AZURE_EXTERNAL_DNS_DOMAIN="${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
+fi
+
+if [ "${AUTH_THROUGH_CERTS}" == "true" ]; then
+  KEYVAULT_CLIENT_ID="$(<"${SHARED_DIR}/aks_keyvault_secrets_provider_client_id")"
+  EXTRA_ARGS="${EXTRA_ARGS} --aro-hcp-key-vault-users-client-id ${KEYVAULT_CLIENT_ID}"
+fi
+
+if [ "${ENABLE_SIZE_TAGGING}" == "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-size-tagging"
+fi
+
+if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
@@ -54,7 +78,7 @@ if [ "${AKS}" == "true" ]; then
   oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
   oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
   oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
-  oc apply -f https://raw.githubusercontent.com/openshift/api/master/route/v1/zz_generated.crd-manifests/routes-Default.crd.yaml
+  oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
 fi
 
 if [ "${CLOUD_PROVIDER}" == "Azure" ]; then

@@ -13,6 +13,16 @@ export PATH=/usr/libexec/origin:$PATH
 
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
+# In order for openshift-tests to pull external binary images from the
+# payload, we need access enabled to the images on the build farm. In
+# order to do that, we need to unset the KUBECONFIG so we talk to the
+# build farm, not the cluster under test.
+echo "Granting access for image pulling from the build farm..."
+KUBECONFIG_BAK=$KUBECONFIG
+unset KUBECONFIG
+oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+export KUBECONFIG=$KUBECONFIG_BAK
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -25,14 +35,6 @@ if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
     echo "Overriding 'hypershift' cluster type to be 'aws'"
 fi
 
-# OpenShift clusters intalled with platform type External is handled as 'None'
-# by the e2e framework, even through it was installed in an infrastructure (CLUSTER_TYPE)
-# integrated by OpenShift (like AWS).
-STATUS_PLATFORM_NAME="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
-if [[ "${STATUS_PLATFORM_NAME-}" == "External" ]]; then
-    export CLUSTER_TYPE="external"
-fi
-
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -42,6 +44,14 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# OpenShift clusters intalled with platform type External is handled as 'None'
+# by the e2e framework, even through it was installed in an infrastructure (CLUSTER_TYPE)
+# integrated by OpenShift (like AWS).
+STATUS_PLATFORM_NAME="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
+if [[ "${STATUS_PLATFORM_NAME-}" == "External" ]]; then
+    export CLUSTER_TYPE="external"
 fi
 
 if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
@@ -69,11 +79,12 @@ if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
     oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
 fi
 
-# if this test requires an SSH bastion and one is not installed, configure it
-KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
+    # if this test requires an SSH bastion and one is not installed, configure it
+    KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+    KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+    export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
+
     export SSH_BASTION_NAMESPACE=test-ssh-bastion
     echo "Setting up ssh bastion"
 
@@ -110,6 +121,12 @@ if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
     export KUBE_SSH_BASTION="${BASTION_HOST}:22"
 fi
 
+if [[ -f "${SHARED_DIR}/mirror-tests-image" ]]; then
+    TEST_ARGS="${TEST_ARGS:-}"
+    TEST_ARGS+=" --from-repository=$(<"${SHARED_DIR}/mirror-tests-image")"
+fi
+
+TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
 
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
@@ -183,7 +200,7 @@ powervs*)
     export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
-external) export TEST_PROVIDER='' ;;
+external) export TEST_PROVIDER='{"type":"external"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -314,6 +331,38 @@ function suite() {
     set +x
 }
 
+function wait_for_ipsec_full_mode() {
+  until
+    timeout 30s oc rollout status daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes && \
+    oc wait --for=delete daemonset/ovn-ipsec-containerized -n openshift-ovn-kubernetes --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not available yet (or) ovn-ipsec-containerized daemonset is still deployed"
+    sleep 30s
+  done
+  wait_for_cluster_operators_ready
+}
+
+function wait_for_ipsec_external_mode() {
+  until
+    oc wait --for=delete daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not removed yet"
+    sleep 30s
+  done
+  wait_for_cluster_operators_ready
+}
+
+function wait_for_cluster_operators_ready() {
+  until
+    oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+  do
+    echo "Cluster Operators Degraded=True,Progressing=True,or Available=False"
+    sleep 30s
+  done
+}
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 
 oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
@@ -425,6 +474,16 @@ echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
 
+# reportedly even the above is not enough for etcd which can still require time to stabilize and rotate certs.
+# wait longer if the new command is available, but it won't be present in past releases.
+echo "$(date) - waiting for oc adm wait-for-stable-cluster..."
+if oc adm wait-for-stable-cluster --minimum-stable-period 2m &>/dev/null; then
+	echo "$(date) - oc adm reports cluster is stable."
+else
+	echo "$(date) - oc adm wait-for-stable-cluster is not available in this release"
+fi
+
+
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 count=1
 while :
@@ -462,7 +521,7 @@ do
   for imagestream in $non_imported_imagestreams
   do
       echo "[$(date)] Retrying image import $imagestream"
-      oc import-image -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
+      oc import-image --insecure=true -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
   done
   set -e
 done
@@ -488,6 +547,27 @@ suite-conformance)
     ;;
 suite)
     suite
+    ;;
+ipsec-suite)
+     # Rollout IPsec Full mode and run the suite.
+     echo "Rolling out IPsec Full mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full"}}}}}'
+     wait_for_ipsec_full_mode
+     echo "IPsec Full mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec External mode and run the suite.
+     echo "Rolling out IPsec External mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"External"}}}}}'
+     wait_for_ipsec_external_mode
+     echo "IPsec External mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec Full mode with NAT-T encapsulation and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full", "full":{"encapsulation": "Always"}}}}}}'
+     wait_for_ipsec_full_mode
+     echo "IPsec Full mode with NAT-T encapsulation rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"

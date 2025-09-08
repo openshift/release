@@ -74,7 +74,7 @@ function configure_freeipa() {
 
     #Generate ca.crt and ca.key used by ipa server.
     temp_dir=$(mktemp -d)
-    openssl genrsa -out "$temp_dir"/ca.key 2048
+    openssl genpkey -algorithm RSA -out "$temp_dir"/ca.key -pkeyopt rsa_keygen_bits:2048 -pkeyopt rsa_keygen_pubexp:3
     openssl req -x509 -sha256 -key "$temp_dir"/ca.key -nodes -new -days 365 -out "$temp_dir"/ca.crt -subj '/CN=freeipa-test/O=FREEIPA-TEST' -set_serial 1
 
     oc create secret tls freeipa-certs --cert="$temp_dir"/ca.crt --key="$temp_dir"/ca.key -n freeipa
@@ -107,7 +107,7 @@ spec:
       subdomain: freeipa
       initContainers:
       - name: step-1-gen-ipa-ca-csr
-        image: quay.io/freeipa/freeipa-server:fedora-39
+        image: quay.io/freeipa/freeipa-server:fedora-40
         securityContext:
           runAsUser: 0
         tty: true
@@ -137,7 +137,7 @@ spec:
           - name: systemd-var-dirsrv
             mountPath: /var/run/dirsrv
       - name: setup-certs
-        image: quay.io/freeipa/freeipa-server:fedora-39
+        image: quay.io/freeipa/freeipa-server:fedora-40
         securityContext:
           runAsUser: 0
         command: ["/bin/bash", "-c"]
@@ -161,7 +161,7 @@ spec:
             mountPath: /certs
       containers:
       - name: step-2-run-ipa-server
-        image: quay.io/freeipa/freeipa-server:fedora-39
+        image: quay.io/freeipa/freeipa-server:fedora-40
         securityContext:
           runAsUser: 0
         tty: true
@@ -259,18 +259,18 @@ EOF
 
     oc apply -f "$temp_file"
 
-    # Wait for FreeIPA pod to be running and ready
-    echo "Checking for FreeIPA pod to be running and ready"
+    echo "Waiting for FreeIPA pod to be running and ready..."
     count=0
     max_attempts=20
     while :; do
-        pod_status=$(oc get pods -n freeipa --no-headers | grep freeipa)
+        pod_status=$(oc get pods -n freeipa)
+        echo "$pod_status" # print for when debugging is needed
+        pod_status=$(echo "$pod_status" | grep freeipa)
         if [[ $pod_status == *"1/1"*"Running"* ]]; then
             echo "FreeIPA pod is running and ready."
             break
         fi
 
-        echo "Waiting for FreeIPA pod to be running and ready..."
         sleep 30
         ((count++))
 

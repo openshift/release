@@ -1,0 +1,90 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+- context_dir: components
+  dockerfile_path: notebook-controller/Dockerfile
+  from: ubi_minimal
+  to: kf-notebook-controller
+- context_dir: components
+  dockerfile_path: odh-notebook-controller/Dockerfile
+  from: ubi_minimal
+  to: odh-notebook-controller
+promotion:
+  to:
+  - namespace: red-hat-data-services
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: kf-notebook-controller-unit
+  run_if_changed: ^(components/common/.*|components/notebook-controller/.*)
+  steps:
+    test:
+    - as: unit
+      commands: |
+        unset GOFLAGS
+        pushd components/notebook-controller
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: odh-notebook-controller-unit
+  run_if_changed: ^(components/common/.*|components/notebook-controller/.*|components/odh-notebook-controller/.*)
+  steps:
+    test:
+    - as: unit
+      commands: |
+        unset GOFLAGS
+        pushd components/odh-notebook-controller
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: odh-notebook-controller-e2e
+  steps:
+    cluster_profile: gcp-opendatahub
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        pushd components/odh-notebook-controller
+        make run-ci-e2e-tests
+      dependencies:
+      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
+        name: odh-notebook-controller
+      - env: KF_NOTEBOOK_CONTROLLER
+        name: kf-notebook-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: main
+  org: red-hat-data-services
+  repo: kubeflow

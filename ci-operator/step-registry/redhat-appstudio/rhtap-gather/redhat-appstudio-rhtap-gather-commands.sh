@@ -143,7 +143,6 @@ while IFS= read -r i; do
   mkdir -p ${ARTIFACT_DIR}/nodes/$i
   queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
-  FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal-previous.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --boot=-1
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
 done < /tmp/nodes
 
@@ -241,7 +240,16 @@ function gather_network() {
 
 # Gather network details both from SDN and OVN. One of them should succeed.
 gather_network openshift-sdn app=sdn sdn
-gather_network openshift-ovn-kubernetes app=ovnkube-node ovnkube-node
+sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
+sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')
+if [ "${sample_node}" = "${sample_node_zone}" ]; then
+  echo "INFO: INTERCONNECT MODE"
+  ovnkube_container=ovnkube-controller
+else
+  echo "INFO: LEGACY MODE"
+  ovnkube_container=ovnkube-node
+fi
+gather_network openshift-ovn-kubernetes app=ovnkube-node $ovnkube_container
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"

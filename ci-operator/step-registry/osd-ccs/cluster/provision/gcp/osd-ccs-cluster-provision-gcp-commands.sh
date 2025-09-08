@@ -15,7 +15,7 @@ function backoff() {
   local failed=0
   logger "INFO" "Running Command '$*'"
   while true; do
-    eval "$@" && failed=0 || failed=1
+    eval "$*" && failed=0 || failed=1
     if [[ $failed -eq 0 ]]; then
       break
     fi
@@ -163,6 +163,47 @@ GCP_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json"
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
 logger "INFO" "Available cluster versions:"
 echo "${versionList}"
+
+if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
+  PAYLOAD_TAG=$(echo $ORIGINAL_RELEASE_IMAGE_LATEST | cut -d':' -f2)-nightly
+
+  DELAY=60
+  MAX_DELAY=360
+  TIME_LIMIT=3600
+  start_time=$(date +%s)
+
+  while true; do
+    versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
+    logger "INFO" "Looking for $PAYLOAD_TAG in available cluster versions:\n${versionList}"
+    # Check if image has been synced yet
+    if echo "$versionList" | grep -q "$PAYLOAD_TAG"; then
+      logger "INFO" "$PAYLOAD_TAG is available from OCM, continuing..."
+      OPENSHIFT_VERSION=$PAYLOAD_TAG
+      break
+    fi
+
+    current_time=$(date +%s)
+    elapsed_time=$((current_time - start_time))
+
+    # Don't wait longer than $TIME_LIMIT for the payload to be synced
+    if [[ $elapsed_time -ge $TIME_LIMIT ]]; then
+      minutes=$((TIME_LIMIT / 60))
+      logger "ERROR" "timed out after $minutes minutes waiting for $PAYLOAD_TAG to become available"
+      exit 1
+    fi
+
+    # Wait for the current delay before retrying
+    logger "INFO" "Payload tag not found. Waiting for $DELAY seconds before retrying..."
+    sleep $DELAY
+
+    # Double the delay for exponential back-off, but cap it at the max delay
+    DELAY=$((DELAY * 2))
+    if [[ $DELAY -gt $MAX_DELAY ]]; then
+       DELAY=$MAX_DELAY
+    fi
+  done
+fi
+
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
@@ -177,8 +218,10 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
 fi
 
 default_compute_nodes=2
+MULTI_AZ_SWITCH=""
 if [[ "$MULTI_AZ" == "true" ]]; then
   default_compute_nodes=3
+  MULTI_AZ_SWITCH="--multi-az"
 fi
 COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 
@@ -238,7 +281,9 @@ cmd="ocm create cluster ${CLUSTER_NAME} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
+--compute-nodes ${COMPUTE_NODES} \
 --subscription-type ${SUBSCRIPTION_TYPE} \
+${MULTI_AZ_SWITCH} \
 ${MARKETPLACE_GCP_TERMS_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
@@ -249,6 +294,10 @@ ${SHARED_VPC_SWITCH:-}"
 # Create GCP cluster
 logger "INFO" "Running Command '${cmd}'"
 eval "${cmd}" > "${ARTIFACT_DIR}/cluster.txt"
+exit_code=$?
+
+# Used by gather steps to generate JUnit
+echo $exit_code > "${SHARED_DIR}/install-status.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
 mkdir -p "${SHARED_DIR}"
@@ -257,7 +306,7 @@ logger "INFO" "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUST
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
-echo "Waiting for cluster ready..."
+logger "INFO" "Waiting for cluster ready..."
 start_time=$(date +"%s")
 while true; do
   sleep 60
@@ -265,8 +314,22 @@ while true; do
   logger "INFO" "Cluster state: ${CLUSTER_STATE}"
   if [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${CLUSTER_STATE}" == "waiting" ]]; then
     logger "INFO" "Granting the required permissions in the host project..."
-    ephemeral_sa_email=$(ocm describe cluster "${CLUSTER_ID}" | grep -Po "osd-managed-admin-[^\s\t]+")
-    add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    logger "INFO" "------------------------------"
+    ocm describe cluster "${CLUSTER_ID}"
+    logger "INFO" "------------------------------"
+    emails_str=$(ocm describe cluster "${CLUSTER_ID}" | grep -Po "[a-zA-Z0-9\-\.]+@[a-zA-Z0-9\-\.]+.iam.gserviceaccount.com(\s+[a-zA-Z0-9\-\.]+@[a-zA-Z0-9\-\.]+.iam.gserviceaccount.com(\s+[a-zA-Z0-9\-\.]+@[a-zA-Z0-9\-\.]+.iam.gserviceaccount.com)?)?")
+    ephemeral_sa_email=$(echo "${emails_str}" | awk '{print $1}')
+    if [ -n "${ephemeral_sa_email}" ]; then
+      add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    fi
+    ephemeral_sa_email=$(echo "${emails_str}" | awk '{print $2}')
+    if [ -n "${ephemeral_sa_email}" ]; then
+      add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    fi
+    ephemeral_sa_email=$(echo "${emails_str}" | awk '{print $3}')
+    if [ -n "${ephemeral_sa_email}" ]; then
+      add_iam_policy_binding "${ephemeral_sa_email}" "${VPC_PROJECT_ID}"
+    fi
     continue
   fi
   if [[ "${CLUSTER_STATE}" == "ready" ]]; then

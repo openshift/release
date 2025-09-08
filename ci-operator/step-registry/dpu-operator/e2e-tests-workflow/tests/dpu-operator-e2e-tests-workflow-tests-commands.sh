@@ -1,82 +1,172 @@
 #!/bin/bash
 
-echoerr() { echo "$@" 1>&2; }
+set -e
 
-trigger_build() {
-	curl -sik --resolve "$endpoint_resolve" "https://${endpoint}/job/${test_name}/buildWithParameters?token=${dpu_token}&pullnumber=${PULL_NUMBER}" | grep location: | tr -d '\r\n' | cut -d' ' -f2
+echo "Handling pull request https://github.com/openshift/dpu-operator/pull/$PULL_NUMBER , git-sha=$PULL_PULL_SHA"
+
+die() {
+    printf '%s\n' "$*"
+    exit 1
 }
 
-wait_for_job_to_run() {
-	echoerr "Waiting for job to start..."
-	# Maximum sleep duration in seconds (5 days)
-	max_sleep_duration=432000
-	sleep_counter=0
-
-	while :
-	do
-		JSON_FILE=$(mktemp /tmp/pullnumber.XXX)
-		curl -k --resolve "$endpoint_resolve" -X GET $1/api/json > $JSON_FILE
-		blocked=$(cat $JSON_FILE | jq .blocked)
-		if [[ "$blocked" == "true" ]]; then
-			echo "Job is blocked, waiting for job to start"
-		elif [[ "$blocked" == "false" ]]; then
-			cat $JSON_FILE | jq -r .executable.url
-			break
-		else
-			echo "Error: unknown value of blocked variable: $blocked"
-			exit 1
-		fi
-
-		if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-			echo "Exiting- job has not started for longer than 5 days..."
-			exit 1
-		fi
-		sleep_counter=$((sleep_counter + 60))
-		sleep 60
-	done
+_curl_qm() {
+    curl \
+        -s \
+        --resolve "${queue_manager_tls_host}:443:${queue_manager_tls_ip}" \
+        --cacert "$queue_manager_tls_crt" \
+        -H "Authorization: Bearer $queue_manager_auth_token" \
+        "$@" \
+        2>/dev/null
 }
 
-wait_for_job_to_finish_running() {
-	echoerr "Waiting for job to finish..."
-	local job_url=$1/api/json
-	local max_sleep_duration=21600  # Maximum sleep duration in seconds (6 hours)
-	local sleep_counter=0
-
-	while :
-	do
-		JSON_FILE=$(mktemp /tmp/output.XXX)
-		curl -k -s --resolve "$endpoint_resolve" "$job_url" > "$JSON_FILE"
-
-		# Extract the result field
-		result=$(jq -r '.result' < "$JSON_FILE")
-
-		if [[ "$result" != "null" ]]; then
-			# Job has completed
-			echo "Job Result: $result"
-			curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/consoleText")
-			echo "$curl_info"
-			if [ "$result" == "SUCCESS" ]; then
-				exit 0
-			else
-				exit 1
-			fi
-		else
-			if [ "$sleep_counter" -ge "$max_sleep_duration" ]; then
-				echo "Exiting due to long sleep duration..."
-				exit 1
-			fi
-			sleep_counter=$((sleep_counter + 60))
-			sleep 60
-		fi
-	done
+_curl_jobs_submit() {
+    _curl_qm -X POST "https://$queue_manager_tls_host/jobs/submit?pullnumber=$1&pull_pull_sha=$2&pickup=1"
 }
 
-endpoint=$(cat "/var/run/token/dpu-token/url")
-dpu_token=$(cat "/var/run/token/dpu-token/dpu-key")
-test_name="99_Lab217_E2E_IPU_Deploy"
-endpoint_resolve="${endpoint}:443:10.0.180.88"
-job_url="https://${endpoint}/job/${test_name}/lastBuild"
+_curl_jobs_retrieve() {
+    _curl_qm -X POST "https://$queue_manager_tls_host/jobs/retrieve?uuid=$1"
+}
 
-job_queue_item=$(trigger_build)
-job_url=$(wait_for_job_to_run "$job_queue_item" | tail -n1)
-wait_for_job_to_finish_running "$job_url"
+_curl_jobs_retrieve_with_retry() {
+    local out
+    local rc
+
+    local try_count="$1"
+    local sleeptime="$2"
+    shift 2
+
+    local try_count0="$try_count"
+
+    while : ; do
+        rc=0
+        out="$(_curl_jobs_retrieve "$@" 2>/dev/null)" || rc="$?"
+        if [ "$rc" -eq 0 ] ; then
+            printf '%s\n' "$out"
+            return 0
+        fi
+
+        # Try at least once, but at most $try_count times.
+        try_count="$((try_count - 1))"
+        if [ "$try_count" -le 0 ] ; then
+            echo "Failure to retrieve job after $try_count0 tries"
+            return 1
+        fi
+
+        sleep "$sleeptime"
+
+        # Try to re-resolve the name.
+        local ip
+        ip="$(resolve_name "$queue_manager_tls_host" "${nameservers[@]}")" || :
+        if [ -n "$ip" ] ; then
+            queue_manager_tls_ip="$ip"
+        fi
+    done
+}
+
+_json_get() {
+    printf '%s' "$1" | jq -r "$2" 2>/dev/null
+}
+
+get_nameservers() {
+    local DNS_DATA
+    local URL1="https://github.com/openshift/release/blob/master/clusters/build-clusters/common_managed/dns.yaml"
+    local URL='https://raw.githubusercontent.com/openshift/release/refs/heads/master/clusters/build-clusters/common_managed/dns.yaml'
+
+    DNS_DATA="$(curl --fail -s -L "$URL")" || die "get_nameservers: cannot download $URL1"
+
+    python3 -c 'import yaml' 2>/dev/null || pip install PyYAML &>/dev/null || die "get_nameservers: cannot install PyYAML"
+
+    python3 -c 'if 1:
+        import sys, yaml
+
+        data = yaml.safe_load(sys.stdin)
+        nameservers = data["spec"]["servers"][0]["forwardPlugin"]["upstreams"]
+        if not nameservers:
+            sys.exit(1)
+        print(" ".join(nameservers))
+    ' <<< "$DNS_DATA" 2>/dev/null || die "get_nameservers: cannot find nameservers in $URL1"
+}
+
+resolve_name() {
+    # No nslookup/dig is installed. Use python.
+    # DNS servers from https://github.com/openshift/release/blob/master/clusters/build-clusters/common_managed/dns.yaml
+    python3 -c 'import dns.resolver' 2>/dev/null || pip install dnspython &>/dev/null
+    python3 -c 'if 1:
+        import sys
+
+        try:
+            name = sys.argv[1]
+            nameservers = sys.argv[2:]
+
+            import dns.resolver as d
+            r = d.Resolver()
+            r.nameservers = nameservers
+            print(next(iter(r.resolve(name, "A"))))
+        except Exception:
+            sys.exit(1)
+    ' \
+    "$@"
+}
+
+rc=0
+nameservers_s="$(get_nameservers)" || rc="$?"
+if [ "$rc" -ne 0 ] ; then
+    die "$nameservers_s"
+fi
+IFS=' ' read -r -a nameservers <<< "$nameservers_s"
+
+queue_manager_tls_host="$(cat "/var/run/token/e2e-test/queue-manager-tls-host")"
+queue_manager_auth_token="$(cat "/var/run/token/jenkins-secrets/queue-manager-auth-token")"
+queue_manager_tls_crt="/var/run/token/jenkins-secrets/queue-manager-tls-crt"
+
+queue_manager_tls_ip="$(resolve_name "$queue_manager_tls_host" "${nameservers[@]}")" || :
+
+if [ -z "$queue_manager_tls_ip" ] ; then
+    echo "Failure to resolve \"queue-manager-tls-host\" using \"${nameservers[*]}\""
+    exit 1
+fi
+
+submit_response="$(_curl_jobs_submit "$PULL_NUMBER" "$PULL_PULL_SHA")" || die "Failure submitting job in queue-manager"
+
+return_code="$(_json_get "$submit_response" '.return_code')"
+if [ "$return_code" -ne 200 ] 2>/dev/null && [ "$return_code" -ne 202 ] 2>/dev/null ; then
+    echo "failure to start job: $return_code"
+    exit 1
+fi
+
+uuid="$(_json_get "$submit_response" '.message')"
+
+echo "Started job in queue manager: UUID=$uuid, return_code=$return_code. Start polling"
+
+while true ; do
+    retrieve_response="$(_curl_jobs_retrieve_with_retry 5 1 "$uuid")" \
+        || die "Failure checking job status in queue-manager"
+
+    return_code="$(_json_get "$retrieve_response" '.return_code')"
+
+    if [ "$return_code" -eq 102 ] 2>/dev/null ; then
+        # Job still running.
+        sleep 15
+        continue
+    fi
+
+    result_msg="$(_json_get "$retrieve_response" '.result_msg')"
+
+    if [ "$return_code" -ne 200 ] 2>/dev/null ; then
+        echo "failure checking for job $uuid [$return_code]: $result_msg"
+        exit 1
+    fi
+
+    echo "==============================================="
+    _json_get "$retrieve_response" '.console_logs'
+    echo "==============================================="
+
+    job_status="$(_json_get "$retrieve_response" '.message')"
+    echo "= Job $uuid completed with [$job_status]: $result_msg"
+    echo "==============================================="
+
+    if [ "$job_status" = 'SUCCESS' ] ; then
+        exit 0
+    fi
+    exit 1
+done

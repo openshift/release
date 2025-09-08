@@ -28,8 +28,19 @@ for try in $(seq "${RETRIES}"); do
     break
   else
     if [ $try == $RETRIES ]; then
-      echo "Error policies failed to become compliant in allotted time."
-      exit 1
+      if [ "$IGNORE_SECONDARY_POLICIES" == "true" ]; then
+        CANDIDATES=$(echo "$notready" | grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge | grep -v policy-quay-status || true)
+        if [ -z "$CANDIDATES" ]; then
+          echo "Warning: Proceeding with OPP QE tests with some policy failures"
+          exit 0
+        else
+          echo "Error policies failed to become compliant in allotted time, even considering the ignore list."
+          exit 1
+        fi
+      else
+        echo "Error policies failed to become compliant in allotted time."
+        exit 1
+      fi
     fi
     echo "Try ${try}/${RETRIES}: Policies are not compliant. Checking again in 30 seconds"
     sleep 30

@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ephemeral-cluster
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ephemeral-cluster
+  namespace: ephemeral-cluster
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ephemeral-cluster-admin
+rules:
+- apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters
+  verbs:
+  - "*"
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ephemeral-cluster-admin
+  namespace: ephemeral-cluster
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: ephemeral-cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: ephemeral-cluster
+  namespace: ephemeral-cluster

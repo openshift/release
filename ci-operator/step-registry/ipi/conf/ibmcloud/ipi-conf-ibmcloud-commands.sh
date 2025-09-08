@@ -23,7 +23,7 @@ case "${SIZE_VARIANT}" in
         master_type=bx2-8x32
         ;;
     default)
-        master_type=bx2-4x16
+        master_type=""
         ;;
     large)
         master_type=bx2-16x64
@@ -36,6 +36,7 @@ case "${SIZE_VARIANT}" in
 	exit 1
 	;;
 esac
+
 
 # Select zone(s) based on REGION and ZONE_COUNT
 REGION="${LEASED_RESOURCE}"

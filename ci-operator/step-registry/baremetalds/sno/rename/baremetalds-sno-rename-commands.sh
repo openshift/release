@@ -123,14 +123,6 @@ function update_node_ip {
   echo "node IP updated"
 }
 
-
-function update_etcd_member {
-  echo "Update etcd member"
-  podman exec -it recert_etcd bash -c "/usr/bin/etcdctl member list | cut -d',' -f1 | xargs -i etcdctl member update "{}" --peer-urls=http://${ADDITIONAL_NODE_IP}:2380"
-  echo "etcd member updated"
-}
-
-
 function recert {
   local etcd_image="\${ETCD_IMAGE}"
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
@@ -191,7 +183,6 @@ function recert {
       --cluster-rename \${new_cluster_name}:\${new_base_domain} \
       --summary-file-clean /kubernetes/recert_summary_clean.yaml \
 
-  update_etcd_member
   podman kill recert_etcd
 }
 
@@ -236,6 +227,9 @@ then
   echo "Cluster name, domain node IP and hostname changed via recert successfully."
 
   delete_crts_keys
+
+  echo "Removing previous OVN dbs..."
+  rm -rf /var/lib/ovn-ic/etc/ovn*.db
 
   stable_period_minutes=5
   start=\$(date +%s)

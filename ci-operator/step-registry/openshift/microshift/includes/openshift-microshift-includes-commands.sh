@@ -1,6 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
+printenv
+
 if [ -z "${SHARED_DIR-}" ] ; then
     echo "The SHARED_DIR environment variable is not defined"
     exit 1
@@ -50,8 +52,24 @@ function ci_copy_secrets() {
 
     # Set up the pull secret at the expected location
     if [ -e /tmp/pull-secret ] ; then
+        echo "Setting up a pull secret file"
         export PULL_SECRET="${HOME}/.pull-secret.json"
-        cp /tmp/pull-secret "${PULL_SECRET}"
+
+        if [ -e /tmp/registry.stage.redhat.io ] ; then
+            cat > /tmp/pull-secret-stage <<EOF
+{
+    "auths": {
+        "registry.stage.redhat.io": {
+            "auth": "$(cat /tmp/registry.stage.redhat.io)"
+        }
+    }
+}
+EOF
+            # Merge the files and save the result at the expected location
+            jq -s '.[0] * .[1]' /tmp/pull-secret /tmp/pull-secret-stage > "${PULL_SECRET}"
+        else
+            cp /tmp/pull-secret "${PULL_SECRET}"
+        fi
     fi
 
     # Set up the AWS CLI keys at the expected location for accessing the cached data.
@@ -94,12 +112,26 @@ function ci_subscription_register() {
         return 1
     fi
 
+    # Create a subscription manager registration script which will run elevated.
+    # This is a workaround to avoid sudo logging its command line containing
+    # secrets in the system logs.
+    local -r submgr_script="$(mktemp /tmp/submgr_script.XXXXXXXX.sh)"
+
+    cat >"${submgr_script}" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+subscription-manager register \
+    --org="$(cat /tmp/subscription-manager-org)" \
+    --activationkey="$(cat /tmp/subscription-manager-act-key)"
+EOF
+    chmod +x "${submgr_script}"
+
     # Attempt registration with retries
     for try in $(seq 3) ; do
         echo "Trying to register the system: attempt #${try}"
-        if sudo subscription-manager register \
-                --org="$(cat /tmp/subscription-manager-org)" \
-                --activationkey="$(cat /tmp/subscription-manager-act-key)" ; then
+        if sudo "${submgr_script}" ; then
+            rm -f "${submgr_script}"
             return 0
         fi
 
@@ -141,9 +173,9 @@ function download_microshift_scripts() {
     chmod 755 "${DNF_RETRY}"
 }
 
-function ci_clone_src() {
+function ci_get_clonerefs() {
     local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
-    if (( go_version < 22 )); then
+    if (( go_version < 24 )); then
         # Releases that use older Go, cannot compile the most recent prow code.
         # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
         mkdir -p /tmp/prow
@@ -157,6 +189,22 @@ function ci_clone_src() {
         cd /tmp/prow
     fi
     go build -mod=mod -o /tmp/clonerefs ./cmd/clonerefs
+}
+
+function ci_clone_src() {
+    fails=0
+    for _ in $(seq 3) ; do
+        if ci_get_clonerefs; then
+            break
+        else
+            fails=$((fails + 1))
+            if [[ "${fails}" -ge 3 ]]; then
+                echo "Failed to download and compile clonerefs"
+                exit 1
+            fi
+            sleep 10
+        fi
+    done
 
     if [ -z ${CLONEREFS_OPTIONS+x} ]; then
         # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
@@ -168,6 +216,122 @@ function ci_clone_src() {
     umask 0002
     /tmp/clonerefs
     find /go/src -type d -not -perm -0775 | xargs --max-procs 10 --max-args 100 --no-run-if-empty chmod g+xw
+}
+
+function ci_custom_link_report() {
+    local -r report_title="$1"
+    local -r step_name="$2"
+    local -r report_html="${ARTIFACT_DIR}/custom-link-tools.html"
+
+    # Build the URL prefix
+    local job_url_path
+    job_url_path="logs"
+    if [ "${JOB_TYPE}" == "presubmit" ]; then
+        job_url_path="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+    fi
+    local -r url_prefix="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/${ARTIFACT_DIR#/logs/}/scenario-info"
+
+    # Disable tracing and glob expansion
+    set +x
+    shopt -s nullglob
+
+    cat >>"${report_html}" <<EOF
+<html>
+<head>
+  <title>${report_title}</title>
+  <meta name="description" content="Links to relevant logs">
+  <link rel="stylesheet" type="text/css" href="/static/style.css">
+  <link rel="stylesheet" type="text/css" href="/static/extensions/style.css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+  <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
+  <style>
+    body {
+      background-color: #303030;
+    }
+    a {
+        color: #FFFFFF;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    p {
+      color: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+EOF
+
+    for test in "${ARTIFACT_DIR}"/scenario-info/*; do
+        testname=$(basename "${test}")
+        p_extra_style=""
+        # If there's no junit from Robot Framework execution (i.e. it didn't run), or
+        # if junit contains any failures=N, N>0, then make the line red-ish to make it easier to find.
+        if ! find "${test}" -type f -name 'junit*.xml' | grep -q . || find "${test}" -type f -name 'junit*.xml' -exec grep -q -E 'failures="[1-9][0-9]?"' {} +; then
+            p_extra_style="color:#FF6666"
+        fi
+
+        cat >>"${report_html}" <<EOF
+<p style="${p_extra_style}">${testname}:&nbsp;
+<a target="_blank" href="${url_prefix}/${testname}">directory</a>
+EOF
+
+        for file in boot_and_run.log boot.log run.log log.html ; do
+            if [ -f "${test}/${file}" ]; then
+                cat >>"${report_html}" <<EOF
+&nbsp;/&nbsp;<a target="_blank" href="${url_prefix}/${testname}/${file}">${file}</a>
+EOF
+            fi
+        done
+
+        for vm in "${test}"/vms/*; do
+            if [ "${vm: -4}" == ".xml" ]; then
+                continue
+            fi
+            vmname=$(basename "${vm}")
+            cat >>"${report_html}" <<EOF
+&nbsp;/&nbsp;<a target="_blank" href="${url_prefix}/${testname}/vms/${vmname}/sos">${vmname} sos reports</a>
+EOF
+        done
+
+        echo '</p>' >>"${report_html}"
+    done
+
+    cat >>"${report_html}" <<EOF
+</body>
+</html>
+EOF
+
+    # Re-enable tracing and glob expansion
+    set -x
+    shopt -u nullglob
+}
+
+# Implement scenario directory check with fallbacks. Simplify or remove the
+# function when the structure is homogenised in all the active releases.
+function get_source_dir() {
+  declare -A SCENARIO_DIRS=(
+    [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
+    [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
+    [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
+    [releases]="scenarios/releases:scenarios"
+    [presubmits]="scenarios/presubmits:scenarios"
+    [periodics]="scenarios/periodics:scenarios-periodics"
+  )
+  local -r scenario_type=$1
+  local -r base="/home/${HOST_USER}/microshift/test"
+  local -r dirs="${SCENARIO_DIRS[$scenario_type]}"
+  local -r ndir="${base}/$(echo "$dirs" | cut -d: -f1)"
+  local -r fdir="${base}/$(echo "$dirs" | cut -d: -f2)"
+
+  # We need the variable to expand on the client side
+  # shellcheck disable=SC2029
+  if ssh "${INSTANCE_PREFIX}" "[ -d \"${ndir}\" ]" ; then
+    echo "${ndir}"
+  else
+    echo "${fdir}"
+  fi
 }
 
 #

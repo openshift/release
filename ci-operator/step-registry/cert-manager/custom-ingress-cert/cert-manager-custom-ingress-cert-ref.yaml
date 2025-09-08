@@ -1,18 +1,16 @@
 ref:
- as: cert-manager-custom-ingress-cert
- from_image:
-   namespace: ci
-   name: verification-tests
-   tag: latest
- grace_period: 20m
- commands: cert-manager-custom-ingress-cert-commands.sh
- cli: latest
- resources:
-   limits:
-     cpu: 500m
-     memory: 500Mi
-   requests:
-     cpu: 300m
-     memory: 200Mi
- documentation: |-
-   Manage OpenShift cluster's default ingress certificate with cert-manager.
+  as: cert-manager-custom-ingress-cert
+  from: upi-installer
+  cli: latest
+  commands: cert-manager-custom-ingress-cert-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: CLUSTERISSUER_NAME
+      documentation: The name of the cert-manager ClusterIssuer to use for the external certificates issuance. (Prerequsite is that the ClusterIssuer is created and ready.)
+      default: "letsencrypt-prodoction-ci"
+  documentation: |-
+    Create cert-manager Certificate resources issued from the given ClusterIssuer.
+    Replace default Ingress certificates with cert-manager managed certificates.

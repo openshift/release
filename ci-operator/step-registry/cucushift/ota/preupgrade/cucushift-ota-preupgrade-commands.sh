@@ -21,12 +21,28 @@ function get_tp_operator(){
     "4.16")
     tp_operator=("cluster-api" "olm")
     ;;
+    "4.17")
+    tp_operator=("cluster-api" "olm")
+    ;;
     *)
-    tp_operator=()
+    tp_operator=("cluster-api")
     ;;
     esac
-    echo ${tp_operator[*]}
+    echo "${tp_operator[@]}"
 }
+
+# get prometheus object
+# Parameter
+#    sub_url: the sub url of prometheus api
+# Example:
+#    get_prometheus_api "v1/label/reason/values"
+function get_prometheus_api(){
+    local token url sub_url="${1}"
+    token="$(oc -n openshift-monitoring create token prometheus-k8s)"
+    url="$(oc get route prometheus-k8s -n openshift-monitoring --no-headers|awk '{print $2}')"
+    curl -s -k -H "Authorization: Bearer $token" "https://${url}/api/${sub_url}"
+}
+        
 
 function check_tp_operator_notfound(){
     local try=0 max_retries=2
@@ -48,11 +64,11 @@ function check_tp_operator_notfound(){
                 (( try += 1 ))
                 sleep 60
             else
-                echo "Unexpected ns found for $1!"
+                echo "ns found for $1!"
                 return 1
             fi
         else
-            echo "Unexpected operator found $1!"
+            echo "operator found $1!"
             return 1
         fi
     done
@@ -76,7 +92,7 @@ function check_manifest_annotations(){
         return 1
     fi
     tp_operators=$(printf "%s " "${tp_operator[*]}")
-    for op_file in ${tp_op_filepaths[*]}; do
+    for op_file in "${tp_op_filepaths[@]}"; do
         op_name=$(yq e '.metadata.name' ${op_file})
         if [ -z "${op_name}" ] ; then
             echo "No metadata.name in manifest!"
@@ -259,6 +275,98 @@ function pre-OCP-24358(){
     return 0
 }
 
+function pre-OCP-32747(){
+    local reason alerts alert namespace severity description state summary retry=10
+    
+    oc patch featuregate cluster --type json -p '[{"op": "add", "path": "/spec/featureSet", "value": "TechPreviewNoUpgrade"}]'
+    while (( retry > 0 )); do
+        reason=$( get_prometheus_api "v1/label/reason/values" )
+        if [[ "${reason}" == *"FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+            break
+        fi
+        sleep 1m
+        retry=$((retry-1))
+    done
+    if [[ "${reason}" != *"FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+        echo "Error: 32747 After waiting 10 minutes, FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade still not appears"
+        return 1
+    fi
+
+    retry=5
+    while (( retry > 0 )); do
+        alerts=$( get_prometheus_api "v1/alerts" )
+        alert="$(echo "${alerts}" | yq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+        namespace="$(echo "${alert}" | yq -r ".labels.namespace")"
+        severity="$(echo "${alert}" | yq -r ".labels.severity")"
+        description="$(echo "${alert}" | yq -r ".annotations.description")"
+        state="$(echo "${alert}" | yq -r ".state")"
+        if [[ "${namespace}" != "openshift-cluster-version" ]] \
+            || [[ "${severity}" != "info" ]] \
+            || [[ "${description}" != *"In most cases, you will still be able to apply patch releases."* ]] \
+            || [[ "${state}" != "pending" ]]; then
+            sleep 1m
+            retry=$((retry-1))
+            continue
+        fi
+        break
+    done
+    echo -e "Alert ClusterNotUpgradeable at beginning:\n${alert}"
+    if [[ "${namespace}" != "openshift-cluster-version" ]]; then
+        echo "Error: 32747 namespace is incorrect, expected is openshift-cluster-version, but observed is ${namespace}"
+        return 1
+    fi
+    if [[ "${severity}" != "info" ]]; then
+        echo "Error: 32747 severity is incorrect, expected is info, but observed is ${severity}"
+        return 1
+    fi
+    if [[ "${description}" != *"In most cases, you will still be able to apply patch releases."* ]]; then
+        echo "Error: 32747 description is incorrect, expected is 'In most cases, you will still be able to apply patch releases.', but observed is '${description}'"
+        return 1
+    fi
+    if [[ "${state}" != "pending" ]]; then
+        echo "Error: 32747 state is incorrect, expected is pending, but observed is ${state}"
+        return 1
+    fi
+    echo "Alert ClusterNotUpgradeable at beginning is correct"
+
+    retry=0
+    while (( retry < 70 ));do
+        alerts=$( get_prometheus_api "v1/alerts" )
+        alert="$(echo "${alerts}" | yq  -r '.data.alerts[]| select(.labels.alertname == "ClusterNotUpgradeable")')"
+        state="$(echo "${alert}" | yq -r ".state")"
+        if [[ "${state}" == "firing" ]]; then
+            if [[ ${retry} -lt 60 ]]; then
+                echo "Error: 32747 Alerts should be changed for at least 1 hour: https://github.com/openshift/cluster-version-operator/blob/8a8bca5df3bd89f8caab7c185f407f6a6e2697c8/install/0000_90_cluster-version-operator_02_servicemonitor.yaml#L87-L93"
+                echo "${alert}"
+                return 1
+            fi
+            break
+        fi
+        echo "Attempted ${retry}"
+        sleep 1m
+        retry=$((retry+1))
+    done
+
+    echo -e "Alert ClusterNotUpgradeable after 70 minutes is:\n${alert}"
+    if [[ "${state}" != "firing" ]]; then
+        echo -e "Error: 32747 Alert not changed to firing after 70 minutes"
+        return 1
+    fi
+
+    summary="$(echo "${alert}" | yq -r ".annotations.summary")"
+    if [[ "${summary}" != *"One or more cluster operators have been blocking minor version cluster upgrades for at least an hour."* ]]; then
+        echo "Error: 32747 When state is firing, summary is incorrect, expected is 'One or more cluster operators have been blocking minor version cluster upgrades for at least an hour.', but observed is '${summary}'"
+        return 1
+    fi
+
+    description="$(echo "${alert}" | yq -r ".annotations.description")"
+    if [[ "${description}" != *"Reason FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade"* ]]; then
+        echo "Error: 32747 When state is firing, description is incorrect, expected is 'Reason FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade', but observed is '${description}'"
+        return 1
+    fi
+    echo "Alert ClusterNotUpgradeable works normal"
+}
+
 function pre-OCP-47197(){
     echo "Test Start: ${FUNCNAME[0]}"
     local version 
@@ -278,7 +386,7 @@ function pre-OCP-47197(){
         echo "Fail to get tp operator list on ${src_ver}!"
         return 1
     fi
-    for tp_op in ${src_tp_op[*]}; do
+    for tp_op in "${src_tp_op[@]}"; do
         if ! check_tp_operator_notfound ${tp_op}; then
             return 1
         fi
@@ -289,7 +397,7 @@ function pre-OCP-47197(){
         echo "Fail to get tp operator list on ${tgt_ver}!"
         return 1
     fi
-    if ! check_manifest_annotations ${tgt_tp_op[*]}; then
+    if ! check_manifest_annotations "${tgt_tp_op[@]}"; then
         echo "Fail to check annotation in target manifest"
         return 1
     else
@@ -345,7 +453,7 @@ function pre-OCP-53907(){
         return 1
     fi
     bad_metadata="true"
-    for image in ${images[*]}; do
+    for image in "${images[@]}"; do
         if [[ "${image}" == "null" ]] ; then
             echo "No image info!"
             return 1
@@ -400,7 +508,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to-image with to multi arch" \
     "oc adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:f44f1570d0b88a75034da9109211bb39672bc1a5d063133a50dcda7c12469ca7 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
 
@@ -408,7 +516,7 @@ function pre-OCP-60396(){
     verify_output \
     "proper error trying --to with to multi arch" \
     "oc adm upgrade --to 4.10.0 --to-multi-arch" \
-    "--to-multi-arch may not be used with --to or --to-image" 1 \
+    "--to-multi-arch may not be used with --to, --to-image, or --to-latest" 1 \
     || return 1
 
     # verify not progressing.
@@ -466,6 +574,9 @@ function pre-OCP-60397(){
     # set testing graph
     set_upstream_graph "https://arm64.ocp.releases.ci.openshift.org/graph" || return 1
 
+    # wait for status change
+    sleep 60
+
     # check RetrievedUpdates=True
     verify_retrieved_updates  || return 1
 
@@ -486,8 +597,13 @@ function pre-OCP-60397(){
     "architecture=\"arm64\"" \
     || return 1
 
+    #export pull-secrets from live cluster for skopeo inspect to use
+    run_command "oc extract secret/installation-pull-secrets -n openshift-image-registry --confirm --to=/tmp/secret/"
     # verify cvo image still non-hetero
-    verify_nonhetero || return 1
+    verify_output \
+    "cvo image pre-transition is non-hetero" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') --authfile /tmp/secret/.dockerconfigjson | jq .mediaType" \
+    "application/vnd.docker.distribution.manifest.v2+json" || return 1
 
     # clear the upgrade
     if ! SOURCE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}' 2>&1 )"; then
@@ -521,21 +637,191 @@ function defer-OCP-60397(){
     switch_channel "candidate"
 }
 
+function check_mcp_status() {
+    local machineCount updatedMachineCount counter
+    machineCount=$(oc get mcp $1 -o=jsonpath='{.status.machineCount}')
+    counter=0
+    while [ $counter -lt 1200 ]
+    do
+        sleep 20
+        counter=`expr $counter + 20`
+        echo "waiting ${counter}s"
+        updatedMachineCount=$(oc get mcp $1 -o=jsonpath='{.status.updatedMachineCount}')
+        if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
+            echo "MCP $1 updated successfully"
+            break
+        fi
+    done
+    if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
+        echo "Timeout to update MCP $1"
+        return 1
+    fi
+    return 0
+}
+
+function pre-OCP-47160(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    echo "Check the techpreview operator is not installed by default..."
+    local version tp_op op tmp_manifest_dir_pre fs
+    version=$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d. -f1,2)
+    # shellcheck disable=SC2207
+    tp_op=($(get_tp_operator ${version}))
+    if [ -z "${tp_op[*]}" ] ; then
+        echo "Fail to get tp operator list on ${version}!"
+        return 1
+    fi
+    for op in "${tp_op[@]}"; do
+        if ! check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+
+    echo "Check no TechPreviewNoUpgrade featureset in manifests with --included cmd..."
+    tmp_manifest_dir_pre=$(mktemp -d)
+    if ! oc adm release extract --included --to "${tmp_manifest_dir_pre}"; then
+        echo "Failed to extract manifest!"
+        return 1
+    fi
+    if grep -q -r "release.openshift.io/feature-set: .*TechPreviewNoUpgrade" ${tmp_manifest_dir_pre} ; then
+        echo "There should not be TechPreviewNoUpgrade featureset!"
+        return 1
+    fi
+
+    echo "Enable TechPreviewNoUpgrade featureset..."
+    local pre_co_num expected_co_num post_co_num
+    pre_co_num=$(oc get co --no-headers|wc -l)
+    oc patch featuregate cluster -p '{"spec": {"featureSet": "TechPreviewNoUpgrade"}}' --type merge || true
+    fs=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
+    if [[ "${fs}" != "TechPreviewNoUpgrade" ]]; then
+        echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    if ! check_mcp_status master || ! check_mcp_status worker ; then
+        echo "Fail to enable TechPreviewNoUpgrade fs!"
+        return 1
+    fi
+
+    echo "Check the techpreview operator is installed..."
+    for op in "${tp_op[@]}"; do
+        if check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+    expected_co_num=$(expr $pre_co_num + ${#tp_op[@]})
+    post_co_num=$(oc get co --no-headers|wc -l)
+    if (( "$expected_co_num" != "$post_co_num" )); then
+        echo "Unexpected techpreview operator enabled or disabled!"
+        return 1
+    fi
+
+    echo "Check upgradeable=false condition is set through 'oc adm upgrade'..."
+    tmp_log=$(mktemp)
+    oc adm upgrade 2>&1 | tee "${tmp_log}"
+    if ! grep -q 'Upgradeable=False' "${tmp_log}" || ! grep -q "FeatureGates_RestrictedFeatureGates_TechPreviewNoUpgrade" "${tmp_log}"; then
+        echo "Upgrade msg is not expected!"
+        return 1
+    fi
+
+    echo "Check there should be TechPreviewNoUpgrade featureset extracted with --included cmd..."
+    local manifest_tp_num manifest_fs_num tmp_manifest_dir_post
+    tmp_manifest_dir_post=$(mktemp -d)
+    if ! oc adm release extract --included --to "${tmp_manifest_dir_post}"; then
+        echo "Failed to extract manifest!"
+        return 1
+    fi
+    manifest_tp_num=$(grep -rh "release.openshift.io/feature-set: .*TechPreviewNoUpgrade" ${tmp_manifest_dir_post}|awk -F": " '{print $2}'|sort -u|wc -l)
+    manifest_fs_num=$(grep -rh "release.openshift.io/feature-set:" ${tmp_manifest_dir_post}|awk -F": " '{print $2}'|sort -u|wc -l)
+    if (( "$manifest_tp_num" != "$manifest_fs_num" )); then
+        echo "There should be TechPreviewNoUpgrade in each featureset annotation!"
+        return 1
+    fi
+
+    echo "Check TechPreviewNoUpgrade flag cannot be unset..."
+    oc patch featuregate cluster -p '{"spec": {"featureSet": ""}}' --type merge || true
+    oc patch featuregate cluster --type=json -p '[{"op":"remove", "path":"/spec/featureSet"}]' || true
+    if [[ "$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')" != "TechPreviewNoUpgrade" ]]; then
+        echo "Unset featureset test fail!"
+        return 1
+    fi
+    return 0
+}
+
+function pre-OCP-47200(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    echo "Check the techpreview operator is not installed by default..."
+    local version tp_op op
+    version=$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d. -f1,2)
+    # shellcheck disable=SC2207
+    tp_op=($(get_tp_operator ${version}))
+    if [ -z "${tp_op[*]}" ] ; then
+        echo "Fail to get tp operator list on ${version}!"
+        return 1
+    fi
+    # Skip cluster-api due to the mismatch between ns and operator when enabling CustomNoUpgrade fs
+    if [[ ${#tp_op[@]} -eq 1 ]] && [[ "${tp_op[0]}" == "cluster-api" ]]; then
+        echo "Only cluster-api tp operator avaialble in ${version}, skip the test!"
+        return 1
+    else
+        echo "Drop cluster-api from tp operator list: ${tp_op[*]}"
+        for i in "${!tp_op[@]}"; do
+            if [[ "${tp_op[i]}" == "cluster-api" ]]; then
+                unset 'tp_op[i]'
+                echo "After dropping, the operator list is: ${tp_op[*]}"
+                break
+            fi
+        done
+    fi
+
+    for op in "${tp_op[@]}"; do
+        if ! check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+
+    echo "Enable non-TechPreviewNoUpgrade featureset..."
+    local fs_before fs_after
+    fs_before=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
+    if [[ "${fs_before}" != "null" ]]; then
+        echo "The cluster was already enabled featureset unexpected: ${fs_before}"
+        return 1
+    fi
+    oc patch featuregate cluster -p '{"spec": {"featureSet": "CustomNoUpgrade"}}' --type merge || true
+    fs_after=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
+    if [[ "${fs_after}" != "CustomNoUpgrade" ]]; then
+        echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    if ! check_mcp_status master || ! check_mcp_status worker ; then
+        echo "Fail to enable CustomNoUpgrade fs!"
+        return 1
+    fi
+
+    echo "Check the techpreview operator is not installed..."
+    for op in "${tp_op[@]}"; do
+        if ! check_tp_operator_notfound ${op}; then
+            return 1
+        fi
+    done
+    return 0
+}
+
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not
 function run_ota_multi_test(){
     caseset=(OCP-47197)
-    for case in ${caseset[*]}; do
+    for case in "${caseset[@]}"; do
         if ! type pre-"${case}" &>/dev/null; then
-            echo "WARN: no pre-${case} function found" >> "${report_file}"
+            echo "WARN: no pre-${case} function found"
         else
             echo "------> ${case}"
             pre-"${case}"
             if [[ $? == 0 ]]; then
-                echo "PASS: pre-${case}" >> "${report_file}"
+                echo "PASS: pre-${case}"
+                export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${case}"
             else
-                echo "FAIL: pre-${case}" >> "${report_file}"
+                echo "FAIL: pre-${case}"
+                export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${case}"
             fi
         fi
     done
@@ -544,14 +830,16 @@ function run_ota_multi_test(){
 # Run single case through case ID
 function run_ota_single_case(){
     if ! type pre-"${1}" &>/dev/null; then
-        echo "WARN: no pre-${1} function found" >> "${report_file}"
+        echo "WARN: no pre-${1} function found"
     else
         echo "------> ${1}"
         pre-"${1}"
         if [[ $? == 0 ]]; then
-            echo "PASS: pre-${1}" >> "${report_file}"
+            echo "PASS: pre-${1}"
+            export SUCCESS_CASE_SET="${SUCCESS_CASE_SET} ${1}"
         else
-            echo "FAIL: pre-${1}" >> "${report_file}"
+            echo "FAIL: pre-${1}"
+            export FAILURE_CASE_SET="${FAILURE_CASE_SET} ${1}"
             # case failed in the middle may leave the cluster in unusable state
             if type defer-"${1}" &>/dev/null; then
                 defer-"${1}"
@@ -560,11 +848,31 @@ function run_ota_single_case(){
     fi
 }
 
+# Generate the Junit for ota-preupgrade
+function createPreUpgradeJunit() {
+    echo -e "\n# Generating the Junit for ota-preupgrade"
+    local report_file="${ARTIFACT_DIR}/junit_ota_preupgrade.xml"
+    IFS=" " read -r -a ota_success_cases <<< "${SUCCESS_CASE_SET}"
+    IFS=" " read -r -a ota_failure_cases <<< "${FAILURE_CASE_SET}"
+    local cases_count=$((${#ota_success_cases[@]} + ${#ota_failure_cases[@]}))
+    echo '<?xml version="1.0" encoding="UTF-8"?>' > "${report_file}"
+    echo "<testsuite name=\"ota preupgrade\" tests=\"${cases_count}\" failures=\"${#ota_failure_cases[@]}\">" >> "${report_file}"
+    for success in "${ota_success_cases[@]}"; do
+        echo "  <testcase name=\"ota preupgrade should succeed: ${success}\"/>" >> "${report_file}"
+    done
+    for failure in "${ota_failure_cases[@]}"; do
+        echo "  <testcase name=\"ota preupgrade should succeed: ${failure}\">" >> "${report_file}"
+        echo "    <failure message=\"ota preupgrade failed at ${failure}\"></failure>" >> "${report_file}"
+        echo "  </testcase>" >> "${report_file}"
+    done
+    echo '</testsuite>' >> "${report_file}"
+}
+
+
 if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
   exit 0
 fi
 
-report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 # oc cli is injected from release:target
 run_command "which oc"
 run_command "oc version --client"
@@ -576,9 +884,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+export SUCCESS_CASE_SET=""
+export FAILURE_CASE_SET=""
+
 set +e
 if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
 else
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
+createPreUpgradeJunit

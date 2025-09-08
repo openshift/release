@@ -3,10 +3,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
-  openshift_release_rhel-8-release-golang-1.20-openshift-4.14:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.20-openshift-4.14
 binary_build_commands: make build
 build_root:
   project_image:
@@ -14,10 +10,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    openshift_release_rhel-8-release-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.20-openshift-4.14
   to: hive
 promotion:
   to:
@@ -91,7 +83,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.17"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -109,10 +101,12 @@ tests:
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         CLOUD=aws make test-e2e
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
+      - collection: ""
+        mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
         namespace: test-credentials
-      - mount_path: /tmp/secret/pull-secret
+      - collection: ""
+        mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
@@ -136,7 +130,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.17"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -156,10 +150,12 @@ tests:
         export USE_MANAGED_DNS=false
         CLOUD=aws make test-e2e-pool
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
+      - collection: ""
+        mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
         namespace: test-credentials
-      - mount_path: /tmp/secret/pull-secret
+      - collection: ""
+        mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:

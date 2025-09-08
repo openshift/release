@@ -2,21 +2,22 @@ workflow:
   as: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-guest
   steps:
     pre:
-    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-provision
-    - ref: cucushift-hypershift-extended-enable-guest
+      - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-provision
+      - ref: cucushift-hypershift-extended-enable-guest
+      - ref: cucushift-installer-reportportal-marker
     post:
-    - ref: cucushift-hypershift-extended-disable-guest
-    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-deprovision
+      - ref: cucushift-hypershift-extended-disable-guest
+      - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-deprovision
+      - ref: send-results-to-reportportal
     env:
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       HYPERSHIFT_NAMESPACE: "local-cluster"
-      MCE_QE_CATALOG: "true"
       DISCONNECTED: "true"
       IP_STACK: v4v6
-      PACKET_OS: rocky_9
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
+        NUM_WORKERS=3
         MIRROR_IMAGES=true
         NETWORK_TYPE=OVNKubernetes
         WORKER_MEMORY=14336

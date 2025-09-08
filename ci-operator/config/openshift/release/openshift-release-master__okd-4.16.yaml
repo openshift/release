@@ -31,6 +31,10 @@ base_images:
     name: "4.16"
     namespace: origin
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   initial:
     prerelease:
@@ -42,7 +46,7 @@ releases:
   latest:
     candidate:
       product: okd
-      stream: okd
+      stream: okd-scos
       version: "4.16"
 resources:
   '*':
@@ -54,15 +58,12 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-upgrade
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-ovn-upgrade
@@ -76,12 +77,12 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp
 - as: e2e-vsphere-ovn
-  interval: 168h
+  cron: 30 6 * * 2
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-upi
-  interval: 168h
+  cron: 27 5 * * 2
   steps:
     cluster_profile: vsphere-elastic
     workflow: upi-vsphere

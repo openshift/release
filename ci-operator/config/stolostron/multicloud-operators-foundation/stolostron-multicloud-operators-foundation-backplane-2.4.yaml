@@ -49,32 +49,32 @@ tests:
     true
   container:
     from: bin
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
   container:
     from: bin
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
     make test --warn-undefined-variables
   container:
     from: test-bin
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: integration
   commands: make test-integration
   container:
     from: test-bin
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: multicloud-manager
@@ -112,7 +112,7 @@ tests:
           cpu: 100m
     workflow: ocm-e2e-clusterpool
 - as: sonarcloud
-  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -120,7 +120,8 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow sonar/go/prow
       credentials:
-      - mount_path: /etc/sonarcloud/
+      - collection: ""
+        mount_path: /etc/sonarcloud/
         name: acm-sonarcloud-token
         namespace: test-credentials
       from: src
@@ -154,7 +155,8 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

@@ -16,9 +16,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.17"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -51,11 +55,6 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   arm64-latest:
     release:
@@ -83,6 +82,7 @@ tests:
 - as: aws-ipi-disc-priv-sts-ep-f28
   cron: 36 15 10 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -98,6 +98,7 @@ tests:
 - as: aws-ipi-ovn-ipsec-to-multiarch-f28
   cron: 2 14 30 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -117,6 +118,7 @@ tests:
 - as: azure-ipi-to-multiarch-f28
   cron: 26 2 15 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -133,9 +135,11 @@ tests:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 36 15 15,29 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -151,9 +155,11 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 13 18 9,25 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -169,9 +175,11 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-sno-agent-ipv4-static-connected-f14
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 21 16 7,21 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -187,32 +195,21 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
-- as: gcp-ipi-disc-priv-oidc-f28
-  cron: 49 11 21 * *
-  steps:
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      COMPUTE_NODE_TYPE: t2a-standard-4
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OCP_ARCH: arm64
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-to-multiarch-f28
+- as: gcp-ipi-to-multiarch-mini-perm-f28
   cron: 5 4 29 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
       ENABLE_OTA_TEST: OCP-60397
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-sanity-arch-migration

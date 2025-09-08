@@ -1,0 +1,66 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.19"
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: aws-usgov-ipi-private-sts-f999-logging
+  cron: 32 5 29 2 *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_TEST_VERSION: "6.3"
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~AZWIF&;~AZMonitor&;~GCL&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "35"
+    test:
+    - chain: openshift-logging-deploy-operators
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-stable-openshift-logging-6.3

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build01
+    cluster: build06
     context: ci/prow/ci-index-lvm-operator-static-deps
     decorate: true
     decoration_config:
@@ -60,7 +60,7 @@ presubmits:
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build01
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -112,11 +112,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build09
+    cluster: build06
     context: ci/prow/lvm-operator-bundle-e2e-aws
     decorate: true
     decoration_config:
@@ -129,6 +129,7 @@ presubmits:
     name: pull-ci-openshift-lvm-operator-release-4.12-lvm-operator-bundle-e2e-aws
     optional: true
     rerun_command: /test lvm-operator-bundle-e2e-aws
+    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
     spec:
       containers:
       - args:
@@ -137,7 +138,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/lvm-operator-bundle-e2e-aws-cluster-profile
         - --target=lvm-operator-bundle-e2e-aws
         command:
         - ci-operator
@@ -154,8 +154,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/lvm-operator-bundle-e2e-aws-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -179,9 +177,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -193,11 +188,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lvm-operator-bundle-e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build01
+    cluster: build06
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
@@ -207,6 +202,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-lvm-operator-release-4.12-unit-test
     rerun_command: /test unit-test
+    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
     spec:
       containers:
       - args:

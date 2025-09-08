@@ -5,23 +5,23 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/ci-index
+    cluster: build04
+    context: ci/prow/ci-bundle-opendatahub-operator-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-opendatahub-operator-main-ci-index
-    rerun_command: /test ci-index
+    name: pull-ci-opendatahub-io-opendatahub-operator-main-ci-bundle-opendatahub-operator-bundle
+    rerun_command: /test ci-bundle-opendatahub-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=opendatahub-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,13 +54,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-bundle-opendatahub-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -111,11 +111,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/opendatahub-operator-e2e
     decorate: true
     decoration_config:
@@ -127,6 +127,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e
     rerun_command: /test opendatahub-operator-e2e
+    skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$
     spec:
       containers:
       - args:
@@ -135,7 +136,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/opendatahub-operator-e2e-cluster-profile
         - --target=opendatahub-operator-e2e
         command:
         - ci-operator
@@ -152,8 +152,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/opendatahub-operator-e2e-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -177,9 +175,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-gcp-opendatahub
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -195,7 +190,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build04
     context: ci/prow/opendatahub-operator-pr-image-mirror
     decorate: true
     decoration_config:

@@ -55,6 +55,16 @@ fi
 cp -rt "${installer_dir}" \
     /var/lib/openshift-install/upi/"${CLUSTER_TYPE}"/*
 
+# Copy install-config to artifacts directory for debugging
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+
+# Copy variables.ps1 to artifacts directory for debugging
+echo "variables.ps1"
+echo "-------------------"
+cat ${SHARED_DIR}/variables.ps1 | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/variables.ps1
+
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
 function gather_console_and_bootstrap() {
@@ -62,6 +72,9 @@ function gather_console_and_bootstrap() {
     source "${SHARED_DIR}/govc.sh"
     unset SSL_CERT_FILE
     unset GOVC_TLS_CA_CERTS
+
+    infra_id=$(jq -r '.infraID' "${installer_dir}/metadata.json")
+
     # list all the virtual machines in the folder/rp
     clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}")
     GATHER_BOOTSTRAP_ARGS=()
@@ -79,11 +92,22 @@ function gather_console_and_bootstrap() {
       # with ip addresses as the value
       # wait 1 minute for an ip address to become available
 
+      # If hostname has cluster name in it (newer powercli installs), strip the host name off for the IP logic below to work for gather
+      if [[ "${hostname}" == "${infra_id}"* ]]; then
+        hostname=${hostname#${infra_id}-}
+      fi
+
+      # Older UPI installs have "-0" after bootstrap.  We'll remove those to be consistent with newer builds.
+      if [[ "${hostname}" == "bootstrap-0" ]]; then
+        hostname="bootstrap"
+      fi
+
+      echo "declaring ${hostname//-/_}_ip"
       # shellcheck disable=SC2140
       declare "${hostname//-/_}_ip"="$(govc vm.ip -wait=1m -vm.ipath="$ipath" | awk -F',' '{print $1}')"
     done
 
-    GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_0_ip}")
+    GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_ip}")
     GATHER_BOOTSTRAP_ARGS+=('--master' "${control_plane_0_ip}" '--master' "${control_plane_1_ip}" '--master' "${control_plane_2_ip}")
 
     # 4.5 and prior used the terraform.tfstate for gather bootstrap. This causes an error with:
@@ -118,8 +142,25 @@ function update_image_registry() {
     sleep 15
   done
 
-  echo "$(date -u --rfc-3339=seconds) - Patching image registry configuration..."
+  echo "$(date -u --rfc-3339=seconds) - Configuring image registry with emptyDir..."
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to see that it has work to do..."
+  sleep 30
+
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait --all --for=condition=Available=True clusteroperators.config.openshift.io --timeout=10m
+
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry to rollout..."
+  oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m
+
+  echo "$(date -u --rfc-3339=seconds) - Wait until imageregistry config changes are observed by kube-apiserver..."
+  sleep 60
+
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver to finish rolling out..."
+  oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m
+
+  oc wait --all --for=condition=Degraded=False clusteroperators.config.openshift.io --timeout=1m
 }
 
 function setE2eMirror() {
@@ -243,9 +284,6 @@ fi
 ## Approving the CSR requests for nodes
 approve_csrs &
 
-## Configure image registry
-update_image_registry &
-
 ## Monitor for cluster completion
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
 
@@ -257,6 +295,10 @@ set +e
 wait "$!"
 ret="$?"
 set -e
+
+
+## Configure image registry
+update_image_registry
 
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"

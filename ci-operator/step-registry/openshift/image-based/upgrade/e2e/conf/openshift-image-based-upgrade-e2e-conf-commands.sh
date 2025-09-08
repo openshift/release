@@ -45,7 +45,7 @@ done
 
 date
 
-oc adm wait-for-stable-cluster --minimum-stable-period 1m
+oc adm wait-for-stable-cluster --minimum-stable-period 5m
 
 date
 

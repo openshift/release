@@ -24,7 +24,10 @@ class RCPaths:
 
         # The updated configuration and deployment files, to app.ci, are located here:
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
-        self.path_rc_rpms = self.path_base.joinpath('clusters/build-clusters/common/release-controller')
+        self.path_rc_rpms = [
+            self.path_base.joinpath('clusters/build-clusters/common/release-controller'),
+            self.path_base.joinpath('clusters/build-clusters/vsphere02/release-controller'),
+        ]
 
         # CRT Resources
         self.path_crt_resources = self.path_base.joinpath('clusters/app.ci/crt')
@@ -36,6 +39,8 @@ class RCPaths:
         self.path_rpc_resources = self.path_base.joinpath('clusters/app.ci/release-payload-controller')
         # Release Reimport Controller Resources
         self.path_reimport_resources = self.path_base.joinpath('clusters/app.ci/release-reimport-controller')
+        # Release Mirror Cleanup Controller Resources
+        self.path_mirror_cleanup_resources = self.path_base.joinpath('clusters/app.ci/release-mirror-cleanup-controller')
 
 
 class Config:

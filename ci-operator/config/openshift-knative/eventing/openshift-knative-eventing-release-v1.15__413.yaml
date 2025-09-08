@@ -283,7 +283,8 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: test-conformance-aws-413
+- always_run: false
+  as: test-conformance
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -293,6 +294,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -331,7 +343,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-conformance
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-conformance
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -397,8 +410,10 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-conformance-aws-413-c
-  cron: 54 0 * * 2,6
+  timeout: 5h0m0s
+- always_run: false
+  as: test-conformance-c
+  cron: 34 6 6 5 *
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -408,6 +423,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -446,7 +472,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-conformance
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-conformance
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -512,7 +539,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-e2e-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: test-e2e
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -522,6 +551,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -560,7 +600,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-e2e
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -626,8 +667,10 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-e2e-aws-413-c
-  cron: 46 1 * * 2,6
+  timeout: 5h0m0s
+- always_run: false
+  as: test-e2e-c
+  cron: 20 17 25 10 *
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -637,6 +680,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -675,7 +729,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-e2e
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -741,7 +796,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-encryption-auth-e2e-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: test-encryption-auth-e2e
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -751,6 +808,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -789,7 +857,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-encryption-auth-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-encryption-auth-e2e
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -855,8 +924,10 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-encryption-auth-e2e-aws-413-c
-  cron: 20 2 * * 2,6
+  timeout: 5h0m0s
+- always_run: false
+  as: test-encryption-auth-e2e-c
+  cron: 13 13 18 3 *
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -866,6 +937,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -904,7 +986,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-encryption-auth-e2e
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-encryption-auth-e2e
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -970,7 +1053,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-reconciler-aws-413
+  timeout: 5h0m0s
+- always_run: false
+  as: test-reconciler
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -980,6 +1065,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -1018,7 +1114,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-reconciler
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-reconciler
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -1084,8 +1181,10 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- as: test-reconciler-aws-413-c
-  cron: 16 0 * * 2,6
+  timeout: 5h0m0s
+- always_run: false
+  as: test-reconciler-c
+  cron: 57 0 * * 2,6
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1095,6 +1194,17 @@ tests:
       SPOT_INSTANCES: "true"
       ZONES_COUNT: "1"
     post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
     - as: knative-must-gather
       best_effort: true
       cli: latest
@@ -1133,7 +1243,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-reconciler
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-reconciler
       dependencies:
       - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
         name: knative-eventing-apiserver-receive-adapter
@@ -1199,6 +1310,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-v1.15
   org: openshift-knative

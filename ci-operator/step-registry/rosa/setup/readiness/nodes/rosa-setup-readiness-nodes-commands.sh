@@ -93,7 +93,7 @@ function listMachineConfigPoolDetails() {
 
 # List details of machinesets, machines and nodes depending on Classic Rosa or HCP cluster
 function listDetails() {
-  if [ "$is_hcp_cluster" = "false" ]; then
+  if [ "$HOSTED_CP" = "false" ]; then
     echo "Listing machine pool config, machine and node details"
     listMachineConfigPoolDetails
     listMachineAndNodeDetails
@@ -142,9 +142,12 @@ function waitForReady() {
           echo "Successful attempts at Nodes being Ready in a row: $successful_attempts Want: $desired_successful_attempts"
         else
           current_time=$(date +"%s")
+          echo $current_time > ${SHARED_DIR}/workers_scale_end_epoch.txt
           record_cluster "timers" "nodes_ready" $(( "${current_time}" - "${start_time}" ))
           echo "All nodes are ready to run workloads after $(( ${current_time} - ${start_time} )) seconds"
           FINAL_NODE_STATE="Pass"
+          record_cluster "timers" "global_end" "$(date +'%s')"
+
           break
         fi
       else
@@ -166,20 +169,19 @@ function waitForReady() {
 # Determine count of desired compute node count
 function getDesiredComputeCount {
   desired_compute_count=0
+  entries=(".autoscaling.min_replicas" ".autoscaling.min_replica" ".replicas" )
   for MP_NAME in $(rosa list machinepool -c "$CLUSTER_ID" -o json | jq -r '.[].id'); do
-    mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json  |jq -r '.replicas')
-    if [[ "$mp_compute_count" = "null" ]]; then
-      echo "Machinepool $MP_NAME --auto-scaling enabled, retrieving min_replica count desired"
-      if [[ $HOSTED_CP = "true" ]];then
-        mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replica')
-      else
-        mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replicas')
+    mp_detail=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json)
+    for entry in "${entries[@]}"; do
+      mp_compute_count=$(echo "$mp_detail"| jq -r ${entry})
+      if [[ ! "$mp_compute_count" = "null" ]];then
+        break
       fi
-    fi
+    done
     echo "Machinepool $MP_NAME desired compute node count is $mp_compute_count"
     desired_compute_count=$(expr $desired_compute_count + $mp_compute_count)
   done
- 
+
   export desired_compute_count
   echo "Total desired node count: $desired_compute_count"
 }
@@ -187,15 +189,53 @@ function getDesiredComputeCount {
 # Determine if node count needs to be revised due to day 2 op workaround for medium+ sized clusters
 function fixNodeScaling {
   machine_pool=$(rosa list machinepool -c "$CLUSTER_ID" -o json)
-  if [[ "$HOSTED_CP" == "false" ]] && [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
-    if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    if [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
       if [[ `echo "$machine_pool" | jq -r '.[].autoscaling.min_replicas'` -ne ${MIN_REPLICAS} ]]; then
         rosa edit machinepool -c "$CLUSTER_ID" worker --min-replicas "$MIN_REPLICAS"
       fi
     else
       rosa edit machinepool -c "$CLUSTER_ID" worker --enable-autoscaling=false --replicas "$REPLICAS"
     fi
+    workers_scale_event_epoch=$(date +"%s")
+    echo $workers_scale_event_epoch > ${SHARED_DIR}/workers_scale_event_epoch.txt
   fi
+}
+
+# Check hcp cluster current/desired node's count via rosa cmd one by one. 
+function checkHCPEveryComputeCount {
+  entries=(".autoscaling.min_replicas" ".autoscaling.min_replica" ".replicas" )
+  for MP_NAME in $(rosa list machinepool -c "$CLUSTER_ID" -o json | jq -r '.[].id'); do
+    mp_detail=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json)
+    for entry in "${entries[@]}"; do
+      mp_desired_count=$(echo "$mp_detail"| jq -r ${entry})
+      if [[ ! "$mp_compute_count" != "null" ]];then
+       mp_current_count=$(echo "$mp_detail"| jq -r .status.current_replicas)
+       if (( "$mp_current_count" >= "$mp_desired_count" )); then
+         echo "$(date): ${MP_NAME} worker nodes are ready and match desired $mp_desired_count node count."
+        else
+         echo "$(date): ${MP_NAME} worker nodes are not ready and don't match desired $mp_desired_count node count."
+         listDetails
+         exit 1
+        fi
+      fi
+    done
+  done
+}
+
+# Check classic cluster current/desired machineset count one by one
+function checkEveryMachinesetCount {
+  oc get machinesets -n openshift-machine-api --no-headers -l hive.openshift.io/machine-pool!=infra | awk '{print $1}' | while read mpsetName; do
+    current_count=$(oc get machinesets $mpsetName -n openshift-machine-api -o jsonpath='{.status.availableReplicas}')
+    desired_count=$(oc get machinesets $mpsetName -n openshift-machine-api -o jsonpath='{.status.replicas}')
+    if (( "$current_count" == "$desired_count" )); then
+      echo "$(date): machineset ${mpsetName} is ready and match desired $desired_count node count."
+    else
+      echo "$(date): machineset ${mpsetName} not ready and don't match desired $desired_count node count."
+      listDetails
+      exit 1
+    fi
+  done
 }
 
 # Get cluster
@@ -236,8 +276,8 @@ else
 fi
 
 # Check if this is a HCP cluster
-is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
-log "hypershift.enabled is set to $is_hcp_cluster"
+HOSTED_CP="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
+log "hypershift.enabled is set to $HOSTED_CP"
 
 # Check if we modified the node counts to reduce day 2 op time and fix as necessary
 fixNodeScaling
@@ -267,4 +307,13 @@ else
     echo "Exiting test!"
     exit 1
 fi
+
+if [ "$HOSTED_CP" = "false" ]; then
+  echo "checking classic cluster machineset count one by one"
+  checkEveryMachinesetCount
+else
+  echo "checking HCP cluster nodes count one by one"
+  checkHCPEveryComputeCount
+fi
+
 cat "${SHARED_DIR}/cluster-config"

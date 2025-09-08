@@ -1,0 +1,29 @@
+base_images:
+  base:
+    name: "4.18"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_telco-runner_latest
+      RUN dnf install -y rsync
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: eco-ci-cd
+  cluster: build05
+  cron: 00 10 * * 1
+  steps:
+    test:
+    - ref: telcov10n-slcm-slcm-container-tests
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd-private
+  variant: slcm-container-tests-project2

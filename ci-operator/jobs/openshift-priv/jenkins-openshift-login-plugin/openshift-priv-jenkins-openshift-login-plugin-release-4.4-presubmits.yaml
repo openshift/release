@@ -1,7 +1,7 @@
 presubmits:
   openshift-priv/jenkins-openshift-login-plugin:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.4$
     - ^release-4\.4-
@@ -19,6 +19,7 @@ presubmits:
     name: pull-ci-openshift-priv-jenkins-openshift-login-plugin-release-4.4-e2e-aws-jenkins
     path_alias: github.com/openshift/jenkins-openshift-login-plugin
     rerun_command: /test e2e-aws-jenkins
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -28,7 +29,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-jenkins-cluster-profile
         - --target=e2e-aws-jenkins
         command:
         - ci-operator
@@ -45,8 +45,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-jenkins-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -73,9 +71,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -94,7 +89,7 @@ presubmits:
     branches:
     - ^release-4\.4$
     - ^release-4\.4-
-    cluster: build05
+    cluster: build07
     context: ci/prow/images
     decorate: true
     decoration_config:

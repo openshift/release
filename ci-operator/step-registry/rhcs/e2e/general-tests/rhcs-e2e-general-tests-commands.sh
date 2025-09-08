@@ -54,8 +54,6 @@ export AWS_DEFAULT_REGION="${REGION}"
 #fi
 export RHCS_OUTPUT=${SHARED_DIR} # this is the sensitive information sharing folder between steps
 
-export GATEWAY_URL=$GATEWAY_URL
-
 if [ ! -z "$RHCS_SOURCE" ];then
     export RHCS_SOURCS=$RHCS_SOURCE
 fi

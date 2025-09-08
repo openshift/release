@@ -7,6 +7,7 @@ set -o xtrace
 set -x
 ls
 
+
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 30
@@ -30,8 +31,8 @@ done
 
 echo "starting pod scenarios"
 ./pod-scenarios/prow_run.sh
-
+rc=$?
 echo "Done running the test!" 
 
-exit 0
-
+echo "Return code: $rc"
+exit $rc

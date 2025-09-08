@@ -14,9 +14,18 @@ if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
 fi 
 
+######### added for debugging purposes #########
+# export DISPLAY=:99
+# Xvfb :99 &
+# # Xvfb :99 -screen 0 1024x768x16 2>/dev/null &
+
+# export CYPRESS_video=false
+# export CYPRESS_videoCompression=false
+###############################################
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-cp ${SECRETS_DIR}/clc/secret-options-yaml ./options.yaml
+cp ${SECRETS_DIR}/clc-interop/secret-options-yaml ./options.yaml
 
 # Set the dynamic vars based on provisioned hub cluster.
 CYPRESS_BASE_URL=$(oc whoami --show-console)

@@ -20,7 +20,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    tag: rhel-9-release-golang-1.22-openshift-4.18
 images:
 - dockerfile_path: Dockerfile
   inputs:
@@ -36,8 +36,7 @@ images:
   to: kube-compare-artifacts
 promotion:
   to:
-  - disabled: true
-    name: "4.18"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -70,6 +69,11 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: bin
+- as: system-test
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: bin
+  postsubmit: true
 - as: unit-report-creator
   commands: GOFLAGS="-mod=readonly" make test-report-creator
   container:

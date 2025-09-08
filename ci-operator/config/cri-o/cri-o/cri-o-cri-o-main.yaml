@@ -3,15 +3,15 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
-  rhel-coreos-9-base:
-    name: "4.15"
+  rhel-coreos-base:
+    name: "4.19"
     namespace: ocp
     tag: rhel-coreos-9
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    tag: rhel-9-release-golang-1.23-openshift-4.19
 images:
 - dockerfile_literal: |
     # We want to test the PR using the code from it. Now, this repo ships RPMs
@@ -35,7 +35,7 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
-    rhel-coreos-9-base:
+    rhel-coreos-base:
       as:
       - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
   to: rhel-coreos-9
@@ -46,12 +46,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -61,13 +61,33 @@ resources:
 rpm_build_commands: hack/build-rpms.sh
 tests:
 - as: e2e-aws-ovn
+  skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
+  skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- always_run: false
+  as: perfscale-control-plane-6nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
+      ITERATION_MULTIPLIER_ENV: "15"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: cri-o

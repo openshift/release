@@ -1,11 +1,11 @@
 presubmits:
   openshift/hypershift-toolkit:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -14,7 +14,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-toolkit-master-images
-    optional: true
     rerun_command: /test images
     spec:
       containers:
@@ -61,7 +60,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build09
+    cluster: build06
     context: ci/prow/kube-conformance-aws
     decorate: true
     decoration_config:
@@ -82,7 +81,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/kube-conformance-aws-cluster-profile
         - --target=kube-conformance-aws
         command:
         - ci-operator
@@ -99,8 +97,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/kube-conformance-aws-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -124,9 +120,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -142,7 +135,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     decoration_config:

@@ -5,17 +5,18 @@ presubmits:
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/413-images
+    cluster: build06
+    context: ci/prow/414-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "413"
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-413-images
-    rerun_command: /test 413-images
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-414-images
+    rerun_command: /test 414-images
+    run_if_changed: ^non-existing$
     spec:
       containers:
       - args:
@@ -24,7 +25,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=413
+        - --variant=414
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,25 +58,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )413-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )414-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/413-test-conformance-aws-413
+    cluster: build09
+    context: ci/prow/414-test-conformance
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "413"
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-413-test-conformance-aws-413
-    rerun_command: /test 413-test-conformance-aws-413
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-414-test-conformance
+    rerun_command: /test 414-test-conformance
     spec:
       containers:
       - args:
@@ -84,9 +86,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-conformance-aws-413-cluster-profile
-        - --target=test-conformance-aws-413
-        - --variant=413
+        - --target=test-conformance
+        - --variant=414
         command:
         - ci-operator
         image: ci-operator:latest
@@ -102,8 +103,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/test-conformance-aws-413-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -127,9 +126,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -139,25 +135,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )413-test-conformance-aws-413,?($|\s.*)
+    trigger: (?m)^/test( | .* )(414-test-conformance|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/413-test-e2e-aws-413
+    cluster: build09
+    context: ci/prow/414-test-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "413"
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-413-test-e2e-aws-413
-    rerun_command: /test 413-test-e2e-aws-413
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-414-test-e2e
+    rerun_command: /test 414-test-e2e
     spec:
       containers:
       - args:
@@ -166,9 +163,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-e2e-aws-413-cluster-profile
-        - --target=test-e2e-aws-413
-        - --variant=413
+        - --target=test-e2e
+        - --variant=414
         command:
         - ci-operator
         image: ci-operator:latest
@@ -184,8 +180,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/test-e2e-aws-413-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -209,9 +203,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -221,25 +212,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )413-test-e2e-aws-413,?($|\s.*)
+    trigger: (?m)^/test( | .* )(414-test-e2e|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/413-test-reconciler-aws-413
+    cluster: build09
+    context: ci/prow/414-test-reconciler
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "413"
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-413-test-reconciler-aws-413
-    rerun_command: /test 413-test-reconciler-aws-413
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-414-test-reconciler
+    rerun_command: /test 414-test-reconciler
     spec:
       containers:
       - args:
@@ -248,9 +240,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-reconciler-aws-413-cluster-profile
-        - --target=test-reconciler-aws-413
-        - --variant=413
+        - --target=test-reconciler
+        - --variant=414
         command:
         - ci-operator
         image: ci-operator:latest
@@ -266,8 +257,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/test-reconciler-aws-413-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -291,9 +280,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -303,25 +289,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )413-test-reconciler-aws-413,?($|\s.*)
+    trigger: (?m)^/test( | .* )(414-test-reconciler|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/413-test-reconciler-encryption-auth-aws-413
+    cluster: build09
+    context: ci/prow/414-test-reconciler-encryption-auth
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "413"
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-413-test-reconciler-encryption-auth-aws-413
-    rerun_command: /test 413-test-reconciler-encryption-auth-aws-413
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-414-test-reconciler-encryption-auth
+    rerun_command: /test 414-test-reconciler-encryption-auth
     spec:
       containers:
       - args:
@@ -330,9 +317,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-reconciler-encryption-auth-aws-413-cluster-profile
-        - --target=test-reconciler-encryption-auth-aws-413
-        - --variant=413
+        - --target=test-reconciler-encryption-auth
+        - --variant=414
         command:
         - ci-operator
         image: ci-operator:latest
@@ -348,8 +334,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/test-reconciler-encryption-auth-aws-413-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -373,9 +357,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -385,25 +366,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )413-test-reconciler-encryption-auth-aws-413,?($|\s.*)
+    trigger: (?m)^/test( | .* )(414-test-reconciler-encryption-auth|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/413-test-reconciler-keda-aws-413
+    cluster: build09
+    context: ci/prow/414-test-reconciler-keda
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "413"
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-413-test-reconciler-keda-aws-413
-    rerun_command: /test 413-test-reconciler-keda-aws-413
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-414-test-reconciler-keda
+    rerun_command: /test 414-test-reconciler-keda
     spec:
       containers:
       - args:
@@ -412,9 +394,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-reconciler-keda-aws-413-cluster-profile
-        - --target=test-reconciler-keda-aws-413
-        - --variant=413
+        - --target=test-reconciler-keda
+        - --variant=414
         command:
         - ci-operator
         image: ci-operator:latest
@@ -430,8 +411,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/test-reconciler-keda-aws-413-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -455,9 +434,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -467,23 +443,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )413-test-reconciler-keda-aws-413,?($|\s.*)
+    trigger: (?m)^/test( | .* )(414-test-reconciler-keda|remaining-required),?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/415-images
+    cluster: build06
+    context: ci/prow/419-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-415-images
-    rerun_command: /test 415-images
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-419-images
+    rerun_command: /test 419-images
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -492,7 +469,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=415
+        - --variant=419
         command:
         - ci-operator
         image: ci-operator:latest
@@ -525,23 +502,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )419-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/415-test-conformance-aws-415
+    cluster: build06
+    context: ci/prow/419-test-conformance
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-415-test-conformance-aws-415
-    rerun_command: /test 415-test-conformance-aws-415
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-419-test-conformance
+    rerun_command: /test 419-test-conformance
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -550,8 +529,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-conformance-aws-415
-        - --variant=415
+        - --target=test-conformance
+        - --variant=419
         command:
         - ci-operator
         image: ci-operator:latest
@@ -596,23 +575,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-test-conformance-aws-415,?($|\s.*)
+    trigger: (?m)^/test( | .* )419-test-conformance,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/415-test-e2e-aws-415
+    cluster: build06
+    context: ci/prow/419-test-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-415-test-e2e-aws-415
-    rerun_command: /test 415-test-e2e-aws-415
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-419-test-e2e
+    rerun_command: /test 419-test-e2e
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -621,8 +602,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-e2e-aws-415
-        - --variant=415
+        - --target=test-e2e
+        - --variant=419
         command:
         - ci-operator
         image: ci-operator:latest
@@ -667,23 +648,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-test-e2e-aws-415,?($|\s.*)
+    trigger: (?m)^/test( | .* )419-test-e2e,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/415-test-reconciler-aws-415
+    cluster: build06
+    context: ci/prow/419-test-reconciler
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-415-test-reconciler-aws-415
-    rerun_command: /test 415-test-reconciler-aws-415
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-419-test-reconciler
+    rerun_command: /test 419-test-reconciler
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -692,8 +675,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler-aws-415
-        - --variant=415
+        - --target=test-reconciler
+        - --variant=419
         command:
         - ci-operator
         image: ci-operator:latest
@@ -738,23 +721,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-test-reconciler-aws-415,?($|\s.*)
+    trigger: (?m)^/test( | .* )419-test-reconciler,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/415-test-reconciler-encryption-auth-aws-415
+    cluster: build06
+    context: ci/prow/419-test-reconciler-encryption-auth
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-415-test-reconciler-encryption-auth-aws-415
-    rerun_command: /test 415-test-reconciler-encryption-auth-aws-415
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-419-test-reconciler-encryption-auth
+    rerun_command: /test 419-test-reconciler-encryption-auth
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -763,8 +748,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler-encryption-auth-aws-415
-        - --variant=415
+        - --target=test-reconciler-encryption-auth
+        - --variant=419
         command:
         - ci-operator
         image: ci-operator:latest
@@ -809,23 +794,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-test-reconciler-encryption-auth-aws-415,?($|\s.*)
+    trigger: (?m)^/test( | .* )419-test-reconciler-encryption-auth,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/415-test-reconciler-keda-aws-415
+    cluster: build06
+    context: ci/prow/419-test-reconciler-keda
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: "415"
+      ci-operator.openshift.io/variant: "419"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-415-test-reconciler-keda-aws-415
-    rerun_command: /test 415-test-reconciler-keda-aws-415
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-419-test-reconciler-keda
+    rerun_command: /test 419-test-reconciler-keda
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -834,8 +821,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler-keda-aws-415
-        - --variant=415
+        - --target=test-reconciler-keda
+        - --variant=419
         command:
         - ci-operator
         image: ci-operator:latest
@@ -880,477 +867,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )415-test-reconciler-keda-aws-415,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.15$
-    - ^release-v1\.15-
-    cluster: build05
-    context: ci/prow/416-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "416"
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-416-images
-    rerun_command: /test 416-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=416
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.15$
-    - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/416-test-conformance-aws-416
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "416"
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-416-test-conformance-aws-416
-    rerun_command: /test 416-test-conformance-aws-416
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-conformance-aws-416-cluster-profile
-        - --target=test-conformance-aws-416
-        - --variant=416
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/test-conformance-aws-416-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-test-conformance-aws-416,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.15$
-    - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/416-test-e2e-aws-416
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "416"
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-416-test-e2e-aws-416
-    rerun_command: /test 416-test-e2e-aws-416
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-e2e-aws-416-cluster-profile
-        - --target=test-e2e-aws-416
-        - --variant=416
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/test-e2e-aws-416-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-test-e2e-aws-416,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.15$
-    - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/416-test-reconciler-aws-416
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "416"
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-416-test-reconciler-aws-416
-    rerun_command: /test 416-test-reconciler-aws-416
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-reconciler-aws-416-cluster-profile
-        - --target=test-reconciler-aws-416
-        - --variant=416
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/test-reconciler-aws-416-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-test-reconciler-aws-416,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.15$
-    - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/416-test-reconciler-encryption-auth-aws-416
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "416"
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-416-test-reconciler-encryption-auth-aws-416
-    rerun_command: /test 416-test-reconciler-encryption-auth-aws-416
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-reconciler-encryption-auth-aws-416-cluster-profile
-        - --target=test-reconciler-encryption-auth-aws-416
-        - --variant=416
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/test-reconciler-encryption-auth-aws-416-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-test-reconciler-encryption-auth-aws-416,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.15$
-    - ^release-v1\.15-
-    cluster: build03
-    context: ci/prow/416-test-reconciler-keda-aws-416
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "416"
-      ci.openshift.io/generator: prowgen
-      job-release: "4.16"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.15-416-test-reconciler-keda-aws-416
-    rerun_command: /test 416-test-reconciler-keda-aws-416
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-reconciler-keda-aws-416-cluster-profile
-        - --target=test-reconciler-keda-aws-416
-        - --variant=416
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/test-reconciler-keda-aws-416-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws-serverless
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )416-test-reconciler-keda-aws-416,?($|\s.*)
+    trigger: (?m)^/test( | .* )419-test-reconciler-keda,?($|\s.*)

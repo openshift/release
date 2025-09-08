@@ -8,12 +8,9 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 
-if [[ "${AWS_KMS_KEY_ENABLE_DEFAULT_MACHINE}" == "yes" ]]; then
-  key_arn_default_machine=${AWS_KMS_KEY_ARN_DEFAULT_MACHINE}
-  if [[ "${key_arn_default_machine}" == "" ]]; then
-    # pre-creaetd
-    key_arn_default_machine=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
-  fi
+if [[ "${ENABLE_AWS_KMS_KEY_DEFAULT_MACHINE}" == "yes" ]]; then
+
+  key_arn_default_machine=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
 
   KMS_PATCH_DEFAULT_MACHINE="${ARTIFACT_DIR}/install-config-kms-default-machine.yaml.patch"
   cat > "${KMS_PATCH_DEFAULT_MACHINE}" << EOF
@@ -29,12 +26,9 @@ EOF
 fi
 
 
-if [[ "${AWS_KMS_KEY_ENABLE_CONTROL_PLANE}" == "yes" ]]; then
-  key_arn_control_plane=${AWS_KMS_KEY_ARN_CONTROL_PLANE}
-  if [[ "${key_arn_control_plane}" == "" ]]; then
-    # pre-creaetd
-    key_arn_control_plane=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
-  fi
+if [[ "${ENABLE_AWS_KMS_KEY_CONTROL_PLANE}" == "yes" ]]; then
+
+  key_arn_control_plane=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn_control_plane)
 
   KMS_PATCH_CONTROL_PLANE="${ARTIFACT_DIR}/install-config-kms-control-plane.yaml.patch"
   cat > "${KMS_PATCH_CONTROL_PLANE}" << EOF
@@ -50,12 +44,8 @@ EOF
 fi
 
 
-if [[ "${AWS_KMS_KEY_ENABLE_COMPUTE}" == "yes" ]]; then
-  key_arn_compute=${AWS_KMS_KEY_ARN_COMPUTE}
-  if [[ "${key_arn_compute}" == "" ]]; then
-    # pre-creaetd
-    key_arn_compute=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
-  fi
+if [[ "${ENABLE_AWS_KMS_KEY_COMPUTE}" == "yes" ]]; then
+  key_arn_compute=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn_compute)
 
   KMS_PATCH_COMPUTE="${ARTIFACT_DIR}/install-config-kms-compute.yaml.patch"
   cat > "${KMS_PATCH_COMPUTE}" << EOF

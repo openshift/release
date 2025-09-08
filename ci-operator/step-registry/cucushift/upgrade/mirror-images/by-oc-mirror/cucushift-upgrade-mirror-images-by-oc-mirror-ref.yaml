@@ -1,0 +1,24 @@
+ref:
+  as: cucushift-upgrade-mirror-images-by-oc-mirror
+  from: oc-mirror
+  cli: target
+  grace_period: 10m
+  commands: cucushift-upgrade-mirror-images-by-oc-mirror-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: MIRROR_GRAPH_DATA
+    default: "false"
+    documentation: |-
+      Determin if generate osus resource and mirror graph-data image
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  dependencies:
+  - name: "release:target"
+    env: "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
+  documentation: |-
+    Mirror release image to local image registry.

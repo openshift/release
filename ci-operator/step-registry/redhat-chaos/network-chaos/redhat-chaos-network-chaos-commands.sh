@@ -1,12 +1,11 @@
 #!/bin/bash
 set -o errexit
+
+console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+export HEALTH_CHECK_URL=https://$console_url
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
-oc config view
-oc projects
-python3 --version
 
 
 ES_PASSWORD=$(cat "/secret/es/password")
@@ -30,5 +29,8 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 ./network-chaos/prow_run.sh
 rc=$?
+if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
+    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
+fi
 echo "Finished running network chaos"
 echo "Return code: $rc"

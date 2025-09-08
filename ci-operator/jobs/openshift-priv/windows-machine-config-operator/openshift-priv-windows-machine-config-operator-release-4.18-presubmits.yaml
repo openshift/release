@@ -5,13 +5,14 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build09
+    cluster: build06
     context: ci/prow/aws-e2e-operator
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -21,7 +22,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-aws-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test aws-e2e-operator
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -31,7 +32,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/aws-e2e-operator-cluster-profile
         - --target=aws-e2e-operator
         command:
         - ci-operator
@@ -48,8 +48,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/aws-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -76,9 +74,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -88,19 +83,20 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )aws-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build07
     context: ci/prow/azure-e2e-operator
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -110,7 +106,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-azure-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test azure-e2e-operator
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -120,7 +116,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/azure-e2e-operator-cluster-profile
         - --target=azure-e2e-operator
         command:
         - ci-operator
@@ -137,8 +132,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/azure-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -165,9 +158,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-azure4
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -177,19 +167,20 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(azure-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )azure-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build07
     context: ci/prow/azure-e2e-upgrade
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -199,6 +190,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-azure-e2e-upgrade
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test azure-e2e-upgrade
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -208,7 +200,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/azure-e2e-upgrade-cluster-profile
         - --target=azure-e2e-upgrade
         command:
         - ci-operator
@@ -225,8 +216,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/azure-e2e-upgrade-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -253,9 +242,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-azure4
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -265,77 +251,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(azure-e2e-upgrade|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.18$
-    - ^release-4\.18-
-    cluster: build01
-    context: ci/prow/build
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-build
-    path_alias: github.com/openshift/windows-machine-config-operator
-    rerun_command: /test build
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=build
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build,?($|\s.*)
+    trigger: (?m)^/test( | .* )azure-e2e-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build07
     context: ci/prow/ci-bundle-wmco-bundle
     decorate: true
     decoration_config:
@@ -398,13 +320,14 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build04
     context: ci/prow/gcp-e2e-operator
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -414,7 +337,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-gcp-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test gcp-e2e-operator
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -424,7 +347,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/gcp-e2e-operator-cluster-profile
         - --target=gcp-e2e-operator
         command:
         - ci-operator
@@ -441,8 +363,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/gcp-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -469,13 +389,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -485,13 +398,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(gcp-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )gcp-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build07
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -555,7 +468,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build07
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -569,7 +482,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-lint
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test lint
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -626,6 +539,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: nutanix
@@ -636,7 +550,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-nutanix-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test nutanix-e2e-operator
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -646,7 +560,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/nutanix-e2e-operator-cluster-profile
         - --target=nutanix-e2e-operator
         command:
         - ci-operator
@@ -663,8 +576,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/nutanix-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -691,9 +602,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-nutanix
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -703,7 +611,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(nutanix-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )nutanix-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -716,6 +624,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
@@ -725,7 +634,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-platform-none-vsphere-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test platform-none-vsphere-e2e-operator
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -735,7 +644,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/platform-none-vsphere-e2e-operator-cluster-profile
         - --target=platform-none-vsphere-e2e-operator
         command:
         - ci-operator
@@ -752,8 +660,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/platform-none-vsphere-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -780,9 +686,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -792,13 +695,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(platform-none-vsphere-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )platform-none-vsphere-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build07
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -812,7 +715,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-security
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test security
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -869,7 +772,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build07
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -883,7 +786,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-unit
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test unit
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -940,6 +843,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
@@ -949,6 +853,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-vsphere-disconnected-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test vsphere-disconnected-e2e-operator
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -958,7 +863,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/vsphere-disconnected-e2e-operator-cluster-profile
         - --target=vsphere-disconnected-e2e-operator
         command:
         - ci-operator
@@ -975,8 +879,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/vsphere-disconnected-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1003,9 +905,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1015,7 +914,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-disconnected-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )vsphere-disconnected-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1028,6 +927,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
@@ -1037,7 +937,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-vsphere-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test vsphere-e2e-operator
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -1047,7 +947,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/vsphere-e2e-operator-cluster-profile
         - --target=vsphere-e2e-operator
         command:
         - ci-operator
@@ -1064,8 +963,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/vsphere-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1092,9 +989,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1104,7 +998,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )vsphere-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1117,6 +1011,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
@@ -1126,7 +1021,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-vsphere-proxy-e2e-operator
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test vsphere-proxy-e2e-operator
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -1136,7 +1031,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/vsphere-proxy-e2e-operator-cluster-profile
         - --target=vsphere-proxy-e2e-operator
         command:
         - ci-operator
@@ -1153,8 +1047,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/vsphere-proxy-e2e-operator-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1181,9 +1073,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1193,7 +1082,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-proxy-e2e-operator|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )vsphere-proxy-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1215,7 +1104,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-operator-release-4.18-wicd-unit-vsphere
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test wicd-unit-vsphere
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
@@ -1225,7 +1114,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/wicd-unit-vsphere-cluster-profile
         - --target=wicd-unit-vsphere
         command:
         - ci-operator
@@ -1242,8 +1130,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/wicd-unit-vsphere-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1270,9 +1156,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1282,4 +1165,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(wicd-unit-vsphere|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )wicd-unit-vsphere,?($|\s.*)

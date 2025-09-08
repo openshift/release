@@ -49,6 +49,13 @@ function update_image_registry() {
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait co image-registry --for=condition=Available=True  --timeout=30m
+  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
+  sleep 60
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
+  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
+  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 echo "[INFO] Initializing..."
 
@@ -111,6 +118,11 @@ echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not add additional workers if we need to run them as day2 (e.g., to test cluster-api)
+    echo "{INFO} Additional worker ${name} will be added as day2 operation"
+    continue
+  fi
   ADAPTED_YAML="
   name: ${name}
   role: ${name%%-[0-9]*}
@@ -192,6 +204,11 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "
 echo "[INFO] Creating manifests..."
 oinst create manifests
 
+# Enable BMO to watch all namespaces if CAPI is enabled
+if [[ "$ENABLE_CAPI" == "true" ]]; then
+    sed -i 's/watchAllNamespaces: false/watchAllNamespaces: true/' "${INSTALL_DIR}/openshift/99_baremetal-provisioning-config.yaml"
+fi
+
 ### Inject customized manifests
 echo -e "\n[INFO] The following manifests will be included at installation time:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
@@ -226,13 +243,13 @@ if ! wait $!; then
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-update_image_registry &
 echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+update_image_registry
 
 touch  "${SHARED_DIR}/success"
 touch /tmp/install-complete

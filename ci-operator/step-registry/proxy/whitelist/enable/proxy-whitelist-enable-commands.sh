@@ -6,6 +6,15 @@ set -o pipefail
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
+if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+  BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+fi
+
+if [[ -z ${BASE_DOMAIN} ]]; then
+  echo "Error: BASE_DOMAIN is not empty, but it's required."
+  exit 1
+fi
+
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
 if ! whoami &> /dev/null; then
@@ -79,6 +88,7 @@ EOF
 cat <<EOF >> ${SHARED_DIR}/proxy_whitelist.txt
 oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
 console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
+canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
 api.openshift.com
 console.redhat.com
 mirror.openshift.com

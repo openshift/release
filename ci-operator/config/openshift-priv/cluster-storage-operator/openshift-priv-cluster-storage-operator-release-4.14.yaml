@@ -3,6 +3,14 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -46,18 +54,25 @@ tests:
   container:
     from: src
 - as: verify-kustomize-assets
-  commands: ./hack/verify-manifest.sh
-  container:
-    from: src
+  steps:
+    test:
+    - as: verify-kustomize
+      cli: latest
+      commands: ./hack/verify-manifest.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
-- as: e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi
   optional: true
   steps:
     cluster_profile: aws
@@ -71,7 +86,8 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-csi
+- always_run: false
+  as: e2e-gcp-csi
   optional: true
   steps:
     cluster_profile: gcp
@@ -114,16 +130,18 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi-file
-- as: e2e-aws-shared-resources
+- always_run: false
+  as: e2e-aws-shared-resources
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - ref: csi-driver-shared-resource-e2e
     workflow: csi-driver-shared-resource-e2e-test
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -132,7 +150,8 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-parallel
+- always_run: false
+  as: e2e-openstack-parallel
   optional: true
   steps:
     cluster_profile: openstack-vexxhost

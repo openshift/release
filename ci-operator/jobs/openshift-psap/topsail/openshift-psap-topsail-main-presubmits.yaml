@@ -5,24 +5,25 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/rhoai-e2e
+    cluster: build10
+    context: ci/prow/cont_bench-jump-ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhoai
+      capability/intranet: intranet
+      ci-operator.openshift.io/variant: cont_bench
       ci.openshift.io/generator: prowgen
-    name: pull-ci-openshift-psap-topsail-main-rhoai-e2e
-    rerun_command: /test rhoai-e2e
+    name: pull-ci-openshift-psap-topsail-main-cont_bench-jump-ci
+    rerun_command: /test cont_bench-jump-ci
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=e2e
-        - --variant=rhoai
+        - --target=jump-ci
+        - --variant=cont_bench
         command:
         - ci-operator
         image: ci-operator:latest
@@ -55,31 +56,31 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhoai-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )(cont_bench-jump-ci|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/rhoai-images
+    cluster: build10
+    context: ci/prow/jump-ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhoai
+      capability/intranet: intranet
+      ci-operator.openshift.io/variant: jump
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-topsail-main-rhoai-images
-    rerun_command: /test rhoai-images
+    name: pull-ci-openshift-psap-topsail-main-jump-ci
+    rerun_command: /test jump-ci
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=rhoai
+        - --target=ci
+        - --variant=jump
         command:
         - ci-operator
         image: ci-operator:latest
@@ -112,32 +113,31 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhoai-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )(jump-ci|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/rhoai-light
+    cluster: build10
+    context: ci/prow/jump-ci-plot
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhoai
+      capability/intranet: intranet
+      ci-operator.openshift.io/variant: jump
       ci.openshift.io/generator: prowgen
-    name: pull-ci-openshift-psap-topsail-main-rhoai-light
-    rerun_command: /test rhoai-light
+    name: pull-ci-openshift-psap-topsail-main-jump-ci-plot
+    rerun_command: /test jump-ci-plot
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=light
-        - --variant=rhoai
+        - --target=ci-plot
+        - --variant=jump
         command:
         - ci-operator
         image: ci-operator:latest
@@ -147,14 +147,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -167,12 +161,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -182,31 +170,31 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhoai-light,?($|\s.*)
+    trigger: (?m)^/test( | .* )(jump-ci-plot|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/rhoai-long
+    cluster: build10
+    context: ci/prow/mac_ai-jump-ci
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 7h0m0s
     labels:
-      ci-operator.openshift.io/variant: rhoai
+      capability/intranet: intranet
+      ci-operator.openshift.io/variant: mac_ai
       ci.openshift.io/generator: prowgen
-    name: pull-ci-openshift-psap-topsail-main-rhoai-long
-    rerun_command: /test rhoai-long
+    name: pull-ci-openshift-psap-topsail-main-mac_ai-jump-ci
+    rerun_command: /test mac_ai-jump-ci
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=long
-        - --variant=rhoai
+        - --target=jump-ci
+        - --variant=mac_ai
         command:
         - ci-operator
         image: ci-operator:latest
@@ -239,30 +227,31 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhoai-long,?($|\s.*)
+    trigger: (?m)^/test( | .* )(mac_ai-jump-ci|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/rhoai-plot
+    cluster: build10
+    context: ci/prow/mac_ai-jump-ci-mac5
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhoai
+      capability/intranet: intranet
+      ci-operator.openshift.io/variant: mac_ai
       ci.openshift.io/generator: prowgen
-    name: pull-ci-openshift-psap-topsail-main-rhoai-plot
-    rerun_command: /test rhoai-plot
+    name: pull-ci-openshift-psap-topsail-main-mac_ai-jump-ci-mac5
+    rerun_command: /test mac_ai-jump-ci-mac5
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=plot
-        - --variant=rhoai
+        - --target=jump-ci-mac5
+        - --variant=mac_ai
         command:
         - ci-operator
         image: ci-operator:latest
@@ -295,4 +284,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhoai-plot,?($|\s.*)
+    trigger: (?m)^/test( | .* )(mac_ai-jump-ci-mac5|remaining-required),?($|\s.*)

@@ -11,18 +11,22 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -30,7 +34,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
+    tag: release
   tests-private:
     name: tests-private
     namespace: ci
@@ -55,27 +59,20 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     release:
       architecture: amd64
       channel: candidate
       version: "4.14"
-  multi-latest:
+  target:
     release:
       architecture: multi
       channel: candidate
-      version: "4.14"
-  target:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
       version: "4.14"
 resources:
   '*':
@@ -88,6 +85,7 @@ tests:
 - as: aws-c2s-ipi-disc-priv-fips-f28
   cron: 10 9 23 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-c2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -99,6 +97,7 @@ tests:
 - as: aws-ipi-disc-priv-localzone-fips-f28
   cron: 6 2 6 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-1-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -110,6 +109,7 @@ tests:
 - as: aws-ipi-disc-priv-sts-ep-fips-f28
   cron: 11 5 8 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -121,6 +121,7 @@ tests:
 - as: aws-ipi-ovn-ipsec-to-multiarch-f28
   cron: 12 12 1 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       ADDITIONAL_WORKERS: "1"
@@ -132,6 +133,7 @@ tests:
 - as: aws-ipi-shared-vpc-phz-sts-fips-f28
   cron: 42 19 6 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -143,6 +145,7 @@ tests:
 - as: aws-ipi-usertags-custom-sg-fips-f28
   cron: 59 21 27 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -150,224 +153,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
-- as: aws-ocm-osd-ccs-f28
-  cron: 35 3 8 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: osd-ccs-aws
-- as: gcp-ocm-osd-ccs-marketplace-f28
-  cron: 35 12 8 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-      SUBSCRIPTION_TYPE: marketplace-gcp
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: osd-ccs-gcp
-- as: gcp-ocm-osd-ccs-xpn-f28
-  cron: 43 0 12 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: osd-ccs-gcp-xpn
-- as: gcp-ocm-osd-ccs-xpn-private-marketplace-f28
-  cron: 36 7 25 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-      SUBSCRIPTION_TYPE: marketplace-gcp
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: osd-ccs-gcp-xpn-private
-- as: aws-rosa-non-sts-byo-vpc-kms-proxy-f28
-  cron: 12 10 1 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-non-sts-byo-vpc-kms-proxy
-- as: aws-rosa-sts-f28
-  cron: 35 19 25 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts
-- as: aws-rosa-sts-byo-kms-oidc-f28
-  cron: 42 18 7 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts-byo-kms-oidc
-- as: aws-rosa-sts-localzone-f28
-  cron: 35 14 13 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts-localzone
-- as: aws-rosa-sts-security-group-f28
-  cron: 1 18 17 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts-security-group
-- as: aws-rosa-sts-private-proxy-f28
-  cron: 32 13 29 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts-private-proxy
-- as: aws-rosa-sts-shared-vpc-f28
-  cron: 53 14 30 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.14"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts-shared-vpc
-- as: aws-rosa-hcp-byo-kms-oidc-auditlog-stage-critical-f28
-  cron: 11 5 24 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa and @critical'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
-- as: aws-rosa-hcp-private-proxy-stage-critical-f28
-  cron: 8 11 28 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa and @critical'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-private-proxy
-- as: aws-rosa-hcp-stage-critical-f28
-  cron: 14 14 6 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa and @critical'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp
-- as: aws-rosa-hcp-sector-prod-critical-f28
-  cron: 46 5 7 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-      CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@rosa and @critical'
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.14"
-      REGION: us-east-1
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp
-- as: aws-rosa-hcp-sector-prod-stable-critical-f28
-  cron: 23 8 28 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: stable
-      CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@rosa and @critical'
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.14"
-      REGION: us-east-1
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp
-- as: aws-rosa-hcp-sector-byo-kms-oidc-auditlog-prod-critical-f28
-  cron: 29 3 10 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-      CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@rosa and @critical'
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.14"
-      REGION: us-east-1
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
-- as: aws-rosa-hcp-sector-private-proxy-prod-critical-f28
-  cron: 53 22 17 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-      CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@rosa and @critical'
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.14"
-      REGION: us-east-1
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-usgov-ipi-private-sts-f28
   cron: 3 21 21 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-usgov-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -378,6 +167,7 @@ tests:
 - as: azure-ipi-to-multiarch-f28
   cron: 12 0 16 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
@@ -391,6 +181,7 @@ tests:
 - as: azure-mag-ipi-fips-f28
   cron: 11 14 27 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azuremag-qe
     env:
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
@@ -402,6 +193,7 @@ tests:
   cluster: build01
   cron: 3 4 5 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azurestack-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
@@ -410,9 +202,11 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 39 19 17 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
@@ -426,9 +220,11 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 17 14 2 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
@@ -442,9 +238,11 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-sno-agent-ipv4-static-connected-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 20 17 6 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     env:
       AGENT_PLATFORM_TYPE: none
@@ -458,30 +256,23 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
-- as: gcp-ipi-disc-priv-oidc-fips-f28
-  cron: 3 8 20 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FIPS_ENABLED: "true"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-to-multiarch-f28
+- as: gcp-ipi-to-multiarch-mini-perm-f28
   cron: 12 17 16 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: ibmcloud-ipi-proxy-private-rt-f28
   cron: 36 23 7 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     env:
       RT_ENABLED: "true"
@@ -492,6 +283,7 @@ tests:
   cluster: build01
   cron: 44 13 4 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: nutanix-qe-dis
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
@@ -499,22 +291,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: aws-ocm-osd-ccs-fleet-manager-f7
-  cron: 53 10 4,13,20,27 * *
-  steps:
-    cluster_profile: fleet-manager-qe
-    env:
-      CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - ref: osd-ccs-fleet-manager-test
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: osd-ccs-fleet-manager
 - as: vsphere-ipi-disc-f28
-  cron: 1 22 23 * *
+  cron: 48 0 27 1 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: vsphere-dis-2
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
@@ -523,15 +303,17 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: vsphere-ipi-ovn-dualstack-f28
-  cron: 38 12 18 * *
+  cron: 39 4 6 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: vsphere-elastic
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-proxy-fips-f28
-  cron: 31 18 9 * *
+  cron: 37 9 14 11 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: vsphere-dis-2
     env:
       FIPS_ENABLED: "true"
@@ -542,8 +324,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-zones-f28
-  cron: 23 13 7 * *
+  cron: 49 22 19 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: vsphere-elastic
     test:
     - chain: cucushift-installer-check-cluster-health

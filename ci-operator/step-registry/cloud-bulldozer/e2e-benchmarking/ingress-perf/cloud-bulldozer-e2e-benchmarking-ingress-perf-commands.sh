@@ -17,7 +17,10 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
     git switch ${PULL_NUMBER}
     pushd workloads/ingress-perf
-    ES_SERVER="" ./run.sh
+    ES_PASSWORD=$(cat "/secret/perfscale-prod/password")
+    ES_USERNAME=$(cat "/secret/perfscale-prod/username")
+    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-perfscale-pro-wxrjvmobqs7gsyi3xvxkqmn7am.us-west-2.es.amazonaws.com"
+    ./run.sh
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
 fi

@@ -1,0 +1,77 @@
+clusterName: build02
+provision:
+  gcp: {}
+onboard:
+  osd: false
+  hosted: false
+  unmanaged: false
+  useTokenFileInKubeconfig: true
+  quayioPullThroughCache:
+    patches:
+    - type: json-patch
+      matches:
+      - kind: ImageContentSourcePolicy
+      inline: [{"op": "add", "path": "/spec/repositoryDigestMirrors/0/mirrors", "value": ["quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"]}]
+  certificate:
+    patches:
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apps-tls
+      inline: [{"op": "add", "path": "/spec/issuerRef/name", "value": "cert-issuer-ci-build-farm"}]
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apps-tls
+      inline: [
+        {"op": "remove", "path": "/metadata/labels/aws-project"},
+        {"op": "add", "path": "/metadata/labels/gcp-project", "value": "openshift-ci-build-farm"}
+      ]
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apiserver-tls
+      inline: [{"op": "add", "path": "/spec/issuerRef/name", "value": "cert-issuer-ci-build-farm"}]
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apiserver-tls
+      inline: [
+        {"op": "remove", "path": "/metadata/labels/aws-project"},
+        {"op": "add", "path": "/metadata/labels/gcp-project", "value": "openshift-ci-build-farm"}
+      ]
+  ciSchedulingWebhook:
+    skip: true
+  multiarchBuilderController:
+    skip: true
+  machineSet:
+    skip: true
+  passthrough:
+    exclude:
+    - "**/supplemental-ci-images/**"
+    - "**/upgrader-sa.yaml"
+  openshiftMonitoring:
+    patches:
+    - matches:
+      - kind: ConfigMap
+        name: cluster-monitoring-config
+        namespace: openshift-monitoring
+      inline:
+        data:
+          config.yaml: |
+            prometheusK8s:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: standard
+                  resources:
+                    requests:
+                      storage: 400Gi
+            alertmanagerMain:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: standard
+                  resources:
+                    requests:
+                      storage: 10Gi
+  multiarchTuningOperator:
+    skip: true

@@ -11,10 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-nodejs-openshift-4.14
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
@@ -25,9 +25,9 @@ images:
     ocp_builder_rhel-8-base-nodejs-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-base-nodejs-openshift-4.14
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: console
 - dockerfile_path: Dockerfile.plugins.demo
   from: nodejs-10
@@ -69,12 +69,18 @@ resources:
     requests:
       cpu: "1"
       memory: 10Gi
-test_binary_build_commands: ./build.sh
+test_binary_build_commands: |
+  ./build-frontend.sh
+  ./build-demos.sh
 tests:
 - as: backend
-  commands: ./test-backend.sh
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    mkdir -p ${ARTIFACT_DIR} ${XDG_CACHE_HOME}
+    go install -mod= github.com/jstemmer/go-junit-report@latest
+    /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: test-bin
+    from: ocp_builder_rhel-8-golang-1.20-openshift-4.14
 - as: frontend
   commands: |
     git config --global --add safe.directory /go/src/github.com/openshift/console

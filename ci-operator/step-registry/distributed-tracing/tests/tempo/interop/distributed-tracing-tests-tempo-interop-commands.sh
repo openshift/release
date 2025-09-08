@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -f "${SHARED_DIR}/api.login"; then
+    eval "$(cat "${SHARED_DIR}/api.login")"
+else
+    echo "No ${SHARED_DIR}/api.login present. This is not an HCP or ROSA cluster. Continue using \$KUBECONFIG env path."
+fi
+
 # Used for downstream testing.
 # Set the Go path and Go cache environment variables
 export GOPATH=/tmp/go
@@ -14,9 +20,9 @@ export GOCACHE=/tmp/.cache/go-build
 mkdir -p /tmp/go/bin $GOCACHE \
   && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
 
-git clone https://github.com/grafana/tempo-operator.git /tmp/tempo-tests
+git clone https://github.com/IshwarKanse/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
-git checkout -b downstream-release "${INTEROP_TESTS_COMMIT}"
+git checkout rhosdt-3.6
 make build
 
 #Enable user workload monitoring.
@@ -45,9 +51,6 @@ fi
 # Unset environment variable which conflicts with Chainsaw
 unset NAMESPACE
 
-# Initialize a variable to keep track of errors
-any_errors=false
-
 # Execute Tempo e2e tests
 chainsaw test \
 --config .chainsaw-openshift.yaml \
@@ -58,32 +61,7 @@ chainsaw test \
 tests/e2e \
 tests/e2e-openshift \
 tests/e2e-openshift-serverless \
-tests/e2e-openshift-ossm || any_errors=true
-
-# Get the platform type
-dt_platform_type=$(oc get infrastructures cluster -o=jsonpath='{.status.platformStatus.type}')
-echo "Platform is $dt_platform_type"
-
-# Check if the cluster is STS or WIF cluster
-dt_wif_or_sts=$(oc get authentication cluster -o=jsonpath='{.spec.serviceAccountIssuer}')
-echo "$dt_wif_or_sts"
-
-if [[ "$dt_platform_type" == "AWS" && -n "$dt_wif_or_sts" ]]; then
-    chainsaw test \
-        --config .chainsaw-openshift.yaml \
-        --report-name "junit_tempo_aws-sts" \
-        --report-path "$ARTIFACT_DIR" \
-        --selector type=aws-sts \
-        --report-format "XML" \
-        --test-dir tests/e2e-openshift-object-stores || any_errors=true
-else
-    echo "Cluster is not AWS STS cluster, skipping the AWS STS tests"
-fi
-
-# Check if any errors occurred
-if $any_errors; then
-  echo "Tests failed, check the logs for more details."
-  exit 1
-else
-  echo "All the tests passed."
-fi
+tests/e2e-openshift-ossm \
+tests/e2e-long-running \
+tests/e2e-openshift-object-stores \
+tests/operator-metrics

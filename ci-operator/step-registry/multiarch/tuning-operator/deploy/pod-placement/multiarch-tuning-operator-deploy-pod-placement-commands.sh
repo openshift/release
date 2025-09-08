@@ -11,12 +11,12 @@ trap 'FRC=$?; createMTOJunit; debug' EXIT TERM
 # Print deployments, pods, nodes for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "Getting deployment info...\n"
-        echo -e "oc -n $NAMESPACE get deployments -owide\n$(oc -n $NAMESPACE get deployments -owide)"
-        echo -e "Getting pod info....\n"
-        echo -e "oc -n $NAMESPACE get pods -owide\n$(oc -n $NAMESPACE get pods -owide)"
-        echo -e "Getting nodes info...\n"
-        echo -e "oc get node -owide\n$(oc get node -owide)"
+        set +e
+        for r in pods deployments events subscriptions clusterserviceversions clusterpodplacementconfigs; do
+          oc get ${r} -n "${NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/${r}.yaml"
+          oc describe ${r} -n "${NAMESPACE}" |& tee "${ARTIFACT_DIR}/${r}.txt"
+          oc get ${r} -n "${NAMESPACE}" -o wide
+        done
     fi
 }
 

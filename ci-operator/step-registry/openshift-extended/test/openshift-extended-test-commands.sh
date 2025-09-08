@@ -35,16 +35,25 @@ function exit_trap {
     fi
 }
 
+# CLUSTER_PROFILE_DIR is set by dptp only when cluster_profile is set in your test per
+# https://docs.ci.openshift.org/docs/architecture/step-registry/#available-environment-variables.
+# as we known, now some tests do not set it because of using cluster claim, so there is no CLUSTER_PROFILE_DIR,
+# and then step will fail with CLUSTER_PROFILE_DIR: unbound variable
+# here we provide fake default value although it is not used for env indeed, but it could keep step running and
+# then the test should get the related resource in other way if there is no cluster profile for your test. 
+
 trap 'exit_trap' EXIT
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
-export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/.awscred
+export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/osServicePrincipal.json
+export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/usr/local/krew/bin:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
+github_token=$(cat "/var/run/vault/tests-private-account/token-git")
+export GITHUB_TOKEN=$github_token
 
 # add for hosted kubeconfig in the hosted cluster env
 if test -f "${SHARED_DIR}/nested_kubeconfig"
@@ -76,6 +85,10 @@ which extended-platform-tests
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+if [ -f "${SHARED_DIR}/runtime_env" ]; then
+    source "${SHARED_DIR}/runtime_env"
 fi
 
 # restore external oidc cache dir for oc
@@ -126,19 +139,19 @@ else
 fi
 
 mkdir -p ~/.ssh
-cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
+cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
 eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
 
-test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does not exist"
-cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
+test -f "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-publickey" || echo "ssh-publickey file does not exist"
+cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-publickey" ~/.ssh/ssh-publickey || true
 chmod 0644 ~/.ssh/ssh-publickey || true
 eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
 
 #set env for rosa which are required by hypershift qe team
-if test -f "${CLUSTER_PROFILE_DIR}/ocm-token"
+if test -f "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ocm-token"
 then
-    TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
+    TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
 if test -f "${SHARED_DIR}/cluster-id"
@@ -155,14 +168,14 @@ gcp)
     export KUBE_SSH_USER=core
     export SSH_CLOUD_PRIV_GCP_USER="${QE_BASTION_SSH_USER:-core}"
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/google_compute_engine || true
     PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
 aws)
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
@@ -178,7 +191,7 @@ aws-usgov|aws-c2s|aws-sc2s)
     ;;
 alibabacloud)
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_alibaba_rsa || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/kube_alibaba_rsa || true
     export SSH_CLOUD_PRIV_ALIBABA_USER="${QE_BASTION_SSH_USER:-core}"
     export KUBE_SSH_USER=core
     export PROVIDER_ARGS="-provider=alibabacloud -gce-zone=us-east-1"
@@ -187,7 +200,7 @@ alibabacloud)
 ;;
 azure4|azuremag|azure-arm64)
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
+    cp "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
     export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
     export TEST_PROVIDER=azure
     ;;
@@ -214,10 +227,10 @@ openstack*)
 ibmcloud)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     export SSH_CLOUD_PRIV_IBMCLOUD_USER="${QE_BASTION_SSH_USER:-core}"
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
+equinix-edge-enablement|equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -335,7 +348,9 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
-    extended-platform-tests run all --dry-run | \
+    echo "SHARD_ARGS=\"${SHARD_ARGS}\""
+
+    extended-platform-tests run all --dry-run ${SHARD_ARGS:-} | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
@@ -376,9 +391,10 @@ function run {
 
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
+    remove_kubeadmin_user
+    create_must-gather_dir_for_case
     ret_value=0
     set -x
-    remove_kubeadmin_user
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
@@ -476,7 +492,7 @@ function handle_filters {
     done
 
     echo "handle AND logical"
-    for filter in ${filters_and[*]}
+    for filter in "${filters_and[@]}"
     do
         echo "handle filter_and ${filter}"
         handle_and_filter "${filter}"
@@ -484,7 +500,7 @@ function handle_filters {
 
     echo "handle OR logical"
     rm -fr ./case_selected_or
-    for filter in ${filters_or[*]}
+    for filter in "${filters_or[@]}"
     do
         echo "handle filter_or ${filter}"
         handle_or_filter "${filter}"
@@ -617,6 +633,23 @@ function check_case_selected {
         echo "find case"
     else
         echo "do not find case"
+    fi
+}
+function create_must-gather_dir_for_case {
+    MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO"
+    # MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO|OLM"
+
+    if echo ${test_scenarios} | grep -qE "${MOUDLE_NEED_MUST_GATHER_PER_CASE}"; then
+        mkdir -p "${ARTIFACT_DIR}/must-gather" || true
+        if [ -d "${ARTIFACT_DIR}/must-gather" ]; then
+            export QE_MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"
+        else
+            unset QE_MUST_GATHER_DIR
+        fi
+        # need to check if QE_MUST_GATHER_DIR is empty in case code. 
+        # if empty, it means there is no such dir, can not put must-gather file into there.
+        # if it is not empty, it means there is such dir. and need to check the existing dir size + must-gather file size is 
+        # greater than 500M, if it is greater, please do not put it. or else, put must-gather into there.
     fi
 }
 run

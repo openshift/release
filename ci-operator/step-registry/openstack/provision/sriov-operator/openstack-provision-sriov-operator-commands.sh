@@ -14,6 +14,14 @@ then
 	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+# If this file is present, we want to run the tests against an Hypershift HostedCluster
+# and therefore we want to load the KUBECONFIG from a specific path.
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+	export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+fi
+
 function wait_for_sriov_pods() {
     # Wait up to 15 minutes for SNO to be installed
     for _ in $(seq 1 15); do
@@ -51,8 +59,8 @@ function wait_for_sriov_pods() {
 }
 
 function wait_for_sriov_network_node_state() {
-    # Wait up to 5 minutes for SriovNetworkNodeState to be succeeded
-    for _ in $(seq 1 10); do
+    # Wait up to 15 minutes for SriovNetworkNodeState to be succeeded
+    for _ in $(seq 1 30); do
         NODES_READY=$(oc get SriovNetworkNodeState --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.syncStatus}' | grep Succeeded | wc -l || true)
         if [ "${NODES_READY}" == "1" ]; then
             FOUND_NODE=1
@@ -63,7 +71,7 @@ function wait_for_sriov_network_node_state() {
     done
 
     if [ ! -n "${FOUND_NODE:-}" ] ; then
-        echo "SriovNetworkNodeState is not succeeded after 5 minutes"
+        echo "SriovNetworkNodeState is not succeeded after 15 minutes"
         oc get SriovNetworkNodeState -n openshift-sriov-network-operator -o yaml
         exit 1
     fi
@@ -92,6 +100,9 @@ if [ -n "${is_dev_version:-}" ]; then
     export SRIOV_NETWORK_CONFIG_DAEMON_IMAGE=quay.io/openshift/origin-sriov-network-config-daemon:${oc_version}
     export SRIOV_NETWORK_WEBHOOK_IMAGE=quay.io/openshift/origin-sriov-network-webhook:${oc_version}
     export SRIOV_NETWORK_OPERATOR_IMAGE=quay.io/openshift/origin-sriov-network-operator:${oc_version}
+    export METRICS_EXPORTER_IMAGE=quay.io/openshift/origin-sriov-network-metrics-exporter:${oc_version}
+    export METRICS_EXPORTER_KUBE_RBAC_PROXY_IMAGE=quay.io/openshift/origin-kube-rbac-proxy:${oc_version}
+    export RDMA_CNI_IMAGE=quay.io/openshift/origin-rdma-cni:${oc_version}
     export OVS_CNI_IMAGE=""
     unset NAMESPACE
     # CLUSTER_TYPE is used by both openshift/release and the operator, so we need to unset it
@@ -109,16 +120,21 @@ if [ -n "${is_dev_version:-}" ]; then
         pod-security.kubernetes.io/warn=privileged \
         security.openshift.io/scc.podSecurityLabelSync=false
 
-    # Use private credentials to pull CNF images
-    # See in our vault: shiftstack-secrets/quay-openshift-credentials
-    QUAY_USERNAME=$(cat /var/run/quay-openshift-credentials/quay_username)
-    QUAY_PASSWORD=$(cat /var/run/quay-openshift-credentials/quay_password)
-    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
-    QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
-    jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift": {"auth":$QUAY_AUTH}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
-    mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
-    rm /tmp/global-pull-secret.json
+    # On Hypershift deployments, the CNF credentials have already been loaded when creating
+    # the HostedCluster so we don't need to do it again.
+    if ! test -f "${SHARED_DIR}/nested_kubeconfig"
+    then
+    	# Use private credentials to pull CNF images
+    	# See in our vault: shiftstack-secrets/quay-openshift-credentials
+    	QUAY_USERNAME=$(cat /var/run/quay-openshift-credentials/quay_username)
+    	QUAY_PASSWORD=$(cat /var/run/quay-openshift-credentials/quay_password)
+    	oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+    	QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
+    	jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift": {"auth":$QUAY_AUTH}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+    	mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
+    	oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
+    	rm /tmp/global-pull-secret.json
+    fi
 
     make deploy-setup
     popd
@@ -177,6 +193,26 @@ EOF
         echo "Waiting for sriov-network-operator to be installed"
         sleep 10
     done
+
+    # This is only needed on ocp 4.16+
+    # introduced https://github.com/openshift/sriov-network-operator/pull/887
+    # u/s https://github.com/k8snetworkplumbingwg/sriov-network-operator/pull/617
+    if (( $(echo "$oc_version >= 4.16" | bc -l) )); then
+        SRIOV_OPERATOR_CONFIG=$(
+            oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+    apiVersion: sriovnetwork.openshift.io/v1
+    kind: SriovOperatorConfig
+    metadata:
+      name: default
+      namespace: openshift-sriov-network-operator
+    spec:
+      enableInjector: true
+      enableOperatorWebhook: true
+      logLevel: 2
+EOF
+        )
+        echo "Created \"$SRIOV_OPERATOR_CONFIG\" SriovOperatorConfig"
+    fi
 
     if [ -n "${FOUND_SNO:-}" ] ; then
         wait_for_sriov_pods

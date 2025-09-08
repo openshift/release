@@ -1,16 +1,20 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.18"
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   hypershift-operator:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: "4.18"
-    namespace: ocp
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.18_base-rhel9:
     name: "4.18"
     namespace: ocp
@@ -19,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
 binary_build_commands: make manager-core
 build_root:
   from_repository: true
@@ -35,8 +43,7 @@ images:
   to: cluster-capi-controllers
 promotion:
   to:
-  - disabled: true
-    name: "4.18"
+  - name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -89,6 +96,34 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp
+- as: e2e-azure-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: openshift/e2e-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure
+- as: e2e-vsphere-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: openshift/e2e-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
 - as: e2e-openstack-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -111,20 +146,33 @@ tests:
 - as: e2e-aws-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
+- as: regression-clusterinfra-aws-ipi-techpreview-capi
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@capi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 7h30m0s
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

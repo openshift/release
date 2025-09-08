@@ -1,20 +1,20 @@
 base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   installer:
-    name: "4.17"
+    name: "4.19"
     namespace: ocp
     tag: installer
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_4.20_base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   image_stream_tag:
     name: release
@@ -22,18 +22,20 @@ build_root:
     tag: golang-1.22
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: image-based-install-operator
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -47,11 +49,13 @@ tests:
     HOME=/tmp make build
   container:
     from: src
+  restrict_network_access: false
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: unit-test
   commands: HOME=/tmp make test
   container:
     from: src
+  restrict_network_access: false
 - as: integration
   cluster_claim:
     architecture: amd64
@@ -59,7 +63,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.17"
+  restrict_network_access: false
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -77,16 +82,18 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ibio
-  optional: true
+  cluster: build05
   steps:
     cluster_profile: packet-assisted
     dependencies:
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: image-based-install-operator
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.19"
+    workflow: image-based-install-operator-ofcir
 - as: e2e-ibio-periodic
+  cluster: build05
   cron: 00 00 * * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -94,8 +101,31 @@ tests:
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
-    workflow: image-based-install-operator
+      SEED_IMAGE_TAG: "4.19"
+    workflow: image-based-install-operator-ofcir
+- as: ibio-reinstall
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      IMG: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.19"
+    workflow: image-based-install-operator-ofcir-reinstall
+- as: ibio-reinstall-periodic
+  cluster: build05
+  cron: 00 00 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      IMG: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      SEED_IMAGE_TAG: "4.19"
+    workflow: image-based-install-operator-ofcir-reinstall
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -2,6 +2,8 @@ presubmits:
   openshift/assisted-installer:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(deploy/.*|hack/.*|src/.*|vendor/.*|Dockerfile.*|Makefile|go\.mod|go\.sum|\.dockerignore)$
     branches:
     - ^release-ocm-2\.10$
     - ^release-ocm-2\.10-
@@ -11,12 +13,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-release-ocm-2.10-e2e-ai-operator-ztp
     rerun_command: /test e2e-ai-operator-ztp
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -25,7 +27,6 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-cluster-profile
         - --target=e2e-ai-operator-ztp
         command:
         - ci-operator
@@ -42,8 +43,6 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -67,9 +66,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -86,6 +82,83 @@ presubmits:
     - ^release-ocm-2\.10$
     - ^release-ocm-2\.10-
     cluster: build05
+    context: ci/prow/e2e-ai-operator-ztp-sno-day2-workers
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-installer-release-ocm-2.10-e2e-ai-operator-ztp-sno-day2-workers
+    optional: true
+    rerun_command: /test e2e-ai-operator-ztp-sno-day2-workers
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ai-operator-ztp-sno-day2-workers
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-sno-day2-workers,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-ocm-2\.10$
+    - ^release-ocm-2\.10-
+    cluster: build07
     context: ci/prow/format-check
     decorate: true
     labels:
@@ -94,7 +167,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-release-ocm-2.10-format-check
     rerun_command: /test format-check
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -140,7 +213,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.10$
     - ^release-ocm-2\.10-
-    cluster: build05
+    cluster: build07
     context: ci/prow/images
     decorate: true
     labels:
@@ -194,7 +267,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.10$
     - ^release-ocm-2\.10-
-    cluster: build05
+    cluster: build07
     context: ci/prow/lint
     decorate: true
     labels:
@@ -203,7 +276,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-release-ocm-2.10-lint
     rerun_command: /test lint
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -249,7 +322,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.10$
     - ^release-ocm-2\.10-
-    cluster: build05
+    cluster: build07
     context: ci/prow/mce-images
     decorate: true
     labels:
@@ -304,7 +377,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.10$
     - ^release-ocm-2\.10-
-    cluster: build05
+    cluster: build07
     context: ci/prow/unit-test
     decorate: true
     labels:
@@ -313,7 +386,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-release-ocm-2.10-unit-test
     rerun_command: /test unit-test
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:

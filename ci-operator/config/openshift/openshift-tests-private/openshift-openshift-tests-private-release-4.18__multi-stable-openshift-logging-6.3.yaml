@@ -1,0 +1,99 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.19"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: azure-ipi-arm-f999-logging
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      FILTERS_ADDITIONAL: ""
+      LOGGING_TEST_VERSION: "6.3"
+      OCP_ARCH: arm64
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~AZWIF&;~Splunk&
+      TEST_IMPORTANCE: Critical|High|Medium|Low
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-logging-deploy-operators
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: gcp-ipi-proxy-oidc-amd-f999-logging
+  cron: 31 13 29 2 *
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      COMPUTE_NODE_TYPE: e2-standard-8
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_TEST_VERSION: "6.3"
+      OCP_ARCH: amd64
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~GCL&;~AZWIF&;~AZMonitor&
+      TEST_IMPORTANCE: Critical|High|Medium
+      TEST_PARALLEL: "3"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - chain: openshift-logging-deploy-operators
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-stable-openshift-logging-6.3

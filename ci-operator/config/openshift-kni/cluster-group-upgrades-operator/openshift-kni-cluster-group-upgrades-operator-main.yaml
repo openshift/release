@@ -2,7 +2,7 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   from_repository: true
 images:
@@ -25,17 +25,17 @@ operator:
     with: pipeline:cluster-group-upgrades-operator
 promotion:
   to:
-  - name: "4.17"
+  - name: "4.20"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.17"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -48,10 +48,15 @@ tests:
 - as: ci-job
   commands: |
     unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
   container:
     from: src
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: integration
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws-telco
     env:
@@ -67,6 +72,22 @@ tests:
         ci-job-type optional-operators-ci-aws
         ci-repo-name cluster-group-upgrades-operator
         ci-org-name openshift-kni
+    pre:
+    - chain: ipi-aws-pre
+    - as: pre
+      cli: latest
+      commands: |
+        KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG
+        cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        make non-kind-deps-update
+        make install-acm-crds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: optional-operators-subscribe
     test:
     - as: integration
       cli: latest
@@ -81,6 +102,17 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: tekton-linting
+  commands: |
+    unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make yamllint
+  container:
+    from: src
+  optional: true
+  run_if_changed: ^(?:.*/)?(?:\.tekton/.*|\.konflux/.*)$
 - as: security
   optional: true
   steps:

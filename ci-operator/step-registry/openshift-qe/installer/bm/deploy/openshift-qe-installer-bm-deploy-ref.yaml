@@ -2,20 +2,21 @@ ref:
   as: openshift-qe-installer-bm-deploy
   from_image:
     namespace: ci
-    name: telco-bastion
+    name: ocp-qe-perfscale-ci
     tag: latest
+  cli: latest
   commands: openshift-qe-installer-bm-deploy-commands.sh
-  credentials:
-    - namespace: test-credentials # this entry injects the custom credential
-      name: perfscale-metal-bastion
-      mount_path: /secret
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   env:
+    - name: BASTION_VLANED_INTERFACE
+      default: "ens1f1"
+      documentation: |-
+        Bastion VLAN Interface
     - name: CRUCIBLE
-      default: "true"
+      default: "false"
       documentation: |-
         Enable or disable crucible install on the bastion
     - name: FIPS
@@ -23,7 +24,7 @@ ref:
       documentation: |-
         Enable or disable fips
     - name: JETLAG_BRANCH
-      default: "v0.0.3"
+      default: "v0.3.6"
       documentation: |-
         Jetlag release tag
     - name: JETLAG_LATEST
@@ -34,35 +35,19 @@ ref:
       default: ""
       documentation: |-
         If defined, use a specific jetlag PR. When defined, JETLAG_LATEST and JETLAG_BRANCH get ignored.
-    - name: LAB
-      default: "performancelab"
-      documentation: |-
-        Lab where the hardware is located
-    - name: LAB_CLOUD
-      default: "cloud31"
-      documentation: |-
-        Lab allocation
-    - name: NUM_SNO_NODES
-      default: "1"
-      documentation: |-
-        Number of SNO nodes
     - name: NUM_WORKER_NODES
-      default: "1"
+      default: ""
       documentation: |-
         Number of worker nodes
-    - name: OCP_BUILD
-      default: "ga"
-      documentation: |-
-        Whether the build should use 'dev' (nightly builds) or 'ga' for Generally Available version of OpenShift
-    - name: OCP_VERSION
-      default: "latest-4.15"
-      documentation: |-
-        Short Version. Values accepted: latest-4.14, explicit version i.e. 4.15.2 or for dev builds, candidate-4.16
     - name: PUBLIC_VLAN
-      default: "false"
+      default: "true"
       documentation: |-
-        Host your SNO cluster on lab public routable VLAN network
+        Host cluster on a lab public routable VLAN network
     - name: TYPE
-      default: "bm"
+      default: "mno"
       documentation: |-
-        BM, SNO or RWN.
+        mno, sno
+    - name: NUM_HYBRID_WORKER_NODES
+      default: ""
+      documentation: |-
+        Number of VM worker nodes

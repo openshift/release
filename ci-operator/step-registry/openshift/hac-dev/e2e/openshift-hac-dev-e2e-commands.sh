@@ -18,6 +18,11 @@ CYPRESS_RP_HAC=$(cat /usr/local/ci-secrets/github/report-portal-token-hac)
 CYPRESS_VC_KUBECONFIG=$(cat /usr/local/ci-secrets/github/vc-kubeconfig)
 CYPRESS_SNYK_TOKEN=$(cat /usr/local/ci-secrets/github/snyk_token)
 
+#Vault Secrets for RH Trusted Profile Analyzer (testing SBOM)
+export CYPRESS_ATLAS_PASSWORD CYPRESS_ATLAS_USERNAME
+CYPRESS_ATLAS_USERNAME=$(cat /usr/local/ci-secrets/github/atlas_stage_acc)
+CYPRESS_ATLAS_PASSWORD=$(cat /usr/local/ci-secrets/github/atlas_stage_pass)
+
 #QONTRACT
 export QONTRACT_PASSWORD QONTRACT_USERNAME QONTRACT_BASE_URL
 QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/github/QONTRACT_PASSWORD)
@@ -69,6 +74,7 @@ bonfire deploy hac \
         --source=appsre \
         --clowd-env ${ENV_NAME} \
         --namespace ${NAMESPACE} \
+        --set-image-tag quay.io/redhat-services-prod/hcc-platex-services/chrome-service=latest \
         --timeout 1200
 
 # Hacks for clowder and keycloak integration
@@ -82,6 +88,13 @@ oc get deployment $ENV_NAME-mbop -o json | \
      {"name": "KEYCLOAK_PASSWORD", "value": $pass},
      {"name": "KEYCLOAK_VERSION", "value": "23.0.1"}])' | oc replace -f -
 oc rollout status deployment $ENV_NAME-mbop
+
+# workaround for BETA flag being used on testing env (eph env)
+oc get frontend hac-dev --output json | jq '.spec.frontend.paths += ["/beta/api/plugins/hac-dev"]' | oc apply -f -
+oc get frontend hac-core --output json | jq '.spec.frontend.paths += ["/beta/apps/hac-core"]' | oc apply -f -
+
+oc rollout status deployment hac-dev-frontend
+oc rollout status deployment hac-core-frontend
 
 # Call the keycloak API and add a user
 B64_USER=$(oc get secret ${ENV_NAME}-keycloak -o json | jq '.data.username'| tr -d '"')

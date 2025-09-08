@@ -35,19 +35,12 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   latest:
-    prerelease:
+    release:
       architecture: multi
-      product: ocp
-      version_bounds:
-        lower: 4.15.0-0
-        upper: 4.16.0-0
+      channel: fast
+      version: "4.15"
   target:
     release:
       architecture: multi
@@ -115,8 +108,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
-- as: gcp-ipi-proxy-oidc-amd-mixarch-f28
-  cron: 33 4 7 * *
+- as: gcp-ipi-proxy-private-mini-perm-amd-mixarch-f28
+  cron: 4 2 14 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -124,11 +117,11 @@ tests:
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       ENABLE_OTA_TEST: OCP-24358
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

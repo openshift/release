@@ -3,6 +3,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   initial:
     candidate:
@@ -26,7 +30,6 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
@@ -35,10 +38,10 @@ tests:
 - as: e2e-aws-ovn-no-capabilities
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-      BASE_DOMAIN: aws-2.ci.openshift.org
+        Ingress
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
       TEST_SKIPS: check registry.redhat.io is available and samples operator can import
@@ -51,8 +54,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -60,9 +61,7 @@ tests:
 - as: e2e-aws-ovn-proxy
   interval: 168h
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -70,19 +69,26 @@ tests:
 - as: e2e-aws-ovn-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-ovn-tls-13
+  interval: 168h
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-tls-13
 - as: e2e-aws-ovn-techpreview-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
@@ -91,9 +97,8 @@ tests:
 - as: e2e-aws-ovn-upgrade
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -103,12 +108,11 @@ tests:
 - as: e2e-aws-ovn-upgrade-out-of-change
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -119,8 +123,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
     observers:
       enable:
       - observers-resource-watch
@@ -146,16 +148,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
-- as: e2e-azure-sdn-serial
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-azure-sdn-serial
 - as: e2e-azure-ovn-techpreview-serial
   interval: 168h
   steps:
@@ -167,33 +159,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
-- as: e2e-azure-sdn-upgrade
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-azure-sdn
-- as: e2e-azure-sdn-upgrade-out-of-change
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-azure-sdn
 - as: e2e-azure-ovn-upgrade
   interval: 168h
   steps:
@@ -244,16 +209,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-ovn
-- as: e2e-gcp-sdn
-  interval: 168h
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-techpreview
   interval: 168h
   steps:
@@ -274,10 +229,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-xpn
+  interval: 168h
+  steps:
+    cluster_profile: gcp
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-xpn
 - as: e2e-gcp-ovn-mount-ns-hiding
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FAIL_ON_CORE_DUMP: "true"
       MOUNT_NS_HIDING_ENABLED: "true"
@@ -296,35 +259,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
-- as: e2e-gcp-sdn-upgrade
-  cluster: build02
-  interval: 168h
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-gcp-sdn
-- as: e2e-gcp-sdn-upgrade-out-of-change
-  cluster: build02
-  interval: 168h
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
-  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -335,7 +270,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-ovn-upgrade-out-of-change
-  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-3
@@ -368,16 +302,15 @@ tests:
 - as: e2e-aws-upgrade-ovn-single-node
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node
 - as: e2e-vsphere-ovn-upgrade
-  interval: 168h
+  cron: 40 22 * * 5
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -397,10 +330,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-crun
 - as: e2e-gcp-crun-upgrade
-  cluster: build02
   cron: '@daily'
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -411,9 +343,8 @@ tests:
 - as: e2e-aws-crun-upgrade
   cron: '@daily'
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -421,7 +352,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-crun
 - as: e2e-vsphere-crun-upgrade
-  cron: '@daily'
+  cron: 4 18 * * *
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -441,8 +372,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-cgroupsv1
 - as: e2e-gcp-cgroupsv1-upgrade
-  cluster: build02
-  cron: '@daily'
+  cron: '@weekly'
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
@@ -455,9 +385,8 @@ tests:
 - as: e2e-aws-cgroupsv1-upgrade
   cron: '@daily'
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -465,7 +394,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-cgroupsv1
 - as: e2e-vsphere-cgroupsv1-upgrade
-  cron: '@daily'
+  cron: 0 2 * * 2
   steps:
     cluster_profile: vsphere-elastic
     observers:

@@ -3,6 +3,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base
+  cnv-ci:
+    name: "4.18"
+    namespace: cnv
+    tag: cnv-ci-src-upgrade
   cnv-ci-src:
     name: "4.18"
     namespace: cnv
@@ -23,14 +27,69 @@ releases:
       product: ocp
       stream: nightly
       version: "4.18"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.18"
+  multi-latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-azure-deploy-cnv
-  interval: 168h
+- as: e2e-aws-arm64-deploy-cnv
+  cron: 34 16 6 2 *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c6g.metal
+      KUBEVIRT_RELEASE: v0.55.0
+      KUBEVIRT_STORAGECLASS_NAME: gp3-csi
+      KUBEVIRT_STORAGECLASS_RWX_NAME: ""
+      OCP_ARCH: arm64
+      OCP_VERSION: "4.18"
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: cnv-e2e
+    workflow: ipi-aws
+- as: e2e-aws-arm64-upgrade-cnv
+  cron: 21 10 18 8 *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c6g.metal
+      KUBEVIRT_RELEASE: v0.55.0
+      KUBEVIRT_STORAGECLASS_NAME: gp3-csi
+      KUBEVIRT_STORAGECLASS_RWX_NAME: ""
+      MAKEFILE_TARGET: upgrade_test
+      OCP_ARCH: arm64
+      OCP_VERSION: "4.18"
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: cnv-e2e
+    workflow: ipi-aws
+- as: deploy-azure-kubevirt-ovn
+  interval: 24h
   steps:
     cluster_profile: azure-2
     env:
@@ -48,7 +107,8 @@ tests:
         cd /tmp/cnv-ci
         make deploy_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: ""
+        mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:
@@ -56,7 +116,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.55.0
+      - default: v1.4.0
         name: KUBEVIRT_RELEASE
       - default: "4.18"
         name: OCP_VERSION
@@ -64,7 +124,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "false"
+      - default: "true"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src
       resources:
@@ -72,8 +132,8 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-azure-upgrade-cnv
-  interval: 168h
+- as: upgrade-azure-kubevirt-ovn
+  cron: 29 10 9 5 *
   steps:
     cluster_profile: azure-2
     env:
@@ -90,7 +150,8 @@ tests:
         cd /tmp/cnv-ci
         make upgrade_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: ""
+        mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:
@@ -98,7 +159,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.55.0
+      - default: v1.4.0
         name: KUBEVIRT_RELEASE
       - default: "4.18"
         name: OCP_VERSION
@@ -106,7 +167,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "false"
+      - default: "true"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src-upgrade
       resources:

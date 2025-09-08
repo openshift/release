@@ -15,18 +15,26 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
     namespace: ci
-    tag: latest
+    tag: "4.14"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -34,7 +42,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: latest
+    tag: release
   tests-private:
     name: tests-private
     namespace: ci
@@ -59,11 +67,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -91,36 +98,8 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: alibaba-ipi-private-fips-f28
-  cron: 36 15 26 * *
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - ref: api-job-k8sgpt
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
-- as: alibaba-ipi-private-fips-f28-destructive
-  cron: 6 5 11 * *
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
-- as: alibaba-ipi-private-fips-f28-ui
-  cron: 26 20 7 * *
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-e2e-test-qe-ui
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
 - as: aws-c2s-ipi-disc-priv-fips-f28
-  cron: 42 15 5 * *
+  cron: 16 14 26 * *
   steps:
     cluster_profile: aws-c2s-qe
     env:
@@ -133,7 +112,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-c2s-ipi-disc-priv-fips-f28-destructive
-  cron: 44 20 10 * *
+  cron: 10 8 8 * *
   steps:
     cluster_profile: aws-c2s-qe
     env:
@@ -145,8 +124,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-disc-priv-f28-ota
-  cron: 23 20 19 * *
+- as: aws-ipi-disc-priv-f28-longrun-ota
+  cron: 4 6 25 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -156,10 +135,10 @@ tests:
       TEST_FILTERS: DisconnectedOnly&
       TEST_SCENARIOS: OTA
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-localzone-fips-f28
-  cron: 26 21 9 * *
+  cron: 34 23 17 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -172,7 +151,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
 - as: aws-ipi-disc-priv-localzone-fips-f28-destructive
-  cron: 4 8 11 * *
+  cron: 21 22 13 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -184,20 +163,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-edge-zone
-- as: aws-ipi-disc-priv-f28-longduration-cloud
-  cron: 43 16 13 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longduration
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-sdn-rhcos-rhel8-f28
-  cron: 53 23 24 * *
+  cron: 5 22 25 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -209,7 +176,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sdn-workers-rhcos-rhel8
 - as: aws-ipi-disc-priv-sdn-rhcos-rhel8-f28-destructive
-  cron: 51 3 27 * *
+  cron: 11 2 2 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -220,64 +187,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sdn-workers-rhcos-rhel8
-- as: aws-ipi-disc-priv-sts-basecap-none-f28
-  cron: 26 22 2 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-basecap-none-f28-destructive
-  cron: 12 16 21 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disc-priv-sts-efs-f28
-  cron: 14 7 4 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
-- as: aws-ipi-disc-priv-sts-efs-f28-destructive
-  cron: 5 2 14 * *
-  steps:
-    cluster_profile: aws-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disc-priv-sts-ep-fips-f28
   cron: 16 2 24 * *
   steps:
@@ -305,7 +214,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-disc-priv-workers-rhcos-rhel8-f28
-  cron: 19 13 5 * *
+  cron: 14 4 3 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -317,7 +226,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-workers-rhcos-rhel8
 - as: aws-ipi-disc-priv-workers-rhcos-rhel8-f28-destructive
-  cron: 32 4 5 * *
+  cron: 41 16 25 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -329,7 +238,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-workers-rhcos-rhel8
 - as: aws-ipi-efa-pg-f28
-  cron: 42 10 18 * *
+  cron: 2 6 5 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -338,7 +247,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-efa-pg
 - as: aws-ipi-efa-pg-f28-destructive
-  cron: 17 7 27 * *
+  cron: 21 2 24 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -347,7 +256,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-efa-pg
 - as: aws-ipi-f28-longduration-hive-remaining
-  cron: 9 21 22 * *
+  cron: 43 2 3 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -359,7 +268,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f28-longduration-hive-sd-rosa
-  cron: 3 12 12 * *
+  cron: 6 0 22 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -368,10 +277,10 @@ tests:
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f28-longduration-hive-spec
-  cron: 37 18 25 * *
+  cron: 55 4 23 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -383,7 +292,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-localzone-byo-subnet-ovn-day2-f28
-  cron: 15 19 24 * *
+  cron: 14 13 7 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -392,7 +301,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn-day2
 - as: aws-ipi-localzone-byo-subnet-ovn-day2-f28-destructive
-  cron: 41 2 23 * *
+  cron: 23 16 11 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -401,7 +310,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn-day2
 - as: aws-ipi-localzone-byo-subnet-sdn-f28
-  cron: 2 11 24 * *
+  cron: 29 1 24 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -410,7 +319,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-sdn
 - as: aws-ipi-localzone-byo-subnet-sdn-f28-destructive
-  cron: 15 13 26 * *
+  cron: 34 21 7 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -419,7 +328,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-sdn
 - as: aws-ipi-localzone-fips-f28
-  cron: 24 5 20 * *
+  cron: 32 3 15 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -429,7 +338,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone
 - as: aws-ipi-localzone-fips-f28-destructive
-  cron: 25 3 26 * *
+  cron: 33 9 26 * *
   steps:
     cluster_profile: aws-1-qe
     env:
@@ -439,7 +348,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone
 - as: aws-ipi-ovn-efs-fips-f28-ui
-  cron: 22 12 15 * *
+  cron: 24 17 8 * *
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
@@ -451,7 +360,7 @@ tests:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
 - as: aws-ipi-ovn-hypershift-arm-nodepool-guest-f28
-  cron: 48 4 19 * *
+  cron: 36 16 20 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -466,7 +375,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-arm-nodepool-guest-f28-destructive
-  cron: 42 8 15 * *
+  cron: 24 22 13 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -481,7 +390,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-arm-nodepool-mgmt-f28
-  cron: 7 10 2 * *
+  cron: 9 19 24 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -490,28 +399,22 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-hypershift-fips-mgmt-f28
-  cron: 1 8 14 * *
+  cron: 41 7 16 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --fips
       FIPS_ENABLED: "true"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-hypershift-fips-guest-f28
-  cron: 33 12 23 * *
+  cron: 13 19 19 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -524,7 +427,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-fips-guest-f28-destructive
-  cron: 47 14 7 * *
+  cron: 55 19 24 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -537,7 +440,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-guest-critical-f28
-  cron: 35 12 23 * *
+  cron: 42 16 10 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -549,7 +452,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-install-f28-longduration
-  cron: 59 8 16 * *
+  cron: 11 3 29 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -560,20 +463,17 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: aws-ipi-ovn-hypershift-mgmt-critical-f28
-  cron: 49 4 19 * *
+  cron: 16 22 10 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_IMPORTANCE: Critical
-      TEST_TIMEOUT: "90"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-hypershift-mce-guest-f28
-  cron: 13 12 18 * *
+  cron: 45 19 28 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -585,7 +485,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-guest-f28-destructive
-  cron: 10 15 23 * *
+  cron: 15 12 26 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -597,7 +497,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-guest-f28-longduration
-  cron: 14 11 13 * *
+  cron: 48 18 12 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -606,36 +506,30 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
       TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-hypershift-qe-longduration
+    - chain: openshift-e2e-test-hypershift-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-mgmt-f28
-  cron: 21 11 5 * *
+  cron: 29 23 10 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       MCE_VERSION: "2.4"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
 - as: aws-ipi-ovn-hypershift-mce-mgmt-f28-longduration
-  cron: 31 18 22 * *
+  cron: 37 1 3 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       MCE_VERSION: "2.4"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
-      TEST_TIMEOUT: "90"
     test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt-longduration
+    - chain: openshift-e2e-test-hypershift-qe-mgmt-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
 - as: aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f28
-  cron: 11 23 23 * *
+  cron: 6 0 16 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -648,7 +542,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-ibmz-guest
 - as: aws-ipi-ovn-hypershift-mce-ibmz-mgmt-critical-f28
-  cron: 41 2 22 * *
+  cron: 52 9 23 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -660,7 +554,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-ibmz
 - as: aws-ipi-ovn-hypershift-mce-power-guest-critical-f28
-  cron: 6 8 17 * *
+  cron: 17 20 23 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -673,21 +567,18 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-power-guest
 - as: aws-ipi-ovn-hypershift-mce-power-mgmt-critical-f28
-  cron: 3 16 30 * *
+  cron: 30 16 18 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       MCE_VERSION: "2.4"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_IMPORTANCE: Critical
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-power
 - as: aws-ipi-ovn-hypershift-public-private-guest-f28
-  cron: 42 6 24 * *
+  cron: 31 1 4 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -698,19 +589,16 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-public-private-guest
 - as: aws-ipi-ovn-hypershift-public-private-mgmt-f28
-  cron: 54 14 17 * *
+  cron: 22 20 16 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-public-private
 - as: aws-ipi-ovn-hypershift-pub-private-guest-f28-destructive
-  cron: 24 18 21 * *
+  cron: 13 13 23 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -721,7 +609,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-public-private-guest
 - as: aws-ipi-ovn-ipsec-f28-obo
-  cron: 49 2 15 * *
+  cron: 34 15 2 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -734,7 +622,7 @@ tests:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-ovn-ipsec-to-multiarch-f28
-  cron: 56 1 24 * *
+  cron: 31 1 4 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -746,18 +634,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-winc-f28
-  cron: 16 15 24 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
 - as: aws-ipi-private-fips-f28-disasterrecovery
   cron: 57 23 12 * *
   steps:
@@ -769,7 +645,7 @@ tests:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: aws-ipi-private-shared-vpc-phz-sts-f28
-  cron: 39 14 5 * *
+  cron: 30 14 20 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -779,7 +655,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
 - as: aws-ipi-private-shared-vpc-phz-sts-f28-destructive
-  cron: 28 23 2 * *
+  cron: 15 3 19 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -789,7 +665,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
 - as: aws-ipi-proxy-sdn-workers-rhel8-fips-f28
-  cron: 17 22 7 * *
+  cron: 23 7 3 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -798,7 +674,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8-fips
 - as: aws-ipi-proxy-sdn-workers-rhel8-fips-f28-destructive
-  cron: 0 3 22 * *
+  cron: 18 19 14 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -807,7 +683,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8-fips
 - as: aws-ipi-proxy-workers-rhel8-etcd-encryption-f28
-  cron: 9 14 25 * *
+  cron: 42 21 3 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -816,7 +692,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8-etcd-encryption
 - as: aws-ipi-proxy-workers-rhel8-etcd-encryptio-f28-destructive
-  cron: 46 3 17 * *
+  cron: 3 12 18 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -824,8 +700,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8-etcd-encryption
-- as: aws-ipi-proxy-fips-f28-fips-check
-  cron: 7 22 12 * *
+- as: aws-ipi-proxy-fips-f999-fips-check
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -834,8 +710,22 @@ tests:
     test:
     - ref: fips-check-optional-operator-images-scan
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-longduration-mco-fips-proxy-all-f28
+  cron: 13 23 24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-shared-vpc-phz-f28
-  cron: 6 3 1 * *
+  cron: 44 7 16 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -844,7 +734,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz
 - as: aws-ipi-shared-vpc-phz-f28-destructive
-  cron: 1 14 27 * *
+  cron: 36 3 13 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -853,7 +743,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz
 - as: aws-ipi-shared-vpc-phz-sts-fips-f28
-  cron: 27 22 26 * *
+  cron: 30 12 4 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -864,7 +754,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
 - as: aws-ipi-shared-vpc-phz-sts-fips-f28-destructive
-  cron: 39 8 5 * *
+  cron: 27 2 16 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -875,7 +765,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
 - as: aws-ipi-workers-marketplace-f28
-  cron: 43 16 10 * *
+  cron: 8 22 10 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -884,7 +774,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-workers-marketplace
 - as: aws-ipi-workers-marketplace-f28-destructive
-  cron: 3 23 10 * *
+  cron: 55 19 9 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -892,241 +782,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-workers-marketplace
-- as: aws-ocm-osd-ccs-f28
-  cron: 33 23 24 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@osd_ccs'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: osd-ccs-aws
-- as: gcp-ocm-osd-ccs-f28
-  cron: 24 18 24 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@osd_ccs'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: osd-ccs-gcp
-- as: gcp-ocm-osd-ccs-marketplace-f28
-  cron: 17 0 6 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@osd_ccs'
-      OPENSHIFT_VERSION: "4.14"
-      SUBSCRIPTION_TYPE: marketplace-gcp
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: osd-ccs-gcp
-- as: gcp-ocm-osd-ccs-xpn-marketplace-f28
-  cron: 34 15 7 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@osd_ccs'
-      OPENSHIFT_VERSION: "4.14"
-      SUBSCRIPTION_TYPE: marketplace-gcp
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: osd-ccs-gcp-xpn
-- as: gcp-ocm-osd-ccs-xpn-private-f28
-  cron: 23 22 6 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@osd_ccs'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: osd-ccs-gcp-xpn-private
-- as: aws-rosa-non-sts-byo-vpc-kms-proxy-f28
-  cron: 25 21 13 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-non-sts-byo-vpc-kms-proxy
-- as: aws-rosa-sts-f28
-  cron: 20 6 27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts
-- as: aws-rosa-sts-byo-kms-oidc-f28
-  cron: 24 1 24 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-byo-kms-oidc
-- as: aws-rosa-sts-localzone-f28
-  cron: 13 6 6 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-localzone
-- as: aws-rosa-sts-security-group-f28
-  cron: 26 0 3 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-security-group
-- as: aws-rosa-sts-private-proxy-f28
-  cron: 7 5 13 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@disconnected and @rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-private-proxy
-- as: aws-rosa-sts-shared-vpc-f28
-  cron: 22 0 27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-shared-vpc
-- as: aws-rosa-hcp-int-full-f28
-  cron: 3 6 5 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp
-- as: aws-rosa-hcp-stage-full-f28
-  cron: 2 23 17 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp
-- as: aws-rosa-hcp-byo-kms-oidc-auditlog-int-full-f28
-  cron: 19 6 17 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
-- as: aws-rosa-hcp-byo-kms-oidc-auditlog-stage-full-f28
-  cron: 51 15 4 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
-- as: aws-rosa-hcp-private-proxy-int-full-f28
-  cron: 7 13 2 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-private-proxy
-- as: aws-rosa-hcp-private-proxy-stage-full-f28
-  cron: 15 14 13 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.14"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-sc2s-ipi-disc-priv-fips-f28
-  cron: 23 5 14 * *
+  cron: 5 2 7 * *
   steps:
     cluster_profile: aws-sc2s-qe
     env:
@@ -1138,7 +795,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-sc2s-ipi-disconnected-private
 - as: aws-sc2s-ipi-disc-priv-fips-f28-destructive
-  cron: 56 18 12 * *
+  cron: 31 13 20 * *
   steps:
     cluster_profile: aws-sc2s-qe
     env:
@@ -1150,7 +807,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-sc2s-ipi-disconnected-private
 - as: aws-usgov-ipi-disc-priv-f28
-  cron: 16 3 21 * *
+  cron: 46 14 6 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1161,7 +818,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-disconnected-private
 - as: aws-usgov-ipi-disc-priv-f28-destructive
-  cron: 36 1 14 * *
+  cron: 24 9 15 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1172,7 +829,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-disconnected-private
 - as: aws-usgov-ipi-private-f28
-  cron: 13 15 26 * *
+  cron: 35 21 3 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1181,7 +838,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
 - as: aws-usgov-ipi-private-f28-destructive
-  cron: 12 4 3 * *
+  cron: 36 11 18 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1190,7 +847,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
 - as: aws-usgov-ipi-private-f28-longduration-hive
-  cron: 4 16 7 * *
+  cron: 25 16 26 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1202,7 +859,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
 - as: aws-usgov-ipi-private-sts-f28
-  cron: 19 19 14 * *
+  cron: 33 23 26 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1212,7 +869,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
 - as: aws-usgov-ipi-private-sts-f28-destructive
-  cron: 36 23 20 * *
+  cron: 32 14 3 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1222,7 +879,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
 - as: aws-usgov-ipi-private-workers-marketplace-f28
-  cron: 4 9 21 * *
+  cron: 21 0 17 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1231,7 +888,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
 - as: aws-usgov-ipi-private-workers-marketplace-f28-destructive
-  cron: 25 18 15 * *
+  cron: 5 8 14 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
@@ -1240,33 +897,33 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
 - as: azure-ipi-f28-ota
-  cron: 33 3 19 * *
+  cron: 18 14 7 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@ota'
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: OTA
-      TEST_TIMEOUT: "75"
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-confidential-trustedlaunch-f28
-  cron: 6 15 13 * *
+  cron: 38 20 11 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+      ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
 - as: azure-ipi-confidential-trustedlaunch-f28-destructive
-  cron: 46 17 4 * *
+  cron: 34 2 11 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_DEFAULT_MACHINE: "true"
+      ENABLE_ENCRYPTIONATHOST_DEFAULT_MACHINE: "false"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
@@ -1295,7 +952,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
 - as: azure-ipi-f28-longduration-part3-3
-  cron: 34 0 3 * *
+  cron: 25 10 3 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1303,20 +960,21 @@ tests:
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "100"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-marketplace-mini-perm-f28
-  cron: 12 7 25 * *
+  cron: 39 9 17 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       OS_IMAGE_VERSION: 413.92.2023101700
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-marketplace-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-marketplace
 - as: azure-ipi-marketplace-noplan-f28-destructive
-  cron: 41 11 3 * *
+  cron: 4 23 4 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1337,7 +995,7 @@ tests:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f28
-  cron: 8 18 27 * *
+  cron: 33 16 7 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1346,7 +1004,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f28-ui
-  cron: 17 10 19 * *
+  cron: 12 11 24 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1355,7 +1013,7 @@ tests:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f28-destructive
-  cron: 20 19 20 * *
+  cron: 24 12 22 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1364,7 +1022,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
 - as: azure-ipi-to-multiarch-f28
-  cron: 6 19 24 * *
+  cron: 3 22 12 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1378,7 +1036,7 @@ tests:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-vmgenv1-f28
-  cron: 35 6 8 * *
+  cron: 42 17 12 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1390,7 +1048,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-generation
 - as: azure-ipi-vmgenv1-f28-destructive
-  cron: 34 13 5 * *
+  cron: 56 2 28 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1402,7 +1060,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-generation
 - as: azure-ipi-workers-rhel8-f28
-  cron: 32 10 16 * *
+  cron: 2 11 27 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1411,7 +1069,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
 - as: azure-ipi-workers-rhel8-f28-destructive
-  cron: 11 15 28 * *
+  cron: 46 13 28 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1420,7 +1078,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
 - as: azure-mag-ipi-f28-longduration-hive
-  cron: 39 10 27 * *
+  cron: 36 11 15 * *
   steps:
     cluster_profile: azuremag-qe
     env:
@@ -1432,7 +1090,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-mag-ipi
 - as: azure-mag-ipi-fips-f28
-  cron: 25 2 13 * *
+  cron: 50 22 27 * *
   steps:
     cluster_profile: azuremag-qe
     env:
@@ -1442,7 +1100,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-mag-ipi
 - as: azure-mag-ipi-fips-f28-destructive
-  cron: 31 5 7 * *
+  cron: 3 0 24 * *
   steps:
     cluster_profile: azuremag-qe
     env:
@@ -1452,7 +1110,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-mag-ipi
 - as: azure-mag-ipi-fullyprivate-f28
-  cron: 35 21 27 * *
+  cron: 39 15 24 * *
   steps:
     cluster_profile: azuremag-qe
     env:
@@ -1461,7 +1119,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: azure-mag-ipi-fullyprivate-f28-destructive
-  cron: 25 17 25 * *
+  cron: 55 3 22 * *
   steps:
     cluster_profile: azuremag-qe
     env:
@@ -1469,20 +1127,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
-- as: azure-mag-ipi-fullyprivate-f28-longduration-cloud
-  cron: 54 12 2 * *
-  steps:
-    cluster_profile: azuremag-qe
-    env:
-      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longduration
-    workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: azure-stack-ipi-f28
   cluster: build01
-  cron: 21 12 22 * *
+  cron: 22 15 13 * *
   steps:
     cluster_profile: azurestack-qe
     env:
@@ -1493,7 +1140,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-stack-ipi
 - as: azure-stack-ipi-f28-destructive
   cluster: build01
-  cron: 11 14 7 * *
+  cron: 54 11 3 * *
   steps:
     cluster_profile: azurestack-qe
     env:
@@ -1504,7 +1151,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-stack-ipi
 - as: azure-stack-ipi-proxy-fips-f28
   cluster: build01
-  cron: 29 3 25 * *
+  cron: 17 0 5 * *
   steps:
     cluster_profile: azurestack-qe
     env:
@@ -1516,7 +1163,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: azure-stack-ipi-proxy-fips-f28-destructive
   cluster: build01
-  cron: 12 14 6 * *
+  cron: 10 17 13 * *
   steps:
     cluster_profile: azurestack-qe
     env:
@@ -1528,7 +1175,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: azure-stack-upi-f28
   cluster: build01
-  cron: 4 22 8 * *
+  cron: 12 3 4 * *
   steps:
     cluster_profile: azurestack-qe
     env:
@@ -1539,7 +1186,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-stack-upi
 - as: azure-stack-upi-f28-destructive
   cluster: build01
-  cron: 20 19 21 * *
+  cron: 9 0 25 * *
   steps:
     cluster_profile: azurestack-qe
     env:
@@ -1550,7 +1197,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-stack-upi
 - as: baremetalds-hypershift-agent-mce-dualstack-guest-f28
   cluster: build05
-  cron: 3 0 3 * *
+  cron: 44 0 13 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1572,7 +1219,7 @@ tests:
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-hypershift-agent-mce-dualstack-guest-f28-des
   cluster: build05
-  cron: 15 20 14 * *
+  cron: 25 6 5 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1594,7 +1241,7 @@ tests:
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-hypershift-agent-mce-dualstack-mgmt-f28
   cluster: build05
-  cron: 6 10 21 * *
+  cron: 30 0 6 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1609,15 +1256,12 @@ tests:
       IP_STACK: v4v6
       LVM_OPERATOR_SUB_CHANNEL: stable-4.14
       MCE_VERSION: "2.4"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
 - as: baremetalds-hypershift-agent-mce-guest-f28
   cluster: build05
-  cron: 21 22 17 * *
+  cron: 24 10 16 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1630,7 +1274,7 @@ tests:
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-hypershift-agent-mce-guest-f28-des
   cluster: build05
-  cron: 7 12 29 * *
+  cron: 20 12 3 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1643,21 +1287,18 @@ tests:
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-hypershift-agent-mce-mgmt-f28
   cluster: build05
-  cron: 10 2 16 * *
+  cron: 26 17 21 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.14
       MCE_VERSION: "2.4"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
 - as: baremetalds-hypershift-agent-mce-disconnected-guest-f28
   cluster: build05
-  cron: 25 18 5 * *
+  cron: 11 1 27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1671,7 +1312,7 @@ tests:
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-guest
 - as: baremetalds-hypershift-agent-mce-disconnected-guest-f28-des
   cluster: build05
-  cron: 36 3 5 * *
+  cron: 14 3 6 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1684,20 +1325,18 @@ tests:
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-guest
 - as: baremetalds-hypershift-agent-mce-disconnected-mgmt-f28
   cluster: build05
-  cron: 30 10 17 * *
+  cron: 6 11 29 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.14
       MCE_VERSION: "2.4"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected
 - as: baremetalds-ipi-ovn-ipv4-fips-f28
-  cron: 45 0 11 * *
+  cluster: build05
+  cron: 34 16 23 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1709,7 +1348,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-fips-f28-ui
-  cron: 1 6 10 * *
+  cluster: build05
+  cron: 52 12 18 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1721,7 +1361,8 @@ tests:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-fips-f28-wrs
-  cron: 23 8 15 * *
+  cluster: build05
+  cron: 28 23 7 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1738,7 +1379,8 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv4-fips-f28-destructive
-  cron: 8 12 22 * *
+  cluster: build05
+  cron: 38 16 5 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1750,7 +1392,8 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv6-fips-f28
-  cron: 32 3 1 * *
+  cluster: build05
+  cron: 11 20 25 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1764,7 +1407,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-ipv6-fips-f28-destructive
-  cron: 25 8 22 * *
+  cluster: build05
+  cron: 23 4 2 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1778,7 +1422,8 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f28
-  cron: 36 2 27 * *
+  cluster: build05
+  cron: 25 8 1 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1791,7 +1436,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-destructive
-  cron: 16 0 4 * *
+  cluster: build05
+  cron: 18 16 11 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1804,7 +1450,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-guest-f28
-  cron: 25 12 7 * *
+  cron: 21 15 5 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1814,7 +1460,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-guest
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-guest-f28-destr
-  cron: 4 2 6 * *
+  cron: 6 13 3 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1824,7 +1470,8 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f28
-  cron: 14 19 24 * *
+  cluster: build05
+  cron: 49 22 13 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1837,7 +1484,8 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f28-des
-  cron: 29 15 30 * *
+  cluster: build05
+  cron: 26 0 2 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1850,33 +1498,28 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-mgmt-f28
-  cron: 11 21 22 * *
+  cluster: build05
+  cron: 57 10 28 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.14
       MCE_VERSION: "2.4"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-mgmt-f28
-  cron: 34 22 17 * *
+  cron: 14 3 2 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
-    env:
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift
 - as: baremetal-3-plus-1-agent-ipv4-static-f28
-  cluster: build05
-  cron: 22 15 14 * *
+  capabilities:
+  - intranet
+  cron: 23 19 17 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1887,8 +1530,9 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-3-plus-1
 - as: baremetal-compact-agent-platform-none-ipv4-static-f28
-  cluster: build05
-  cron: 9 20 5 * *
+  capabilities:
+  - intranet
+  cron: 27 18 8 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1903,8 +1547,9 @@ tests:
       workers: "0"
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-ephe-compact-agent-ipv4-static-connected-p1-f28
-  cluster: build05
-  cron: 1 14 18 * *
+  capabilities:
+  - intranet
+  cron: 47 14 6 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1918,8 +1563,9 @@ tests:
       workers: "0"
     workflow: baremetal-lab-agent-install-network-static-ephemeral
 - as: baremetal-ephe-sno-agent-ipv4-static-connected-p1-f28
-  cluster: build05
-  cron: 13 15 8 * *
+  capabilities:
+  - intranet
+  cron: 56 13 12 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1934,8 +1580,9 @@ tests:
       workers: "0"
     workflow: baremetal-lab-agent-install-network-static-ephemeral
 - as: baremetal-ha-agent-ipv4-static-disc-fips-f28
-  cluster: build05
-  cron: 36 18 25 * *
+  capabilities:
+  - intranet
+  cron: 35 15 27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1953,8 +1600,9 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-disconnected
 - as: baremetal-ha-agent-platform-none-ipv4-static-f28
-  cluster: build05
-  cron: 39 17 22 * *
+  capabilities:
+  - intranet
+  cron: 26 21 23 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1969,8 +1617,9 @@ tests:
       workers: "2"
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-f28
-  cluster: build05
-  cron: 25 14 24 * *
+  capabilities:
+  - intranet
+  cron: 5 20 28 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1985,8 +1634,9 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-f28
-  cluster: build05
-  cron: 56 19 12 * *
+  capabilities:
+  - intranet
+  cron: 12 16 21 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -2001,8 +1651,9 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-pxe-sno-agent-ipv4-static-connected-f28
-  cluster: build05
-  cron: 32 13 23 * *
+  capabilities:
+  - intranet
+  cron: 10 16 4 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -2018,8 +1669,9 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-pxe
 - as: baremetal-sno-agent-ipv4-static-connected-fips-f28
-  cluster: build05
-  cron: 3 18 24 * *
+  capabilities:
+  - intranet
+  cron: 42 15 15 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -2036,8 +1688,9 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-upi-ovn-ipv4-f28
-  cluster: build05
-  cron: 27 14 3 * *
+  capabilities:
+  - intranet
+  cron: 36 13 26 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -2048,41 +1701,69 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
-- as: gcp-ipi-confidential-computing-fips-f28-destructive
-  cron: 2 18 16 * *
+- as: baremetal-upi-ovn-ipv4-compact-f28
+  capabilities:
+  - intranet
+  cron: 33 15 7 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      architecture: amd64
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi
+- as: gcp-ipi-confidential-fips-mini-perm-f28-destructive
+  cron: 44 12 16 * *
   steps:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
-- as: gcp-ipi-disc-priv-oidc-fips-f28
-  cron: 2 4 9 * *
+- as: gcp-ipi-confidential-secureboot-mini-perm-f28
+  cron: 26 16 13 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f28
+  cron: 7 10 3 * *
   steps:
     cluster_profile: gcp-qe
     env:
       E2E_RUN_TAGS: '@disconnected'
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-disc-priv-oidc-fips-f28-destructive
-  cron: 38 15 23 * *
+- as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f28-destructive
+  cron: 13 11 4 * *
   steps:
     cluster_profile: gcp-qe
     env:
       E2E_RUN_TAGS: '@disconnected'
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 - as: gcp-ipi-disc-workers-rhel8-f28
-  cron: 25 20 17 * *
+  cron: 1 1 20 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2092,7 +1773,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-workers-rhel8
 - as: gcp-ipi-disc-workers-rhel8-f28-destructive
-  cron: 35 12 25 * *
+  cron: 35 10 13 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2102,7 +1783,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-workers-rhel8
 - as: gcp-ipi-filestore-csi-f28-longduration-part3-3
-  cron: 0 11 23 * *
+  cron: 23 6 1 * *
   steps:
     cluster_profile: gcp-qe
     dependency_overrides:
@@ -2111,37 +1792,43 @@ tests:
       TEST_SCENARIOS: Cluster_Operator|OTA|GCP-Filestore-CSI
       TEST_TIMEOUT: "100"
     test:
-    - chain: openshift-e2e-test-qe-longduration
+    - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-marketplace-f28
-  cron: 11 12 26 * *
+- as: gcp-ipi-marketplace-mini-perm-f28
+  cron: 41 18 15 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
-- as: gcp-ipi-marketplace-f28-destructive
-  cron: 16 6 22 * *
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-marketplace-mini-perm-f28-destructive
+  cron: 48 7 29 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-workers-marketplace
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-mini-perm-custom-type-f28
-  cron: 31 3 4 * *
+  cron: 21 7 26 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: custom-4-16384
+      CONTROL_PLANE_NODE_TYPE: custom-4-16384
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-minimal-permission
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-ovn-ipsec-f28-destructive-ota
-  cron: 25 22 19 * *
+  cron: 24 23 3 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2152,140 +1839,164 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: gcp-ipi-ovn-winc-f28
-  cron: 37 5 19 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
-- as: gcp-ipi-private-fips-f28-disasterrecovery
-  cron: 24 13 6 * *
+- as: gcp-ipi-private-fips-mini-perm-f28-disasterrecovery
+  cron: 44 19 17 * *
   steps:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-private
-- as: gcp-ipi-private-f28-longduration-cloud
-  cron: 24 19 27 * *
+- as: gcp-ipi-proxy-etcd-encryption-f28-compliance
+  cron: 32 9 27 * *
   steps:
     cluster_profile: gcp-qe
     env:
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longduration
-    workflow: cucushift-installer-rehearse-gcp-ipi-private
-- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
-  cron: 41 18 24 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_FILTERS: ~HyperShiftMGMT
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
+      TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "20"
     test:
     - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
-- as: gcp-ipi-secureboot-confidential-computing-f28
-  cron: 51 0 20 * *
+- as: gcp-ipi-proxy-etcd-encryption-f28-compliance-destructive
+  cron: 35 2 4 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest;Disruptive&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "55"
     test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
-- as: gcp-ipi-secureboot-f28-destructive
-  cron: 4 16 3 * *
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
+- as: gcp-ipi-proxy-etcd-encryption-f999-file-integrity
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@fio'
+      FILTERS_ADDITIONAL: ""
+      INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-14:latest
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
     test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-secureboot
-- as: gcp-ipi-to-multiarch-f28
-  cron: 47 18 27 * *
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
+- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles
+  cron: 44 21 2 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@spo'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
+- as: gcp-ipi-to-multiarch-mini-perm-f28
+  cron: 20 21 30 * *
   steps:
     cluster_profile: gcp-qe
     env:
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-workers-rhel8-fips-f28
-  cron: 57 5 9 * *
+  cron: 12 9 19 * *
   steps:
     cluster_profile: gcp-qe
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8-fips
 - as: gcp-ipi-workers-rhel8-fips-f28-destructive
-  cron: 7 10 12 * *
+  cron: 15 7 1 * *
   steps:
     cluster_profile: gcp-qe
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8-fips
 - as: ibmcloud-ipi-dedicatedhost-dynamic-f28-destructive
-  cron: 16 13 23 * *
+  cron: 39 4 30 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
 - as: ibmcloud-ipi-dedicatedhost-static-f28
-  cron: 11 0 4 * *
+  cron: 47 13 2 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
 - as: ibmcloud-ipi-mini-perm-f28
-  cron: 41 9 9 * *
+  cron: 42 19 14 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
 - as: ibmcloud-ipi-mini-perm-f28-destructive
-  cron: 36 22 26 * *
+  cron: 16 12 25 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
 - as: ibmcloud-ipi-ovn-ipsec-f28
-  cron: 13 12 7 * *
+  cron: 25 20 17 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: ibmcloud-ipi-ovn-ipsec-f28-destructive
-  cron: 14 15 26 * *
+  cron: 7 18 3 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
+- as: ibmcloud-ipi-ovn-ipsec-f60-longduration-cloud
+  cron: 24 22 18 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: ibmcloud-ipi-ovn-mtu-migrate-f28
-  cron: 36 7 24 * *
+  cron: 21 18 4 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-mtu-migrate
 - as: ibmcloud-ipi-private-fips-f28
-  cron: 21 22 8 * *
+  cron: 4 12 17 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -2294,7 +2005,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: ibmcloud-ipi-private-fips-f28-destructive
-  cron: 30 23 4 * *
+  cron: 33 10 30 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -2303,7 +2014,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: ibmcloud-ipi-proxy-private-rt-f28
-  cron: 51 22 5 * *
+  cron: 25 8 10 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -2312,7 +2023,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: ibmcloud-ipi-proxy-private-rt-f28-destructive
-  cron: 22 20 12 * *
+  cron: 23 17 27 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -2321,7 +2032,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: ibmcloud-ipi-tp-f28
-  cron: 6 15 25 * *
+  cron: 2 4 26 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -2330,7 +2041,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: ibmcloud-ipi-tp-f28-destructive
-  cron: 27 5 1 * *
+  cron: 32 18 15 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -2339,14 +2050,14 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: ibmcloud-ipi-workers-rhel8-f28
-  cron: 54 1 22 * *
+  cron: 24 15 29 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-workers-rhel8
 - as: ibmcloud-ipi-workers-rhel8-f28-ui
-  cron: 58 18 5 * *
+  cron: 28 1 22 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -2354,7 +2065,7 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-workers-rhel8
 - as: nutanix-ipi-boot-categories-project-rt-f28
   cluster: build01
-  cron: 28 13 7 * *
+  cron: 36 15 7 * *
   steps:
     cluster_profile: nutanix-qe
     env:
@@ -2376,7 +2087,7 @@ tests:
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
 - as: nutanix-ipi-compact-image-registry-s3-f28
   cluster: build01
-  cron: 13 2 27 * *
+  cron: 18 16 9 * *
   steps:
     cluster_profile: nutanix-qe
     env:
@@ -2398,7 +2109,7 @@ tests:
     workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
 - as: nutanix-ipi-disc-rt-f28
   cluster: build01
-  cron: 36 10 14 * *
+  cron: 20 2 15 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -2424,7 +2135,7 @@ tests:
     workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
-  cron: 55 2 10 * *
+  cron: 4 11 14 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -2444,9 +2155,20 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+- as: nutanix-ipi-proxy-fips-f60-longduration-cloud
+  cluster: build01
+  cron: 4 16 1 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: nutanix-ipi-tp-f28
   cluster: build01
-  cron: 12 4 17 * *
+  cron: 55 19 20 * *
   steps:
     cluster_profile: nutanix-qe
     env:
@@ -2466,21 +2188,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-tp-f28-longduration-cloud
-  cluster: build01
-  cron: 23 21 13 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longduration
-    workflow: cucushift-installer-rehearse-nutanix-ipi
 - as: vsphere-agent-compact-fips-f28
-  cron: 35 18 27 * *
+  cron: 20 17 15 5 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2489,7 +2198,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-install-compact
 - as: vsphere-agent-disc-compact-f28
-  cron: 56 2 22 * *
+  cron: 57 17 2 1 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2502,7 +2211,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-disconnected-install-compact
 - as: vsphere-agent-disc-ha-f28
-  cron: 27 16 6 * *
+  cron: 2 12 22 11 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2515,7 +2224,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-disconnected-install-ha
 - as: vsphere-agent-disc-sno-f28
-  cron: 49 13 5 * *
+  cron: 39 6 12 1 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2528,21 +2237,21 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-disconnected-install-sno
 - as: vsphere-agent-ha-f28
-  cron: 25 1 23 * *
+  cron: 47 11 13 9 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-install-ha
 - as: vsphere-agent-sno-f28
-  cron: 59 23 21 * *
+  cron: 3 5 22 4 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-install-sno
 - as: vsphere-ipi-compact-etcd-encryption-f28
-  cron: 5 11 26 * *
+  cron: 41 2 13 11 *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -2551,7 +2260,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
 - as: vsphere-ipi-compact-etcd-encryption-f28-destructive
-  cron: 17 8 27 * *
+  cron: 11 0 21 3 *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -2560,7 +2269,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
 - as: vsphere-ipi-disc-f28
-  cron: 55 9 7 * *
+  cron: 7 12 5 9 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2573,7 +2282,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: vsphere-ipi-disc-f28-destructive
-  cron: 25 4 18 * *
+  cron: 8 16 14 3 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2586,7 +2295,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: vsphere-ipi-disk-encryption-tang-fips-f28
-  cron: 36 22 22 * *
+  cron: 24 23 21 8 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2602,7 +2311,7 @@ tests:
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-vsphere-ipi-disk-encryption-tang
 - as: vsphere-ipi-disk-encryption-tang-fips-f28-destructive
-  cron: 4 3 16 * *
+  cron: 6 4 10 6 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2611,28 +2320,28 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-disk-encryption-tang
 - as: vsphere-ipi-external-lb-post-f28
-  cron: 22 12 12 * *
+  cron: 1 3 13 8 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-external-lb-post
 - as: vsphere-ipi-ovn-dualstack-f28
-  cron: 27 5 8 * *
+  cron: 1 0 19 6 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-dualstack-f28-destructive
-  cron: 28 17 5 * *
+  cron: 16 8 9 10 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-dualstack-privmaryv6-f28
-  cron: 23 16 3 * *
+  cron: 6 18 11 10 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2641,7 +2350,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-dualstack-privmaryv6-f28-destructive
-  cron: 51 22 8 * *
+  cron: 3 15 3 12 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2650,42 +2359,42 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-ipsec-f28
-  cron: 22 1 3 * *
+  cron: 20 11 14 12 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 - as: vsphere-ipi-ovn-ipsec-f28-destructive
-  cron: 19 8 26 * *
+  cron: 22 1 18 1 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 - as: vsphere-ipi-ovn-local-to-shared-gateway-mode-migration-f28
-  cron: 37 9 9 * *
+  cron: 33 20 16 9 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-local-to-shared-gateway-mode-migration
 - as: vsphere-ipi-ovn-shared-to-local-gw-migration-f28
-  cron: 3 20 14 * *
+  cron: 24 19 20 7 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
 - as: vsphere-ipi-ovn-shared-to-local-gw-migration-f28-destructive
-  cron: 1 4 15 * *
+  cron: 39 2 4 5 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
 - as: vsphere-ipi-proxy-fips-regen-cert-f28
-  cron: 18 15 23 * *
+  cron: 55 6 25 2 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2698,7 +2407,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-fips-f28-destructive
-  cron: 3 11 23 * *
+  cron: 32 15 18 9 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2709,8 +2418,20 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-proxy-fips-f60-longduration-cloud
+  cron: 43 19 7 8 *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-tp-f28
-  cron: 26 6 14 * *
+  cron: 26 10 9 6 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2722,7 +2443,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-tp-f28-destructive
-  cron: 46 15 18 * *
+  cron: 40 1 5 10 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2733,8 +2454,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-longduration-reliability-test-f28
-  cron: 31 10 15 * *
+- as: vsphere-ipi-f28-sanity-reliability-test
+  cron: 9 0 9 1 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2744,7 +2465,7 @@ tests:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: vsphere-ipi-proxy-workers-rhel8-f28
-  cron: 7 7 2 * *
+  cron: 2 20 19 3 *
   steps:
     cluster_profile: vsphere-dis-2
     leases:
@@ -2754,7 +2475,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
 - as: vsphere-ipi-proxy-workers-rhel8-f28-destructive
-  cron: 12 11 16 * *
+  cron: 59 6 13 1 *
   steps:
     cluster_profile: vsphere-dis-2
     leases:
@@ -2764,7 +2485,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
 - as: vsphere-ipi-remote-worker-f28
-  cron: 31 0 6 * *
+  cron: 5 11 17 8 *
   steps:
     cluster_profile: vsphere-connected-2
     leases:
@@ -2774,7 +2495,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-remote-worker
 - as: vsphere-ipi-remote-worker-f28-destructive
-  cron: 10 4 14 * *
+  cron: 56 17 24 6 *
   steps:
     cluster_profile: vsphere-connected-2
     leases:
@@ -2784,28 +2505,28 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-remote-worker
 - as: vsphere-ipi-sdn-f28
-  cron: 22 17 4 * *
+  cron: 39 23 2 8 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-sdn
 - as: vsphere-ipi-sdn-f28-destructive
-  cron: 21 18 17 * *
+  cron: 37 15 5 3 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-sdn
 - as: vsphere-ipi-sdn-migration-ovn-f28
-  cron: 16 1 16 * *
+  cron: 11 8 6 3 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-vsphere-ipi-sdn-bond
 - as: vsphere-ipi-static-ip-tp-f28
-  cron: 3 22 5 * *
+  cron: 22 16 6 2 *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -2814,7 +2535,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
 - as: vsphere-ipi-static-ip-tp-f28-destructive
-  cron: 33 4 20 * *
+  cron: 22 3 18 10 *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -2823,67 +2544,53 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
 - as: vsphere-ipi-template-f28
-  cron: 48 5 19 * *
+  cron: 17 4 25 4 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-template
 - as: vsphere-ipi-template-f28-destructive
-  cron: 16 22 21 * *
+  cron: 57 10 9 1 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-template
 - as: vsphere-ipi-zones-f28
-  cron: 14 22 25 * *
+  cron: 8 21 6 2 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: vsphere-ipi-zones-f28-destructive
-  cron: 16 8 8 * *
+  cron: 27 15 4 4 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
-- as: vsphere-ipi-zones-f28-longduration-cloud
-  cron: 26 6 10 * *
+- as: vsphere-ipi-zones-multisubnets-external-lb-f28
+  cron: 2 6 14 1 *
   steps:
     cluster_profile: vsphere-elastic
     env:
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-longduration
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
-- as: vsphere-ipi-zones-multisubnets-external-lb-f28
-  cron: 54 19 19 * *
-  steps:
-    cluster_profile: vsphere-multizone-2
-    leases:
-    - count: 2
-      env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-multizone-2-quota-slice
+      VSPHERE_MULTI_NETWORKS: "true"
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
 - as: vsphere-ipi-zones-multisubnets-external-lb-f28-destructive
-  cron: 38 19 25 * *
+  cron: 45 4 5 12 *
   steps:
-    cluster_profile: vsphere-multizone-2
-    leases:
-    - count: 2
-      env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-multizone-2-quota-slice
+    cluster_profile: vsphere-elastic
+    env:
+      VSPHERE_MULTI_NETWORKS: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
 - as: vsphere-upi-disc-sdn-rhcos-rhel8-f28
-  cron: 48 8 7 * *
+  cron: 1 19 20 5 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2896,7 +2603,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-sdn-workers-rhcos-rhel8
 - as: vsphere-upi-disc-sdn-rhcos-rhel8-f28-destructive
-  cron: 25 12 14 * *
+  cron: 56 2 2 8 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2909,7 +2616,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-sdn-workers-rhcos-rhel8
 - as: vsphere-upi-disc-secureboot-fips-f28
-  cron: 6 19 22 * *
+  cron: 56 10 18 4 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2923,7 +2630,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
 - as: vsphere-upi-disc-secureboot-fips-f28-destructive
-  cron: 23 1 30 * *
+  cron: 6 7 23 5 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -2937,7 +2644,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
 - as: vsphere-upi-disconnecting-network-f28
-  cron: 25 14 3 * *
+  cron: 47 7 5 7 *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -2947,7 +2654,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnecting-network
 - as: vsphere-upi-disconnecting-network-f28-destructive
-  cron: 29 2 10 * *
+  cron: 43 19 26 11 *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -2957,21 +2664,21 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnecting-network
 - as: vsphere-upi-encrypt-f28
-  cron: 31 19 21 * *
+  cron: 22 13 18 8 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-encrypt
 - as: vsphere-upi-encrypt-f28-destructive
-  cron: 2 1 3 * *
+  cron: 56 23 25 3 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-encrypt
 - as: vsphere-upi-platform-external-f28
-  cron: 24 2 17 * *
+  cron: 53 22 21 10 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2980,7 +2687,7 @@ tests:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
 - as: vsphere-upi-platform-external-f28-destructive
-  cron: 51 6 8 * *
+  cron: 35 10 11 7 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2989,33 +2696,151 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
 - as: vsphere-upi-platform-none-f28
-  cron: 25 0 14 * *
+  cron: 41 20 5 4 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
 - as: vsphere-upi-platform-none-f28-destructive
-  cron: 4 15 13 * *
+  cron: 16 22 26 8 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
 - as: vsphere-upi-zones-f28
-  cron: 20 12 15 * *
+  cron: 15 4 8 11 *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
 - as: vsphere-upi-zones-f28-destructive
-  cron: 58 23 22 * *
+  cron: 10 0 18 6 *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
+- as: openstack-ipi-f28-disasterrecovery
+  cron: 11 1 13 * *
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      ROTATE_CLOUD_CREDENTIALS: "true"
+      USE_RAMFS: "false"
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: openshift-e2e-openstack-ipi
+- as: baremetal-ipi-ovn-vmedia-disk-encryption-f28
+  capabilities:
+  - intranet
+  cron: 7 2 5 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-upi-ovn-dual-stack-realtime-kernel-f28
+  capabilities:
+  - intranet
+  cron: 7 18 6 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: cucushift-installer-check-realtime
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-dual-stack
+- as: baremetal-sno-ipv4-etcd-encryption-rt-kernel-kdump-f28
+  capabilities:
+  - intranet
+  cron: 26 16 6 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_ETCD_ENCRYPTION: "true"
+      ENABLE_KDUMP: "true"
+      RESERVE_BOOTSTRAP: "false"
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
+- as: baremetal-sno-ipv4-etcd-encryption-rt-kernel-basecap-f28
+  capabilities:
+  - intranet
+  cron: 34 14 6 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: baremetal MachineAPI Ingress
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      BASELINE_CAPABILITY_SET: None
+      ENABLE_ETCD_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: cucushift-installer-check-capability
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
+- as: baremetal-upi-ovn-ipv6-static-realtime-kernel-f28
+  capabilities:
+  - intranet
+  cron: 24 18 22 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: cucushift-installer-check-realtime
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-ipv6-static
+- as: baremetal-sno-ipv4-disk-etcd-encrypt-disk-mirror-day2-f60
+  capabilities:
+  - intranet
+  cron: 58 19 16 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      ENABLE_DISK_MIRRORING: "true"
+      ENABLE_ETCD_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      VENDOR: hpe
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

@@ -8,9 +8,9 @@ base_images:
     namespace: ci
     tag: v1.53.1
   hypershift-operator:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
@@ -67,26 +67,24 @@ tests:
 - as: e2e-aws-sdn-upgrade
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
-- always_run: false
-  as: e2e-aws-ovn-ipsec-upgrade
-  optional: true
+- always_run: true
+  as: e2e-aws-ovn-upgrade-ipsec
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 - as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -101,19 +99,19 @@ tests:
 - as: e2e-ovn-ipsec-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-aws-ovn-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn-serial
 - always_run: false
-  as: e2e-aws-ovn-ipsec-serial
+  as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-ovn-ipsec-serial
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
   timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
@@ -136,7 +134,7 @@ tests:
     workflow: baremetalds-e2e-ovn-ipsec
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -158,7 +156,8 @@ tests:
         Services Secondary IP Family \[LinuxOnly\] should function for service endpoints
         using hostNetwork\| should have ipv4 and ipv6 internal node ip
     workflow: openshift-e2e-vsphere-ovn-dualstack
-- as: e2e-vsphere-ovn-dualstack-primaryv6
+- always_run: false
+  as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -193,6 +192,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
+  timeout: 5h30m0s
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
@@ -209,7 +209,7 @@ tests:
   as: e2e-aws-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-ovn-serial
@@ -233,7 +233,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-live-migration-sdn-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
@@ -249,7 +249,7 @@ tests:
 - as: e2e-aws-live-migration-sdn-ovn-rollback
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes,rollback=true
@@ -281,14 +281,14 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-ovn-clusternetwork-cidr-expansion
-  cron: 9 17 5,20 * *
+  cron: 52 16 14 7 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-hypershift-conformance
   steps:
@@ -333,7 +333,7 @@ tests:
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   optional: true
@@ -345,7 +345,7 @@ tests:
 - as: e2e-aws-hypershift-ovn-kubevirt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density

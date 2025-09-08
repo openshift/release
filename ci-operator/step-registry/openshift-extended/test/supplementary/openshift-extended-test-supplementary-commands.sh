@@ -25,7 +25,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/usr/local/krew/bin:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
@@ -439,7 +439,7 @@ function handle_filters {
     done
 
     echo "handle AND logical"
-    for filter in ${filters_and[*]}
+    for filter in "${filters_and[@]}"
     do
         echo "handle filter_and ${filter}"
         handle_and_filter "${filter}"
@@ -447,7 +447,7 @@ function handle_filters {
 
     echo "handle OR logical"
     rm -fr ./case_selected_or
-    for filter in ${filters_or[*]}
+    for filter in "${filters_or[@]}"
     do
         echo "handle filter_or ${filter}"
         handle_or_filter "${filter}"

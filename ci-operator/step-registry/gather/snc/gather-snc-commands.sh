@@ -39,12 +39,22 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     --recurse packer@"${INSTANCE_PREFIX}":~/snc/*.crcbundle /tmp
 
+echo "Check if crc-bundle-${PULL_NUMBER} bucket" exists
+if LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets describe "gs://crc-bundle-${PULL_NUMBER}" \
+       --format="value(name)" > /dev/null 2>&1; then
+  echo "Bucket 'gs://crc-bundle-${PULL_NUMBER}' already exists. No action needed."
+else
+  echo "create crc-bundle-${PULL_NUMBER} bucket"
+  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets create "gs://crc-bundle-${PULL_NUMBER}" \
+      --project "${GOOGLE_PROJECT_ID}"
+fi
+
 echo "Upload the bundle to gcp crc-bundle bucket"
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil cp /tmp/*.crcbundle gs://crc-bundle/
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil cp /tmp/*.crcbundle gs://crc-bundle-"${PULL_NUMBER}"/
 
 echo "Make Bundle publicly accessible from bucket"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil acl \
-   ch -r -u AllUsers:R gs://crc-bundle/
+   ch -r -u AllUsers:R gs://crc-bundle-"${PULL_NUMBER}"/
 
 echo "Create file in artifact directory, having links to storage links"
-find /tmp/ -maxdepth 1 -name "*.crcbundle" -printf "https://storage.googleapis.com/crc-bundle/%f\n" > ${ARTIFACT_DIR}/bundles.txt
+find /tmp/ -maxdepth 1 -name "*.crcbundle" -printf "https://storage.googleapis.com/crc-bundle-${PULL_NUMBER}/%f\n" > ${ARTIFACT_DIR}/bundles.txt

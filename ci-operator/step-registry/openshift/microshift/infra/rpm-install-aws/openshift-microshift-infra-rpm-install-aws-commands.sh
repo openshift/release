@@ -11,11 +11,18 @@ cat << EOF > /tmp/config.yaml
 apiServer:
   subjectAltNames:
   - ${IP_ADDRESS}
+telemetry:
+  status: Disabled
 EOF
 
 configure_vm_args=""
 if "${OPTIONAL_RPMS}"; then
   configure_vm_args="--optional-rpms"
+
+  # install all the optional RPMs except those specified in ${SKIPPED_OPTIONAL_RPMS}
+  if [ -n "${SKIPPED_OPTIONAL_RPMS}" ]; then
+    configure_vm_args="${configure_vm_args} --skip-optional-rpms ${SKIPPED_OPTIONAL_RPMS}"
+  fi
 fi
 
 cat <<EOF > /tmp/install.sh
@@ -27,6 +34,15 @@ ci_subscription_register
 
 sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
+if [[ "${JOB_NAME_SAFE}" =~ .*ocp-conformance-optional.* ]]; then
+  # Increase pull QPS for conformance with optional RPMs
+  sudo mkdir -p /etc/microshift/config.d/
+  sudo tee /etc/microshift/config.d/kubelet-qps.yaml >/dev/null <<2EOF2
+kubelet:
+  registryPullQPS: 10
+
+2EOF2
+fi
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
 ./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images ${configure_vm_args} /tmp/pull-secret
@@ -57,6 +73,48 @@ if "${SRC_FROM_GIT}"; then
   export CLONEREFS_OPTIONS
 fi
 ci_clone_src
+
+REBASE_SUCCEEDED=false
+REBASE_TO=""
+# RELEASE_IMAGE_LATEST is always set by the release-controller, whether this is
+# a payload job, a periodic, or a presubmit. In order to distinguish between
+# payload/not payload, we inspect the prow job id, which includes the word "nightly"
+# among the version and the date for the promotion candidate if its a payload test
+# and a UUID otherwise.
+# Should we find any errors, we simply proceed without rebasing.
+PROWJOB_ID=$(echo "${JOB_SPEC}" | jq -r '.prowjobid // empty')
+if [[ -n "${PROWJOB_ID}" && "${PROWJOB_ID}" =~ .*nightly.* ]]; then
+
+  REBASE_TO="${RELEASE_IMAGE_LATEST}"
+fi
+
+if [ -n "${REBASE_TO}" ]; then
+  echo "REBASE_TO is set to ${REBASE_TO}"
+  export PATH="${HOME}/.local/bin:${PATH}"
+  python3 -m ensurepip --upgrade
+  pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
+
+  cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/.pull-secret.json
+
+  cd /go/src/github.com/openshift/microshift/
+  DEST_DIR="${HOME}"/.local/bin ./scripts/fetch_tools.sh yq
+  # Extract the ARM release image from the last_rebase.sh file (third parameter)
+  ARM_RELEASE_IMAGE=$(grep -o 'registry\.ci\.openshift\.org/ocp-arm64/release-arm64:[^[:space:]"]*' ./scripts/auto-rebase/last_rebase.sh | head -1)
+  if [[ -z "${ARM_RELEASE_IMAGE}" ]]; then
+    echo "Failed to extract ARM release image from last_rebase.sh"
+    echo "rebase failed" > "${SHARED_DIR}"/rebase_failure
+    exit 0
+  fi
+  # Bail out without error if the rebase fails. Next steps should be skipped if this happens.
+  PULLSPEC_RELEASE_AMD64="${REBASE_TO}" \
+    PULLSPEC_RELEASE_ARM64="${ARM_RELEASE_IMAGE}" \
+    DRY_RUN=y \
+    ./scripts/auto-rebase/rebase_job_entrypoint.sh || { echo "rebase failed" > "${SHARED_DIR}"/rebase_failure; exit 0; }
+  REBASE_SUCCEEDED=true
+else
+  echo "REBASE_TO is not set, skipping rebase"
+fi
+
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
@@ -69,4 +127,12 @@ scp \
   /tmp/config.yaml \
   "${INSTANCE_PREFIX}:/tmp"
 
-ssh "${INSTANCE_PREFIX}" "/tmp/install.sh"
+ssh "${INSTANCE_PREFIX}" "/tmp/install.sh" || {
+  # If the rebase succeeded but the build fails we also need to skip next steps
+  # as it could be that the rebase needs manual intervention.
+  if [[ "${REBASE_SUCCEEDED}" == "true" ]]; then
+    echo "build failed after successful rebase" > "${SHARED_DIR}"/rebase_failure
+    exit 0
+  fi
+  exit 1
+}

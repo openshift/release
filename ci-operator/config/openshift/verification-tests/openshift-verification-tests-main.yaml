@@ -1,0 +1,48 @@
+base_images:
+  base:
+    name: cucushift
+    namespace: ci
+    tag: latest
+  droute:
+    name: droute
+    namespace: dno
+    tag: latest
+binary_build_commands: go build ./tools/cmd/...
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+images:
+- dockerfile_path: tools/openshift-ci/Dockerfile
+  from: base
+  to: verification-tests
+- dockerfile_literal: |
+    FROM this-is-ignored-and-not-used
+    USER root
+    RUN set -x && \
+        curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz -o /tmp/gcloud.tar.gz && \
+        tar -C /opt -xf /tmp/gcloud.tar.gz && \
+        /opt/google-cloud-sdk/install.sh --usage-reporting false --quiet --path-update true
+  from: droute
+  to: junit2reportportal
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: check-upgrade-tags
+  commands: make check-upgrade-tags
+  container:
+    from: bin
+  optional: true
+  run_if_changed: features/upgrade/.*/.*.feature
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: verification-tests

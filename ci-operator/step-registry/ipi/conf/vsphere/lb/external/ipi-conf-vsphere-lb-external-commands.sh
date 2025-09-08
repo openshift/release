@@ -3,6 +3,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+################################################################################################
+# This file is no longer used.  It is being left behind temporarily while we migrate to python #
+################################################################################################
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"

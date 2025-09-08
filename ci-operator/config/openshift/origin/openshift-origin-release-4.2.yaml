@@ -104,11 +104,13 @@ releases:
     integration:
       name: "4.2"
       namespace: ocp
+      reference_policy: Source
   latest:
     integration:
       include_built_images: true
       name: "4.2"
       namespace: ocp
+      reference_policy: Source
 resources:
   '*':
     requests:
@@ -200,15 +202,10 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-builds
-- as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-    run-tests
-  openshift_installer:
-    cluster_profile: aws
-  optional: true
-- as: e2e-aws-jenkins
+- always_run: false
+  as: e2e-aws-jenkins
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-jenkins
 - as: e2e-gcp-image-ecosystem
   run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
@@ -218,7 +215,7 @@ tests:
 - as: e2e-aws-image-registry
   run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-image-registry
 - as: e2e-gcp-upgrade
   steps:
@@ -226,9 +223,10 @@ tests:
     workflow: openshift-upgrade-gcp
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-serial
-- as: e2e-vsphere
+- always_run: false
+  as: e2e-vsphere
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -237,7 +235,7 @@ tests:
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-conformance-k8s
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest

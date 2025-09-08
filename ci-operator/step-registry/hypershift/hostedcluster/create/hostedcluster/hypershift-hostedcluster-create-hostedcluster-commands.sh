@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo pipefail -x
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -37,6 +37,15 @@ else
   exit 1
 fi
 
+# We need to modify BASE_DOMAIN based on which account this job is running.
+if [[ -z "$BASE_DOMAIN" ]]; then
+	if [[ "${CLUSTER_PROFILE_NAME}" == "aws" ]]; then
+		BASE_DOMAIN='hypershift.origin-ci-int-aws.dev.rhcloud.com'
+	else
+		BASE_DOMAIN="hypershift.${CLUSTER_PROFILE_NAME}.ci.openshift.org"
+	fi
+fi
+
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
 echo "DOMAIN is ${DOMAIN}"
@@ -44,10 +53,6 @@ if [[ -z "${DOMAIN}" ]]; then
   >&2 echo "ERROR: Failed to determine the base domain."
   exit 1
 fi
-
-# We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
-# have to use a hack like this.
-[[ ${CONTROLPLANE_OPERATOR_IMAGE} = "LATEST" ]] && CONTROLPLANE_OPERATOR_IMAGE="${HYPERSHIFT_RELEASE_LATEST}"
 
 HASH="$(echo -n $PROW_JOB_ID|sha256sum)"
 CLUSTER_NAME=${HASH:0:20}
@@ -70,6 +75,13 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 case "${PLATFORM}" in
   "aws")
+    DEFAULT_NODE_SELECTOR="hypershift.openshift.io/control-plane=true"
+    if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
+      NODE_SELECTOR="${DEFAULT_NODE_SELECTOR},${CONTROL_PLANE_NODE_SELECTOR}"
+    else
+      NODE_SELECTOR="${DEFAULT_NODE_SELECTOR}"
+    fi
+
     ARGS=( --name "${CLUSTER_NAME}" \
       --infra-id "${INFRA_ID}" \
       --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
@@ -81,9 +93,8 @@ case "${PLATFORM}" in
       --pull-secret /tmp/pull-secret.json \
       --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
       --release-image "${RELEASE_IMAGE}" \
-      --control-plane-operator-image "${CONTROLPLANE_OPERATOR_IMAGE:-}" \
-      --node-selector "hypershift.openshift.io/control-plane=true" \
-      --olm-catalog-placement guest \
+      --node-selector "${NODE_SELECTOR}" \
+      --olm-catalog-placement "${OLM_CATALOG_PLACEMENT}" \
       --additional-tags "expirationDate=${EXPIRATION_DATE}" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \
@@ -98,10 +109,11 @@ case "${PLATFORM}" in
       ARGS+=( "--multi-arch" )
     fi
 
-    if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
-      ARGS+=( "--node-selector \"${CONTROL_PLANE_NODE_SELECTOR}\"" )
+    if [[ "${HYPERSHFIT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
+      ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
     fi
 
+    echo "Creating cluster with the following arguments:"
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"
     ;;
   "powervs")
@@ -111,8 +123,11 @@ case "${PLATFORM}" in
     if [[ -z "${POWERVS_VPC}" ]]; then
       POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
-    if [[ -z "${POWERVS_CLOUD_CONNECTION}" ]]; then
-      POWERVS_CLOUD_CONNECTION=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    if [[ -z "${POWERVS_TRANSIT_GATEWAY}" ]]; then
+      POWERVS_TRANSIT_GATEWAY=$(jq -r '.transitGateway' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${TRANSIT_GATEWAY_LOCATION}" ]]; then
+          TRANSIT_GATEWAY_LOCATION=$(jq -r '.transitGatewayLocation' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
     if [[ -z "${POWERVS_REGION}" ]]; then
       POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
@@ -122,6 +137,18 @@ case "${PLATFORM}" in
     fi
     if [[ -z "${POWERVS_VPC_REGION}" ]]; then
       POWERVS_VPC_REGION=$(jq -r '.vpcRegion' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_RESOURCE_GROUP}" ]]; then
+      POWERVS_RESOURCE_GROUP=$(jq -r '.resourceGroupName' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_PROC_TYPE}" ]]; then
+      POWERVS_PROC_TYPE=$(jq -r '.procType' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_PROCESSORS}" ]]; then
+      POWERVS_PROCESSORS=$(jq -r '.processors' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+    fi
+    if [[ -z "${POWERVS_SYS_TYPE}" ]]; then
+      POWERVS_SYS_TYPE=$(jq -r '.sysType' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
 
     bin/hypershift create cluster powervs \
@@ -135,7 +162,6 @@ case "${PLATFORM}" in
       --pull-secret=/etc/registry-pull-credentials/.dockerconfigjson \
       --release-image ${RELEASE_IMAGE} \
       --olm-catalog-placement guest \
-      --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
       --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
       --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
       --vpc-region ${POWERVS_VPC_REGION} \
@@ -144,7 +170,8 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --cloud-connection ${POWERVS_CLOUD_CONNECTION} \
+      --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
+      --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
       --debug

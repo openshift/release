@@ -3,51 +3,51 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.22-linux:
+  stolostron_builder_go1.24-linux:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.24-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.24-linux
 images:
 - dockerfile_path: operator/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.24-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multicluster-global-hub-operator
 - dockerfile_path: manager/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.24-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multicluster-global-hub-manager
 - dockerfile_path: agent/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.22-linux:
+    stolostron_builder_go1.24-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.22-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multicluster-global-hub-agent
 promotion:
   to:
   - disabled: true
-    name: "2.12"
+    name: "2.15"
     namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -72,7 +72,7 @@ tests:
     make unit-tests
   container:
     from: src
-  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: test-integration
   commands: |
     export SELF="make"
@@ -80,13 +80,13 @@ tests:
     make integration-test
   container:
     from: src
-  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: test-e2e
-  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-hub-of-hubs-aws-kind
-      AWS_INSTANCE_TYPE: c5ad.2xlarge
+      AWS_INSTANCE_TYPE: m5ad.2xlarge
     post:
     - ref: ocm-e2e-kind-destroy
     pre:
@@ -133,7 +133,7 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: sonarcloud-post-submit
   commands: |
     export TMP_BIN="/tmp/bin"
@@ -152,7 +152,7 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: latest-operator-image-mirror
   postsubmit: true
   steps:
@@ -187,7 +187,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.12
+      DESTINATION_BRANCH: release-2.15
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

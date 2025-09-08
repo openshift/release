@@ -20,8 +20,20 @@ export CERBERUS_WATCH_NAMESPACES="[^.*$]"
 
 # We will ignore any installer pods, redhat-operator, certified-operators and collect-profiles as those pods restart consistently and cause false failures
 # We also want to ignore kube-burner pods as these should already be verified in test steps 
-export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*,^loki*]"
+DEFAULT_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*,^loki*]"
+DEFAULT_IGNORE_PODS="${DEFAULT_IGNORE_PODS#[}"
+DEFAULT_IGNORE_PODS="${DEFAULT_IGNORE_PODS%]}"
 
+# Merge default and user provided ignore list
+if [ -n "$CERBERUS_USER_IGNORE_PODS" ] && [ "$CERBERUS_USER_IGNORE_PODS" != "[]" ]; then
+  CERBERUS_USER_IGNORE_PODS="${CERBERUS_USER_IGNORE_PODS#[}"
+  CERBERUS_USER_IGNORE_PODS="${CERBERUS_USER_IGNORE_PODS%]}"
+  CERBERUS_IGNORE_PODS="[$DEFAULT_IGNORE_PODS,$CERBERUS_USER_IGNORE_PODS]"
+else
+  CERBERUS_IGNORE_PODS="[$DEFAULT_IGNORE_PODS]"
+fi
+
+export CERBERUS_IGNORE_PODS
 
 ./cerberus/prow_run.sh
 

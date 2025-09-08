@@ -1,0 +1,147 @@
+base_images:
+  base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/ci/Dockerfile
+  from: base-rhel9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: cert-manager-operator
+- dockerfile_path: images/ci/operand.Dockerfile
+  from: base-rhel9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: cert-manager
+operator:
+  bundles:
+  - as: cert-manager-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: openshift.io/cert-manager-operator:latest
+    with: pipeline:cert-manager-operator
+  - pullspec: quay.io/jetstack/cert-manager-controller:latest
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-webhook:latest
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:latest
+    with: pipeline:cert-manager
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: src
+- as: fips-image-scan-operator
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-operator
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-cert-manager
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager
+    test:
+    - ref: fips-check-image-scan
+- as: e2e-operator
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.19"
+  skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n cert-manager-operator rollout status deployment cert-manager-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-generic-claim
+- as: e2e-operator-tech-preview
+  optional: true
+  skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-hypershift
+zz_generated_metadata:
+  branch: cert-manager-1.17
+  org: openshift
+  repo: cert-manager-operator

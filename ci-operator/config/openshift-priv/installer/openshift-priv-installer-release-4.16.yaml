@@ -69,7 +69,6 @@ base_images:
     tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
-  use_build_cache: true
 canonical_go_repository: github.com/openshift/installer
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
@@ -411,7 +410,8 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-sharednetwork
   timeout: 6h0m0s
-- as: e2e-azure-ovn-resourcegroup
+- always_run: false
+  as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
     cluster_profile: azure4
@@ -462,7 +462,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      PLATFORM_VERSION: "8.4"
+      PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-workers-rhel
   timeout: 6h0m0s
 - always_run: false
@@ -628,7 +628,8 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-static-ovn
+- always_run: false
+  as: e2e-vsphere-static-ovn
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -640,21 +641,24 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-upi-zones
+- always_run: false
+  as: e2e-vsphere-ovn-upi-zones
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones
+- always_run: false
+  as: e2e-vsphere-ovn-zones
   optional: true
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-zones-techpreview
   optional: true
   run_if_changed: vsphere
   steps:
@@ -671,11 +675,12 @@ tests:
     workflow: openshift-e2e-gcp-crc
   timeout: 6h0m0s
 - as: e2e-metal-assisted
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
   timeout: 6h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
@@ -688,7 +693,7 @@ tests:
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
   timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
@@ -711,7 +716,7 @@ tests:
   optional: true
   run_if_changed: (azure|azurestack)
   steps:
-    cluster_profile: azurestack-qe
+    cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack
   timeout: 6h0m0s
 - as: e2e-azurestack-upi
@@ -719,7 +724,7 @@ tests:
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)
   steps:
-    cluster_profile: azurestack-qe
+    cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack-upi
   timeout: 6h0m0s
 - as: e2e-ibmcloud-ovn
@@ -747,11 +752,6 @@ tests:
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        FIPS_MODE=true
-        NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-compact-ipv4-none-platform
@@ -836,7 +836,7 @@ tests:
     env:
       FAIL_ON_CORE_DUMP: "false"
       OS_IMAGE_PLAN: NoPurchasePlan
-      OS_IMAGE_URN: azureopenshift:aro4:aro_414:412.92.20231021
+      OS_IMAGE_URN: azureopenshift:aro4:aro_415:415.92.20240220
     post:
     - chain: gather-network
     - chain: gather-core-dump

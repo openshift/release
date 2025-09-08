@@ -41,4 +41,19 @@ for node in "${node_list[@]}"; do
     fi
 done
 
+if [[ -f "${SHARED_DIR}/.openshift_install.log" ]]; then
+    echo "installation log found"
+    #template defined, ova should not be imported
+    if grep -q "Obtaining RHCOS image file" "${SHARED_DIR}"/.openshift_install.log; then
+      echo "Fail: template defined in install-config, should not import ova"
+      check_result=1
+    else
+      echo "Pass: template defined in install-config, skip importing ova"
+    fi
+    rm -f "${SHARED_DIR}"/.openshift_install.log
+else
+    echo "installation log not found"
+    check_result=1
+fi
+
 exit ${check_result}

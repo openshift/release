@@ -2,19 +2,19 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: console-plugin-test-cypress
+    tag: tectonic-console-builder-v29
 images:
 - dockerfile_path: Dockerfile
   to: kubevirt-plugin
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -43,7 +43,8 @@ tests:
         # Run kubevirt-plugin gating suite
         ./test-prow-e2e.sh ${KUBEVIRT_PLUGIN_IMG_NAME};
       credentials:
-      - mount_path: /var/run/operator-secret
+      - collection: ""
+        mount_path: /var/run/operator-secret
         name: operator-secret
         namespace: test-credentials
       dependencies:
@@ -51,9 +52,13 @@ tests:
         name: kubevirt-plugin-img
       from: src
       resources:
+        limits:
+          ci-operator.openshift.io/shm: 2G
         requests:
+          ci-operator.openshift.io/shm: 2G
           cpu: 100m
           memory: 200Mi
+      timeout: 6h0m0s
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

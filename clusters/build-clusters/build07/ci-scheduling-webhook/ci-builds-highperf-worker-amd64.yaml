@@ -1,0 +1,263 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build07-rdv8j
+  name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build07-rdv8j
+      machine.openshift.io/cluster-api-machineset: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build07-rdv8j
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1a
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+          ci-instance-type: high-perf
+      providerSpec:
+        value:
+          ami:
+            id: ami-0e79bb8acc37d2696
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 5000
+              kmsKey:
+                arn: ""
+              volumeSize: 800
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build07-rdv8j-worker-profile
+          instanceType: c7a.12xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-la
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-node
+          subnet:
+            id: subnet-0c9c81d0602a48775
+          tags:
+          - name: kubernetes.io/cluster/build07-rdv8j
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+      - effect: NoSchedule
+        key: ci-instance-type
+        value: high-perf
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 1
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1a
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build07-rdv8j
+  name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1b
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build07-rdv8j
+      machine.openshift.io/cluster-api-machineset: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1b
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build07-rdv8j
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1b
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+          ci-instance-type: high-perf
+      providerSpec:
+        value:
+          ami:
+            id: ami-0e79bb8acc37d2696
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 5000
+              kmsKey:
+                arn: ""
+              volumeSize: 800
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build07-rdv8j-worker-profile
+          instanceType: c7a.12xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1b
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-node
+          subnet:
+            id: subnet-0b8ff1721284fe653
+          tags:
+          - name: kubernetes.io/cluster/build07-rdv8j
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+      - effect: NoSchedule
+        key: ci-instance-type
+        value: high-perf
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1b
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 1
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1b
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build07-rdv8j
+  name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1c
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build07-rdv8j
+      machine.openshift.io/cluster-api-machineset: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1c
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build07-rdv8j
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1c
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+          ci-instance-type: high-perf
+      providerSpec:
+        value:
+          ami:
+            id: ami-0e79bb8acc37d2696
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 5000
+              kmsKey:
+                arn: ""
+              volumeSize: 800
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build07-rdv8j-worker-profile
+          instanceType: c7a.12xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1c
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-lc
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-node
+          subnet:
+            id: subnet-0c3be5f3dee800a3a
+          tags:
+          - name: kubernetes.io/cluster/build07-rdv8j
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+      - effect: NoSchedule
+        key: ci-instance-type
+        value: high-perf
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1c
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 1
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build07-rdv8j-ci-builds-highperf-worker-amd64-us-east-1c

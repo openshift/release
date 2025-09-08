@@ -35,11 +35,10 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   latest:
     prerelease:
@@ -92,22 +91,13 @@ tests:
     test:
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: gcp-ipi-disc-priv-oidc-fips-f28
-  cron: 2 11 5 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      ENABLE_OTA_TEST: OCP-30832
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-upgrade-qe-sanity-disconnected
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-proxy-private-f28
-  cron: 32 18 13 * *
+- as: gcp-ipi-proxy-private-mini-perm-f28
+  cron: 4 7 4 * *
   steps:
     cluster_profile: gcp-qe
     env:
       ENABLE_OTA_TEST: OCP-24358
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
@@ -129,7 +119,6 @@ tests:
       ENABLE_OTA_TEST: OCP-24358
       FIPS_ENABLED: "true"
     test:
-    - ref: nutanix-upgrade-pre-config
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-ipi-disc-f28

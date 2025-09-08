@@ -43,7 +43,7 @@ echo  "-------------------------------------------------------------------------
 if [ -d ocp-qe-perfscale-ci ];then
      rm -rf ocp-qe-perfscale-ci
 fi
-git clone -b upgrade https://github.com/openshift-qe/ocp-qe-perfscale-ci.git --depth=1
+git clone -b upgrade https://github.com/openshift-eng/ocp-qe-perfscale-ci.git --depth=1
 cd ocp-qe-perfscale-ci/upgrade_scripts 
 ENABLE_FORCE=${ENABLE_FORCE:=true}
 SCALE=${SCALE:=false}
@@ -51,7 +51,11 @@ MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=1}
 EUS_UPGRADE=${EUS_UPGRADE:=false}
 EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
 echo TARGET_RELEASES is $TARGET_RELEASES
+
 UPGRADE_WAIT_NUM=${UPGRADE_WAIT_NUM="450"}
+
+#making sure this variable is an int
+export UPGRADE_WAIT_NUM=$(($UPGRADE_WAIT_NUM))
 IF_DEGRADED=$(oc get co -ojsonpath='{.items[*].status.conditions[?(@.type=="Degraded")].status}')
 IF_DEGRADED=$(echo $IF_DEGRADED | tr -s '[A-Z]' '[a-z]')
 

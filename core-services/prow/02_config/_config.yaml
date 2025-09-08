@@ -17,11 +17,19 @@ deck:
       - org: openshift
         slug: test-platform
       github_users:
+      - deads2k
       - vikaslaad
       - dobbymoodge
       - bparees
       - AlexNPavel
       - jupierce
+  - repo: openshift/multiarch-tuning-operator
+    rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: team-multi-arch-maintainers
+      - org: openshift
+        slug: test-platform
   - repo: openshift/openshift-tests-private
     rerun_auth_configs:
       github_team_slugs:
@@ -92,7 +100,7 @@ deck:
         slug: openshift-team-sd-sre-cicd
       - org: openshift
         slug: test-platform
-  - repo: openshift-qe/ocp-qe-perfscale-ci
+  - repo: openshift-eng/ocp-qe-perfscale-ci
     rerun_auth_configs:
       github_team_slugs:
       - org: openshift
@@ -133,6 +141,34 @@ deck:
         slug: openshift-team-operator-runtime
       - org: openshift
         slug: openshift-team-operator-ecosystem
+  - repo: opendatahub-io/notebooks
+    rerun_auth_configs:
+      github_team_slugs:
+      - org: opendatahub-io
+        slug: notebook-devs
+      github_users:
+      - andyatmiami
+      - atheo89
+      - caponetto
+      - daniellutz
+      - harshad16
+      - jiridanek
+      - jstourac
+      - paulovmr
+  - repo: red-hat-data-services/notebooks
+    rerun_auth_configs:
+      github_team_slugs:
+      - org: red-hat-data-services
+        slug: notebook-admins
+      github_users:
+      - andyatmiami
+      - atheo89
+      - caponetto
+      - daniellutz
+      - harshad16
+      - jiridanek
+      - jstourac
+      - paulovmr
   hidden_repos:
   - openshift/ose
   - openshift/online-registration
@@ -142,7 +178,8 @@ deck:
       origin-ci-test: test-platform-results
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
-      openshift-kni/eco-ci-cd: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-kni/eco-ci-cd-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-online/access-transparency-service: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/cucushift: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/distributed-tracing-qe: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -195,7 +232,7 @@ deck:
       optional_files:
       - .*/monitor.*\.xml
       required_files:
-      - .*/junit.*\.xml
+      - .*junit.*\.xml
     - lens:
         name: podinfo
       required_files:
@@ -260,6 +297,8 @@ plank:
   default_decoration_config_entries:
   - config:
       censor_secrets: true
+      censoring_options:
+        minimum_secret_length: 6
       gcs_configuration:
         bucket: test-platform-results
         compress_file_types:
@@ -303,10 +342,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20240911-5886b0452
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20240911-5886b0452
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20240911-5886b0452
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20240911-5886b0452
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250903-f49c6158b
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20250903-f49c6158b
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20250903-f49c6158b
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20250903-f49c6158b
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -327,8 +366,8 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
-      grace_period: 2h0m0s
-      timeout: 22h0m0s
+      grace_period: 3h0m0s
+      timeout: 45h0m0s
     repo: openshift/openshift-tests-private
   - config:
       gcs_configuration:
@@ -377,16 +416,42 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-kni/eco-ci-cd-private
+  - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-online/access-transparency-service
+  - config:
+      timeout: 36h0m0s
     repo: openshift-kni/eco-ci-cd
+  - config:
+      timeout: 23h55m0s
+    repo: openshift-eng/ocp-qe-perfscale-ci
+  - config:
+      timeout: 12h0m0s
+    repo: openshift/ovn-kubernetes
   - config:
       timeout: 6h0m0s
     repo: openshift/osde2e
   - config:
       timeout: 23h0m0s
     repo: openshift/svt
+  - config:
+      timeout: 24h0m0s
+    repo: openshift/ols-load-generator
+  - config:
+      timeout: 23h55m0s
+    repo: openshift-psap/topsail
+  - config:
+      timeout: 24h0m0s
+    repo: openshift/hypershift
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
-    openshift-kni/eco-ci-cd: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-online/access-transparency-service: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -401,10 +466,11 @@ plank:
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
-  max_concurrency: 1500
+  max_concurrency: 1750
   max_goroutines: 20
+  max_revivals: 3
   pod_pending_timeout: 30m0s
-  pod_running_timeout: 48h0m0s
+  pod_running_timeout: 72h0m0s
   pod_unscheduled_timeout: 30m0s
   report_templates:
     '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -413,7 +479,10 @@ plank:
     integr8ly/integreatly-operator: |-
       ### Report flaky E2E tests and PROW issues in [INTLY-7197](https://issues.redhat.com/browse/INTLY-7197) epic. Detailed instructions can be found in the description of said epic.
       [Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
-    openshift-kni/eco-ci-cd: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+    openshift-kni/eco-ci-cd-private: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-online/access-transparency-service: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -473,7 +542,7 @@ prowjob_default_entries:
 - cluster: '*'
   config:
     tenant_id: qe-private
-  repo: openshift-kni/eco-ci-cd
+  repo: openshift-kni/eco-ci-cd-private
 prowjob_namespace: ci
 push_gateway:
   interval: 1m0s
@@ -502,6 +571,8 @@ tide:
   blocker_label: tide/merge-blocker
   context_options:
     from-branch-protection: true
+    optional-regex-contexts:
+    - multi-pr-.*
     orgs:
       ViaQ:
         repos:
@@ -521,6 +592,8 @@ tide:
             required-contexts:
             - Total Success
             skip-unknown-contexts: true
+          container-selinux:
+            skip-unknown-contexts: true
           dnsname:
             skip-unknown-contexts: true
           gvisor-tap-vsock:
@@ -536,6 +609,8 @@ tide:
           podman:
             required-contexts:
             - Total Success
+            skip-unknown-contexts: true
+          podman-machine-os:
             skip-unknown-contexts: true
           podman-py:
             skip-unknown-contexts: true
@@ -555,14 +630,38 @@ tide:
             skip-unknown-contexts: true
           assisted-test-infra:
             skip-unknown-contexts: true
+          cert-manager-operator-release:
+            skip-unknown-contexts: true
           ci-docs:
+            skip-unknown-contexts: true
+          jenkins:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          lightspeed-service:
             skip-unknown-contexts: true
           release:
             skip-unknown-contexts: true
+      openshift-kni:
+        repos:
+          cnf-features-deploy:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          numaresources-operator:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          scheduler-plugins:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
+          telco-reference:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
       openshift-priv:
         repos:
           assisted-installer:
             skip-unknown-contexts: true
+          jenkins:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
       operator-framework:
         repos:
           api:
@@ -595,12 +694,17 @@ tide:
         repos:
           release:
             skip-unknown-contexts: true
+      rh-ecosystem-edge:
+        repos:
+          recert:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
   display_all_tide_queries_in_status: true
   max_goroutines: 100
   merge_label: tide/merge-method-merge
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
-    openshift-kni/eco-ci-cd: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr

@@ -72,7 +72,23 @@ fi
 
 # Create VPC
 echo "Creating a VPC in the resource group $infra_name-rg"
-ibmcloud is vpc-create $infra_name-vpc --resource-group-name $infra_name-rg
+count=0
+max_retries=6
+sleeptime=30
+while [ $count -lt $max_retries ]; do
+  count=$(( count + 1 ))
+  echo "Try $count/6: Waiting for VPC to be successfully created ..."
+  ibmcloud is vpc-create $infra_name-vpc --resource-group-name $infra_name-rg
+  create_status=$?
+  if [ $create_status -eq 0 ]; then
+        echo "VPC $infra_name-vpc is created successfully"
+        break
+    else
+        echo "Failed to create VPC after $count/6 retry, the error code is $create_status"
+        sleep $sleeptime
+  fi
+done
+
 set +e
 vpc_status=$(ibmcloud is vpc $infra_name-vpc | awk '/Status/{print $2}')
 if [ "$vpc_status" != "available" ]; then
@@ -354,10 +370,10 @@ ssh "${ssh_options[@]}" root@$bvsi_fip "/root/setup_proxy.sh"
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${bvsi_fip}:3128/
 export HTTPS_PROXY=http://${bvsi_fip}:3128/
-export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
 export http_proxy=http://${bvsi_fip}:3128/
 export https_proxy=http://${bvsi_fip}:3128/
-export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 echo "$(date) Successfully completed the e2e creation chain"

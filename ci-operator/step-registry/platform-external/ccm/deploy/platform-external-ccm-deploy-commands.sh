@@ -69,9 +69,9 @@ log "Deploying Cloud Controller Manager"
 
 while read -r manifest
 do
-  echo "Processing manifest ${SHARED_DIR}/$manifest";
-  oc create -f ${SHARED_DIR}/$manifest || true
-done <<< "$(cat "${SHARED_DIR}/ccm-manifests.txt")"
+  echo "Creating resource from manifest ${SHARED_DIR}/${manifest}";
+  oc create -f "${SHARED_DIR}"/"${manifest}" || true
+done <<< "$(cat "${SHARED_DIR}/deploy-ccm-manifests.txt")"
 
 ## What will be an standard method?
 # For AWS:

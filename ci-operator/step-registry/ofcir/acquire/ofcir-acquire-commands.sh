@@ -84,9 +84,9 @@ function getCIR(){
     PORTFILE=$SHARED_DIR/server-sshport
     CIRFILE=$SHARED_DIR/cir
 
-    # ofcir may be unavailable in the cluster(or the ingress machinery), retry once incase we get unlucky,
-    # we don't want to overdo it on the retries incase we start leaking CIR's
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 1 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
+    # ofcir may be unavailable in the cluster(or the ingress machinery), retry
+    # we can retry several times, preventing CIR leaking should be done by OFCIR with pool size
+    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 15 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="
@@ -120,16 +120,15 @@ function getCIR(){
     fi
 }
 
-# Most virt based jobs run on all of the CI hosts, but the diask space available
-# in ESI isn't enough for upgrade jobs
-CIRTYPE=host_el9,host_esi_el9
-[[ "$JOB_NAME" =~ -upgrade|-serial ]] && CIRTYPE=host_el9
-
+CIRTYPE=host_el9
 #CLUSTERTYPE can be one of "virt", "virt-arm64", "baremetal" or "baremetal-moc"
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster_el9
 [ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
 [ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
+[ "$CLUSTERTYPE" == "assisted_large_el9" ] && CIRTYPE=assisted_large_el9
+[ "$CLUSTERTYPE" == "assisted_medium_el9" ] && CIRTYPE=assisted_medium_el9
+[ "$CLUSTERTYPE" == "assisted_small_el9" ] && CIRTYPE=assisted_small_el9
 
 getCIR && exit_with_success
 exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"

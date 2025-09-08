@@ -9,12 +9,18 @@ function waitForReady() {
     set +x
     local retries=0
     local attempts=140
-    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!=,node.openshift.io/os_id=rhcos --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].status}" | tr ' ' '\n' | grep -c "True") != "$1" ]]; do
+    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].status}" | tr ' ' '\n' | grep -c "True") != "$1" ]]; do
         log "Following nodes are currently present, waiting for desired count $1 to be met."
         log "Machinesets:"
-        oc get machinesets -A
+        oc get machinesets.m -A
         log "Nodes:"
         oc get nodes --no-headers -l node-role.kubernetes.io/worker | cat -n
+
+        # Approve CSRs if the desired node count > 250
+        # https://issues.redhat.com/browse/OCPBUGS-47508
+        if [[ $1 -gt 250 ]]; then
+            csrApprove
+        fi
         log "Sleeping for 60 seconds"
         sleep 60
         ((retries += 1))
@@ -23,8 +29,8 @@ function waitForReady() {
                 oc describe node $node
             done
 
-            for machine in $(oc get machine  -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=worker  --output jsonpath="{.items[?(@.status.phase!='Running')].metadata.name}"); do
-                oc describe machine $machine -n openshift-machine-api
+            for machine in $(oc get machine.m  -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=worker  --output jsonpath="{.items[?(@.status.phase!='Running')].metadata.name}"); do
+                oc describe machine.m $machine -n openshift-machine-api
             done
             echo "error: all $1 nodes didn't become READY in time, failing"
             exit 1
@@ -35,7 +41,7 @@ function waitForReady() {
 }
 
 function scaleMachineSets(){
-    worker_machine_sets=$(oc get --no-headers machinesets -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel)
+    worker_machine_sets=$(oc get --no-headers machinesets.m -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel )
     scale_num=$(echo $worker_machine_sets | wc -w | xargs)
     scale_size=$(($1/$scale_num))
     first_machine=""
@@ -54,11 +60,17 @@ function scaleMachineSets(){
     fi
 }
 
+function csrApprove() {
+    log "Bulk Approve CSR"
+    oc get csr | awk '/Pending/ && $1 !~ /^z/ {print $1}' | xargs -P 0 -I {} oc adm certificate approve {}
+    log "Bulk Approved CSRs"
+}
+
 function scaleDownMachines() {
     num_to_decrease=$(($1-$2))
     echo "num to decrease $num_to_decrease"
 
-    for machineset in $(oc get --no-headers machinesets -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel); do
+    for machineset in $(oc get --no-headers machinesets.m -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel); do
         echo "machine set to edit $machineset"
         machine_set_num=$(oc get $machineset -n openshift-machine-api -o jsonpath="{.spec.replicas}")
         echo "machine set scale num currently: $machine_set_num"
@@ -77,7 +89,7 @@ function scaleDownMachines() {
         fi
     done
 }
-current_worker_count=$(oc get nodes --no-headers -l "node-role.kubernetes.io/worker,node.openshift.io/os_id=rhcos" --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+current_worker_count=$(oc get nodes --no-headers -l "node-role.kubernetes.io/worker" --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 echo "current worker count $current_worker_count"
 echo "worker scale count $WORKER_REPLICA_COUNT"
 

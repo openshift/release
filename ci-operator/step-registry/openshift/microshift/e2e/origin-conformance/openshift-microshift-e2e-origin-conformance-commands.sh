@@ -5,6 +5,11 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 trap_subprocesses_on_term
 
+if [[ -f "${SHARED_DIR}"/rebase_failure ]]; then
+  echo "Rebase failed, skipping origin conformance"
+  exit 0
+fi
+
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 MICROSHIFT_URL="https://${IP_ADDRESS}:6443"
 CONFORMANCE_SKIP="/tmp/skip.txt"
@@ -15,6 +20,15 @@ export STATIC_CONFIG_MANIFEST_DIR=/tmp/manifests
 mkdir "${STATIC_CONFIG_MANIFEST_DIR}"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+# In order for openshift-tests to pull external binary images from the
+# payload, we need access enabled to the images on the build farm. In
+# order to do that, we need to unset the KUBECONFIG so we talk to the
+# build farm, not the cluster under test.
+echo "Granting access for image pulling from the build farm..."
+KUBECONFIG_BAK=$KUBECONFIG
+unset KUBECONFIG
+oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+export KUBECONFIG=$KUBECONFIG_BAK
 
 # The base image for this step is incapable of ssh-ing to MicroShift's VM because
 # of user configuration. Since this image comes from promotion of origin we would

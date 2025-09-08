@@ -1,12 +1,12 @@
 base_images:
   hypershift-operator:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: hypershift-operator
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: hypershift-tests
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   ocp_4.16_base-rhel9:
     name: 4.16-priv
     namespace: ocp-private
@@ -64,7 +64,6 @@ tests:
   commands: make GOLANGCI_LINT_CACHE=/tmp/.golangci-lint-cache golangci-lint
   container:
     from: src
-  optional: true
 - as: unit
   commands: make test-unit
   container:
@@ -132,7 +131,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-gcp-pao
-  cluster: build03
+  cluster: build05
   steps:
     cluster_profile: gcp
     test:
@@ -147,7 +146,7 @@ tests:
       timeout: 2h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-pao-updating-profile
-  cluster: build03
+  cluster: build05
   steps:
     cluster_profile: gcp
     test:
@@ -163,7 +162,7 @@ tests:
     workflow: ipi-gcp
   timeout: 5h0m0s
 - as: e2e-gcp-pao-workloadhints
-  cluster: build03
+  cluster: build05
   steps:
     cluster_profile: gcp
     test:
@@ -180,7 +179,7 @@ tests:
   timeout: 4h0m0s
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local
@@ -188,8 +187,10 @@ tests:
     from: src
 - always_run: false
   as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
+  restrict_network_access: false
   steps:
     env:
       E2E_TESTS_CONFIG: |

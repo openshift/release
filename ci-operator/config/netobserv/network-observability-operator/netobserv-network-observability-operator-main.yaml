@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   flowlogs-pipeline:
     name: flowlogs-pipeline
     namespace: netobserv
@@ -11,10 +15,6 @@ base_images:
     name: network-observability-console-plugin
     namespace: netobserv
     tag: ci
-  operator-sdk:
-    name: "4.16"
-    namespace: origin
-    tag: operator-sdk
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -29,6 +29,7 @@ operator:
   bundles:
   - as: noo-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/netobserv/network-observability-operator:.*
     with: network-observability-operator
@@ -47,7 +48,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -57,57 +58,98 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-operator
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
   optional: true
   steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: noo-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-netobserv-operator
+      OO_SECURITY_CONTEXT: restricted
     test:
     - as: install
       cli: latest
       commands: |
-        oc create ns openshift-netobserv-operator
-        operator-sdk run bundle "$OO_BUNDLE" -n openshift-netobserv-operator --verbose --security-context-config restricted
         oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
-      dependencies:
-      - env: OO_BUNDLE
-        name: noo-bundle
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
     - as: noo-e2e-flowcollector
       cli: latest
-      commands: |
+      commands: |2
+
         export PATH=$PATH:$HOME
 
         if ! which kubectl; then
           ln -s "$(which oc)" ${HOME}/kubectl
         fi
+        # patch as Downstream to scrape metrics
+        echo "====> Patching CSV to scrape metrics"
+        CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
+        oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p='[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/4/value", "value": "true"}]'
 
-        export CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
-        make set-release-kind-downstream
-        PORT_FWD=false NAMESPACE=netobserv make deploy-loki
+        export NAMESPACE=netobserv
+        PORT_FWD=false make deploy-loki
         oc apply -f /go/src/github.com/netobserv/network-observability-operator/config/samples/flows_v1beta2_flowcollector.yaml
 
-        echo "====> Waiting for netobserv-privileged pod to be ready"
-        while : ; do oc get ds netobserv-ebpf-agent -n netobserv-privileged && break; sleep 1; done
+        sleep 30
+        echo "====> Waiting for flowlogs-pipeline daemonset to be created"
+        while :; do
+          oc get daemonset flowlogs-pipeline -n ${NAMESPACE} && break
+          sleep 1
+        done
 
-        oc wait pods --timeout=120s --for=condition=ready -l app=netobserv-ebpf-agent -n netobserv-privileged
+        echo "====> Waiting for netobserv-ebpf-agent daemonset to be created"
+        while :; do
+          oc get daemonset netobserv-ebpf-agent -n ${NAMESPACE}-privileged && break
+          sleep 1
+        done
 
-        echo "====> Waiting for flowlogs-pipeline pod to be ready"
-        oc wait pods --timeout=120s --for=condition=ready -l app=flowlogs-pipeline -n netobserv
+        echo "====> Waiting for console-plugin deployment to be created"
+        while :; do
+          oc get deployment netobserv-plugin -n ${NAMESPACE} && break
+          sleep 1
+        done
 
-        echo "====> Waiting for console-plugin pod to be ready"
-        oc wait -n netobserv --timeout=60s --for condition=Available=True deployment netobserv-plugin
+        echo "====> Waiting for flowcollector to be ready"
+        timeout=0
+        rc=1
+        while [ $timeout -lt 180 ]; do
+          status=$(oc get flowcollector/cluster -o jsonpath='{.status.conditions[0].reason}')
+          if [[ $status == "Ready" ]]; then
+            rc=0
+            break
+          fi
+          sleep 30
+          timeout=$((timeout+30))
+        done
+        if [ "${rc}" == 1 ]; then
+          echo "flowcollector did not become Ready after 180 secs!!!"
+          exit $rc
+        fi
 
-        echo "====> Waiting for flowcollector pod to be ready"
-        oc wait flowcollector/cluster --timeout=120s --for=condition=ready
+
+        # Query metrics from Prometheus using in-cluster service URL
+        THANOS_URL=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+
+        timeout=0
+        rc=1
+        while [ $timeout -lt 180 ]; do
+          result=$(curl -s -k -H "Authorization: Bearer $(oc create token prometheus-k8s -n openshift-monitoring)" "https://${THANOS_URL}/api/v1/query?query=netobserv_ingest_flows_processed" | jq -r '.data.result[0].value[1]')
+          if [[ -n "$result" && "$result" != "null" ]]; then
+            echo "Metric netobserv_ingest_flows_processed found: $result"
+            rc=0
+            break
+          fi
+          sleep 10
+          timeout=$((timeout+10))
+        done
+        if [ "${rc}" == 1 ]; then
+          echo "Metric netobserv_ingest_flows_processed not found after 180 secs!!!"
+          exit $rc
+        fi
 
         echo "====> Deleting flowcollector"
         oc delete flowcollector/cluster
@@ -115,7 +157,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: netobserv

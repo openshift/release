@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-
 #
 # Enable CCM
 #
@@ -22,14 +20,16 @@ install_yq4
 #
 # Append CI credentials to pull-secret
 #
-log "Logging to CI registry: $(dirname "$(dirname $RELEASE_IMAGE_LATEST )")"
-export PULL_SECRET=/tmp/pull-secret-with-ci
-cp -v "${CLUSTER_PROFILE_DIR}"/pull-secret $PULL_SECRET
-oc registry login --to $PULL_SECRET
+# The REGISTRY_AUTH_FILE environment variable is used to authenticate
+# openshift-tests to the CI registry.
+# We must clone the CI-operator provided credentials to the shared directory
+# to be used by the openshift-tests and upper steps to consumed CI image.
+cp -v "${CLUSTER_PROFILE_DIR}"/pull-secret "${REGISTRY_AUTH_FILE}"
 
-log "Saving CI pull secret to extract image info to CI registry: "
-cp -v ${PULL_SECRET} "${SHARED_DIR}/pull-secret-with-ci"
-
+if [[ $(dirname "$(dirname "${RELEASE_IMAGE_LATEST}" )") != "quay.io" ]]; then
+  log "Logging to CI registry to later to extract CCM image info: $(dirname "$(dirname $RELEASE_IMAGE_LATEST )")"
+  oc registry login --to "${REGISTRY_AUTH_FILE}"
+fi
 #
 # Enable CCM
 #
@@ -40,12 +40,22 @@ if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" == "yes" ]]; then
   CONFIG_PLATFORM_EXTERNAL_CCM="External"
 fi
 
+# Setting the baseDomain from profile or leave the default.
 #
-# Render the install-config.yaml
+if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  CLUSTER_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+  echo "Using baseDomain from CI Profile, value: ${CLUSTER_BASE_DOMAIN}"
+else
+  CLUSTER_BASE_DOMAIN="${BASE_DOMAIN}"
+  echo "Using baseDomain from default,value: ${BASE_DOMAIN}"
+fi
+
+#
+# Patch the install-config.yaml
 #
 log "Creating install-config.yaml patch"
 cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${CLUSTER_BASE_DOMAIN}
 platform:
   external:
     platformName: ${PROVIDER_NAME}
@@ -59,7 +69,7 @@ controlPlane:
   replicas: 3
   architecture: amd64
 publish: External
-pullSecret: '$(cat ${PULL_SECRET} | awk -v ORS= -v OFS= '{$1=$1}1')'
+pullSecret: '$(cat ${REGISTRY_AUTH_FILE} | awk -v ORS= -v OFS= '{$1=$1}1')'
 EOF
 
 log "Patching install-config.yaml"

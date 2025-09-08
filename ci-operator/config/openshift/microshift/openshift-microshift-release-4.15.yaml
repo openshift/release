@@ -1,3 +1,8 @@
+base_images:
+  microshift-ci-brew:
+    name: brew
+    namespace: microshift
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -79,87 +84,102 @@ tests:
 - as: microshift-metal-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
-      EC2_INSTANCE_TYPE: c5n.metal
+      EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.3
+      SCENARIO_TYPE: presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: microshift-metal-tests-arm
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
-      EC2_AMI: ami-0addfb94c944af1cc
       EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.3
+      SCENARIO_TYPE: presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: rebase-on-nightlies
-  cron: 0 4 * * 1-5
+  cron: 27 7 28 * *
   steps:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
-      EC2_INSTANCE_TYPE: c5n.metal
+      EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.3
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-periodic-test-arm
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
-      EC2_AMI: ami-0addfb94c944af1cc
       EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.3
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
-  cron: 30 3 * * *
+  cron: 3 8 16 4 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
-      EC2_INSTANCE_TYPE: c5n.metal
+      EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.3
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-arm
-  cron: 30 3 * * *
+  cron: 25 5 14 1 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.3
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-rhel-eus-nightly
-  cron: 0 12 * * *
+  cron: 17 12 13 11 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus-nightly-arm
-  cron: 30 12 * * *
+  cron: 55 16 16 10 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c7g.2xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus-arm
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: c7g.2xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: clusterbot
-  cron: 0 2 * * *
+  cron: 16 3 15 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       MICROSHIFT_ARCH: x86_64
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-clusterbot
+- as: e2e-aws-nvidia-device-plugin-nightly
+  cron: 53 0 21 8 *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: g4dn.xlarge
+      MICROSHIFT_OS: rhel-9.3
+      SUITE: nvidia-device-plugin
+    workflow: openshift-microshift-e2e-bare-metal-tests
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

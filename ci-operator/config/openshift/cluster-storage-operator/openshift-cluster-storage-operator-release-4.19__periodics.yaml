@@ -1,0 +1,57 @@
+base_images:
+  aws-ebs-csi-driver-operator-test:
+    name: "4.19"
+    namespace: ocp
+    tag: aws-ebs-csi-driver-operator-test
+  cluster-storage-operator-test:
+    name: "4.19"
+    namespace: ocp
+    tag: cluster-storage-operator-test
+build_root:
+  from_repository: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
+  cron: 36 3 * * 0
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws-storage-symlinks
+- as: periodic-e2e-gcp-ovn-upgrade-check-dev-symlinks
+  cron: 0 12 * * 6
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-storage-symlinks
+- as: periodic-e2e-aws-selinux-alpha
+  cron: 36 18 * * 0
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_GATES: '[''SELinuxMount=true'']'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_ARGS: --run=sig-storage.*SELinux
+      TEST_SKIPS: Disruptive\|disruptive\|SELinuxMountReadWriteOncePodOnly
+      TEST_SUITE: all
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-csi
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: cluster-storage-operator
+  variant: periodics

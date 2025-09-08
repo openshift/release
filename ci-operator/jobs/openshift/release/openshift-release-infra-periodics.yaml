@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -124,8 +124,8 @@ periodics:
               name: "$(BRANCH)"
               namespace: ocp
               tag: cli
-            cli-ocm:
-              name: cli-ocm
+            ocm-cli:
+              name: ocm-cli
               namespace: ci
               tag: latest
           resources:
@@ -220,7 +220,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -424,7 +424,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -533,7 +533,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -767,7 +767,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -949,7 +949,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -1066,7 +1066,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -1174,7 +1174,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -1243,6 +1243,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: ipi-$(CLUSTER_TYPE)-ovn-hybrid
+          - as: launch-private
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                PUBLISH: Internal
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: launch-rt
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -1657,7 +1666,7 @@ periodics:
       - name: CLUSTER_DURATION
         value: "9000"
       - name: BRANCH
-        value: "4.9"
+        value: "4.16"
       - name: CLUSTER_TYPE
         value: vsphere
       - name: UNRESOLVED_CONFIG
@@ -1764,6 +1773,123 @@ periodics:
               env:
                 TEST_SUITE: "all"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: vsphere02
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-dis-2
+    config-type: modern
+    job-architecture: amd64
+    job-env: vsphere-dis
+    job-type: launch
+  name: release-openshift-origin-installer-launch-vsphere-dis-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_PROFILE
+        value: vsphere-dis-2
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.17"
+      - name: CLUSTER_TYPE
+        value: vsphere
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              leases:
+              - env: VSPHERE_BASTION_LEASED_RESOURCE
+                resource_type: vsphere-connected-2-quota-slice
+              workflow: cucushift-agent-vsphere-disconnected-install-compact
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -1963,7 +2089,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -2068,7 +2194,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -2109,27 +2235,27 @@ periodics:
         value: |
           base_images:
             assisted-image-service:
-              name: ocm-2.12
+              name: ocm-2.13
               namespace: edge-infrastructure
               tag: assisted-image-service
             assisted-installer:
-              name: ocm-2.12
+              name: ocm-2.13
               namespace: edge-infrastructure
               tag: assisted-installer
             assisted-installer-agent:
-              name: ocm-2.12
+              name: ocm-2.13
               namespace: edge-infrastructure
               tag: assisted-installer-agent
             assisted-installer-controller:
-              name: ocm-2.12
+              name: ocm-2.13
               namespace: edge-infrastructure
               tag: assisted-installer-controller
             assisted-service:
-              name: ocm-2.12
+              name: ocm-2.13
               namespace: edge-infrastructure
               tag: assisted-service
             assisted-test-infra:
-              name: ocm-2.12
+              name: ocm-2.13
               namespace: edge-infrastructure
               tag: assisted-test-infra
             dev-scripts:
@@ -2279,7 +2405,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -2387,7 +2513,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -2493,7 +2619,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -2517,12 +2643,21 @@ periodics:
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_TYPE
         value: aws
       - name: UNRESOLVED_CONFIG
         value: |
           releases:
             initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-stable
+                  upper: 4.999.0-0
+            latest:
               prerelease:
                 product: okd
                 version_bounds:
@@ -2599,7 +2734,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -2623,12 +2758,21 @@ periodics:
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_TYPE
         value: aws
       - name: UNRESOLVED_CONFIG
         value: |
           releases:
             initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-next
+                  upper: 4.999.0-0
+            latest:
               prerelease:
                 product: okd
                 version_bounds:
@@ -2705,7 +2849,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -2813,7 +2957,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -2922,7 +3066,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -3031,7 +3175,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -3126,7 +3270,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -3235,7 +3379,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -3354,7 +3498,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -3447,7 +3591,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -3613,7 +3757,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -3733,7 +3877,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -3840,7 +3984,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -3947,7 +4091,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
@@ -4000,10 +4144,6 @@ periodics:
                 PLATFORM: powervs
                 HYPERSHIFT_BASE_DOMAIN: hypershift.cis.ibm.net
                 HYPERSHIFT_NODE_COUNT: 2
-                POWERVS_RESOURCE_GROUP: ibm-hypershift-dev
-                POWERVS_PROC_TYPE: shared
-                POWERVS_PROCESSORS: 0.5
-                POWERVS_SYS_TYPE: e980
               workflow: hypershift-hostedcluster-workflow
               test:
               - ref: clusterbot-wait
@@ -4054,6 +4194,228 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build05
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: metal-qe
+    job-type: launch
+  name: release-openshift-origin-installer-launch-metal-qe-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.16"
+      - name: CLUSTER_TYPE
+        value: equinix-ocp-metal-qe
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              workflow: baremetal-lab-ipi
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-equinix-ocp-metal-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build07
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cloud-cluster-profile: oci-agent-qe
+    config-type: modern
+    job-architecture: amd64
+    job-env: oci
+    job-type: launch
+  name: release-openshift-origin-installer-launch-oci-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_PROFILE
+        value: oci-agent-qe
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.20"
+      - name: CLUSTER_TYPE
+        value: oci
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: cucushift-agent-oci
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-oci-agent-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

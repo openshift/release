@@ -1,0 +1,41 @@
+ref:
+  as: openshift-svt-regression
+  timeout: 24h0m0s
+  from_image:
+    namespace: ci
+    name: openshift-svt-regression
+    tag: latest
+  cli: latest
+  commands: openshift-svt-regression-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  env:
+  - name: PARAMETERS
+    default: ""
+    documentation: |-
+      Any additional parameters to pass to scripts
+  - name: SCRIPT
+    default: ""
+    documentation: |-
+      Script to run in https://github.com/openshift/svt repository, no default given so has to be defined in config file.
+      Use relative path under svt. e.g. perfscale_regression_ci/scripts/scalability/loaded-projects.sh
+  - name: KUBE_BURNER_VERSION
+    default: ""
+    documentation: |-
+      Override the kube burner version
+  - name: SVT_REPO
+    default: https://github.com/openshift/svt
+    documentation: |-
+      Repository to get regression test scripts. Change it if you want to run test from your SVT fork.
+  - name: SVT_REPO_BRANCH
+    default: master
+    documentation: |-
+      Branch name of SVT repository. If your script you want to run is on other branch - you can change it with this parameter.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the openshift svt regression test in the deployed cluster

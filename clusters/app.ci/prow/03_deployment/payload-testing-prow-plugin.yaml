@@ -80,14 +80,12 @@ items:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
+          - --ref=master
           - --root=/tmp/git-sync
           - --one-time=true
           - --depth=1
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -97,14 +95,12 @@ items:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --branch=master
-          - --wait=30
+          - --ref=master
+          - --period=30s
           - --root=/tmp/git-sync
-          - --max-sync-failures=3
-          env:
-          - name: GIT_SYNC_DEST
-            value: release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -124,12 +120,25 @@ items:
           - --github-app-private-key-path=/etc/github/cert
           - --ci-op-config-dir=/var/repo/release/ci-operator/config
           - --log-level=debug
+          - --trusted-app=openshift-pr-manager[bot]
           env:
           - name: GITHUB_APP_ID
             valueFrom:
               secretKeyRef:
                 name: openshift-prow-github-app
                 key: appid
+          - name: SKIP_JOB_REGEX_1
+            value: microshift
+          - name: SKIP_JOB_EXPIRE_1
+            value: "2025-11-27T00:00:00Z"
+          - name: SKIP_JOB_REGEX_2
+            value: rosa
+          - name: SKIP_JOB_EXPIRE_2
+            value: "2025-11-27T00:00:00Z"
+          - name: SKIP_JOB_REGEX_3
+            value: e2e-aws-driver-toolkit
+          - name: SKIP_JOB_REGEX_4
+            value: fips-payload-scan
           ports:
             - name: http
               containerPort: 8888

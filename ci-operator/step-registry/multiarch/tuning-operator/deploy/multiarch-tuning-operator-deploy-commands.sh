@@ -11,12 +11,25 @@ trap 'FRC=$?; createMTOJunit; debug' EXIT TERM
 # Print deployments, pods, nodes for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "Getting deployment info...\n"
-        echo -e "oc -n $NAMESPACE get deployments -owide\n$(oc -n $NAMESPACE get deployments -owide)"
-        echo -e "Getting pod info....\n"
-        echo -e "oc -n $NAMESPACE get pods -owide\n$(oc -n $NAMESPACE get pods -owide)"
-        echo -e "Getting nodes info...\n"
-        echo -e "oc get node -owide\n$(oc get node -owide)"
+        set +e
+        oc image info --show-multiarch "${OO_BUNDLE}" |& tee "${ARTIFACT_DIR}/image-info.txt"
+        echo "Collecting deployments, pods, events, and other resources for debugging. Please check the ARTIFACT_DIR directory."
+        for r in pods deployments events subscriptions clusterserviceversions clusterpodplacementconfigs; do
+          oc get ${r} -n "${NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/${r}.yaml"
+          oc describe ${r} -n "${NAMESPACE}" > "${ARTIFACT_DIR}/${r}.txt" 2>&1
+          if [[ "$r" == "pods" || "$r" == "deployments" ]]; then
+            for file in "${ARTIFACT_DIR}/${r}.yaml" "${ARTIFACT_DIR}/${r}.txt"; do
+              sed -i \
+                -e '/name: HTTP_PROXY/  { n; s/value:.*/value: REDACTED/; }' \
+                -e '/name: HTTPS_PROXY/ { n; s/value:.*/value: REDACTED/; }' \
+                -e '/name: NO_PROXY/    { n; s/value:.*/value: REDACTED/; }' \
+                -e 's/HTTP_PROXY:.*/HTTP_PROXY: REDACTED/' \
+                -e 's/HTTPS_PROXY:.*/HTTPS_PROXY: REDACTED/' \
+                -e 's/NO_PROXY:.*/NO_PROXY: REDACTED/' "$file"
+            done
+          fi
+          oc get ${r} -n "${NAMESPACE}" -o wide
+        done
     fi
 }
 
@@ -75,11 +88,11 @@ if [[ -n "$KUSTOMIZE_ENV" ]]; then
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - github.com/openshift/multiarch-tuning-operator/deploy/envs/${KUSTOMIZE_ENV}
+  - github.com/openshift/multiarch-tuning-operator/deploy/envs/${KUSTOMIZE_ENV}?ref=${MTO_BRANCH:-main}
+patches:
 EOF
     if [[ -n "$CATALOG_IMAGE_OVERRIDE" ]]; then
         cat <<EOF >> /tmp/kustomization/kustomization.yaml
-patches:
   - target:
       group: operators.coreos.com
       version: v1alpha1
@@ -91,6 +104,21 @@ patches:
         value: ${CATALOG_IMAGE_OVERRIDE}
 EOF
     fi
+    if [[ -n "$SUBSCRIPTION_CHANNEL_OVERRIDE" ]]; then
+        cat <<EOF >> /tmp/kustomization/kustomization.yaml
+  - target:
+      group: operators.coreos.com
+      version: v1alpha1
+      kind: Subscription
+      name: openshift-multiarch-tuning-operator
+      namespace: openshift-multiarch-tuning-operator
+    patch: |-
+      - op: replace
+        path: /spec/channel
+        value: ${SUBSCRIPTION_CHANNEL_OVERRIDE}
+EOF
+    fi
+    echo -e "For debug: show kustomization.yaml\n$(cat /tmp/kustomization/kustomization.yaml)"
     oc apply -k /tmp/kustomization
 fi
 if [[ "$MTO_OPERATOR_INSTALL_METHOD" == "bundle" ]]; then 
@@ -102,8 +130,8 @@ echo "Waiting for multiarch-tuning-operator"
 wait_created deployments -n ${NAMESPACE} -l app.kubernetes.io/part-of=multiarch-tuning-operator
 oc wait deployments -n ${NAMESPACE} \
   -l app.kubernetes.io/part-of=multiarch-tuning-operator \
-  --for=condition=Available=True
+  --for=condition=Available=True --timeout=300s
 wait_created pods -n ${NAMESPACE} -l control-plane=controller-manager
 oc wait pods -n ${NAMESPACE} \
   -l control-plane=controller-manager \
-  --for=condition=Ready=True
+  --for=condition=Ready=True --timeout=300s

@@ -6,13 +6,15 @@ build_root:
 images:
 - build_args:
   - name: max_jobs
-    value: "8"
+    value: "24"
   - name: nvcc_threads
     value: "2"
   - name: TORCH_CUDA_ARCH_LIST
     value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+  - name: vllm_fa_cmake_gpu_arches
+    value: 80-real;90-real
   - name: PYTHON_VERSION
-    value: "3.11"
+    value: "3.12"
   context_dir: .
   dockerfile_path: Dockerfile.ubi
   to: vllm-build-ibm-dev-cuda
@@ -29,28 +31,29 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 200m
-      memory: 200Mi
+      cpu: "1"
+      memory: 500Mi
   smoke-test:
     limits:
       cpu: "4"
-      memory: 24Gi
+      memory: 32Gi
       nvidia.com/gpu: "1"
     requests:
       cpu: "4"
       memory: 8Gi
       nvidia.com/gpu: "1"
-  vllm-build-ibm-dev-main-cuda:
+  vllm-build-ibm-dev-cuda:
     limits:
-      cpu: "16"
-      memory: 24Gi
+      cpu: "24"
+      memory: 84Gi
     requests:
-      cpu: "16"
-      memory: 24Gi
+      cpu: "24"
+      memory: 84Gi
 tests:
 - always_run: true
   as: smoke-test
-  cluster: build05
+  capabilities:
+  - gpu
   commands: |
     export VIRTUAL_ENV=/opt/vllm
     export PATH=$VIRTUAL_ENV/bin/:$PATH
@@ -62,6 +65,8 @@ tests:
     clone: true
     from: vllm-build-ibm-dev-cuda
 - as: ibm-dev-image-mirror
+  capabilities:
+  - highperf
   postsubmit: true
   steps:
     dependencies:
@@ -70,6 +75,7 @@ tests:
       IMAGE_REPO: vllm
       RELEASE_VERSION: fast-ibm
     workflow: opendatahub-io-ci-image-mirror
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: ibm-dev
   org: opendatahub-io

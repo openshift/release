@@ -16,7 +16,7 @@ log(){
 
 # functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
 #configure aws
-aws_region=${REGION:-$LEASED_RESOURCE}
+aws_region=${REGION:-us-east-2}
 configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
 configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 
@@ -65,8 +65,12 @@ run_testing_steps () {
   log "[CI] the generated JUNIT_XML is $JUNIT_XML"
   log "[CI] the generated JUNIT_TEMP_DIR is $JUNIT_TEMP_DIR" 
   
-  # Generate running cmd for day1-post
-  cmd=$(generate_running_cmd "$LABEL_FILTER_SWITCH" "$FOCUS" "$TEST_TIMEOUT" "$JUNIT_XML")
+  # Generate running cmd for $RUN_TIME
+  if [[ "${RUN_TIME}" == "destroy" ]]; then
+    cmd=$(generate_running_cmd "$LABEL_FILTER_SWITCH" "" "$TEST_TIMEOUT" "$JUNIT_XML")
+  else
+    cmd=$(generate_running_cmd "$LABEL_FILTER_SWITCH" "$FOCUS" "$TEST_TIMEOUT" "$JUNIT_XML")
+  fi
   log "[CI] Start e2e testing with command $cmd\n"
 
   # Execute the day1-post running cmd combined with focus

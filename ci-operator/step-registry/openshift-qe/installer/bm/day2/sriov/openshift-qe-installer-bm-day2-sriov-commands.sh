@@ -5,17 +5,8 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-if [ ${BAREMETAL} == "true" ]; then
-  bastion="$(cat /bm/address)"
-  # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
-  # Setup socks proxy
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
-  export KUBECONFIG=/tmp/kubeconfig
-  export https_proxy=socks5://localhost:12345
-  export http_proxy=socks5://localhost:12345
-  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
-fi
+SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/sriov_num_vfs)
+SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
 
 oc config view
 oc projects
@@ -59,7 +50,7 @@ until [ "$(kubectl get csv -n openshift-sriov-network-operator | grep sriov-netw
   do echo "Waiting for SRIOV operator"
   sleep 5
 done
-kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname)"
+kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname | grep sriov)"
 sleep 60
 
 {
@@ -97,8 +88,3 @@ spec:
   numVfs: ${SRIOV_NUM_VFS}
   resourceName: ${SRIOV_RESOURCE_NAME}
 EOF
-
-if [ ${BAREMETAL} == "true" ]; then
-  # kill the ssh tunnel so the job completes
-  pkill ssh
-fi

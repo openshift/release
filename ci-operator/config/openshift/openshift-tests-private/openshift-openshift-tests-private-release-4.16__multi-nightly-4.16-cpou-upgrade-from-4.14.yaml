@@ -31,11 +31,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: upi-installer
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 releases:
   intermediate:
     candidate:
@@ -60,8 +55,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-ovn-ipsec-arm-mixarch-f14
-  cron: 6 23 11,25 * *
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f28
+  cron: 56 21 14 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -76,23 +71,12 @@ tests:
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-2hops
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: azure-ipi-arm-mixarch-f14
-  cron: 11 2 5,19 * *
+- as: azure-ipi-arm-mixarch-f28
+  cron: 6 20 6 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -106,18 +90,7 @@ tests:
       UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE
-        name: release:intermediate
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: cucushift-upgrade-setedge-2hops
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-azure-ipi

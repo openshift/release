@@ -39,10 +39,15 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 releases:
   initial:
-    release:
-      channel: candidate
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.17"
   latest:
     candidate:
@@ -106,9 +111,8 @@ tests:
 - as: e2e-aws-upgrade-ovn-single-node
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -117,9 +121,8 @@ tests:
 - as: e2e-metal-ovn-single-node-rt-upgrade
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
       TEST_TYPE: upgrade-conformance
     observers:
@@ -127,7 +130,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node-realtime
 - as: e2e-vsphere-upgrade
-  interval: 168h
+  cron: 7 8 * * 4
   steps:
     cluster_profile: vsphere-elastic
     observers:
@@ -135,13 +138,43 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere
 - as: e2e-vsphere-zones-upgrade
-  interval: 168h
+  cron: 22 21 * * 4
   steps:
     cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere-zones
+- as: e2e-metal-ipi-ovn-upgrade-network-flow-matrix
+  cluster: build05
+  cron: 0 21 * * 0,2,4,6
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      SUITE: Nftables
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: network-flow-matrix-tests
+    - chain: baremetalds-ipi-test
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
+  timeout: 5h0m0s
+- as: e2e-aws-upgrade-ovn-single-node-network-flow-matrix
+  cron: 0 21 * * 0,2,4,6
+  steps:
+    cluster_profile: aws-3
+    env:
+      SUITE: Nftables
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: network-flow-matrix-tests
+    - ref: single-node-e2e-test
+    workflow: openshift-upgrade-aws-single-node
 zz_generated_metadata:
   branch: master
   org: openshift

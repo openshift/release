@@ -4,13 +4,33 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ ${ENABLE_SHARED_PHZ} == "yes" ]]; then
-  CLUSTER_CREATOR_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 
-  SHARED_ACCOUNT_NO=$(aws sts get-caller-identity | jq -r '.Arn' | awk -F ":" '{print $5}')
-  echo "Using shared account to create PHZ. Account No: ${SHARED_ACCOUNT_NO:0:6}***"
+  echo "Using shared AWS account."
+  if [[ ! -f "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    echo "ERROR: The ENABLE_SHARED_PHZ is enabled, but the 2nd AWS account credential file \${CLUSTER_PROFILE_DIR}/.awscred_shared_account file does not exit, please check your cluster profile."
+    exit 1
+  fi
+
+  CLUSTER_CREATOR_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
+  CLUSTER_CREATOR_AWS_ACCOUNT_NO=$(echo $CLUSTER_CREATOR_USER_ARN | awk -F ":" '{print $5}')
+  echo "Cluster creator account: ${CLUSTER_CREATOR_AWS_ACCOUNT_NO:0:6}***"
+
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  SHARED_ACCOUNT_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
+  SHARED_ACCOUNT_AWS_ACCOUNT_NO=$(echo $SHARED_ACCOUNT_USER_ARN | awk -F ":" '{print $5}')
+  echo "Shared account: ${SHARED_ACCOUNT_AWS_ACCOUNT_NO:0:6}***"
+else
+  echo "Using regular AWS account."
 fi
 
 REGION="${LEASED_RESOURCE}"
@@ -74,7 +94,7 @@ if [[ ${ENABLE_SHARED_PHZ} == "yes" ]]; then
         {
             "Effect": "Allow",
             "Action": "ec2:DeleteTags",
-            "Resource": "arn:aws:ec2:${REGION}:${SHARED_ACCOUNT_NO}:vpc/${VPC_ID}"
+            "Resource": "arn:aws:ec2:${REGION}:${SHARED_ACCOUNT_AWS_ACCOUNT_NO}:vpc/${VPC_ID}"
         },
         {
             "Effect": "Allow",
@@ -113,15 +133,6 @@ EOF
 
   PRINCIPAL_LIST=$(mktemp)
   echo ${CLUSTER_CREATOR_USER_ARN} > ${PRINCIPAL_LIST}
-  if [[ -e ${SHARED_DIR}/sts_ingress_role_arn ]]; then
-    ingress_role=$(head -n 1 ${SHARED_DIR}/sts_ingress_role_arn)
-    if [[ ${ingress_role} == "" ]]; then
-      echo "Ingress role is empty, exit now"
-      exit 1
-    else
-      echo ${ingress_role} >> ${PRINCIPAL_LIST}
-    fi 
-  fi
 
   cat <<EOF> $ASSUME_ROLE_POLICY_DOC
 {

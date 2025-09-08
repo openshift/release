@@ -6,6 +6,13 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AWS_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AWS_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
@@ -213,13 +220,14 @@ echo "Using controlPlane node replicas: ${master_replicas}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AWS_BASE_DOMAIN}
 platform:
   aws:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
       clusterName: ${NAMESPACE}-${UNIQUE_HASH}
+      ci-nat-replace: "${CI_NAT_REPLACE:-false}"
 controlPlane:
   architecture: ${CONTROL_ARCH}
   name: master
@@ -262,44 +270,32 @@ ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}
 rm /tmp/pull-secret
 
 # excluding older releases because of the bug fixed in 4.10, see: https://bugzilla.redhat.com/show_bug.cgi?id=1960378
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
-  MIRROR_REGION="us-east-1"
-  if [ "$REGION" == "us-west-1" ] || [ "$REGION" == "us-east-2" ] || [ "$REGION" == "us-west-2" ] ; then
-    MIRROR_REGION="${REGION}"
-  fi
+# if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+#   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# imageContentSources:
+# - mirrors:
+#   - quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com
+#   source: quay.io
+# EOF
 
-  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
-  cat > "${PATCH}" << EOF
-imageContentSources:
-- mirrors:
-  - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
-  source: quay.io
-EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+#   mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+#   pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
 
-  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
-  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
-
-  PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
-  cat > "${PATCH}" << EOF
-pullSecret: >
-  $(echo "${pull_secret_aws}" | jq -c .)
-EOF
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
-  rm "${PATCH}"
-fi
+#   PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# pullSecret: >
+#   $(echo "${pull_secret_aws}" | jq -c .)
+# EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   rm "${PATCH}"
+# fi
 
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
-if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
-  # TODO: move repo to a more appropriate location
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
-  echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
-fi
-
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
   if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
@@ -379,4 +375,14 @@ platform:
     preserveBootstrapIgnition: true
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_bootstrap_ignition}"
+fi
+
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  patch_user_provisioned_dns="${SHARED_DIR}/install-config-user-provisioned-dns.yaml.patch"
+  cat > "${patch_user_provisioned_dns}" << EOF
+platform:
+  aws:
+    userProvisionedDNS: Enabled
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
 fi

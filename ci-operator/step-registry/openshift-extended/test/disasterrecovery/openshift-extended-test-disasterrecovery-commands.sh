@@ -42,7 +42,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:/usr/local/krew/bin:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
@@ -221,7 +221,7 @@ ibmcloud)
     fi
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
+equinix-ocp-metal|equinix-edge-enablement|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -347,6 +347,7 @@ function run {
 
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
+    create_must-gather_dir_for_case
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
@@ -447,7 +448,7 @@ function handle_filters {
     done
 
     echo "handle AND logical"
-    for filter in ${filters_and[*]}
+    for filter in "${filters_and[@]}"
     do
         echo "handle filter_and ${filter}"
         handle_and_filter "${filter}"
@@ -455,7 +456,7 @@ function handle_filters {
 
     echo "handle OR logical"
     rm -fr ./case_selected_or
-    for filter in ${filters_or[*]}
+    for filter in "${filters_or[@]}"
     do
         echo "handle filter_or ${filter}"
         handle_or_filter "${filter}"
@@ -588,6 +589,23 @@ function check_case_selected {
         echo "find case"
     else
         echo "do not find case"
+    fi
+}
+function create_must-gather_dir_for_case {
+    MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO"
+    # MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO|OLM"
+
+    if echo ${test_scenarios} | grep -qE "${MOUDLE_NEED_MUST_GATHER_PER_CASE}"; then
+        mkdir -p "${ARTIFACT_DIR}/must-gather" || true
+        if [ -d "${ARTIFACT_DIR}/must-gather" ]; then
+            export QE_MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"
+        else
+            unset QE_MUST_GATHER_DIR
+        fi
+        # need to check if QE_MUST_GATHER_DIR is empty in case code. 
+        # if empty, it means there is no such dir, can not put must-gather file into there.
+        # if it is not empty, it means there is such dir. and need to check the existing dir size + must-gather file size is 
+        # greater than 500M, if it is greater, please do not put it. or else, put must-gather into there.
     fi
 }
 run

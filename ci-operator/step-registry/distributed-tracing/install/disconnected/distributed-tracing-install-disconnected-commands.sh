@@ -4,6 +4,33 @@ set -e
 set -u
 set -o pipefail
 
+# Set catalog image names that start with brew in ImageSetConfiguration as vars
+declare JAEGER_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_JAEGER_INDEX_IMAGE}
+declare OTEL_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE}
+declare TEMPO_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE}
+
+# Check if catalog image variables are not empty
+if [[ -z "$JAEGER_INDEX_IMAGE" ]]; then
+    echo "Error: JAEGER_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "JAEGER_INDEX_IMAGE is set to: $JAEGER_INDEX_IMAGE"
+fi
+
+if [[ -z "$OTEL_INDEX_IMAGE" ]]; then
+    echo "Error: OTEL_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "OTEL_INDEX_IMAGE is set to: $OTEL_INDEX_IMAGE"
+fi
+
+if [[ -z "$TEMPO_INDEX_IMAGE" ]]; then
+    echo "Error: TEMPO_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "TEMPO_INDEX_IMAGE is set to: $TEMPO_INDEX_IMAGE"
+fi
+
 # Set XDG_RUNTIME_DIR/containers to be used by oc mirror
 export HOME=/tmp/home
 export XDG_RUNTIME_DIR="${HOME}/run"
@@ -94,7 +121,7 @@ function mirror_catalog_icsp() {
     MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
     echo $MIRROR_REGISTRY_HOST
     if [[ $ret -eq 0 ]]; then 
-        jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
+        jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
       export REG_CREDS=${XDG_RUNTIME_DIR}/containers/auth.json
     else
         echo "!!! fail to extract the auth of the cluster"
@@ -113,17 +140,26 @@ storageConfig:
     path: /tmp/images
 mirror:
   operators:
-  - catalog: registry.stage.redhat.io/redhat/redhat-operator-index:v4.15
+  - catalog: ${TEMPO_INDEX_IMAGE}
+    targetCatalog: rh-osbs/tempo
     packages:
     - name: tempo-product
       channels:
       - name: stable
+  - catalog: ${OTEL_INDEX_IMAGE}
+    targetCatalog: rh-osbs/otel
+    packages:
     - name: opentelemetry-product
       channels:
       - name: stable
+  - catalog: ${JAEGER_INDEX_IMAGE}
+    targetCatalog: rh-osbs/jaeger
+    packages:
     - name: jaeger-product
       channels:
       - name: stable
+  - catalog: registry.stage.redhat.io/redhat/redhat-operator-index:v4.15
+    packages:
     - name: elasticsearch-operator
       channels:
       - name: stable-5.8
@@ -132,9 +168,9 @@ mirror:
       - name: stable
   additionalImages:
   # Used for running disconnected tests
-  - name: quay.io/minio/minio@sha256:7586fd4e11b48d7e41efdc6898b73147231da847cd0d4383d0a718ad2c98e6d8
-  - name: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen@sha256:a036b2ec403f445adc68bfcc359d5040a6603af4081a76a6cf02a5de55138a4e
-  - name: ghcr.io/grafana/tempo-operator/test-utils@sha256:7cf76bad82feb2cc338d23b29d7585c9399dfc8105bbab0c0636a776916aa3bc
+  - name: quay.io/minio/minio@sha256:dfc084fde47cbddece19c0616c280ea23c07f7d306dbbb135688c6ab60c6885c
+  - name: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest@sha256:d16e57246f71cb0b94390226bae23bb5b55d6a0fa5b0d067edf6e370a12e9799
+  - name: ghcr.io/grafana/tempo-operator/test-utils:main@sha256:abe652bdd34f9433b5bbe0e8100838b154f69b51aec0a9cc04fe381eef7bec84
   - name: docker.io/jaegertracing/vertx-create-span@sha256:6704312715644554fe4d51e0ce5cb0032e9231653ac61bdbdb5f290cb637d421
 EOF
 
@@ -142,7 +178,7 @@ EOF
     run_command "curl -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
     run_command "./oc-mirror --config=/tmp/image-set.yaml docker://${MIRROR_REGISTRY_HOST} --continue-on-error --ignore-history --source-skip-tls --dest-skip-tls || true"
     run_command "cp oc-mirror-workspace/results-*/mapping.txt ."
-    run_command "sed 's/registry.redhat.io/registry.stage.redhat.io/g' mapping.txt > mapping-stage.txt"
+    run_command "sed -e 's|registry.redhat.io|registry.stage.redhat.io|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/tempo|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/otel|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/jaeger|brew.registry.redhat.io/rh-osbs/iib|g' mapping.txt > mapping-stage.txt"
     run_command "oc image mirror -a ${REG_CREDS} -f mapping-stage.txt --insecure --filter-by-os='.*'"
 
     # print and apply generated ICSP and catalog source
@@ -150,7 +186,7 @@ EOF
     run_command "cat oc-mirror-workspace/results-*/catalogSource*"
     run_command "oc apply -f ./oc-mirror-workspace/results-*/"
 
-    CATALOG_SOURCE="cs-redhat-operator-index"
+    CATALOG_SOURCE="cs-tempo"
     local -i counter=0
     local status=""
     while [ $counter -lt 600 ]; do
@@ -159,12 +195,105 @@ EOF
       sleep 20
       status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
       [[ $status = "READY" ]] && {
-        echo "$CATALOG_SOURCE CatalogSource created successfully"
+        echo "$CATALOG_SOURCE Tempo CatalogSource created successfully"
         break
       }
     done
     [[ $status != "READY" ]] && {
-      echo "!!! fail to create QE CatalogSource"
+      echo "!!! fail to create Tempo CatalogSource"
+      run "oc get pods -o wide -n openshift-marketplace"
+      run "oc -n openshift-marketplace get catalogsource $CATALOG_SOURCE -o yaml"
+      run "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOG_SOURCE -o yaml"
+      node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
+      run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
+        pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
+      run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json registry.stage.redhat.io/redhat/redhat-operator-index:v4.15"
+
+      run "oc get mcp,node"
+      run "oc get mcp worker -o yaml"
+      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+
+      return 1
+    }
+    return 0
+
+    CATALOG_SOURCE="cs-otel"
+    local -i counter=0
+    local status=""
+    while [ $counter -lt 600 ]; do
+      ((counter+=20))
+      echo "waiting ${counter}s"
+      sleep 20
+      status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
+      [[ $status = "READY" ]] && {
+        echo "$CATALOG_SOURCE OTEL CatalogSource created successfully"
+        break
+      }
+    done
+    [[ $status != "READY" ]] && {
+      echo "!!! fail to create OTEL CatalogSource"
+      run "oc get pods -o wide -n openshift-marketplace"
+      run "oc -n openshift-marketplace get catalogsource $CATALOG_SOURCE -o yaml"
+      run "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOG_SOURCE -o yaml"
+      node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
+      run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
+        pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
+      run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json registry.stage.redhat.io/redhat/redhat-operator-index:v4.15"
+
+      run "oc get mcp,node"
+      run "oc get mcp worker -o yaml"
+      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+
+      return 1
+    }
+    return 0
+
+    CATALOG_SOURCE="cs-jaeger"
+    local -i counter=0
+    local status=""
+    while [ $counter -lt 600 ]; do
+      ((counter+=20))
+      echo "waiting ${counter}s"
+      sleep 20
+      status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
+      [[ $status = "READY" ]] && {
+        echo "$CATALOG_SOURCE Jaeger CatalogSource created successfully"
+        break
+      }
+    done
+    [[ $status != "READY" ]] && {
+      echo "!!! fail to create Jaeger CatalogSource"
+      run "oc get pods -o wide -n openshift-marketplace"
+      run "oc -n openshift-marketplace get catalogsource $CATALOG_SOURCE -o yaml"
+      run "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOG_SOURCE -o yaml"
+      node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
+      run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
+        pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
+      run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json registry.stage.redhat.io/redhat/redhat-operator-index:v4.15"
+
+      run "oc get mcp,node"
+      run "oc get mcp worker -o yaml"
+      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+
+      return 1
+    }
+    return 0
+
+    CATALOG_SOURCE="cs-redhat-operator-index"
+    local -i counter=0
+    local status=""
+    while [ $counter -lt 600 ]; do
+	  ((counter+=20))
+      echo "waiting ${counter}s"
+      sleep 20
+      status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
+      [[ $status = "READY" ]] && {
+        echo "$CATALOG_SOURCE Stage CatalogSource created successfully"
+        break
+      }
+    done
+    [[ $status != "READY" ]] && {
+      echo "!!! fail to create Stage CatalogSource"
       run "oc get pods -o wide -n openshift-marketplace"
       run "oc -n openshift-marketplace get catalogsource $CATALOG_SOURCE -o yaml"
       run "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOG_SOURCE -o yaml"

@@ -56,6 +56,15 @@ env:
     ]
 ```
 
+**Add subscription config:**
+```yaml
+env:
+    OPERATORS: |
+    [
+        {"name": "<operator name>", "source": "<source>", "channel": "<channel>", "operator_group": "global-operators" "install_namespace": "openshift-operators", "target_namespaces": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"},
+    ]
+```
+
 #### Variable Definitions
 
 - **`name`**: The package name of the optional operator to install. Example: `"mtr-operator"`.
@@ -64,7 +73,7 @@ env:
 - **`operator_group`**: (Optional) The operator group name. Example: `"global-operators"`
 - **`install_namespace`**: The namespace into which the operator and catalog will be installed. Example: `"mtr-namespace"`.
 - **`target_namespaces`**: A comma-separated list of namespaces the operator will target. If empty, all namespaces will be targeted. This value can be set to `"!install"` to use the `install_namespace` value. Example: `"mtr,ocm"`
-
+- **`config`**: (Optional) SubscriptionConfig contains configuration specified for a subscription. Example: `{"env": [{"name": "FIPS_MODE", "value": "disabled"}]}`. More fields can be found in the CRD/subscriptions.operators.coreos.com.
 
 ## Requirements
 
@@ -77,4 +86,3 @@ env:
 - `OPERATORS` 
   - **Definition**: A JSON list of operators to install. Please see the [Defining `OPERATORS`](#defining-operators) section of this document for more information.
   - **If left empty**: The script will fail.
-

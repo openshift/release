@@ -6,11 +6,12 @@ set -x
 cat /etc/os-release
 
 if [ ${BAREMETAL} == "true" ]; then
+  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
   bastion="$(cat /bm/address)"
   # Copy over the kubeconfig
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
   # Setup socks proxy
-  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
+  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
   export KUBECONFIG=/tmp/kubeconfig
   export https_proxy=socks5://localhost:12345
   export http_proxy=socks5://localhost:12345
@@ -39,10 +40,10 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-heavy
 
 # A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50" ./run.sh
+ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50  --pod-ready-threshold=2m" ./run.sh
 
 # The measurable run
-export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS} --pprof=${PPROF}"
 
 export CLEANUP_WHEN_FINISH=true
 
@@ -52,14 +53,37 @@ export GEN_CSV=true
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
 echo ${SHARED_DIR}
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+    EXTRA_FLAGS+=" --local-indexing"
+fi
+
+if [[ -n "${USER_METADATA}" ]]; then
+  echo "${USER_METADATA}" > user-metadata.yaml
+  EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+fi
+export EXTRA_FLAGS
+export ADDITIONAL_PARAMS
 
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> "${SHARED_DIR}"/index_data.json
+
+cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
+cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
+
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+    metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
+    cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+fi
+
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
+fi
+#node-density-heavy test
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
 fi

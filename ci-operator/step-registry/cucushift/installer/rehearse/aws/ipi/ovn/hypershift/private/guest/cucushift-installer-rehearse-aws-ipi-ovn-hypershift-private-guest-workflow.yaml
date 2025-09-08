@@ -2,11 +2,12 @@ workflow:
   as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest
   steps:
     pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-provision
-    - ref: cucushift-hypershift-extended-enable-guest
+      - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-provision
+      - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+      - ref: cucushift-hypershift-extended-enable-guest
+      - ref: cucushift-installer-reportportal-marker
     post:
-    - ref: cucushift-hypershift-extended-disable-guest
-    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-deprovision
-  documentation: |-
-    This workflow creates and later destroys a fully private hypershift hosted cluster on AWS. 
-    oc commands in the tests will target the hosted cluster. 
+      - ref: cucushift-hypershift-extended-disable-guest
+      - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-deprovision
+      - ref: send-results-to-reportportal
+  documentation: "This workflow creates and later destroys a fully private hypershift hosted cluster on AWS. \noc commands in the tests will target the hosted cluster. "

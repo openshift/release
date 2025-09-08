@@ -13,6 +13,7 @@ QUAY_PASSWORD="password"
 cd new-ui-tests 
 skopeo -v
 oc version
+python3 -V
 terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
@@ -64,7 +65,7 @@ function reformat_report {
 
       sed -i '4,$ {/<testsuite /d}' ${ReportFileName}_v1.xml
       sed -i '4,$ {/<\/testsuite>/d}' ${ReportFileName}_v1.xml
-      sed -i '$i\\  </testsuite>\\' ${ReportFileName}_v1.xml
+      sed -i '$i  </testsuite>' ${ReportFileName}_v1.xml
       sed -i "3s/OCP-[0-9]*/${ReportType}/g" ${ReportFileName}_v1.xml
       sed -i '3s/time="[0-9.]*"//g' ${ReportFileName}_v1.xml
 
@@ -80,6 +81,7 @@ yarn install || true
 yarn add --dev typescript || true
 yarn add --dev cypress-failed-log || true
 yarn add --dev @cypress/grep || true
+yarn global add regctl || true
 
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
@@ -102,12 +104,12 @@ echo "The Quay hostname is $quay_hostname"
 #curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' --data '{"username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
 
 quay_access_token=$(cat $SHARED_DIR/quay_oauth2_token|tr -d '\n')
-echo "The Quay super user access token is ${quay_access_token}" 
+#echo "The Quay super user access token is ${quay_access_token}" 
 
 ocp_endpoint=$(cat $SHARED_DIR/kubeconfig|grep "server:"|awk '{print $2}'|tr -d '\n')
 echo "The OCP cluster endpoint is ${ocp_endpoint}"
 ocp_kubeadmin_password=$(cat $SHARED_DIR/kubeadmin-password |tr -d '\n')
-echo "The OCP cluster kubeadmin password is ${ocp_kubeadmin_password}"
+#echo "The OCP cluster kubeadmin password is ${ocp_kubeadmin_password}"
 
 export CYPRESS_QUAY_ENDPOINT=${quay_hostname}
 export CYPRESS_QUAY_ENDPOINT_PROTOCOL=https
@@ -118,8 +120,12 @@ export CYPRESS_OCP_ENDPOINT=${ocp_endpoint}
 export CYPRESS_OCP_PASSWORD=${ocp_kubeadmin_password}
 export CYPRESS_QUAY_PROJECT=quay-enterprise
 
+YARN_PATH=$(yarn global bin)
+NEW_PATH="$PATH:${YARN_PATH}"
+export PATH=${NEW_PATH}
+
 #yarn run cypress run --browser firefox --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags=newui+-nopipeline || true
-yarn run cypress run --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --nopipeline' || true
+NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
 
 yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
 

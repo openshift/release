@@ -1,0 +1,26 @@
+ref:
+  as: agent-qe-nutanix-provision
+  from_image:
+    namespace: ci
+    name: "agent-qe-base"
+    tag: latest
+  grace_period: 10m
+  commands: agent-qe-nutanix-provision-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: registry-pull-credentials
+      mount_path: /var/run/vault/secrets
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: FIPS_ENABLED
+      default: "false"
+      documentation: "Indicates a FIPS-enabled cluster, to disable FIPS host checks in the installer."
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: >-
+    The agent-qe-nutanix-provision will provision an Nutanix cluster using the agent based installation,
+    given the configuration assets prepared in the earlier steps.

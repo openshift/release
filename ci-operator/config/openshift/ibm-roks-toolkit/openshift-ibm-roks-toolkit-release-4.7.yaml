@@ -70,7 +70,8 @@ tests:
   commands: make verify
   container:
     from: src
-- as: create-cluster
+- always_run: false
+  as: create-cluster
   commands: export ARTIFACTS_DIR="${ARTIFACT_DIR}" && ./deploy_ci.sh
   container:
     from: iks-deploy
@@ -91,10 +92,12 @@ tests:
       commands: KUBECONFIG=/var/run/appci/kubeconfig GITHUB_TOKEN="$(cat /var/run/github/token)"
         make create-release
       credentials:
-      - mount_path: /var/run/github
+      - collection: ""
+        mount_path: /var/run/github
         name: ibm-roks-toolkit-gh-token
         namespace: test-credentials
-      - mount_path: /var/run/appci
+      - collection: ""
+        mount_path: /var/run/appci
         name: ibm-roks-appci-kubeconfig
         namespace: test-credentials
       from: release-base

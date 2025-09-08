@@ -27,7 +27,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.14"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -37,31 +37,58 @@ resources:
       cpu: 1000m
       memory: 2Gi
 tests:
-- as: scaling-pipelines-upstream-stable-daily
-  cron: 0 2 * * 0
+- as: max-concurrency-downstream-nightly-daily
+  cron: 0 8 * * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
-      DEPLOYMENT_TYPE: upstream
-      DEPLOYMENT_VERSION: stable
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.18"
       MUST_GATHER_TIMEOUT: 35m
-      TEST_CONCURRENT: "100"
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
-      TEST_TOTAL: "1000"
-    workflow: openshift-pipelines-scaling-pipelines
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
   timeout: 8h0m0s
-- as: scaling-pipelines-upstream-nightly-daily
-  cron: 0 14 * * 0
+- as: max-concurrency-downstream-pipelines1-19-daily
+  cron: 0 0 * * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
-      DEPLOYMENT_TYPE: upstream
-      DEPLOYMENT_VERSION: nightly
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
       MUST_GATHER_TIMEOUT: 35m
-      TEST_CONCURRENT: "100"
+      TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
-      TEST_TOTAL: "1000"
-    workflow: openshift-pipelines-scaling-pipelines
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- as: max-concurrency-downstream-pipelines1-18-daily
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.18"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- as: max-concurrency-downstream-pipelines-1-17-daily
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.17"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
   timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-12

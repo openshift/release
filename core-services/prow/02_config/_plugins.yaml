@@ -197,22 +197,19 @@ bugzilla:
       target_release: 4.16.0
       validate_by_default: true
     openshift-4.17:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.18.0
-      target_release: 4.17.0
+      target_release: 4.17.z
       validate_by_default: true
     openshift-4.18:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.19.0
-      target_release: 4.18.0
+      target_release: 4.18.z
+      validate_by_default: true
+    openshift-4.19:
+      dependent_bug_target_releases:
+      - 4.20.0
+      target_release: 4.19.z
       validate_by_default: true
     release-3.11:
       add_external_link: true
@@ -339,22 +336,19 @@ bugzilla:
       target_release: 4.16.0
       validate_by_default: true
     release-4.17:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.18.0
-      target_release: 4.17.0
+      target_release: 4.17.z
       validate_by_default: true
     release-4.18:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.19.0
-      target_release: 4.18.0
+      target_release: 4.18.z
+      validate_by_default: true
+    release-4.19:
+      dependent_bug_target_releases:
+      - 4.20.0
+      target_release: 4.19.z
       validate_by_default: true
 cat: {}
 cherry_pick_unapproved:
@@ -371,6 +365,8 @@ config_updater:
       - build03
       - build04
       - build05
+      - build06
+      - build07
       - build09
       - build10
       - build11
@@ -385,6 +381,8 @@ config_updater:
       - build03
       - build04
       - build05
+      - build06
+      - build07
       - build09
       - build10
       - build11
@@ -393,26 +391,6 @@ config_updater:
       - ocp
   gzip: false
   maps:
-    ci-operator/templates/master-sidecar-4.4.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-master-sidecar-4.4
-    ci-operator/templates/openshift/installer/cluster-launch-installer-e2e.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-installer-e2e
-    ci-operator/templates/openshift/installer/cluster-launch-installer-libvirt-e2e.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-installer-libvirt-e2e
-    ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-e2e.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-installer-openstack-e2e
-    ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-upi-e2e.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-installer-openstack-upi-e2e
     cluster/test-deploy/gcp-3/*:
       cluster_groups:
       - build_farm_ci
@@ -611,30 +589,42 @@ label:
   - px-approved
   - docs-approved
   - qe-approved
+  - ux-approved
   - no-qe
   - downstream-change-needed
   - rebase/manual
   - cluster-config-api-changed
+  - run-integration-tests
   restricted_labels:
     '*':
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
       - openshift-release-oversight
+      - openshift-sustaining-engineers
+      label: ok-to-test
+    - allowed_teams:
+      - openshift-patch-managers
+      - openshift-staff-engineers
+      - openshift-release-oversight
+      - openshift-sustaining-engineers
       label: cherry-pick-approved
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
       - openshift-release-oversight
+      - openshift-sustaining-engineers
       label: backport-risk-assessed
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-sustaining-engineers
       label: staff-eng-approved
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
       - openshift-release-oversight
+      - openshift-sustaining-engineers
       label: jira/valid-bug
     - allowed_teams:
       - openshift-patch-managers
@@ -644,13 +634,19 @@ label:
     - allowed_teams:
       - openshift-release-oversight
       - openshift-staff-engineers
+      - openshift-sustaining-engineers
       label: approved
+    - allowed_teams:
+      - openshift-team-leads
+      - openshift-staff-engineers
+      label: stability-fix-approved
 override:
   allow_top_level_owners: true
   allowed_github_teams:
     openshift:
     - openshift-release-oversight
     - openshift-staff-engineers
+    - openshift-sustaining-engineers
 owners:
   filenames:
     openshift-kni/scheduler-plugins:
@@ -677,6 +673,9 @@ owners:
     openshift/kubernetes:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/kubernetes-kube-storage-version-migrator:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift/operator-framework-catalogd:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
@@ -699,6 +698,9 @@ owners:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift/velero-plugin-for-gcp:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/velero-plugin-for-legacy-aws:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift/velero-plugin-for-microsoft-azure:

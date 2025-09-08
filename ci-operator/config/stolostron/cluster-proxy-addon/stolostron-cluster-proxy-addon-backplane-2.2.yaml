@@ -49,18 +49,22 @@ tests:
     true
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
     make update-deps-overrides
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
     make test --warn-undefined-variables
   container:
     from: test-bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: cluster-proxy-addon
@@ -105,7 +109,8 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

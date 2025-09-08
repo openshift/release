@@ -9,6 +9,14 @@ oc config view
 oc projects
 python --version
 
+if [[ $REMOTE_CLIENT = "true" ]]; then
+    cp /tmp/secret/kubeconfig ${ARTIFACT_DIR}/kubeconfig
+    cp /tmp/secret/kubeadmin-password ${ARTIFACT_DIR}/kubeadmin-password
+    cp ${SHARED_DIR}/runtime_env ${ARTIFACT_DIR}/runtime_env
+    cp ${SHARED_DIR}/metadata.json ${ARTIFACT_DIR}/metadata.json
+    sleep 3600
+    exit 0
+fi
 pushd /tmp
 SLACK_API_TOKEN=$(cat "/token/reliability-v2-slack-api-token")
 export SLACK_API_TOKEN

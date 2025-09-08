@@ -10,7 +10,7 @@ STS=${STS:-true}
 HOSTED_CP=${HOSTED_CP:-false}
 COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
-CHANNEL_GROUP=${CHANNEL_GROUP}
+EC_BUILD=${EC_BUILD:-false}
 MULTI_AZ=${MULTI_AZ:-false}
 EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-"optional"}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
@@ -26,7 +26,6 @@ FIPS=${FIPS:-false}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
@@ -35,7 +34,94 @@ CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
 CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 log(){
-    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
+}
+
+get_channel_versions() {
+  local channel="$1"
+  local cmd="rosa list versions --channel-group ${channel} -o json"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    cmd="$cmd --hosted-cp"
+  fi
+
+  if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+    cmd="$cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
+  else
+
+    cmd="$cmd | jq -r '.[].raw_id'"
+  fi
+  eval $cmd
+}
+
+find_version_in_channel() {
+  local channel="$1"
+  local target_version="$2"
+  local search_type="$3"
+
+  log "Checking ${channel} channel${target_version:+ for ${search_type} version ${target_version}}..."
+
+  local channel_versions
+  channel_versions=$(get_channel_versions "${channel}")
+
+  if [[ -z "${channel_versions}" ]]; then
+    log "No versions found in ${channel} channel"
+    return 1
+  fi
+
+  log "Found versions in ${channel} channel"
+
+  local found_version=""
+  case "${search_type}" in
+    "latest")
+      if [[ "$EC_BUILD" == "true" ]]; then
+        found_version=$(echo "$channel_versions" | grep -i ec | head -1 || true)
+      else
+        found_version=$(echo "$channel_versions" | head -1 || true)
+      fi
+      ;;
+    "pattern")
+      if [[ "$EC_BUILD" == "true" ]]; then
+        found_version=$(echo "$channel_versions" | grep -E "^${target_version}" | grep -i ec | head -1 || true)
+      else
+        found_version=$(echo "$channel_versions" | grep -E "^${target_version}" | head -1 || true)
+      fi
+      ;;
+    "exact")
+      found_version=$(echo "$channel_versions" | grep -x "${target_version}" || true)
+      ;;
+  esac
+
+  if [[ -n "$found_version" ]]; then
+    echo "$found_version"
+    return 0
+  else
+    case "${search_type}" in
+      "latest") log "No suitable version found in ${channel} channel" ;;
+      "pattern") log "Version pattern ${target_version} not found in ${channel} channel" ;;
+      "exact") log "Exact version ${target_version} not found in ${channel} channel" ;;
+    esac
+    return 1
+  fi
+}
+
+# Multi-channel version search
+search_across_channels() {
+  local target_version="$1"
+  local search_type="$2"
+
+  IFS=',' read -r -a CHANNEL_GROUP_ARRAY <<< "${CHANNEL_GROUP// /}"
+
+  for GROUP in "${CHANNEL_GROUP_ARRAY[@]}"; do
+    if found_version=$(find_version_in_channel "${GROUP}" "${target_version}" "${search_type}"); then
+      OPENSHIFT_VERSION="$found_version"
+      CHANNEL_GROUP="${GROUP}"
+      log "Proceeding with ${GROUP} channel group"
+      return 0
+    fi
+  done
+
+  log "Error: No versions found in any of the specified channel groups: ${CHANNEL_GROUP_ARRAY[*]}"
+  exit 1
 }
 
 # Record Cluster Configurations
@@ -164,6 +250,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   version_cmd="$version_cmd --hosted-cp"
 fi
 if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+  # shellcheck disable=SC2089
   version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
 else
   version_cmd="$version_cmd | jq -r '.[].raw_id'"
@@ -171,21 +258,57 @@ fi
 versionList=$(eval $version_cmd)
 echo -e "Available cluster versions:\n${versionList}"
 
+# If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
+# supplied by CI for the payload to use. This only really works for nightlies. ROSA
+# SRE has a job that polls the release controller and syncs new nightlies every 15 minutes,
+# and it can take for up to 60 minutes in practice for the nightly to be available and listed
+# from the ROSA CLI, so we keep retrying with a back off.
+if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
+  PAYLOAD_TAG=$(echo $ORIGINAL_RELEASE_IMAGE_LATEST | cut -d':' -f2)
+
+  DELAY=60
+  MAX_DELAY=360
+  TIME_LIMIT=3600
+  start_time=$(date +%s)
+
+  while true; do
+    versionList=$(eval $version_cmd)
+    echo -e "Looking for $PAYLOAD_TAG in available cluster versions:\n${versionList}"
+    # Check if image has been synced yet
+    if echo "$versionList" | grep -q "$PAYLOAD_TAG"; then
+      echo "$PAYLOAD_TAG is available from ROSA, continuing..."
+      OPENSHIFT_VERSION=$PAYLOAD_TAG
+      break
+    fi
+
+    current_time=$(date +%s)
+    elapsed_time=$((current_time - start_time))
+
+    # Don't wait longer than $TIME_LIMIT for the payload to be synced
+    if [[ $elapsed_time -ge $TIME_LIMIT ]]; then
+      minutes=$((TIME_LIMIT / 60))
+      echo "Error: timed out after $minutes minutes waiting for $PAYLOAD_TAG to become available"
+      exit 1
+    fi
+
+    # Wait for the current delay before retrying
+    echo "Payload tag not found. Waiting for $DELAY seconds before retrying..."
+    sleep $DELAY
+
+    # Double the delay for exponential back-off, but cap it at the max delay
+    DELAY=$((DELAY * 2))
+    if [[ $DELAY -gt $MAX_DELAY ]]; then
+       DELAY=$MAX_DELAY
+    fi
+  done
+fi
+
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-  fi
+  search_across_channels "" "latest"
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-  fi
+  search_across_channels "$OPENSHIFT_VERSION" "pattern"
 else
-  # Match the whole line
-  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+  search_across_channels "$OPENSHIFT_VERSION" "exact"
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -198,11 +321,25 @@ fi
 # fi
 log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
-TAGS="prowci:${CLUSTER_NAME}"
+# Add USER_TAGS to help with cloud cost and make sure to remove
+# invalid tags so that CLI usage doesn't fail later.
+# The [ and ] characters are considered invalid tags, which are
+# used by CI accounts like "renovate[bot]".
+TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' | tr -d '[]' || true)
+if [[ -z "$TAG_Author" ]]; then
+  TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[]' |  jq -r '.repo + "-" + .base_ref' || true)
+fi
+TAG_Author=${TAG_Author:-"periodic"}
+TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
+TAG_Job_Type=$JOB_TYPE
+TAG_CI="prow"
+TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
+TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
 
+# Record the configurations
 cat > ${cluster_config_file} << EOF
 {
   "name": "${CLUSTER_NAME}",
@@ -263,12 +400,8 @@ fi
 
 COMPUTER_NODE_DISK_SIZE_SWITCH=""
 if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
-  if [[ "$HOSTED_CP" == "true" ]] && [[ "$OCM_LOGIN_ENV" == "production" ]]; then
-     echo "The feature WORKER_DISK_SIZE is not ready for HCP on Prod"
-  else
-      COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
-      record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
-  fi
+    COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+    record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
 fi
 
 AUDIT_LOG_SWITCH=""
@@ -313,7 +446,7 @@ fi
 
 CONFIGURE_CLUSTER_AUTOSCALER_SWITCH=""
 if [[ "$ENABLE_AUTOSCALING" == "true" ]] && [[ "$CONFIGURE_CLUSTER_AUTOSCALER" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
-  CONFIGURE_CLUSTER_AUTOSCALER_SWITCH="--autoscaler-balance-similar-node-groups --autoscaler-skip-nodes-with-local-storage --autoscaler-ignore-daemonsets-utilization --autoscaler-scale-down-enabled"
+  CONFIGURE_CLUSTER_AUTOSCALER_SWITCH="--autoscaler-ignore-daemonsets-utilization --autoscaler-max-node-provision-time 10m --autoscaler-balancing-ignored-labels aaa --autoscaler-max-nodes-total 100 --autoscaler-min-cores 0 --autoscaler-max-cores 1000 --autoscaler-min-memory 0 --autoscaler-max-memory 4096 --autoscaler-scale-down-enabled --autoscaler-scale-down-utilization-threshold 0.5 --autoscaler-scale-down-delay-after-add 10s --autoscaler-scale-down-delay-after-delete 10s --autoscaler-scale-down-delay-after-failure 10s"
 fi
 
 ETCD_ENCRYPTION_SWITCH=""
@@ -382,7 +515,7 @@ fi
 
 PRIVATE_LINK_SWITCH=""
 if [[ "$PRIVATE_LINK" == "true" ]]; then
-  PRIVATE_LINK_SWITCH="--private-link"
+  PRIVATE_LINK_SWITCH="--default-ingress-private"
 
   ENABLE_BYOVPC="true"
   PRIVATE_SUBNET_ONLY="true"
@@ -453,15 +586,15 @@ if [[ "$STS" == "true" ]]; then
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
   roleARNFile="${SHARED_DIR}/account-roles-arns"
-  account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
+  account_installer_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
   account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
   account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
-  if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
+  if [[ -z "${account_installer_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
   fi
-  ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
-  record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
+  ACCOUNT_ROLES_SWITCH="--role-arn ${account_installer_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
+  record_cluster "aws.sts" "role_arn" $account_installer_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
   record_cluster "aws.sts" "worker_role_arn" $account_worker_role_arn
 
@@ -488,14 +621,14 @@ fi
 
 SHARED_VPC_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  SAHRED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
-  SAHRED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
-  SAHRED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
-  SHARED_VPC_SWITCH="--base-domain ${SAHRED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN}"
+  SHARED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
+  SHARED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
+  SHARED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
+  SHARED_VPC_SWITCH="--base-domain ${SHARED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SHARED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SHARED_VPC_ROLE_ARN}"
 
-  record_cluster "aws.sts" "private_hosted_zone_id" ${SAHRED_VPC_HOSTED_ZONE_ID}
-  record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SAHRED_VPC_ROLE_ARN}
-  record_cluster "dns" "base_domain" ${SAHRED_VPC_BASE_DOMAIN}
+  record_cluster "aws.sts" "private_hosted_zone_id" ${SHARED_VPC_HOSTED_ZONE_ID}
+  record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SHARED_VPC_ROLE_ARN}
+  record_cluster "dns" "base_domain" ${SHARED_VPC_BASE_DOMAIN}
 fi
 
 DRY_RUN_SWITCH=""
@@ -507,7 +640,6 @@ NO_CNI_SWITCH=""
 if [[ "$NO_CNI" == "true" ]]; then
   NO_CNI_SWITCH="--no-cni"
 fi
-
 
 # Save the cluster config to ARTIFACT_DIR
 cat "${SHARED_DIR}/cluster-config" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/cluster-config"
@@ -546,12 +678,12 @@ echo "  Config cluster autoscaler: ${CONFIGURE_CLUSTER_AUTOSCALER}"
 
 echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  echo "    SAHRED_VPC_HOSTED_ZONE_ID: ${SAHRED_VPC_HOSTED_ZONE_ID}"
-  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
-  echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
+  echo "    SHARED_VPC_HOSTED_ZONE_ID: ${SHARED_VPC_HOSTED_ZONE_ID}"
+  echo "    SHARED_VPC_ROLE_ARN: ${SHARED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
+  echo "    SHARED_VPC_BASE_DOMAIN: ${SHARED_VPC_BASE_DOMAIN}"
 fi
 
-#Record installation start time
+# Record installation start time
 record_cluster "timers" "global_start" "$(date +'%s')"
 
 # Provision cluster
@@ -604,6 +736,10 @@ fi
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
+exit_code=$?
+
+# Used by gather steps to generate JUnit
+echo $exit_code > "${SHARED_DIR}/install-status.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
 CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"

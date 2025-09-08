@@ -3,11 +3,7 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.17_base-rhel9:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_4.18_base-rhel9:
+  ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
@@ -15,10 +11,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.18
-  ocp_builder_rhel-9-base-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-openshift-4.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/images
@@ -33,40 +25,39 @@ images:
 - context_dir: base
   dockerfile_path: Dockerfile.rhel9
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.18:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.18
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: base-rhel9
 - context_dir: egress/router
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: egress-router
 - context_dir: egress/http-proxy
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: egress-http-proxy
 - context_dir: egress/dns-proxy
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: egress-dns-proxy
 - context_dir: ipfailover/keepalived
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: keepalived-ipfailover
 promotion:
   to:
-  - name: 4.19-priv
+  - excluded_images:
+    - base-rhel9
+    name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -86,11 +77,11 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: unit
   commands: go test -race ./...
@@ -101,6 +92,12 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

@@ -13,6 +13,16 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
+if [[ "${MIRROR_BIN}" != "oc-adm" ]]; then
+  echo "users specifically do not use oc-adm to run mirror"
+  exit 0
+fi
+
+if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
+  echo "users are going to mirror images from bastion, skip this step."
+  exit 0
+fi
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -37,6 +47,12 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
     exit 1
 fi
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
+
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
+
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
@@ -60,14 +76,13 @@ echo "target_release_image_repo: $target_release_image_repo"
 # combine custom registry credential and default pull secret
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+oc registry login --to "${new_pull_secret}"
 
 mirror_crd_type='icsp'
 regex_keyword_1="imageContentSources"
-regex_keyword_2="ImageContentSourcePolicy"
 if [[ "${ENABLE_IDMS}" == "yes" ]]; then
     mirror_crd_type='idms'
     regex_keyword_1="imageDigestSources"
-    regex_keyword_2="ImageDigestMirrorSet"
 fi
 
 # set the release mirror args
@@ -97,22 +112,42 @@ else
 fi
 
 # For disconnected or otherwise unreachable mirrors, we want to
-# have steps use an HTTP(S) proxy to reach the registry. This proxy
+# have steps use an HTTP(S) proxy to reach the mirror. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if test -f "${SHARED_DIR}/proxy-conf.sh"
+if test -f "${SHARED_DIR}/mirror-proxy-conf.sh"
 then
         # shellcheck disable=SC1090
-        source "${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/mirror-proxy-conf.sh"
 fi
 
-# execute the mirror command
 cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} | tee '${mirror_output}'"
-run_command "$cmd"
 
-grep -A 6 "${regex_keyword_1}" ${mirror_output} > "${install_config_mirror_patch}"
-grep -B 1 -A 10 "kind: ${regex_keyword_2}" ${mirror_output} > "${cluster_mirror_conf_file}"
+MAX_ATTEMPTS=5
+ATTEMPTS=0
+SUCCESS=false
+while [ "${SUCCESS}" = false ] && (( ATTEMPTS++ < MAX_ATTEMPTS )); do
+  echo "Mirroring images attempt ${ATTEMPTS}/${MAX_ATTEMPTS}"
+  if run_command "$cmd"; then
+    echo "Mirroring images was successful in attempt $ATTEMPTS"
+    SUCCESS=true
+  else
+    echo "Mirroring images attempt $ATTEMPTS failed. Trying again..."
+    sleep 120
+  fi
+done
+
+if [ $SUCCESS = false ]; then
+  echo "Mirroring test images failed after $ATTEMPTS attempts, exiting ..."
+  exit 1
+fi
+
+line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
+install_end_line_num=$(expr ${line_num} - 3) &&
+upgrade_start_line_num=$(expr ${line_num} + 2) &&
+sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" > "${install_config_mirror_patch}"
+sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_conf_file}"
 
 run_command "cat '${install_config_mirror_patch}'"
 rm -f "${new_pull_secret}"
