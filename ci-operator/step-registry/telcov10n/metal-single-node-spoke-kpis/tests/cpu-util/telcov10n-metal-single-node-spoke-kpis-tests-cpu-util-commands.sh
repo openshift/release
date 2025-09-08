@@ -89,6 +89,7 @@ export ACCELERATOR_MODEL=""
 export REGISTRY=""
 export NODE_NAME="\$(oc get node -ojsonpath='{.items[0].metadata.name}')"
 export ENABLE_PTP=""
+export OSEARCH_TOKEN=$(<"/secret/telco5g/password")
 bash \${SCRIPTS_DIR}/test_cpu_util.sh cpu_util=\${DURATION}
 set +x
 EOF
