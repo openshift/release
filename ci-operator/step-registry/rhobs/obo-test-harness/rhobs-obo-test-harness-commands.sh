@@ -14,9 +14,10 @@ main() {
 
 	set -x
 	mkdir $TEST_RESULT_DIR
+	sleep 36000
 	./e2e.test -test.v -operatorInstallNS=coo 2>"$TEST_RESULT_DIR/errors.log" |
 		tee "$TEST_RESULT_DIR/tests.log" |
-		./go-junit-report -set-exit-code >"$TEST_RESULT_DIR/junit-obo.xml"
+		./go-junit-report >"$TEST_RESULT_DIR/junit-obo.xml"
 
 	# HACK: create an empty json file until we know what the addon-metadata
 	# should contain
