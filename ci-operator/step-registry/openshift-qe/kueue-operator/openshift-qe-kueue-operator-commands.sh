@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -x
 
+pushd /tmp
+
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
