@@ -47,6 +47,7 @@ sed -i "s|^PULL_SECRET_FILE=.*|PULL_SECRET_FILE=\"$PULL_SECRET_FILE\"|" "$VARS_F
 sed -i "s/^REGION=.*/REGION=\"$REGION\"/" "$VARS_FILE"
 sed -i "s/^RESOURCE_GROUP=.*/RESOURCE_GROUP=\"$RESOURCE_GROUP\"/" "$VARS_FILE"
 sed -i "s/^IC_API_KEY=.*/IC_API_KEY=\"$IC_API_KEY\"/" "$VARS_FILE"
+sed -i "s/^IC_CLI_VERSION=.*/IC_CLI_VERSION=\"$IC_CLI_VERSION\"/" "$VARS_FILE"
 
 # Run the create-cluster.sh script to create the OCP cluster in IBM cloud VPC
 if [[ -x ./create-cluster.sh ]]; then
