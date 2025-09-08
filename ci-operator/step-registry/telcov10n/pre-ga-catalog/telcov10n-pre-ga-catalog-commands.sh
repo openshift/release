@@ -163,7 +163,7 @@ BEGIN {
 {
     current_ts = $2
     gsub(/T|ci/, "", current_ts)
-    if (current_ts > reference_ts) {
+    if (current_ts >= reference_ts) {
         # printf("%s > %s = ", current_ts, reference_ts)
         print $0
         exit
