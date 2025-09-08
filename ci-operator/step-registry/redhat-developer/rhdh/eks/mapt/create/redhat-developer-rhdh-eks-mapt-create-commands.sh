@@ -19,8 +19,7 @@ echo "Project name: eks"
 echo "Backend URL: s3://${AWS_S3_BUCKET}/eks-${CORRELATE_MAPT}"
 echo "Connection details output: ${SHARED_DIR}"
 
-# Execute mapt command with explicit error handling
-if ! mapt aws eks create \
+mapt aws eks create \
   --project-name "eks" \
   --backed-url "s3://${AWS_S3_BUCKET}/eks-${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
@@ -28,19 +27,21 @@ if ! mapt aws eks create \
   --workers-max 3 \
   --workers-desired 3 \
   --cpus 4 \
-  --memory 4 \
+  --memory 16 \
   --arch x86_64 \
   --spot \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
   --load-balancer-controller \
-  --tags app-code=rhdh-003,service-phase=dev,cost-center=726; then
-  echo "ERROR: mapt aws eks create command failed with exit code $?"
+  --tags app-code=rhdh-003,service-phase=dev,cost-center=726
+
+MAPT_EXIT_CODE=$?
+if [ $MAPT_EXIT_CODE -ne 0 ]; then
+  echo "ERROR: mapt aws eks create command failed with exit code $MAPT_EXIT_CODE"
   exit 1
 fi
 
-# Validate that connection details were created
-if [ ! -f "${SHARED_DIR}/kubeconfig" ] && [ ! -f "${SHARED_DIR}/cluster-info" ]; then
-  echo "ERROR: EKS cluster creation failed - no connection details found in ${SHARED_DIR}"
+if [ ! -f "${SHARED_DIR}/kubeconfig" ]; then
+  echo "ERROR: EKS cluster creation failed - kubeconfig not found in ${SHARED_DIR}"
   echo "Contents of ${SHARED_DIR}:"
   ls -la "${SHARED_DIR}" || true
   exit 1
