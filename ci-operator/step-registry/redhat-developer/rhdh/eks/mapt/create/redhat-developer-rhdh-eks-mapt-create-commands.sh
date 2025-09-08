@@ -20,7 +20,7 @@ mapt aws eks create \
   --workers-max 3 \
   --workers-desired 3 \
   --cpus 4 \
-  --memory 4 \
+  --memory 16 \
   --arch x86_64 \
   --spot \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
