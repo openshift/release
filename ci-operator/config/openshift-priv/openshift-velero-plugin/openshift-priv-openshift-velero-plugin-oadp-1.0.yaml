@@ -1,0 +1,41 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+canonical_go_repository: github.com/openshift/openshift-velero-plugin
+images:
+- dockerfile_path: Dockerfile
+  to: openshift-velero-plugin-oadp-1.0
+promotion:
+  to:
+  - disabled: true
+    name: openshift-velero-plugin
+    namespace: konveyor
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.11"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  steps:
+    test:
+    - as: unit
+      commands: GOFLAGS="-mod=mod" make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-1.0
+  org: openshift-priv
+  repo: openshift-velero-plugin
