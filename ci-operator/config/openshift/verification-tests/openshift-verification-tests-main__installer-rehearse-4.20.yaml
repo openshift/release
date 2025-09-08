@@ -1,9 +1,4 @@
----
 base_images:
-  base:
-    name: cucushift
-    namespace: ci
-    tag: latest
   ansible:
     name: "4.20"
     namespace: ocp
@@ -12,6 +7,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
+  base:
+    name: cucushift
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -29,9 +28,9 @@ base_images:
     namespace: ci
     tag: latest
 images:
-  - dockerfile_path: tools/openshift-ci/Dockerfile
-    from: base
-    to: verification-tests
+- dockerfile_path: tools/openshift-ci/Dockerfile
+  from: base
+  to: verification-tests
 releases:
   latest:
     release:
@@ -50,20 +49,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-  - as: test-ocp-21588
-    steps:
-      cluster_profile: aws-qe
-      dependencies:
-        OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
-        OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
-      env:
-        BASE_DOMAIN: qe.devcluster.openshift.com
-        ENABLE_OTA_TEST: OCP-21588
-        FIPS_ENABLED: "true"
-      test:
-        - chain: openshift-upgrade-qe-test
-      workflow: >-
-        cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
+- as: test-ocp-21588
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 zz_generated_metadata:
   branch: main
   org: openshift
