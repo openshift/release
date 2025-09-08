@@ -146,6 +146,20 @@ else
   KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
 fi
 
+collect_ai_logs() {
+  echo "Collecting AI logs ..."
+  ssh ${SSH_ARGS} root@${bastion} "
+    AI_CLUSTER_ID=\$(curl -sS http://$bastion2:8080/api/assisted-install/v2/clusters/  | jq -r .[0].id)
+    echo 'Cluster ID is:' \$AI_CLUSTER_ID
+    mkdir -p /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE
+    curl -LsSo /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
+    gzip /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar
+  "
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar.gz ${ARTIFACT_DIR}
+}
+
+trap 'collect_ai_logs' EXIT
+
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
