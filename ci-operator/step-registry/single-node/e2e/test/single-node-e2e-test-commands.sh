@@ -51,6 +51,11 @@ fi
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 function cleanup() {
+    if openshift-tests health-check --help &>/dev/null; then
+        echo "Post health check for the cluster"
+        openshift-tests health-check --junit-dir "${ARTIFACT_DIR}/junit" || true
+    fi
+
     echo "Requesting risk analysis for test failures in this job run from sippy:"
     openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
 
@@ -329,11 +334,13 @@ do
     NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
     if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
     then
-      cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+        if ! openshift-tests health-check --help &>/dev/null; then
+            cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
       <testsuite name="cluster nodes" tests="1" failures="0">
         <testcase name="node count should match or exceed machine count"/>
       </testsuite>
 EOF
+        fi
         echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
         break
     fi
@@ -341,9 +348,10 @@ EOF
     sleep $node_check_interval
     i=$((i+1))
     if [ $i -gt $node_check_limit ]; then
-      MACHINELIST="$(kubectl get machines -A)"
-      NODELIST="$(kubectl get nodes)"
-      cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+        if ! openshift-tests health-check --help &>/dev/null; then
+            MACHINELIST="$(kubectl get machines -A)"
+            NODELIST="$(kubectl get nodes)"
+            cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
       <testsuite name="cluster nodes" tests="1" failures="1">
         <testcase name="node count should match or exceed machine count">
           <failure message="">
@@ -354,7 +362,7 @@ EOF
         </testcase>
       </testsuite>
 EOF
-
+        fi
         echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
         # If we enabled the ssh bastion pod, attempt to gather journal logs from each machine, regardless
         # if it made it to a node or not.
@@ -390,13 +398,16 @@ echo "$(date) - waiting for nodes to be ready..."
 ret=0
 oc wait nodes --all --for=condition=Ready=true --timeout=10m || ret=$?
 if [[ "$ret" == 0 ]]; then
+    if ! openshift-tests health-check --help &>/dev/null; then
       cat >"${ARTIFACT_DIR}/junit_node_ready.xml" <<EOF
       <testsuite name="cluster nodes ready" tests="1" failures="0">
         <testcase name="all nodes should be ready"/>
       </testsuite>
 EOF
+    fi
     echo "$(date) - all nodes are ready"
 else
+  if ! openshift-tests health-check --help &>/dev/null; then
     set +e
     getNodeResult=$(oc get nodes)
     set -e
@@ -411,8 +422,9 @@ else
       </testcase>
     </testsuite>
 EOF
-    echo "Timed out waiting for nodes to be ready. Return code: $ret."
-    exit 1
+  fi
+  echo "Timed out waiting for nodes to be ready. Return code: $ret."
+  exit 1
 fi
 
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
