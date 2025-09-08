@@ -35,7 +35,7 @@ cp /root/dev-scripts/ocp/*/log-bundle*.tar.gz /tmp/artifacts/log-bundle-\$HOSTNA
 
 echo "Get sosreport including sar data..."
 sos report --batch \
-  -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh \
+  -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,dnf \
   -k podman.all -k podman.logs \
   --tmp-dir /tmp/artifacts
 
