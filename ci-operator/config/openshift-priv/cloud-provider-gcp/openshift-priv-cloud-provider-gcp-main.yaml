@@ -12,7 +12,7 @@ base_images:
     namespace: ci
     tag: latest
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
@@ -20,7 +20,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
   rhel-coreos-base:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: rhel-coreos
   tests-private:
@@ -68,7 +68,7 @@ promotion:
       cloud-provider-gcp-rpms: rpms
     excluded_images:
     - rhel-coreos
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
 raw_steps:
 - rpm_image_injection_step:
@@ -77,12 +77,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -132,10 +132,16 @@ tests:
     env:
       PROJECT_NAME: cloud-provider-gcp
     workflow: openshift-ci-security
-- as: verify-deps
+- as: verify-vendor-work
   commands: openshift-hack/verify-vendor.sh
   container:
     from: src
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 - as: unit
   commands: openshift-hack/test-unit.sh
   container:

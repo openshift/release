@@ -1,0 +1,47 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+canonical_go_repository: github.com/openshift/velero
+images:
+- dockerfile_path: Dockerfile.ubi
+  to: velero-oadp-1.0
+- dockerfile_path: Dockerfile-velero-restic-restore-helper.ubi
+  to: velero-restic-restore-helper-oadp-1.0
+promotion:
+  to:
+  - additional_images:
+      velero-oadp-1.0: velero-oadp-1.0
+      velero-restic-restore-helper-oadp-1.0: velero-restic-restore-helper-oadp-1.0
+    disabled: true
+    name: velero
+    namespace: konveyor
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.11"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  optional: true
+  steps:
+    test:
+    - as: unit
+      commands: make -f Makefile.prow ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-1.0
+  org: openshift-priv
+  repo: velero

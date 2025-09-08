@@ -42,11 +42,26 @@ function wait_for_state() {
 
 function subscribe_operator () {
     echo "Checking if the PackageManifest exists in the CatalogSource before installing the operator..."
-    output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CATSRC_NAME --field-selector=metadata.name=openshift-cert-manager-operator 2>&1)
-    if [[ $? -ne 0 ]] || echo "$output" | grep -q "No resources found"; then
-        echo "No PackageManifest found. Skipping installation..."
-        exit 0
-    fi
+    local max_retries=6
+    local retry_interval=20
+    local retry_count=0
+    
+    while [[ $retry_count -lt $max_retries ]]; do
+        output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CATSRC_NAME --field-selector=metadata.name=openshift-cert-manager-operator 2>&1)
+        if [[ $? -eq 0 ]] && ! echo "$output" | grep -q "No resources found"; then
+            echo "PackageManifest found, proceeding with installation..."
+            break
+        fi
+        
+        retry_count=$((retry_count + 1))
+        if [[ $retry_count -lt $max_retries ]]; then
+            echo "PackageManifest not found, retrying in $retry_interval seconds... (attempt $retry_count of $max_retries)"
+            sleep $retry_interval
+        else
+            echo "No PackageManifest found after $max_retries attempts. Skipping installation..."
+            exit 0
+        fi
+    done
 
     if [[ "$TARGET_NAMESPACES" == "!all" ]]; then
         TARGET_NAMESPACES=""
