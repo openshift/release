@@ -101,6 +101,10 @@ spec:
     registryPoll:
       interval: 10m
 EOF
+
+echo "Printing MCE CatalogSource details"
+echo "${IMG}"
+
 oc wait CatalogSource --timeout=20m --for=jsonpath='{.status.connectionState.lastObservedState}'=READY -n openshift-marketplace multiclusterengine-catalog
 
 oc apply -f - <<EOF
