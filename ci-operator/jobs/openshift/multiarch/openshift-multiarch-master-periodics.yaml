@@ -17553,104 +17553,6 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.16-install-analysis-all-ppc64le
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.16
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
   cron: 41 11 4 7 *
   decorate: true
   decoration_config:
@@ -21793,300 +21695,6 @@ periodics:
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.17-install-analysis-all-multi-p-p
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=ibvirt-multi-p-p --include-job-names=4.17
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.17-install-analysis-all-ppc64le
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.17
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.17-install-analysis-all-s390x
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  s390x-libvirt,1,--platform=libvirt --include-job-names=libvirt-s390x --include-job-names=4.17
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-s390x-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -26688,300 +26296,6 @@ periodics:
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.18-install-analysis-all-multi-p-p
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=ibvirt-multi-p-p --include-job-names=4.18
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.18-install-analysis-all-ppc64le
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.18
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.18-install-analysis-all-s390x
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  s390x-libvirt,1,--platform=libvirt --include-job-names=libvirt-s390x --include-job-names=4.18
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-s390x-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -31733,300 +31047,6 @@ periodics:
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.19-install-analysis-all-multi-p-p
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=ibvirt-multi-p-p --include-job-names=4.19
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.19-install-analysis-all-ppc64le
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.19
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.19-install-analysis-all-s390x
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  s390x-libvirt,1,--platform=libvirt --include-job-names=libvirt-s390x --include-job-names=4.19
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-s390x-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -37005,300 +36025,6 @@ periodics:
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.20-install-analysis-all-multi-p-p
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=ibvirt-multi-p-p --include-job-names=4.20
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.20-install-analysis-all-ppc64le
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.20
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.20-install-analysis-all-s390x
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  s390x-libvirt,1,--platform=libvirt --include-job-names=libvirt-s390x --include-job-names=4.20
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-s390x-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -42357,300 +41083,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-install-analysis-all-multi-p-p
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=ibvirt-multi-p-p --include-job-names=4.21
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-install-analysis-all-ppc64le
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.21
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    timeout: 6h0m0s
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-install-analysis-all-s390x
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
-      command:
-      - ci-operator
-      env:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-        value: /var/run/secrets/google-serviceaccount-credentials.json
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-install-analysis
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
-                JOB_CONFIGURATION: |
-                  s390x-libvirt,1,--platform=libvirt --include-job-names=libvirt-s390x --include-job-names=4.21
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: aggregator-check-install
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/ocp-remote-libvirt-s390x-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
   cluster: build03
   decorate: true
   decoration_config:
@@ -43353,81 +41785,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocp-e2e-aws-ovn-techpreview-serial-multi-a-a
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-aws-ovn-upgrade-multi-x-ax
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-aws-ovn-upgrade-multi-x-ax
       - --variant=nightly-4.21
       command:
       - ci-operator
@@ -45368,531 +43725,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-3
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-upgrade-aws-ovn-arm64
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-upgrade-aws-ovn-arm64
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-upgrade-aws-ovn-multi-a-a
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-upgrade-aws-ovn-multi-a-a
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-upgrade-aws-ovn-multi-x-x
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-upgrade-aws-ovn-multi-x-x
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: azure-arm64
-    ci-operator.openshift.io/cloud-cluster-profile: azure-arm64
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-upgrade-azure-ovn-multi-a-a
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-upgrade-azure-ovn-multi-a-a
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: azure-arm64
-    ci-operator.openshift.io/cloud-cluster-profile: azure-arm64
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-upgrade-azure-ovn-multi-x-ax
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-upgrade-azure-ovn-multi-x-ax
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build04
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-arm64
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-upgrade-gcp-ovn-multi-a-a
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-upgrade-gcp-ovn-multi-a-a
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build04
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-arm64
-    ci-operator.openshift.io/variant: nightly-4.21
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-multiarch-master-nightly-4.21-ocp-e2e-upgrade-gcp-ovn-multi-x-ax
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=ocp-e2e-upgrade-gcp-ovn-multi-x-ax
-      - --variant=nightly-4.21
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
   cluster: build01
   cron: 0 7 * * 6
   decorate: true
@@ -46829,6 +44661,231 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocp-e2e-aws-ovn-upgrade-multi-x-ax
+      - --variant=nightly-4.21-upgrade-from-nightly-4.20
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 72h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
+    ci-operator.openshift.io/variant: nightly-4.21-upgrade-from-nightly-4.20
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.21-upgrade-from-nightly-4.20-ocp-e2e-upgrade-aws-ovn-arm64
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocp-e2e-upgrade-aws-ovn-arm64
+      - --variant=nightly-4.21-upgrade-from-nightly-4.20
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 72h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: nightly-4.21-upgrade-from-nightly-4.20
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.21-upgrade-from-nightly-4.20-ocp-e2e-upgrade-aws-ovn-multi-a-a
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocp-e2e-upgrade-aws-ovn-multi-a-a
+      - --variant=nightly-4.21-upgrade-from-nightly-4.20
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 72h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: nightly-4.21-upgrade-from-nightly-4.20
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.21-upgrade-from-nightly-4.20-ocp-e2e-upgrade-aws-ovn-multi-x-x
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocp-e2e-upgrade-aws-ovn-multi-x-x
       - --variant=nightly-4.21-upgrade-from-nightly-4.20
       command:
       - ci-operator
