@@ -92,8 +92,7 @@ function download_logs() {
   gcloud_auth_cmd='gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private 2>&1'
   for (( i=1; i<=3; i++ ))
   do
-    output="$(eval $gcloud_auth_cmd)"
-    if ! (grep -q 'ERROR' <<< "$output")
+    if (eval $gcloud_auth_cmd | grep -q -i 'Activated service account')
     then
       break
     fi
@@ -167,6 +166,17 @@ function generate_attribute_env_fips() {
   write_attribute env_fips "$env_fips"
 }
 
+function generate_attribute_job_frequency() {
+  if [[ "$JOB_NAME_SAFE" =~ -(f[0-9]+) ]]
+  then
+    job_frequency="${BASH_REMATCH[1]}"
+    if [[ -n "$job_frequency" ]]
+    then
+      write_attribute job_frequency "$job_frequency"
+    fi
+  fi
+}
+
 function generate_attribute_job_type() {
   job_type='periodic'
   if [[ "$LOGS_PATH" =~ pr-logs ]]
@@ -231,6 +241,17 @@ function generate_attribute_pr_author() {
   fi
 }
 
+function generate_attribute_version() {
+  if [[ "$JOB_NAME" =~ release-(4[.][0-9]+)- ]]
+  then
+    version="${BASH_REMATCH[1]}"
+    if [[ -n "$version" ]]
+    then
+      write_attribute version "$version"
+    fi
+  fi
+}
+
 function generate_attribute_version_installed() {
   version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
@@ -269,11 +290,13 @@ function generate_attributes() {
   generate_attribute_cloud_provider
   generate_attribute_env_disconnected
   generate_attribute_env_fips
+  generate_attribute_job_frequency
   generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
   generate_attribute_pr_author
+  generate_attribute_version
   generate_attribute_version_installed
 }
 
@@ -359,8 +382,7 @@ EOF_JUNIT
 # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
 function generate_result_customize_prow() {
   testsuite_name='Installation'
-  # using the same junit filename as the one generated in must-gather step to overwirte installation results
-  junit_file="$LOCAL_DIR_RST/junit_install.xml"
+  junit_file="$LOCAL_DIR_RST/junit_reportportal_install.xml"
   cat > "$junit_file" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite_name}" failures="0" errors="0" skipped="0" tests="1">
@@ -377,15 +399,19 @@ EOF
 }
 
 function generate_results() {
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
-
   # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
   if [[ "$REPORTPORTAL_PROJECT" = 'prow' ]]
   then
     generate_result_customize_prow
+    # must-gather and gather-extra in post stage also generate junit, once install fails, skip the other junit.
+    if [[ "$INSTALL_RESULT" == "fail" ]]
+    then
+        return 0
+    fi
   else
     generate_result_teststeps
   fi
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
 }
 
 function fix_xmls() {
@@ -436,12 +462,11 @@ function droute_send() {
                                 --metadata="$DATAROUTER_JSON"
                                 --results="${LOCAL_DIR_RST}/*"
                                 --wait
+                   2>&1
                   '
   for (( i=1; i<=3; i++ ))
   do
-    output="$(eval $droute_send_cmd)"
-    echo "$output"
-    if (grep -q 'request' <<< "$output")
+    if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
       break
     fi

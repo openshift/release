@@ -70,7 +70,7 @@ images:
         curl -skL ${MIRRORURL}/ocp/latest-4.16/opm-linux-rhel9.tar.gz -o opm-linux.tar.gz  && \
         tar -C /usr/bin/ -xzvf opm-linux.tar.gz && mv /usr/bin/opm-rhel9 /usr/bin/opm && opm version && rm -f opm-linux.tar.gz && \
         curl -skL ${MIRRORURL}/ocp/latest-4.16/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
-        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
+        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && oc-mirror version && rm -f oc-mirror.tar.gz && \
         VER=$(curl -skL ${MIRRORURL}/operator-sdk/ | grep 'class="name"' | grep -o -E '4.16.[0-9]+' | sort -V | tail -1) && \
         curl -skL ${MIRRORURL}/operator-sdk/${VER}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
         tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
@@ -205,7 +205,7 @@ tests:
     fi
   container:
     from: src
-  skip_if_only_changed: OWNERS$
+  skip_if_only_changed: ^images/|OWNERS$
 - as: code-check
   commands: |
     unset GOFLAGS

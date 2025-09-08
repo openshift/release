@@ -70,19 +70,11 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 if [[ -n "${USER_METADATA}" ]]; then
-    USER_METADATA=$(echo "$USER_METADATA" | xargs)
-    IFS=',' read -r -a env_array <<< "$USER_METADATA"
-    true > user-metadata.yaml
-    for env_pair in "${env_array[@]}"; do
-      env_pair=$(echo "$env_pair" | xargs)
-      env_key=$(echo "$env_pair" | cut -d'=' -f1)
-      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
-      echo "$env_key: \"$env_value\"" >> user-metadata.yaml
-    done
-    EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+  echo "${USER_METADATA}" > user-metadata.yaml
+  EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
 fi
 export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
@@ -100,4 +92,7 @@ cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-in
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+fi
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
