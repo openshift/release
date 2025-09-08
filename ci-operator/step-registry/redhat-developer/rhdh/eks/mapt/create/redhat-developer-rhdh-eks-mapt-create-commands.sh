@@ -19,7 +19,7 @@ mapt aws eks create \
   --version 1.31 \
   --workers-max 3 \
   --workers-desired 3 \
-  --cpus 2 \
+  --cpus 4 \
   --memory 4 \
   --arch x86_64 \
   --spot \
