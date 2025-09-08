@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o nounset
+set -o errexit
+set -o pipefail
 
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
 AWS_SECRET_ACCESS_KEY=$(cat /tmp/secrets/AWS_SECRET_ACCESS_KEY)
