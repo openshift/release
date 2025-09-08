@@ -8,7 +8,7 @@ SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 es_host=$(cat ${CLUSTER_PROFILE_DIR}/elastic_host)
-es_port=$(cat ${CLUSTER_PROFILE_DIR}/elastic_port)
+es_port=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".elastic_port")
 build_id="${BUILD_ID:-unknown}"
 
 cat > /tmp/browbeat_install_script.sh <<EOF

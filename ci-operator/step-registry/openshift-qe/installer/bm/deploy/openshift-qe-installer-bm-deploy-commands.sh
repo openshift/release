@@ -16,7 +16,7 @@ export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
-  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".num_worker_nodes")
   export NUM_WORKER_NODES
 fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
@@ -54,7 +54,7 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
-  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/hypervisor_nic_interface")
+  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/config" | jq ".hypervisor_nic_interface")
   export HV_NIC_INTERFACE
 
   cat <<EOF >>/tmp/all.yml
