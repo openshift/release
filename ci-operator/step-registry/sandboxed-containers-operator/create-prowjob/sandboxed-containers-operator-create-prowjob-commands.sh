@@ -145,12 +145,20 @@ else
     KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
 fi
 
-# Prow Configuration
-PROW_RUN_TYPE="${PROW_RUN_TYPE:-candidate}"
-# Validate PROW_RUN_TYPE
-if [[ "${PROW_RUN_TYPE}" != "candidate" && "${PROW_RUN_TYPE}" != "release" ]]; then
-    echo "ERROR: PROW_RUN_TYPE should be 'candidate' or 'release', got: ${PROW_RUN_TYPE}"
+# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
+# this triggers the mirror redirect install, creating brew & trustee catsrc,
+TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
+# Validate TEST_RELEASE_TYPE
+if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
+    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
     exit 1
+fi
+
+# Prow Run Type depends on TEST_RELEASE_TYPE
+if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+    PROW_RUN_TYPE="candidate"
+else
+    PROW_RUN_TYPE="release"
 fi
 
 # After the tests finish, wait before killing the cluster
@@ -161,14 +169,6 @@ if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
     exit 1
 fi
 
-# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
-# this triggers the mirror redirect install, creating brew & trustee catsrc,
-TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
-# Validate TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
-    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
-    exit 1
-fi
 
 # Allow override of test scenarios
 TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"

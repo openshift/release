@@ -10,6 +10,7 @@ The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates pr
 
 - `sandboxed-containers-operator-create-prowjob-commands.sh` - Main script to generate prowjob configurations
 - The output file is created in the current directory and named `openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_VERSION}.yaml`
+  - `PROW_RUN_TYPE` is based on ``TEST_RELEASE_TYPE.  It is `candidate` for `Pre-GA` and `release` otherwise
 - If the output file exists, it will be moved to a `.backup` file
 
 ## Key Features
