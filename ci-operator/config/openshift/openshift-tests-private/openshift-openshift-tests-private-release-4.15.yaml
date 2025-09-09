@@ -30,121 +30,121 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.15
 images:
-  - dockerfile_literal: |
-      FROM src AS builder
-      RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
-          curl -skL ${MIRRORURL}/ocp/latest-4.15/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
-          tar -xzvf openshift-client-linux.tar.gz && VER=$(./oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs) && \
-          curl -skL ${MIRRORURL}/ocp/${VER}/opm-src.tar.gz -o opm-src.tar.gz && tar -zxf opm-src.tar.gz && \
-          pushd operator-framework-olm* && make build/opm && mv ./bin/opm /tmp/opm && popd
-      FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
-      FROM this-is-ignored-and-not-used
-      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
-      COPY --from=builder /tmp/opm /usr/bin/
-      COPY --from=netobservcli /oc-netobserv /usr/bin/
-      COPY --from=quay.io/hypershift/hypershift-operator:latest usr/bin/hypershift /usr/bin/hypershift
-      COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
-      COPY --from=quay.io/openshifttest/openshift4-tools:v2 /tmp/OpenShift4-tools.tar /tmp/OpenShift4-tools.tar
-      RUN set -x && \
-          yum update -y && \
-          PACKAGES="git gzip httpd-tools java-11-openjdk-headless openssh-clients skopeo util-linux zip" && \
-          yum -y install --setopt=tsflags=nodocs $PACKAGES && \
-          git config --system user.name openshift-tests-private && \
-          git config --system user.email openshift-tests-private@redhat.com && \
-          tar -C /opt -xf /tmp/OpenShift4-tools.tar && \
-          pip3 install --upgrade setuptools pip && pip3 install dotmap minio python-openstackclient pyyaml requests && \
-          sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=0\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo' && \
-          yum -y install --setopt=tsflags=nodocs --enablerepo=azure-cli azure-cli && \
-          sh -c 'echo -e "[google-cloud-cli]\nname=Google Cloud CLI\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\nenabled=0\ngpgcheck=1\nrepo_gpgcheck=0\ngpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo' && \
-          yum -y install --setopt=tsflags=nodocs --enablerepo=google-cloud-cli google-cloud-cli && \
-          yum -y install sos && \
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-          unzip -q awscliv2.zip && ./aws/install -b /bin && \
-          rm -rf ./aws awscliv2.zip && \
-          chmod g+w /etc/passwd && \
-          MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
-          opm version && \
-          curl -skL ${MIRRORURL}/ocp/latest-4.15/oc-mirror.tar.gz -o oc-mirror.tar.gz && \
-          tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && oc-mirror version && rm -f oc-mirror.tar.gz && \
-          VER=$(curl -skL ${MIRRORURL}/operator-sdk/ | grep 'class="name"' | grep -o -E '4.15.[0-9]+' | sort -V | tail -1) && \
-          curl -skL ${MIRRORURL}/operator-sdk/${VER}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
-          tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
-          curl -skL ${MIRRORURL}/rosa/latest/rosa-linux.tar.gz -o rosa.tar.gz && \
-          tar -C /usr/bin/ -xf rosa.tar.gz && chmod 755 /usr/bin/rosa && rosa version && rm -f rosa.tar.gz && \
-          curl -skL https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o govc_Linux_x86_64.tar.gz && \
-          tar -C /usr/bin/ -xvf govc_Linux_x86_64.tar.gz govc && rm -f govc_Linux_x86_64.tar.gz && \
-          yum clean all && \
-          rm -rf /usr/bin/oc /usr/bin/kubectl /root/.config/gcloud /var/cache/yum/* /tmp/*
-    from: tools
-    inputs:
-      network-observability-cli:
-        as:
-          - registry.ci.openshift.org/netobserv/network-observability-cli:ci
-      src:
-        as:
-          - src
-    to: tests-private-base
-  - dockerfile_literal: |
-      FROM this-is-ignored-and-not-used
-      ARG YQ_VERSION="v4.30.8"
-      RUN set -x && \
-          curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-          curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-          PACKAGES="alsa-lib GConf2 gtk2-devel gtk3-devel httpd-tools libnotify-devel libXScrnSaver nodejs nss openssh-clients xorg-x11-server-Xvfb yarn" && \
-          yum -y install --setopt=tsflags=nodocs $PACKAGES && \
-          declare -A YQ_HASH=([amd64]='6c911103e0dcc54e2ba07e767d2d62bcfc77452b39ebaee45b1c46f062f4fd26' \
-                              [arm64]='95092e8b5332890c46689679b5e4360d96873c025ad8bafd961688f28ea434c7') && \
-          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && \
-          YQ_URI="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${arch}" && \
-          curl -sSL "${YQ_URI}" -o /usr/local/bin/yq && \
-          echo "${YQ_HASH[$arch]} */usr/local/bin/yq" | sha256sum --strict --status --check && \
-          chmod +x /usr/local/bin/yq && \
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-          yum install -y ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
-          yum clean all && rm -rf /var/cache/yum/* /tmp/*
-    from: tools
-    to: tests-private-baseui
-  - dockerfile_literal: |
-      FROM bin AS bin
-      FROM this-is-ignored-and-not-used
-      COPY --from=bin /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
-    from: ci_tests-private-base
-    inputs:
-      bin:
-        as:
-          - bin
-    to: tests-private
-  - dockerfile_literal: |
-      FROM src AS builder
-      FROM this-is-ignored-and-not-used
-      WORKDIR /go/src/github.com/openshift/openshift-tests-private
-      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    from: ci_tests-private-baseui
-    inputs:
-      src:
-        as:
-          - src
-    to: tests-private-ui
-  - dockerfile_literal: |
-      FROM bin AS builder
-      FROM this-is-ignored-and-not-used
-      WORKDIR /go/src/github.com/openshift/openshift-tests-private
-      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-      RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
-          cp --force /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/ && \
-          rm -rf /usr/bin/oc /usr/bin/kubectl
-    from: ci_tests-private-base
-    inputs:
-      bin:
-        as:
-          - bin
-    to: tests-private-pr
+- dockerfile_literal: |
+    FROM src AS builder
+    RUN MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
+        curl -skL ${MIRRORURL}/ocp/latest-4.15/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
+        tar -xzvf openshift-client-linux.tar.gz && VER=$(./oc version --client | grep 'Client Version' | cut -d':' -f2 | xargs) && \
+        curl -skL ${MIRRORURL}/ocp/${VER}/opm-src.tar.gz -o opm-src.tar.gz && tar -zxf opm-src.tar.gz && \
+        pushd operator-framework-olm* && make build/opm && mv ./bin/opm /tmp/opm && popd
+    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
+    FROM this-is-ignored-and-not-used
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
+    COPY --from=builder /tmp/opm /usr/bin/
+    COPY --from=netobservcli /oc-netobserv /usr/bin/
+    COPY --from=quay.io/hypershift/hypershift-operator:latest usr/bin/hypershift /usr/bin/hypershift
+    COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
+    COPY --from=quay.io/openshifttest/openshift4-tools:v2 /tmp/OpenShift4-tools.tar /tmp/OpenShift4-tools.tar
+    RUN set -x && \
+        yum update -y && \
+        PACKAGES="git gzip httpd-tools java-11-openjdk-headless openssh-clients skopeo util-linux zip" && \
+        yum -y install --setopt=tsflags=nodocs $PACKAGES && \
+        git config --system user.name openshift-tests-private && \
+        git config --system user.email openshift-tests-private@redhat.com && \
+        tar -C /opt -xf /tmp/OpenShift4-tools.tar && \
+        pip3 install --upgrade setuptools pip && pip3 install dotmap minio python-openstackclient pyyaml requests && \
+        sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=0\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo' && \
+        yum -y install --setopt=tsflags=nodocs --enablerepo=azure-cli azure-cli && \
+        sh -c 'echo -e "[google-cloud-cli]\nname=Google Cloud CLI\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\nenabled=0\ngpgcheck=1\nrepo_gpgcheck=0\ngpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo' && \
+        yum -y install --setopt=tsflags=nodocs --enablerepo=google-cloud-cli google-cloud-cli && \
+        yum -y install sos && \
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+        unzip -q awscliv2.zip && ./aws/install -b /bin && \
+        rm -rf ./aws awscliv2.zip && \
+        chmod g+w /etc/passwd && \
+        MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
+        opm version && \
+        curl -skL ${MIRRORURL}/ocp/latest-4.15/oc-mirror.tar.gz -o oc-mirror.tar.gz && \
+        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && oc-mirror version && rm -f oc-mirror.tar.gz && \
+        VER=$(curl -skL ${MIRRORURL}/operator-sdk/ | grep 'class="name"' | grep -o -E '4.15.[0-9]+' | sort -V | tail -1) && \
+        curl -skL ${MIRRORURL}/operator-sdk/${VER}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
+        tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
+        curl -skL ${MIRRORURL}/rosa/latest/rosa-linux.tar.gz -o rosa.tar.gz && \
+        tar -C /usr/bin/ -xf rosa.tar.gz && chmod 755 /usr/bin/rosa && rosa version && rm -f rosa.tar.gz && \
+        curl -skL https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o govc_Linux_x86_64.tar.gz && \
+        tar -C /usr/bin/ -xvf govc_Linux_x86_64.tar.gz govc && rm -f govc_Linux_x86_64.tar.gz && \
+        yum clean all && \
+        rm -rf /usr/bin/oc /usr/bin/kubectl /root/.config/gcloud /var/cache/yum/* /tmp/*
+  from: tools
+  inputs:
+    network-observability-cli:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
+    src:
+      as:
+      - src
+  to: tests-private-base
+- dockerfile_literal: |
+    FROM this-is-ignored-and-not-used
+    ARG YQ_VERSION="v4.30.8"
+    RUN set -x && \
+        curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="alsa-lib GConf2 gtk2-devel gtk3-devel httpd-tools libnotify-devel libXScrnSaver nodejs nss openssh-clients xorg-x11-server-Xvfb yarn" && \
+        yum -y install --setopt=tsflags=nodocs $PACKAGES && \
+        declare -A YQ_HASH=([amd64]='6c911103e0dcc54e2ba07e767d2d62bcfc77452b39ebaee45b1c46f062f4fd26' \
+                            [arm64]='95092e8b5332890c46689679b5e4360d96873c025ad8bafd961688f28ea434c7') && \
+        arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && \
+        YQ_URI="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${arch}" && \
+        curl -sSL "${YQ_URI}" -o /usr/local/bin/yq && \
+        echo "${YQ_HASH[$arch]} */usr/local/bin/yq" | sha256sum --strict --status --check && \
+        chmod +x /usr/local/bin/yq && \
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
+        yum clean all && rm -rf /var/cache/yum/* /tmp/*
+  from: tools
+  to: tests-private-baseui
+- dockerfile_literal: |
+    FROM bin AS bin
+    FROM this-is-ignored-and-not-used
+    COPY --from=bin /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
+  from: ci_tests-private-base
+  inputs:
+    bin:
+      as:
+      - bin
+  to: tests-private
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ci_tests-private-baseui
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-ui
+- dockerfile_literal: |
+    FROM bin AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+        cp --force /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/ && \
+        rm -rf /usr/bin/oc /usr/bin/kubectl
+  from: ci_tests-private-base
+  inputs:
+    bin:
+      as:
+      - bin
+  to: tests-private-pr
 promotion:
   to:
-    - excluded_images:
-        - tests-private-pr
-      namespace: ci
-      tag: "4.15"
+  - excluded_images:
+    - tests-private-pr
+    namespace: ci
+    tag: "4.15"
 releases:
   arm64-latest:
     candidate:
@@ -158,7 +158,7 @@ releases:
       stream: nightly
       version: "4.15"
 resources:
-  "*":
+  '*':
     limits:
       memory: 8Gi
     requests:
@@ -170,41 +170,40 @@ resources:
       memory: 8Gi
 test_binary_build_commands: make test
 tests:
-  - as: title-check
-    commands: make name-check
-    container:
-      from: src
-    skip_if_only_changed: OWNERS$
-  - as: bindata-check
-    commands: |
-      make update
-      ret=0 && git diff --quiet test/extended/testdata/bindata.go || ret=$?
-      if [ $ret -ne 0 ]; then
-          echo "bindata is not correct updated by your PR, please refer to the following and re-execute \"make update\" on your terminal and then update PR"
-          echo "---"
-          git diff test/extended/testdata/bindata.go || true
-          echo "---"
-          exit 1
-      fi
-    container:
-      from: src
-    skip_if_only_changed: ^images/|OWNERS$
-  - as: code-check
-    commands: |
-      unset GOFLAGS
-      go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2 2> /dev/null
-      which golangci-lint
-      make check-code
-    container:
-      from: src
-    skip_if_only_changed: OWNERS$
+- as: title-check
+  commands: make name-check
+  container:
+    from: src
+  skip_if_only_changed: OWNERS$
+- as: bindata-check
+  commands: |
+    make update
+    ret=0 && git diff --quiet test/extended/testdata/bindata.go || ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "bindata is not correct updated by your PR, please refer to the following and re-execute \"make update\" on your terminal and then update PR"
+        echo "---"
+        git diff test/extended/testdata/bindata.go || true
+        echo "---"
+        exit 1
+    fi
+  container:
+    from: src
+  skip_if_only_changed: ^images/|OWNERS$
+- as: code-check
+  commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2 2> /dev/null
+    which golangci-lint
+    make check-code
+  container:
+    from: src
+  skip_if_only_changed: OWNERS$
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$|OWNERSS
-$   
-  steps: 
+  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$|OWNERS$
+  steps:
     allow_skip_on_success: true
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test
@@ -213,24 +212,24 @@ $
         oc version
         export tmphome="/tmp/home"
         mkdir -p "${tmphome}"
-  
-        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${tmphome} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
+
+        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${tmphome} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
         mkdir -p ${tmphome}/gcloudconfig && export CLOUDSDK_CONFIG=${tmphome}/gcloudconfig && export PATH=$PATH:${tmphome}/google-cloud-sdk/bin
-    
+
         export PATH="$PATH:/opt/OpenShift4-tools:$tmphome"
 
         if ! which kubectl; then
           ln -s "$(which oc)" ${tmphome}/kubectl
         fi
-    
+
         python3 ./hack/pr.py
-      from: tests-private-pr 
+      from: tests-private-pr
       resources:
         limits:
           memory: 6Gi
         requests:
           cpu: "1"
-          memory: 1Gi 
+          memory: 1Gi
     workflow: ipi-aws
 - as: e2e-console
   optional: true
@@ -276,73 +275,6 @@ $
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: baremetal-lab-upi
-- as: debug-winc-aws-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
-- as: debug-winc-gcp-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
-- as: debug-winc-azure-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
-- as: debug-winc-vsphere-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: vsphere-connected-2
-    env:
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: "33612"
-      TEST_TIMEOUT: "1550"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
-- as: debug-winc-nutanix-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
