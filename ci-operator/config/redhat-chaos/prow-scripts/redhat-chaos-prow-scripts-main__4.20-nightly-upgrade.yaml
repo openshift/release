@@ -139,25 +139,20 @@ tests:
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       CHURN: "false"
-      ENABLE_FORCE: "true"
       GC: "false"
-      MAX_UNAVAILABLE: "3"
+      MAX_UNAVAILABLE_WORKER: "1"
       USER_TAGS: |
         TicketId 420
     observers:
       enable:
       - redhat-chaos-cerberus
       - redhat-chaos-pod-scenarios-random-system-pods-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install-stableinitial
+    test:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
-    workflow: openshift-qe-upgrade
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-upgrade-qe-sanity
+    workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 8h0m0s
 - as: chaos-aws-ipsec-loaded-upgrade-419to420-node-scenarios
   cron: 0 1 11 * *
@@ -171,9 +166,8 @@ tests:
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       CHURN: "false"
-      ENABLE_FORCE: "true"
       GC: "false"
-      MAX_UNAVAILABLE: "3"
+      MAX_UNAVAILABLE_WORKER: "1"
       USER_TAGS: |
         TicketId 420
     leases:
@@ -183,16 +177,12 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - redhat-chaos-node-disruptions-worker-outage-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install-stableinitial
+    test:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
-    workflow: openshift-qe-upgrade
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-upgrade-qe-sanity
+    workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 8h0m0s
 - as: chaos-gcp-loaded-upgrade-419to420-node-scenarios
   cron: 0 12 5 * *
@@ -313,10 +303,9 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
       CUSTOM_AZURE_REGION: eastus
-      ENABLE_FORCE: "true"
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "9"
-      MAX_UNAVAILABLE: "1"
+      MAX_UNAVAILABLE_WORKER: "1"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
       WORKER_REPLICA_COUNT: "3"
@@ -329,7 +318,8 @@ tests:
     - chain: workers-scale
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
-    - ref: openshift-qe-upgrade
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-upgrade-qe-sanity
     workflow: openshift-qe-installer-azure
   timeout: 8h0m0s
 - always_run: false
@@ -350,10 +340,9 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
       CUSTOM_AZURE_REGION: eastus
-      ENABLE_FORCE: "true"
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "9"
-      MAX_UNAVAILABLE: "1"
+      MAX_UNAVAILABLE_WORKER: "1"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
       WORKER_REPLICA_COUNT: "3"
@@ -366,7 +355,8 @@ tests:
     - chain: workers-scale
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
-    - ref: openshift-qe-upgrade
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: openshift-upgrade-qe-sanity
     workflow: openshift-qe-installer-azure
   timeout: 8h0m0s
 zz_generated_metadata:
