@@ -153,6 +153,9 @@ if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; t
     exit 1
 fi
 
+# Allow override of test scenarios
+TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
+
 # Let the tests run for this many minutes before killing the cluster and interupting the test
 TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
 # Validate TEST_TIMEOUT is numeric
@@ -171,6 +174,7 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
+
     else
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
     fi
@@ -252,7 +256,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -274,7 +278,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -297,7 +301,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -319,7 +323,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -341,7 +345,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
