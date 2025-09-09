@@ -90,6 +90,23 @@ get_latest_trustee_catalog_tag() {
     echo "${latest_tag}"
 }
 
+
+get_expected_version() {
+    # Extract expected version from catalog tag
+    # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
+    # If input is "latest", returns "0.0.0"
+    # Otherwise returns empty string
+    local catalog_tag="$1"
+
+    if [[ "${catalog_tag}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[0-9]+$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    elif [[ "${catalog_tag}" == "latest" ]]; then
+        echo "0.0.0"
+    else
+        echo ""
+    fi
+}
+
 echo "=========================================="
 echo "Sandboxed Containers Operator - Prowjob Configuration Generator"
 
@@ -179,6 +196,13 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
     fi
 
+    # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
+    extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
+    if [[ -n "${extracted_version}" ]]; then
+        EXPECTED_OSC_VERSION="${extracted_version}"
+        echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+    fi
+
     CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
     CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
 
@@ -195,6 +219,16 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
 
     APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
     TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
+
+    # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
+    extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
+    if [[ -n "${extracted_trustee_version}" ]]; then
+        EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
+        echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
+    else
+        EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
+        echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
+    fi
 
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
@@ -392,6 +426,7 @@ echo "  • OCP Version: ${OCP_VERSION}"
 echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
 echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
 echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
+echo "  • Expected Trustee Version: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
 echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
 echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
 echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
