@@ -40,6 +40,7 @@ images:
 releases:
   latest:
     candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.19"
@@ -59,8 +60,8 @@ tests:
     env:
       BASE_DOMAIN: migration.azure.devcluster.openshift.com
       BUCKET_NAME: s3-azure
-      COMPUTE_NODE_TYPE: Standard_D4s_v6
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v6
+      COMPUTE_NODE_TYPE: Standard_D32ds_v6
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D32ds_v6
       ENABLE_HYBRID_OVERLAY: "false"
       EXECUTE_KUBEVIRT_TESTS: "false"
       FIPS_ENABLED: "true"
@@ -69,6 +70,8 @@ tests:
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: redhat-oadp-operator
       OO_TARGET_NAMESPACES: '!install'
+      REPORTPORTAL_HOSTNAME: reportportal-migration-qe.apps.dno.ocp-hub.prod.psi.redhat.com
+      REPORTPORTAL_PROJECT: OADP
       USER_TAGS: |
         fips true
         oadp qe
@@ -78,39 +81,7 @@ tests:
     - ref: optional-operators-subscribe
     - ref: oadp-s3-create
     - ref: oadp-execute-tests
-    - ref: oadp-s3-destroy
-    workflow: ipi-azure
-  timeout: 8h0m0s
-- as: oadp-qe-azure-fips-arm
-  cron: 0 3 * * *
-  steps:
-    cluster_profile: azure-oadp-qe
-    dependency_overrides:
-      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs/oadp-oadp-operator-bundle:1.5.1-32
-      OO_INDEX: brew.registry.redhat.io/rh-osbs/iib:1033954
-    env:
-      BASE_DOMAIN: migration.azure.devcluster.openshift.com
-      BUCKET_NAME: s3-azure
-      COMPUTE_NODE_TYPE: Standard_D4s_v6
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v6
-      ENABLE_HYBRID_OVERLAY: "false"
-      EXECUTE_KUBEVIRT_TESTS: "false"
-      FIPS_ENABLED: "true"
-      OADP_TEST_FOCUS: Tier0
-      OCP_ARCH: arm64
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: redhat-oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
-      USER_TAGS: |
-        fips true
-        oadp qe
-    test:
-    - ref: optional-operators-configure-proxy-registry
-    - ref: optional-operators-cvp-common-apply-secrets
-    - ref: optional-operators-subscribe
-    - ref: oadp-s3-create
-    - ref: oadp-execute-tests
+    - ref: send-results-to-reportportal
     - ref: oadp-s3-destroy
     workflow: ipi-azure
   timeout: 8h0m0s
