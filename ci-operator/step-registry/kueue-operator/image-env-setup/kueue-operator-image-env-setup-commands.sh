@@ -46,6 +46,7 @@ git status
 export OPERATOR_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERATOR_COMPONENT}:on-pr-${REVISION}"
 echo "export OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> "${SHARED_DIR}/env"
 
+
 REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/${BUNDLE_COMPONENT}"
 BUNDLE_IMAGE=$(skopeo list-tags docker://$REPO | jq -r '.Tags[]' | grep -E '^[a-f0-9]{40}$' | while read -r tag; do
     created=$(skopeo inspect docker://$REPO:$tag 2>/dev/null | jq -r '.Created')
@@ -62,3 +63,15 @@ echo "export BUNDLE_IMAGE=${BUNDLE_IMAGE}" >> "${SHARED_DIR}/env"
 
 oc create namespace openshift-kueue-operator || true
 oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+
+echo "ALICE TEST"
+listMachineConfigPoolDetails
+
+
+# Display Machine Config Pool details
+function listMachineConfigPoolDetails() {
+    log "$(date) - List machine config pools"
+    echo "oc get mcp"
+    oc get mcp
+}
+
