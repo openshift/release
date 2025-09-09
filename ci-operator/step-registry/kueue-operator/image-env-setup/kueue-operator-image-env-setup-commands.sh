@@ -4,7 +4,7 @@ set -euxo pipefail
 
 # Display Machine Config Pool details
 function listMachineConfigPoolDetails() {
-    log "$(date) - List machine config pools"
+    # log "$(date) - List machine config pools"
     echo "oc get mcp"
     oc get mcp
 }
