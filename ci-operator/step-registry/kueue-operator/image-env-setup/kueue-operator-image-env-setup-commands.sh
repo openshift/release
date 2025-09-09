@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+
+# Display Machine Config Pool details
+function listMachineConfigPoolDetails() {
+    log "$(date) - List machine config pools"
+    echo "oc get mcp"
+    oc get mcp
+}
+
 echo "Applying ImageDigestMirrorSet and ImageTagMirrorSet..."
 
 oc apply -f - <<EOF
@@ -32,6 +40,7 @@ spec:
         - quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERAND_COMPONENT}
       source: registry.redhat.io/kueue/kueue-rhel9
 EOF
+
 
 echo "Current PWD: $(pwd)"
 ls -lah
@@ -68,10 +77,4 @@ echo "ALICE TEST"
 listMachineConfigPoolDetails
 
 
-# Display Machine Config Pool details
-function listMachineConfigPoolDetails() {
-    log "$(date) - List machine config pools"
-    echo "oc get mcp"
-    oc get mcp
-}
 
