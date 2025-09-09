@@ -102,8 +102,19 @@ spec:
       interval: 10m
 EOF
 
+
 echo "Printing MCE CatalogSource details"
 echo "${IMG}"
+
+echo "Describing CatalogSource multiclusterengine-catalog"
+oc describe CatalogSource multiclusterengine-catalog -n openshift-marketplace
+
+echo "Getting pods in openshift-marketplace namespace"
+oc get po -n openshift-marketplace 
+
+echo "Describing pods in openshift-marketplace namespace"
+oc describe po -n openshift-marketplace 
+
 
 oc wait CatalogSource --timeout=20m --for=jsonpath='{.status.connectionState.lastObservedState}'=READY -n openshift-marketplace multiclusterengine-catalog
 
