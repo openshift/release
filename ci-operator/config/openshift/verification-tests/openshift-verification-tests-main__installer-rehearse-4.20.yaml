@@ -7,6 +7,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
+  base:
+    name: cucushift
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -15,6 +19,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: openstack-installer
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
   upi-installer:
     name: "4.20"
     namespace: ocp
@@ -23,13 +31,23 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
+binary_build_commands: go build ./tools/cmd/...
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+images:
+- dockerfile_path: tools/openshift-ci/Dockerfile
+  from: base
+  to: verification-tests
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.20"
-  multi-latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.19"
+  target:
     candidate:
       architecture: multi
       product: ocp
@@ -41,103 +59,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: installer-rehearse-aws
-  cron: '@yearly'
+- as: test-ocp-21588
   steps:
-    allow_skip_on_success: true
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
     env:
-      IPSTACK: dualstack
-      SLEEP_DURATION: 1h
-      VPC_IPv6_ONLY_PRIVATE_SUBNETS: "yes"
-      ZONES_COUNT: "1"
-    post:
-    - ref: aws-deprovision-stacks
-    - ref: aws-deprovision-s3buckets
-    pre:
-    - ref: aws-provision-vpc-shared-dualstack
-    - chain: aws-provision-bastionhost
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
+      FIPS_ENABLED: "true"
     test:
-    - ref: cucushift-installer-wait
-- as: installer-rehearse-azure
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: azure-qe
-    env:
-      AZURE_COMPUTE_MULTIDISK_MOUNT_PATH: /var/lib/containers
-      AZURE_COMPUTE_MULTIDISK_TYPE: user-defined
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[''AzureMultiDisk=true'', ''MultiDiskSetup=true'']'
-      FEATURE_SET: CustomNoUpgrade
-    workflow: cucushift-installer-rehearse-azure-ipi-multidisk
-- as: installer-rehearse-ibmcloud
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe
-    env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-7d9xkg2/release:latest
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-sno
-- as: installer-rehearse-gcp
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-t07rh8b/release:latest
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
-- as: installer-rehearse-gcp-dedicated-dns-project
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    env:
-      BASE_DOMAIN: regional.qe.gcp.devcluster.openshift.com
-      PRIVATE_ZONE_PROJECT: openshift-qe-regional
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
-- as: installer-rehearse-ibmcloud-dis
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe-2
-    env:
-      MIRROR_BIN: oc-mirror
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-      SLEEP_DURATION: 5h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
-- as: installer-rehearse-vsphere
-  cron: '@yearly'
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      MULTI_NIC_IPI: "true"
-      SLEEP_DURATION: 24h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-vsphere-ipi-provision
-- as: installer-rehearse-azurestack
-  cluster: build01
-  cron: '@yearly'
-  steps:
-    cluster_profile: azurestack-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    workflow: cucushift-installer-rehearse-azure-stack-upi
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 zz_generated_metadata:
   branch: main
   org: openshift
