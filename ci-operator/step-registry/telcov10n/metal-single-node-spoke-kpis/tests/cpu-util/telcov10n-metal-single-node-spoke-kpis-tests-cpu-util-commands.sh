@@ -69,22 +69,28 @@ function make_up_remote_test_command {
 
 # Test ENV setup
 mkdir -pv \${HOME}/.local/bin
-export PATH=\$PATH:\${HOME}/.local/bin
+export PATH=\$PATH:\${HOME}/.local/bin:\${HOME}/bin:\$(go env GOPATH)/bin
 export RAN_METRICS_URL="${TELCO_KPI_RAN_METRICS_END_POINT_URL}"
 echo "insecure" >| \${HOME}/.curlrc
 
 set -x
 kpi_tests_repo=\$(dirname \${SCRIPTS_DIR})
-oslat_repo=\${kpi_tests_repo}/oslat
 export GIT_SSL_NO_VERIFY=true
 git clone ${TELCO_KPI_COMMON_REPO} \${kpi_tests_repo}
-git clone ${TELCO_KPI_TEST_REPO} \${oslat_repo}
+git clone -b ${TELCO_KPI_TEST_BRANCH} ${TELCO_KPI_TEST_REPO} \${kpi_tests_repo}/cnf-gotests
 cd \${kpi_tests_repo}
 set +x
 ls -rtlhZ
 pwd
 set -x
-bash \${SCRIPTS_DIR}/test_oslat.sh oslat
+export STORAGE_CLASS=""
+export NETWORKS=""
+export ACCELERATOR_MODEL=""
+export REGISTRY=""
+export NODE_NAME="\$(oc get node -ojsonpath='{.items[0].metadata.name}')"
+export ENABLE_PTP=""
+export OSEARCH_TOKEN=$(<"/secret/telco5g/password")
+bash \${SCRIPTS_DIR}/test_cpu_util.sh cpu_util=\${DURATION}
 set +x
 EOF
 
@@ -148,7 +154,9 @@ function make_up_ansible_playbook {
         ansible.builtin.shell: |
           cat << EO-Containerfile > {{ _remote_container_file }}
           FROM quay.io/centos/centos:stream9
-          RUN dnf -y install binutils diffutils skopeo git python3 python3-pip python3-devel jq && \
+          RUN dnf -y install binutils diffutils skopeo git \
+                python3 python3-pip python3-devel jq \
+                wget which golang && \
             dnf clean all && \
             curl -sSLO {{ _oc_bin_url }} && \
             tar -zxvf {{ _oc_bin_url | basename }} && \
@@ -237,7 +245,7 @@ function setup_test_result_for_component_readiness {
 
 function test_kpis {
 
-  echo "************ telcov10n Run oslat Telco KPIs test ************"
+  echo "************ telcov10n Run CPU Utilization Telco KPIs test ************"
 
   make_up_inventory
   make_up_remote_test_command
