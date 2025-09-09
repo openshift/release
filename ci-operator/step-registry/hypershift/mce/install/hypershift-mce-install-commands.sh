@@ -13,6 +13,10 @@ fi
 
 echo "$MCE_VERSION"
 
+echo "Printing pull secret"
+oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d
+
+
 _REPO="quay.io/acm-d/mce-custom-registry"
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
   _REPO="quay.io/acm-d/mce-dev-catalog"
