@@ -198,38 +198,39 @@ tests:
     container:
       from: src
     skip_if_only_changed: OWNERS$
-  - as: e2e-aws
-    optional: true
-    skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$|OWNERS$
-    steps:
-      allow_skip_on_success: true
-      cluster_profile: aws-3
-      test:
-        - ref: enable-qe-catalogsource
-        - as: pr-test
-          cli: latest
-          commands: |
-            oc version
-            export tmphome="/tmp/home"
-            mkdir -p "${tmphome}"
+- as: e2e-aws
+  optional: true
+  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$|OWNERSS
+$   
+  steps: 
+    allow_skip_on_success: true
+    cluster_profile: aws-2
+    test:
+    - ref: enable-qe-catalogsource
+    - as: pr-test
+      cli: latest
+      commands: |
+        oc version
+        export tmphome="/tmp/home"
+        mkdir -p "${tmphome}"
+  
+        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${tmphome} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
+        mkdir -p ${tmphome}/gcloudconfig && export CLOUDSDK_CONFIG=${tmphome}/gcloudconfig && export PATH=$PATH:${tmphome}/google-cloud-sdk/bin
+    
+        export PATH="$PATH:/opt/OpenShift4-tools:$tmphome"
 
-            curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${tmphome} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
-            mkdir -p ${tmphome}/gcloudconfig && export CLOUDSDK_CONFIG=${tmphome}/gcloudconfig && export PATH=$PATH:${tmphome}/google-cloud-sdk/bin
-
-            export PATH="$PATH:/opt/OpenShift4-tools:$tmphome"
-
-            if ! which kubectl; then
-              ln -s "$(which oc)" ${tmphome}/kubectl
-            fi
-
+        if ! which kubectl; then
+          ln -s "$(which oc)" ${tmphome}/kubectl
+        fi
+    
         python3 ./hack/pr.py
-      from: tests-private-pr
+      from: tests-private-pr 
       resources:
         limits:
           memory: 6Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 1Gi 
     workflow: ipi-aws
 - as: e2e-console
   optional: true
