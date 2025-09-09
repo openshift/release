@@ -49,6 +49,108 @@ tests:
   - mount_path: /creds-github
     name: ossm-github-simple-job
   timeout: 20m0s
+- as: lint
+  commands: |
+    make lint \
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+  timeout: 1h0m0s
+- as: gencheck
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: gencheck
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export BUILD_WITH_CONTAINER=0 && \
+          export GOBIN='/gobin' && \
+          export GOCACHE='/tmp/cache' && \
+          export GOMODCACHE='/tmp/cache' && \
+          export XDG_CACHE_HOME='/tmp/cache' && \
+          export ARTIFACTS='${ARTIFACT_DIR}' && \
+          cd /work && \
+          entrypoint \
+          make gen-check"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: unit
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: unit
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export BUILD_WITH_CONTAINER=0 && \
+          cd /work && \
+          entrypoint \
+          make -e T=-v build racetest binaries-test"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-pilot
   steps:
     cluster_profile: ossm-aws
@@ -377,7 +479,7 @@ tests:
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestValidation|TestWebhook|TestMultiRevision|TestAnalysisWritesStatus|TestLocality'"
+          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestValidation|TestWebhook|TestMultiRevision|TestAnalysisWritesStatus|TestLocality|TestPreserveHTTPHeaderCaseConfiguration'"
         # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-9328
       env:
       - name: MAISTRA_NAMESPACE
@@ -556,7 +658,7 @@ tests:
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          ambient 'TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestAuthorizationGateway|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestServiceEntryInlinedWorkloadEntry|TestServiceEntrySelectsWorkloadEntry|TestZtunnelRestart|TestZtunnelConfig|TestZtunnelSecureMetrics'"
+          ambient 'TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestAuthorizationGateway|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestServiceEntryInlinedWorkloadEntry|TestServiceEntrySelectsWorkloadEntry|TestZtunnelRestart|TestZtunnelConfig|TestZtunnelSecureMetrics|TestCrossNamespaceWaypoint'"
         # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-10011
       env:
       - name: MAISTRA_NAMESPACE
