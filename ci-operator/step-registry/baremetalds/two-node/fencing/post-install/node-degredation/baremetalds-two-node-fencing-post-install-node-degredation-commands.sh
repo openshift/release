@@ -106,4 +106,31 @@ virsh -c qemu:///system list --all
 
 EOF
 
+echo "Ensuring internal Image Registry is Available on the surviving node..."
+
+# Wait up to ~10 minutes for the Image Registry CR to appear
+for i in {1..20}; do
+  if oc get configs.imageregistry.operator.openshift.io/cluster >/dev/null 2>&1; then
+    break
+  fi
+  echo "$(date) - waiting for Image Registry CR to appear..."
+  sleep 30
+done
+
+echo "Patching Image Registry to use emptyDir storage (no-op if already set)..."
+oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge \
+  -p '{"spec":{"storage":{"emptyDir":{}}}}' || true
+
+echo "Forcing a rollout to ensure the pod lands on the surviving control-plane node..."
+oc rollout restart deploy/image-registry -n openshift-image-registry || true
+
+echo "Waiting up to 10m for image-registry to become Available..."
+if ! oc rollout status deploy/image-registry -n openshift-image-registry --timeout=10m; then
+  echo "WARNING: image-registry did not become Available within timeout; continuing anyway."
+fi
+
+oc get deploy/image-registry -n openshift-image-registry || true
+
+
 echo "Node degradation and pcs commands completed successfully"
+
