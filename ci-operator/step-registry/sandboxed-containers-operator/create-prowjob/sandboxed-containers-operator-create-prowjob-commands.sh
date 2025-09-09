@@ -407,8 +407,8 @@ if [[ ${file_size} -lt 1000 ]]; then
 fi
 
 # Basic YAML syntax validation if yq is available
-if command -v yq &> /dev/null; then
-    echo "Validating YAML: yq eval '.' "${OUTPUT_FILE}"
+if command -v yq 2&> /dev/null; then
+    echo "Validating YAML: yq eval '.' ${OUTPUT_FILE}"
     if yq eval '.' "${OUTPUT_FILE}" ; then
         echo "✓ YAML syntax is valid"
     else
