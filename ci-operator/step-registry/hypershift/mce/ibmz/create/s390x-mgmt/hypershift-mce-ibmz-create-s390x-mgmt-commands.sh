@@ -39,6 +39,15 @@ cd "ibmcloud-openshift-provisioning" || {
     exit 1
 }
 
+
+# Pushing the release image to quay.io
+
+podman tag $OCP_RELEASE_IMAGE quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:$job_id-latest
+podman push quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:s390x-$job_id-latest
+
+
+export OCP_RELEASE_IMAGE="quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:$job_id-latest"
+
 VARS_FILE="cluster-vars"
 
 sed -i "s/^CLUSTER_NAME=.*/CLUSTER_NAME=\"$CLUSTER_NAME\"/" "$VARS_FILE"
