@@ -17,8 +17,18 @@ workflow:
   
   steps:
     allow_best_effort_post_steps: true
+    env:
+      ZONES_COUNT: "3"
+      CONTROL_PLANE_INSTANCE_TYPE: "m6i.xlarge"
+      COMPUTE_NODE_TYPE: "m6i.xlarge"
+      COMPUTE_NODE_REPLICAS: "3"
+      CONTROL_PLANE_REPLICAS: "3"
+      ADD_ZONES: "yes"
     pre:
-    - chain: ipi-aws-pre
+    - chain: ipi-conf-aws
+    - ref: hypershift-aws-reqserving-e2e-validate-azs
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
     test:
     - ref: hypershift-aws-run-reqserving-e2e
     post:
