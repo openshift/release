@@ -41,8 +41,7 @@ get_latest_osc_catalog_tag() {
 
     if [[ -z "${latest_tag}" ]]; then
         echo "  ERROR: No matching OSC catalog tag found, using default fallback"
-        exit 1
-        latest_tag="1.10.1-1755502791"
+        latest_tag="latest"
     fi
 
     echo "${latest_tag}"
@@ -81,9 +80,8 @@ get_latest_trustee_catalog_tag() {
 
         # Safety limit to prevent infinite loops
         if [[ ${page} -gt 50 ]]; then
-            echo "ERROR: Reached maximum page limit (50) while searching for tags"
+            echo "ERROR: Reached maximum page limit (50) while searching for trustee tags"
             exit 1
-            break
         fi
     done
 
@@ -456,7 +454,7 @@ echo "3. Add to git:"
 echo "git add ci-operator/config/openshift/sandboxed-containers-operator/${OUTPUT_FILE}"
 echo ""
 echo "4. Generate and update CI configuration before creating PR:"
-echo "make ci-operator-config && make registry-metadata && make prow-config && make jobs && make update
+echo "make ci-operator-config && make registry-metadata && make prow-config && make jobs && make update"
 echo ""
 echo "5. git add changes, commit and push to PR"
 echo ""
