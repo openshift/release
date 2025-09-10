@@ -92,21 +92,18 @@ tests:
       CUSTOMER_SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
     test:
     - ref: aro-hcp-provision-delete-all-expired-resource-groups
-- as: create-aro-hcp-in-prod-uksouth
-  cron: 0 */4 * * *
+- as: prod-e2e-parallel
+  cron: 0 0 31 2 0 # we only want to trigger this job via gangway on demand
   steps:
     env:
-      CLUSTER_NAME: periodic-prod-uksouth-cluster
-      CUSTOMER_RESOURCE_GROUP_PREFIX: periodic-prod-uksouth-customer-rg
-      LOCATION: uksouth
-      SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      ARO_HCP_SUITE_NAME: prod/parallel
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      # LOCATION can be passed in via MULTISTAGE_PARAM_OVERRIDE_LOCATION prod_spec_options.envs override
     post:
     - ref: aro-hcp-provision-aro-hcp-gather-extra
     - chain: aro-hcp-provision-teardown-cluster
-    pre:
-    - ref: aro-hcp-provision-generate-resource-group-name
     test:
-    - chain: aro-hcp-provision-create-functional-cluster
+    - ref: aro-hcp-tests-run-aro-hcp-tests
 - as: prod-uksouth-e2e-parallel
   cron: 0 */4 * * *
   steps:
