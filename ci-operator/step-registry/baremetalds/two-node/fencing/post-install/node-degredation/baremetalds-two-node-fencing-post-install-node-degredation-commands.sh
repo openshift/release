@@ -101,36 +101,68 @@ else
     exit 1
 fi
 
+sleep 120
+
 echo "Current VM status after node degradation:"
 virsh -c qemu:///system list --all
 
 EOF
 
-echo "Ensuring internal Image Registry is Available on the surviving node..."
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+oc whoami || true
+oc get nodes -o name || true
 
-# Wait up to ~10 minutes for the Image Registry CR to appear
-for i in {1..20}; do
+echo "Ensuring internal Image Registry is configured and Available on the surviving node..."
+
+# 0) Wait up to ~15 minutes for the Image Registry CR to appear
+for attempt in $(seq 1 30); do
   if oc get configs.imageregistry.operator.openshift.io/cluster >/dev/null 2>&1; then
     break
   fi
-  echo "$(date) - waiting for Image Registry CR to appear..."
+  echo "$(date) - waiting for Image Registry CR to appear (attempt ${attempt}/30)..."
   sleep 30
 done
 
-echo "Patching Image Registry to use emptyDir storage (no-op if already set)..."
-oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge \
-  -p '{"spec":{"storage":{"emptyDir":{}}}}' || true
+# If the operator was intentionally removed, skip politely
+REG_STATE="$(oc get configs.imageregistry.operator.openshift.io/cluster -o jsonpath='{.spec.managementState}' 2>/dev/null || true)"
+if [[ "${REG_STATE}" == "Removed" ]]; then
+  echo "Image Registry managementState=Removed; skipping registry setup."
+else
+  # 1) Make it runnable on one node: Managed + emptyDir (idempotent)
+  echo "Setting Image Registry to Managed + emptyDir (no-op if already configured)..."
+  oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge \
+    -p '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}' || true
 
-echo "Forcing a rollout to ensure the pod lands on the surviving control-plane node..."
-oc rollout restart deploy/image-registry -n openshift-image-registry || true
+  # 2) Ensure the pod (re)schedules now on the surviving master
+  echo "Forcing image-registry rollout..."
+  oc rollout restart deploy/image-registry -n openshift-image-registry || true
 
-echo "Waiting up to 10m for image-registry to become Available..."
-if ! oc rollout status deploy/image-registry -n openshift-image-registry --timeout=10m; then
-  echo "WARNING: image-registry did not become Available within timeout; continuing anyway."
+  echo "Waiting up to 12m for image-registry to become Available..."
+  if ! oc rollout status deploy/image-registry -n openshift-image-registry --timeout=12m; then
+    echo "WARNING: image-registry did not become Available within timeout; continuing anyway."
+  fi
+
+  # 3) Wait for internalRegistryHostname to be published (used by tests & OCM)
+  echo "Waiting for image.config.openshift.io/cluster.status.internalRegistryHostname..."
+  IRH=""
+  for _ in $(seq 1 120); do
+    IRH="$(oc get image.config.openshift.io/cluster -o jsonpath='{.status.internalRegistryHostname}' 2>/dev/null || true)"
+    [[ -n "${IRH}" ]] && break
+    sleep 5
+  done
+  [[ -n "${IRH}" ]] && echo "internalRegistryHostname=${IRH}" || echo "WARNING: internalRegistryHostname still empty."
+
+  # 4) Nudge openshift-controller-manager to observe the hostname, then wait
+  OCM_DEPLOY="$(oc -n openshift-controller-manager get deploy -o name 2>/dev/null | head -n1 || true)"
+  if [[ -n "${OCM_DEPLOY}" ]]; then
+    echo "Restarting ${OCM_DEPLOY} so it observes internalRegistryHostname..."
+    oc rollout restart -n openshift-controller-manager "${OCM_DEPLOY}" || true
+    oc rollout status  -n openshift-controller-manager "${OCM_DEPLOY}" --timeout=10m || true
+  else
+    echo "INFO: No deployment found in openshift-controller-manager namespace (skipping restart)."
+  fi
+
+  echo "Final image-registry deployment status:"
+  oc get deploy/image-registry -n openshift-image-registry || true
 fi
-
-oc get deploy/image-registry -n openshift-image-registry || true
-
-
 echo "Node degradation and pcs commands completed successfully"
-
