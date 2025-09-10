@@ -206,4 +206,3 @@ yq eval '.' openshift-sandboxed-containers-operator-devel__downstream-candidate4
 - **Required**: `curl`, `jq`, `awk`, `sort`, `head`
 - **Optional**: `yq` (for YAML syntax validation)
 - **Network**: Access to `quay.io` API endpoints
-image: ghcr.io/confidential-containers/test-container-image-rs:cosign-**signed**
