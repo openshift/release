@@ -21,6 +21,16 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+# Starting in 4.21, we will aggressively retry test failures only in
+# presubmits to determine if a failure is a flake or legitimate. This is
+# to reduce the number of retests on PR's.
+# TODO: Remove "origin" and run everywhere
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) && "$REPO_NAME" == "origin" ]]; then
+    if openshift-tests run --help | grep -q 'retry-strategy'; then
+        TEST_ARGS+=" --retry-strategy=aggressive"
+    fi
+fi
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
