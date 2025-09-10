@@ -20,6 +20,9 @@ echo "Printing /tmp/test_authfile"
 cat /tmp/test_authfile
 
 
+echo -n "testtesttest" >> /tmp/test_authfile
+cat /tmp/test_authfile
+
 _REPO="quay.io/acm-d/mce-custom-registry"
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
   _REPO="quay.io/acm-d/mce-dev-catalog"
