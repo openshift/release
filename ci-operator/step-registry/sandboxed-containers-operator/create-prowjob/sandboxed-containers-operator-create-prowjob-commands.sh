@@ -157,6 +157,8 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     PROW_RUN_TYPE="candidate"
 else
     PROW_RUN_TYPE="release"
+    CATALOG_SOURCE_NAME="redhat-operators"
+    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
 fi
 
 # After the tests finish, wait before killing the cluster
@@ -231,8 +233,10 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
 else # GA
-    CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-redhat-operators}"
-    TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-redhat-operators}"
+    CATALOG_SOURCE_NAME="redhat-operators"
+    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+    CATALOG_SOURCE_IMAGE="none"
+    TRUSTEE_CATALOG_SOURCE_IMAGE="none"
 fi
 
 # Generate output file path
