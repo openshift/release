@@ -125,9 +125,7 @@ done
 
 # If the operator was intentionally removed, skip politely
 REG_STATE="$(oc get configs.imageregistry.operator.openshift.io/cluster -o jsonpath='{.spec.managementState}' 2>/dev/null || true)"
-if [[ "${REG_STATE}" == "Removed" ]]; then
-  echo "Image Registry managementState=Removed; skipping registry setup."
-else
+if [[ "${REG_STATE}" != "Removed" ]]; then
   # 1) Make it runnable on one node: Managed + emptyDir (idempotent)
   echo "Setting Image Registry to Managed + emptyDir (no-op if already configured)..."
   oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge \
@@ -136,33 +134,39 @@ else
   # 2) Ensure the pod (re)schedules now on the surviving master
   echo "Forcing image-registry rollout..."
   oc rollout restart deploy/image-registry -n openshift-image-registry || true
-
   echo "Waiting up to 12m for image-registry to become Available..."
   if ! oc rollout status deploy/image-registry -n openshift-image-registry --timeout=12m; then
     echo "WARNING: image-registry did not become Available within timeout; continuing anyway."
   fi
 
-  # 3) Wait for internalRegistryHostname to be published (used by tests & OCM)
+  # 3) Wait for internalRegistryHostname to be published (used by OCM/tests)
   echo "Waiting for image.config.openshift.io/cluster.status.internalRegistryHostname..."
-  IRH=""
-  for _ in $(seq 1 120); do
+  IRH="$(oc get image.config.openshift.io/cluster -o jsonpath='{.status.internalRegistryHostname}' 2>/dev/null || true)"
+  if [[ -z "${IRH}" ]]; then
+    sleep 30
     IRH="$(oc get image.config.openshift.io/cluster -o jsonpath='{.status.internalRegistryHostname}' 2>/dev/null || true)"
-    [[ -n "${IRH}" ]] && break
-    sleep 5
-  done
-  [[ -n "${IRH}" ]] && echo "internalRegistryHostname=${IRH}" || echo "WARNING: internalRegistryHostname still empty."
+  fi
+  echo "internalRegistryHostname=${IRH:-<empty>}"
 
-  # 4) Nudge openshift-controller-manager to observe the hostname, then wait
-  OCM_DEPLOY="$(oc -n openshift-controller-manager get deploy -o name 2>/dev/null | head -n1 || true)"
+
+  # 4) Pause the OCM operator and roll the operand to a single replica
+  echo "Scaling openshift-controller-manager-operator to 0 to avoid reconciling replicas..."
+  oc -n openshift-controller-manager-operator scale deploy/openshift-controller-manager-operator --replicas=0 || true
+
+  echo "Scaling OpenShift Controller Manager (operand) to 1 replica and restarting..."
+  OCM_DEPLOY="$(oc -n openshift-controller-manager get deploy -o name 2>/dev/null | grep controller-manager || true)"
   if [[ -n "${OCM_DEPLOY}" ]]; then
-    echo "Restarting ${OCM_DEPLOY} so it observes internalRegistryHostname..."
-    oc rollout restart -n openshift-controller-manager "${OCM_DEPLOY}" || true
-    oc rollout status  -n openshift-controller-manager "${OCM_DEPLOY}" --timeout=10m || true
+    oc -n openshift-controller-manager scale "${OCM_DEPLOY}" --replicas=1 || true
+    oc -n openshift-controller-manager rollout restart "${OCM_DEPLOY}" || true
+    echo "Waiting up to 10m for ${OCM_DEPLOY} rollout to complete..."
+    oc -n openshift-controller-manager rollout status "${OCM_DEPLOY}" --timeout=10m || true
+    oc -n openshift-controller-manager get pods -o wide || true
   else
-    echo "INFO: No deployment found in openshift-controller-manager namespace (skipping restart)."
+    echo "WARN: controller-manager Deployment not found in openshift-controller-manager."
   fi
 
   echo "Final image-registry deployment status:"
   oc get deploy/image-registry -n openshift-image-registry || true
 fi
+
 echo "Node degradation and pcs commands completed successfully"
