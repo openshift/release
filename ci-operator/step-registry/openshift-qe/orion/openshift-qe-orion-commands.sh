@@ -105,6 +105,6 @@ es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} 
 orion_exit_status=$?
 set -e
 
-cp *.csv *.xml ${ARTIFACT_DIR}/
+cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
 
 exit $orion_exit_status

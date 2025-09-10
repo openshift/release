@@ -63,7 +63,7 @@ function generate_policy_related_files {
   set -x
   policies_path="${1}"
 
-  if [ -n "${CATALOGSOURCE_NAME}" ]; then
+  if [ -n "${CATALOGSOURCE_NAME:-}" ]; then
     catatlog_index_img="$(oc -n openshift-marketplace get catsrc ${CATALOGSOURCE_NAME} -ojsonpath='{.spec.image}')"
   fi
 
@@ -82,7 +82,7 @@ function generate_policy_related_files {
       echo -e "$content" | \
         yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"' | \
         yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"' | \
-        yq eval '(.spec.sourceFiles[] | select(.metadata.name == "'${CATALOGSOURCE_NAME:-}'").spec.image) = "'${catatlog_index_img}'"'
+        yq eval '(.spec.sourceFiles[] | select(.metadata.name == "'${CATALOGSOURCE_NAME:-}'").spec.image) = "'${catatlog_index_img:-}'"'
     else
       echo -e "$content" | \
         yq eval '. | select(.kind == "Namespace") .metadata.name += "'${ns_tail}'"' | \

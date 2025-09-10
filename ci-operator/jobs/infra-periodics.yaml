@@ -1101,7 +1101,7 @@ periodics:
       - --target-dir=.
       - --config-dir=./ci-operator/config
       - --current-release=4.21
-      - --future-release=4.21
+      - --future-release=4.22
       - --self-approve=true
       - --assign=openshift/test-platform
       - --rebalancer-cron=0 0 * * 2,5
@@ -1645,7 +1645,7 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/
       - --current-release=4.21
-      - --future-release=4.21
+      - --future-release=4.22
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -1731,7 +1731,7 @@ periodics:
       - --dry-run=false
       - --config-dir=./ci-operator/config/
       - --current-release=4.21
-      - --future-release=4.21
+      - --future-release=4.22
       command:
       - blocking-issue-creator
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_blocking-issue-creator_latest
@@ -3019,19 +3019,32 @@ periodics:
             etcd_pods["$ip"]="$name"
         done
 
+        compacted=0
+        force="${FORCE:-0}"  # set to 1 to force defrag regardless of fragmentation ratio and db size
         # Defragment an endpoint only if needed, leader must be the last one
         for endpoint_info in $(jq -r 'sort_by(.lead)[]| .ep + "|" + (.ratio|tostring) + "|" + (.size|tostring)' <<<"$endpoints_info"); do
             printf '\n***\n'
             # Skip if this endpoint is not fragmented
             fragmentation_ratio=$(cut -d'|' -f2 <<<"$endpoint_info")
             dbsize=$(cut -d'|' -f3 <<<"$endpoint_info")
-            if [[ $fragmentation_ratio -lt $FRAGMENTATION_RATIO_THRESHOLD || $dbsize -lt $DB_SIZE_THRESHOLD ]]; then
-                echo "endpoint $endpoint_info is not fragmented, skipping."
-                continue
+            if [[ $force -eq 0 ]]; then
+                if [[ $fragmentation_ratio -lt $FRAGMENTATION_RATIO_THRESHOLD && $dbsize -lt $DB_SIZE_THRESHOLD ]]; then
+                    echo "endpoint $endpoint_info is not fragmented, skipping."
+                    continue
+                fi
             fi
 
             ip=$(cut -d' ' -f1 <<<"$endpoint_info" | sed 's|https://||g' | cut -d':' -f1)
             pod_name="${etcd_pods[$ip]}"
+
+            # Comact only once per run
+            if [[ $compacted -eq 0 ]]; then
+                echo "Compacting $pod_name - $ip"
+                oc -n openshift-etcd exec pod/"$pod_name" -- sh -c 'unset ETCDCTL_ENDPOINTS;
+                rev=$(ETCDCTL_API=3 etcdctl --insecure-skip-tls-verify=true --endpoints=:2379 endpoint status --write-out="json" | egrep -o '"revision":[0-9]*' | egrep -o '[0-9]*');
+                ETCDCTL_API=3 etcdctl compact $rev;'
+                compacted=1
+            else
 
             # Defragment
             echo "Defragmenting $pod_name - $ip"
@@ -3050,6 +3063,9 @@ periodics:
         done
       command:
       - /bin/bash
+      env:
+      - name: FORCE
+        value: "0"
       image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
       imagePullPolicy: Always
       name: ""
