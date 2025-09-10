@@ -166,6 +166,17 @@ function generate_attribute_env_fips() {
   write_attribute env_fips "$env_fips"
 }
 
+function generate_attribute_job_frequency() {
+  if [[ "$JOB_NAME_SAFE" =~ -(f[0-9]+) ]]
+  then
+    job_frequency="${BASH_REMATCH[1]}"
+    if [[ -n "$job_frequency" ]]
+    then
+      write_attribute job_frequency "$job_frequency"
+    fi
+  fi
+}
+
 function generate_attribute_job_type() {
   job_type='periodic'
   if [[ "$LOGS_PATH" =~ pr-logs ]]
@@ -279,6 +290,7 @@ function generate_attributes() {
   generate_attribute_cloud_provider
   generate_attribute_env_disconnected
   generate_attribute_env_fips
+  generate_attribute_job_frequency
   generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method

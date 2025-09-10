@@ -39,10 +39,6 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: base
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   console-tests:
     name: "4.21"
     namespace: ocp
@@ -69,6 +65,10 @@ base_images:
     tag: libvirt-installer
   nested-environment-builder:
     name: nested-environment-builder
+    namespace: ci
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
     namespace: ci
     tag: latest
   rosa-aws-cli:
@@ -1008,11 +1008,26 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 0 7 * * 0-5
+  cron: 0 8 * * 0-5
   restrict_network_access: false
   steps:
     env:
       SKIP_OCP_INSTALL: "false"
+      T5CI_JOB_TYPE: ptp
+      T5CI_VERSION: "4.21"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-ptp
+- as: e2e-telco5g-ptp-upstream
+  capabilities:
+  - intranet
+  cron: 30 12 * * 1-5
+  restrict_network_access: false
+  steps:
+    env:
+      SKIP_OCP_INSTALL: "false"
+      T5CI_DEPLOY_UPSTREAM: "true"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.21"
     observers:

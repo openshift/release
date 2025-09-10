@@ -12,7 +12,6 @@ These resources provide some supplemental images to be used in CI builds.
 - `cdi_builder_is.yaml`: Used by [openshift-kni/performance-addon-operators](../../../ci-operator/config/openshift-kni/performance-addon-operators)
 - `cincinnati-ci`: Used by [openshift/cincinnati](../../../ci-operator/config/openshift/cincinnati)
 - `cli-jq.yaml`: Used by [openshift/kubernetes](../../ci-operator/config/openshift/kubernetes)
-- `cli-ocm.yaml`: Used by step registry (e.g. osd-create-create) when ocm is needed to create OpenShift Dedicated Clusters
 - `content-mirror`: Used by [release-controller](../../build-clusters/common/release-controller)
 - `coreos`: Used by [coreos](../../../ci-operator/config/coreos)
 - `html-proofer_is.yaml`, `hugo_is.yaml` and `nginx-unprivileged_is.yaml`: Used by [openshift/ci-docs](../../ci-operator/config/openshift/ci-docs)
