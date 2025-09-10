@@ -1,0 +1,176 @@
+base_images:
+  assisted-service-mcp:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: assisted-service-mcp
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.17
+images:
+- context_dir: inspector
+  dockerfile_path: Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-inspector
+- build_args:
+  - name: AIUI_APP_GIT_SHA
+    value: $(git rev-parse HEAD)
+  - name: AIUI_APP_VERSION
+    value: latest
+  context_dir: .
+  dockerfile_path: test/prow/Dockerfile.ui
+  to: rh-ecosystem-edge-assisted-chat-ui
+- context_dir: lightspeed-stack
+  dockerfile_path: Containerfile
+  to: rh-ecosystem-edge-assisted-chat-lightspeed-stack
+- context_dir: .
+  dockerfile_path: test/prow/Dockerfile.plus-llama
+  from: rh-ecosystem-edge-assisted-chat-lightspeed-stack
+  to: rh-ecosystem-edge-assisted-chat-lightspeed-stack-plus-llama
+- context_dir: .
+  dockerfile_path: test/prow/Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-test
+- context_dir: assisted-service-mcp
+  dockerfile_path: Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-mcp-server
+promotion: {}
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: local-development
+  optional: true
+  steps:
+    test:
+    - as: run-and-query
+      commands: |
+        set -euo pipefail
+        set -x
+        echo "[CI] Preparing non-interactive env files"
+        # Ensure minimal .env so generate.sh does not prompt
+        if [ ! -f .env ]; then
+          printf "GEMINI_API_KEY=dummy\n" > .env
+          chmod 600 .env || true
+        fi
+        # Optionally wire Vertex SA creds if present
+        mkdir -p config
+        if [ -d /var/run/secrets/vertex ]; then
+          VERT_SRC=$(ls -1 /var/run/secrets/vertex/* 2>/dev/null | head -n1 || true)
+          if [ -n "${VERT_SRC}" ]; then
+            cp "${VERT_SRC}" config/vertex-credentials.json || true
+            chmod 600 config/vertex-credentials.json || true
+          fi
+        fi
+
+        # Configure OCM authentication using mounted sso-ci credentials
+        echo "[CI] Setting up OCM authentication"
+        if [ -d /var/run/secrets/sso-ci ]; then
+          echo "[CI] Available sso-ci files:"
+          ls -la /var/run/secrets/sso-ci/ || true
+          # Look for client_id and client_secret files
+          if [ -f /var/run/secrets/sso-ci/client_id ] && [ -f /var/run/secrets/sso-ci/client_secret ]; then
+            CLIENT_ID=$(cat /var/run/secrets/sso-ci/client_id)
+            CLIENT_SECRET=$(cat /var/run/secrets/sso-ci/client_secret)
+            echo "[CI] Logging in to OCM with client credentials (client_id: ${CLIENT_ID})"
+            if ocm login --client-id="${CLIENT_ID}" --client-secret="${CLIENT_SECRET}" --url=https://api.openshift.com; then
+              echo "[CI] OCM login successful, verifying token access"
+              if ocm token >/dev/null 2>&1; then
+                echo "[CI] OCM token verification successful"
+                # Export tokens for scripts/run.sh to use
+                export OCM_TOKEN=$(ocm token)
+                export OCM_REFRESH_TOKEN=$(ocm token --refresh)
+                echo "[CI] OCM tokens exported to environment"
+              else
+                echo "[CI] OCM token verification failed"
+                ocm whoami || echo "[CI] OCM whoami failed"
+              fi
+            else
+              echo "[CI] OCM login failed, continuing anyway"
+            fi
+          else
+            echo "[CI] No OCM client credentials found, skipping OCM login"
+          fi
+        else
+          echo "[CI] No sso-ci secrets mounted, skipping OCM login"
+        fi
+
+        # Set up CI environment flag for scripts to detect CI mode
+        echo "[CI] Setting up CI environment markers"
+        export CI_MODE=true
+        touch .ci-mode
+
+        # Enable nested podman mode in run.sh
+        export NESTED_PODMAN=1
+        echo "[CI] Enabling nested podman mode (vfs storage, isolated paths)"
+        export XDG_RUNTIME_DIR="/tmp/run"
+        mkdir -p "${XDG_RUNTIME_DIR}"
+        chmod 755 "${XDG_RUNTIME_DIR}"
+        # Force HOME and config directories to be user-owned and writable
+        echo "[CI] Configuring HOME and XDG config for rootless podman"
+        export HOME="/tmp/home-$(id -u)"
+        export XDG_CONFIG_HOME="${HOME}/.config"
+        mkdir -p "${XDG_CONFIG_HOME}/containers" "${HOME}/.local/share/containers"
+        printf "[storage]\n" > "${XDG_CONFIG_HOME}/containers/storage.conf"
+        printf "driver = \"vfs\"\n" >> "${XDG_CONFIG_HOME}/containers/storage.conf"
+        printf "graphroot = \"/tmp/containers-storage\"\n" >> "${XDG_CONFIG_HOME}/containers/storage.conf"
+        printf "runroot = \"/tmp/containers-run\"\n" >> "${XDG_CONFIG_HOME}/containers/storage.conf"
+        chmod 700 "${HOME}" || true
+        export _CONTAINERS_USERNS_CONFIGURED=1
+        echo "[CI] podman version:"; podman --version || true
+        echo "[CI] podman info:"; podman info || true
+
+        # Wire CI-built images into run.sh via env overrides
+        export LIGHTSPEED_STACK_IMAGE_OVERRIDE="${LIGHTSPEED_STACK_IMAGE}"
+        export ASSISTED_MCP_IMAGE_OVERRIDE="${ASSISTED_MCP_IMAGE}"
+        export UI_IMAGE_OVERRIDE="${UI_IMAGE}"
+        export INSPECTOR_IMAGE_OVERRIDE="${INSPECTOR_IMAGE}"
+
+        echo "[CI] Running make generate"
+        make generate
+        echo "[CI] Running make run"
+        make run
+        echo "[CI] Waiting for services to come up"
+        sleep 10
+        echo "[CI] Probe /v1/models (best-effort)"
+        curl -v -sSf http://localhost:8090/v1/models || true
+      credentials:
+      - collection: ""
+        mount_path: /var/run/secrets/gemini
+        name: assisted-chat-gemini-api-key
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/secrets/vertex
+        name: assisted-chat-vertex-service-account
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/secrets/sso-ci
+        name: assisted-chat-sso-ci
+        namespace: test-credentials
+      dependencies:
+      - env: LIGHTSPEED_STACK_IMAGE
+        name: rh-ecosystem-edge-assisted-chat-lightspeed-stack-plus-llama
+      - env: UI_IMAGE
+        name: rh-ecosystem-edge-assisted-chat-ui
+      - env: INSPECTOR_IMAGE
+        name: rh-ecosystem-edge-assisted-chat-inspector
+      - env: ASSISTED_MCP_IMAGE
+        name: rh-ecosystem-edge-assisted-chat-mcp-server
+      from: rh-ecosystem-edge-assisted-chat-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: ci_testing
+  org: rh-ecosystem-edge
+  repo: assisted-chat
