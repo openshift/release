@@ -88,7 +88,12 @@ spec:
     oc extract cm/default-ingress-cert -n openshift-config-managed --to=/tmp/router-ca --confirm
     /bin/cp /tmp/router-ca/ca-bundle.crt "$SHARED_DIR"/oidcProviders-ca.crt # will be used in go-lang e2e cases
     # Currently we use the router-CA-signed certificates for the keycloak server
-    curl -sSI --cacert /tmp/router-ca/ca-bundle.crt $KEYCLOAK_HOST/realms/master/.well-known/openid-configuration | head -n 1 | grep -q 'HTTP/1.1 200 OK'
+    if curl -sSI --cacert /tmp/router-ca/ca-bundle.crt $KEYCLOAK_HOST/realms/master/.well-known/openid-configuration | grep -Eq 'HTTP/[^ ]+ 200'; then
+        echo "The keycloak host is accessible!"
+    else
+        echo "The keycloak host is inaccessible!"
+        exit 1
+    fi
 
     # The tested / supported version will need to be filled in the tested configurations google doc for each OCP new release
     oc rsh -n keycloak dc/keycloak cat /opt/keycloak/version.txt
@@ -104,13 +109,20 @@ spec:
     echo "---" >> "$SHARED_DIR"/oidcProviders-secret-configmap.yaml
     oc create configmap keycloak-oidc-ca --from-file=ca-bundle.crt=/tmp/router-ca/ca-bundle.crt --dry-run=client -o yaml >> "$SHARED_DIR"/oidcProviders-secret-configmap.yaml
     # Spaces or symbol characters in below "name" should work, in case of similar bug OCPBUGS-44099 in old IDP area
+    # Note, the value examples (e.g. extra's values) used here may be tested and referenced otherwhere.
+    # So, when modifying them, search and modify otherwhere too
     cat > "$SHARED_DIR"/oidcProviders.json << EOF
 {
   "oidcProviders": [
     {
       "claimMappings": {
         "groups": {"claim": "groups", "prefix": "oidc-groups-test:"},
-        "username": {"claim": "email", "prefixPolicy": "Prefix", "prefix": {"prefixString": "oidc-user-test:"}}
+        "username": {"claim": "email", "prefixPolicy": "Prefix", "prefix": {"prefixString": "oidc-user-test:"}},
+        "extra": [
+          {"key": "extratest.openshift.com/foo", "valueExpression": "claims.email"},
+          {"key": "extratest.openshift.com/bar", "valueExpression": "\"extra-test-mark\""}
+        ],
+        "uid": {"expression": "\"testuid-\" + claims.sub + \"-uidtest\""}
       },
       "issuer": {
         "issuerURL": "$ISSUER_URL", "audiences": ["$AUDIENCE_1", "$AUDIENCE_2"],
@@ -205,6 +217,11 @@ function prepare_keycloak_client_files () {
     # oc command's token cache will therefore be long enough for a long-duration test case.
     # However, setting client.session.idle.timeout is not enough. The realm's ssoSessionIdleTimeout must
     # be also set (See the `kcadm.sh update realms/master ...` line).
+
+    # The id_token lifespan defaults to 60 seconds. This could bring problem in e2e tests when the
+    # refresh_token refreshes the id_token not timely enough due to network delay issue. In such
+    # situation, a test can sometimes fail with "You must be logged in to the server (Unauthorized)".
+    # So setting the id_token lifespan a bit larger, which is decided by the "access.token.lifespan" field.
     cat > /tmp/.keycloak/client-oc-cli-test.json << EOF
 {
   "clientId" : "oc-cli-test",
@@ -221,6 +238,7 @@ function prepare_keycloak_client_files () {
     "backchannel.logout.session.required" : "true",
     "oauth2.device.authorization.grant.enabled" : "false",
     "backchannel.logout.revoke.offline.tokens" : "false",
+    "access.token.lifespan" : "150",
     "client.session.idle.timeout" : "7200"
   }
 }
@@ -245,6 +263,7 @@ EOF
     "backchannel.logout.session.required" : "true",
     "oauth2.device.authorization.grant.enabled" : "false",
     "backchannel.logout.revoke.offline.tokens" : "false",
+    "access.token.lifespan" : "150",
     "client.session.idle.timeout" : "7200"
   }
 }
