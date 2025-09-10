@@ -40,27 +40,11 @@ cd "ibmcloud-openshift-provisioning" || {
 }
 
 
-echo "Installing podman CLI"
-
-mkdir /tmp/podman_cli
-curl -LO https://github.com/containers/podman/releases/download/v5.2.2/podman-remote-static-linux_amd64.tar.gz
-tar -xvzf podman-remote-static-linux_amd64.tar.gz -C /tmp/podman_cli
-mv /tmp/podman_cli/bin/podman-remote-static-linux_amd64 /tmp/podman_cli/podman
-
-export PATH=$PATH:/tmp/podman_cli
-
-
-
-# Pushing the release image to quay.io
-podman machine init
-podman machine start
-podman images
-
 podman tag "$OCP_RELEASE_IMAGE" quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:"$job_id"-latest
 podman push quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:s390x-"$job_id"-latest
 
 
-export OCP_RELEASE_IMAGE="quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:$job_id-latest"
+export OCP_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.20.0-ec.5-s390x"
 
 VARS_FILE="cluster-vars"
 
