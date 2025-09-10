@@ -40,9 +40,6 @@ cd "ibmcloud-openshift-provisioning" || {
 }
 
 
-podman tag "$OCP_RELEASE_IMAGE" quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:"$job_id"-latest
-podman push quay.io/rh-ee-dveerabh/hcp-ibmz-phase2-ci/s390x-ocp-image:s390x-"$job_id"-latest
-
 
 export OCP_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.20.0-ec.5-s390x"
 
