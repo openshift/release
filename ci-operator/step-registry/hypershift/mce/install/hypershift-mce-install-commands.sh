@@ -14,7 +14,10 @@ fi
 echo "$MCE_VERSION"
 
 echo "Printing pull secret"
-oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d
+oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/test_authfile
+
+echo "Printing /tmp/test_authfile"
+cat /tmp/test_authfile
 
 
 _REPO="quay.io/acm-d/mce-custom-registry"
