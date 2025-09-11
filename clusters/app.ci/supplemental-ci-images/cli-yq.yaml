@@ -1,36 +1,30 @@
-apiVersion: v1
-kind: List
-items:
-- kind: ImageStream
-  apiVersion: image.openshift.io/v1
-  metadata:
-    namespace: ocp
-    name: cli-yq
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    namespace: ocp
-    name: cli-yq
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: cli-yq
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_cli-yq_latest
+  source:
+    dockerfile: |
+      FROM ocp/4.12:cli
+      RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+      RUN yum install -y jq
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
         kind: ImageStreamTag
-        name: cli-yq:latest
-    source:
-      dockerfile: |
-        FROM ocp/4.12:cli
-        RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-        RUN yum install -y jq
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: ImageStreamTag
-          name: 4.12:cli
-          namespace: ocp
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
-    triggers:
-      - type: ConfigChange
+        name: 4.12:cli
+        namespace: ocp
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+    - type: ConfigChange

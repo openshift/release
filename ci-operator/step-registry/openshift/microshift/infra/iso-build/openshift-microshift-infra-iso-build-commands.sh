@@ -24,6 +24,7 @@ tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
+export GITHUB_TOKEN="\$(cat /tmp/token-git 2>/dev/null || echo '')"
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
 else
@@ -76,6 +77,7 @@ scp \
     /tmp/iso.sh \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \
+    /var/run/vault/tests-private-account/token-git \
     "${CLUSTER_PROFILE_DIR}/pull-secret" \
     "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
     "${CLUSTER_PROFILE_DIR}/ssh-publickey" \

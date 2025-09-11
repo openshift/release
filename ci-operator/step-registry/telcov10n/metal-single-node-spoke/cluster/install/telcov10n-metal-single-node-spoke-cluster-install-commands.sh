@@ -91,7 +91,7 @@ function generate_host_firmware_settings_manifest {
     set +x
     echo
 
-    oc patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
+    oc -n ${SPOKE_CLUSTER_NAME} patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
 spec:
   settings: $(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
 EO-hfs-patch

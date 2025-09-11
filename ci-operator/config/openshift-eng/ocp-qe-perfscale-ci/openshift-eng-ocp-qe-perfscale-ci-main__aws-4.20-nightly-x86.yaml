@@ -52,7 +52,7 @@ tests:
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
 - as: control-plane-252nodes
-  cron: 0 0 * * 3
+  cron: 0 0 * * 1,3
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -73,7 +73,7 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
 - as: control-plane-120nodes
-  cron: 0 2 * * 1,3
+  cron: 0 2 * * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -175,6 +175,19 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-heavy-ipsec-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 5h0m0s
 - always_run: false
   as: payload-node-density-heavy-6nodes

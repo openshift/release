@@ -1,2 +1,5 @@
-# OpenShift Private
-This folder contains configuration that is required for the ci-operator to promote images for the private `openshift-priv` organization.
+OpenShift Private
+=================
+
+This folder contains configuration that is required to mirror images and propagate
+`ci-operator` config changes to private forks in `openshift-priv` organization.
