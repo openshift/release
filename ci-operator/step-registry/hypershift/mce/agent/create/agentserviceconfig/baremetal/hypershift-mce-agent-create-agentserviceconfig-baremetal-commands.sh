@@ -6,7 +6,6 @@ set -o pipefail
 set -E
 
 export PATH=${PATH}:/cli
-gnu_architecture=$(sed 's/amd64/x86_64/;s/arm64/aarch64/' <<< "${architecture:-amd64}")
 
 pushd deploy/operator
 
@@ -19,7 +18,7 @@ ASSISTED_MIRROR_CM="
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: assisted-mirror-config
+  name: mirror-config
   namespace: ${ASSISTED_NAMESPACE}
   labels:
     app: assisted-service
@@ -74,12 +73,12 @@ spec:
    requests:
     storage: 200Gi
  mirrorRegistryRef:
-  name: 'assisted-mirror-config'
+  name: 'mirror-config'
  osImages:
  - openshiftVersion: '${CLUSTER_VERSION}'
-   version: $(echo "$OS_IMAGES" | yq '.[] | select(.cpu_architecture == "'"$gnu_architecture"'").version')
-   url: $(echo "$OS_IMAGES" | yq '.[] | select(.cpu_architecture == "'"$gnu_architecture"'").url')
-   cpuArchitecture: ${gnu_architecture}
+   version: $(echo "$OS_IMAGES" | yq '.[] | select(.cpu_architecture == "'"$AGENTSERVICECONFIG_CPU_ARCHITECTURE"'").version')
+   url: $(echo "$OS_IMAGES" | yq '.[] | select(.cpu_architecture == "'"$AGENTSERVICECONFIG_CPU_ARCHITECTURE"'").url')
+   cpuArchitecture: ${AGENTSERVICECONFIG_CPU_ARCHITECTURE}
 "
 
 if [ "${DISCONNECTED}" = "true" ]; then
@@ -102,7 +101,7 @@ EOF
 
 set -x
 oc wait --timeout=5m --for=condition=ReconcileCompleted AgentServiceConfig agent
-oc wait --timeout=5m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
+oc wait --timeout=15m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
 oc wait --timeout=15m --for=condition=Ready pod -l app=assisted-image-service -n "${ASSISTED_NAMESPACE}"
 
 echo "Enabling configuration of BMH resources outside of openshift-machine-api namespace"
