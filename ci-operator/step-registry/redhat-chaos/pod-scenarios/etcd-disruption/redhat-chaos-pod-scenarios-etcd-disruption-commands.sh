@@ -25,6 +25,23 @@ export TELEMETRY_PASSWORD=$telemetry_password
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
 export HEALTH_CHECK_URL=https://$console_url
+
+# Label ovnkube-node pods on worker nodes for targeted chaos testing
+echo "Labeling ovnkube-node pods on worker nodes for targeted chaos testing..."
+
+# Get worker node names
+worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}')
+
+# Get the namespace and pod names for ovnkube-node pods on worker nodes
+for node in $worker_nodes; do
+  oc get pods -A -l app=ovnkube-node -o wide | grep "$node" | while read namespace name ready status restarts age ip node rest; do
+    echo "Labeling pod $name in namespace $namespace (on worker node $node) as ovnkube-node-worker"
+    oc label pod $name -n $namespace ovnkube-node-worker=true --overwrite
+  done
+done
+
+echo "Finished labeling ovnkube-node pods on worker nodes"
+
 set -o nounset
 set -o pipefail
 set -x
