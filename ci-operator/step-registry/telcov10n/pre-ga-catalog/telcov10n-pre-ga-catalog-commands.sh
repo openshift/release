@@ -76,8 +76,6 @@ EOF
 
 function apply_catalog_source_and_image_content_source_policy {
 
-  image_index_tag="v${IMAGE_INDEX_OCP_VERSION}.0"
-
   SSHOPTS=(-o 'ConnectTimeout=5'
     -o 'StrictHostKeyChecking=no'
     -o 'UserKnownHostsFile=/dev/null'
@@ -89,7 +87,7 @@ function apply_catalog_source_and_image_content_source_policy {
 
   timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
     "${PREGA_CATSRC_AND_ICSP_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
-    "${catalog_info_dir}" "${image_index_tag}" << 'EOF'
+    "${catalog_info_dir}" "${IMAGE_INDEX_OCP_VERSION}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -97,7 +95,8 @@ set -o pipefail
 set -x
 catalog_soruces_url="${1}"
 prega_operator_index_tags_url="${2}"
-tag_version="${4}"
+image_index_ocp_version="${4}"
+tag_version="v${4}.0"
 
 function findout_manifest_digest {
   res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
@@ -135,13 +134,51 @@ function get_related_catalogs_and_icsp_manifests {
     [ "${has_additional}" == "false" ] && break
   done
 
-  echo ${tag/-/.0-}
+  if [ "${image_index_ocp_version/./}" -gt 419 ]; then
+    echo ${tag}
+  else
+    echo ${tag/-/.0-}
+  fi
 }
 
 selected_manifest_digest=$(findout_manifest_digest)
 version_tag=$(get_related_catalogs_and_icsp_manifests)
-info_dir=${3}/${version_tag}
 
+echo "Checking if the selected tag exists..."
+status_code=$(curl -sSL -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}")
+if [ "$status_code" -ne 200 ]; then
+  echo "Resource not found (HTTP status: $status_code). Getting previous version..."
+
+  # Get all tags from the base URL, filter for tag version, sort, and get the previous one
+  next_version=$(curl -sSL "${catalog_soruces_url}" \
+    | grep -oP '(?<=href=")[^"]+' \
+    | sort -t '-' -k2,2 -k3,3 \
+    | grep "${tag_version/.0/}" \
+    | awk -F '[-/]' -v tag_ver="$version_tag" '
+BEGIN {
+    split(tag_ver, a, "[-/]");
+    reference_ts = a[2];
+    gsub(/T|ci/, "", reference_ts);
+}
+{
+    current_ts = $2
+    gsub(/T|ci/, "", current_ts)
+    if (current_ts >= reference_ts) {
+        # printf("%s > %s = ", current_ts, reference_ts)
+        print $0
+        exit
+    }
+}')
+
+  if [ -n "$next_version" ]; then
+    echo "Next available version is: $next_version"
+    version_tag=${next_version}
+  else
+    echo "Could not find a previous version."
+  fi
+fi
+
+info_dir=${3}/${version_tag}
 mkdir -pv ${info_dir}
 pushd .
 cd ${info_dir}
@@ -151,6 +188,13 @@ for f in $(curl -sSL ${catalog_soruces_url}/${version_tag}|grep -oP '(?<=href=")
   curl -sSLO ${catalog_soruces_url}/${version_tag}/${f}
   set +x
 done
+
+set -x
+if [ -n "${next_version:-}" ]; then
+  stable_img_index="quay.io/prega/prega-operator-index:${tag_version}"
+  sed -i "s#^  image:.*#  image: ${stable_img_index}#" catalogSource.yaml
+fi
+set +x
 
 popd
 EOF

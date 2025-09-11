@@ -92,8 +92,7 @@ function download_logs() {
   gcloud_auth_cmd='gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private 2>&1'
   for (( i=1; i<=3; i++ ))
   do
-    output="$(eval $gcloud_auth_cmd)"
-    if ! (grep -q 'ERROR' <<< "$output")
+    if (eval $gcloud_auth_cmd | grep -q -i 'Activated service account')
     then
       break
     fi
@@ -167,6 +166,17 @@ function generate_attribute_env_fips() {
   write_attribute env_fips "$env_fips"
 }
 
+function generate_attribute_job_frequency() {
+  if [[ "$JOB_NAME_SAFE" =~ -(f[0-9]+) ]]
+  then
+    job_frequency="${BASH_REMATCH[1]}"
+    if [[ -n "$job_frequency" ]]
+    then
+      write_attribute job_frequency "$job_frequency"
+    fi
+  fi
+}
+
 function generate_attribute_job_type() {
   job_type='periodic'
   if [[ "$LOGS_PATH" =~ pr-logs ]]
@@ -231,6 +241,17 @@ function generate_attribute_pr_author() {
   fi
 }
 
+function generate_attribute_version() {
+  if [[ "$JOB_NAME" =~ release-(4[.][0-9]+)- ]]
+  then
+    version="${BASH_REMATCH[1]}"
+    if [[ -n "$version" ]]
+    then
+      write_attribute version "$version"
+    fi
+  fi
+}
+
 function generate_attribute_version_installed() {
   version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
@@ -269,11 +290,13 @@ function generate_attributes() {
   generate_attribute_cloud_provider
   generate_attribute_env_disconnected
   generate_attribute_env_fips
+  generate_attribute_job_frequency
   generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
   generate_attribute_pr_author
+  generate_attribute_version
   generate_attribute_version_installed
 }
 

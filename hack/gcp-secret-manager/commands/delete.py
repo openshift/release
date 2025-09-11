@@ -2,6 +2,7 @@
 # pylint: disable=E0401, C0413
 
 import click
+from google.api_core.exceptions import NotFound
 from google.cloud import secretmanager
 from util import (
     PROJECT_ID,
@@ -49,6 +50,10 @@ def delete(collection: str, secret: str):
         click.echo(f"Deleting secret '{secret}'...")
         client.delete_secret(
             name=client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
+        )
+    except NotFound:
+        raise click.ClickException(
+            f"Secret '{secret}' does not exist within the collection."
         )
     except Exception as e:
         raise click.ClickException(

@@ -11,14 +11,12 @@ JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
-BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
-LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
-  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".num_worker_nodes")
   export NUM_WORKER_NODES
 fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
@@ -41,10 +39,8 @@ enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
+smcipmitool_url: "file:///root/smcipmitool.tar.gz"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
-bastion_controlplane_interface: $BASTION_CP_INTERFACE
-bastion_lab_interface: $LAB_INTERFACE
-controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
@@ -58,7 +54,7 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
-  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/hypervisor_nic_interface")
+  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/config" | jq ".hypervisor_nic_interface")
   export HV_NIC_INTERFACE
 
   cat <<EOF >>/tmp/all.yml
@@ -149,6 +145,21 @@ if [[ ${TYPE} == 'sno' ]]; then
 else
   KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
 fi
+
+collect_ai_logs() {
+  echo "Collecting AI logs ..."
+  ssh ${SSH_ARGS} root@${bastion} "
+    AI_CLUSTER_ID=\$(curl -sS http://$bastion2:8080/api/assisted-install/v2/clusters/  | jq -r .[0].id)
+    echo 'Cluster ID is:' \$AI_CLUSTER_ID
+    mkdir -p /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE
+    curl -LsSo /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
+    rm -rf /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar.gz
+    gzip /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar
+  "
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar.gz ${ARTIFACT_DIR}
+}
+
+trap 'collect_ai_logs' EXIT
 
 ssh ${SSH_ARGS} root@${bastion} "
    set -e

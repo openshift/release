@@ -4,7 +4,7 @@ build_root:
       FROM quay.io/multi-arch/yq:4.30.5 as yq4
       FROM quay.io/openshift-kni/ztp-site-generator:4.19.0 AS ztp-gen
       WORKDIR /home/ztp
-      FROM registry.ci.openshift.org/ci/telco-runner
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_telco-runner_latest
       COPY --from=yq4 /usr/bin/yq /usr/bin/yq
       COPY --from=ztp-gen /home/ztp /output/ztp
       RUN \
@@ -186,7 +186,8 @@ tests:
                   policyName: "subscriptions-policy"
                   spec:
                     source: prega-operators-4-20
-                    channel: "stable-6.2"
+                    channel: ""
+                    # channel: "stable-6.3"
                 - fileName: ClusterLogOperatorStatus.yaml
                   policyName: "subscriptions-policy"
                 - fileName: ClusterLogServiceAccount.yaml
@@ -215,8 +216,8 @@ tests:
                       name: prega-operators-4-20
                   spec:
                     displayName: Red Hat Custom Operators Catalog
-                    image: quay.io/prega/prega-operator-index:v4.20.0
-                    # image: registry.redhat.io/redhat/redhat-operator-index:v4.17
+                    # image: quay.io/prega/prega-operator-index:v4.20.0
+                    image: registry.redhat.io/redhat/redhat-operator-index:v4.20
         - filename: group-du-sno-ranGen.yaml
           content: |-
             ---
@@ -232,6 +233,15 @@ tests:
                 group-du-sno: ""
               mcp: "master"
               sourceFiles:
+                - fileName: StorageLV.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    name: local-disks
+                  spec:
+                    storageClassDevices:
+                      - storageClassName: general
+                        devicePaths:
+                          - /dev/disk/by-path/pci-0000:45:00.0-nvme-1
                 - fileName: DisableOLMPprof.yaml
                   policyName: "config-policy"
                 # Set ClusterLogForwarder as example might be better to create another policyTemp-Group
@@ -392,6 +402,7 @@ tests:
     test:
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-telco-operators
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-oslat
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-cpu-util
     workflow: telcov10n-metal-single-node-spoke-kpis
 zz_generated_metadata:
   branch: main

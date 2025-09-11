@@ -1,0 +1,43 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.23
+canonical_go_repository: github.com/openshift/openshift-velero-plugin
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile
+  to: openshift-velero-plugin
+promotion:
+  to:
+  - disabled: true
+    name: openshift-velero-plugin
+    namespace: konveyor
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.11"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  steps:
+    test:
+    - as: unit
+      commands: GOFLAGS="-mod=mod" make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-dev
+  org: openshift-priv
+  repo: openshift-velero-plugin
