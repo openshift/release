@@ -75,7 +75,7 @@ status:
   networkType: OVNKubernetes
 EOF
 
-TEST_ARGS=""
+TEST_ARGS="--max-parallel-tests 30"
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
