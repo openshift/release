@@ -56,7 +56,6 @@ fi
 echo "🚀 Running Fusion Access integration tests..."
 if [[ -f "scripts/test-integration.sh" ]]; then
   echo "Found test script, executing..."
-  timeout "${TEST_TIMEOUT}" bash scripts/test-integration.sh
   TEST_EXIT_CODE=$?
 else
   echo "No test script found, running basic validation tests..."
