@@ -38,8 +38,15 @@ images:
         source_path: /oadp-e2e-qe.tar.gz
   to: oadp-runner
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
   latest:
     candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.19"
@@ -152,6 +159,35 @@ tests:
     test:
     - ref: oadp-execute-tests
     workflow: oadp-ipi-aws-sno-oadp-qe
+  timeout: 8h0m0s
+- as: oadp-qe-aws-arm
+  cron: 30 2 * * *
+  steps:
+    cluster_profile: aws-oadp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs/oadp-oadp-operator-bundle:1.5.1-32
+      OO_INDEX: brew.registry.redhat.io/rh-osbs/iib:1033954
+    env:
+      BASE_DOMAIN: mig-qe-aws.devcluster.openshift.com
+      BUCKET_NAME: s3-oadp-arm
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OADP_TEST_FOCUS: Tier0
+      OCP_ARCH: arm64
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: redhat-oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      RE_TRIGGER_ON_FAILURE: "false"
+      REPORTPORTAL_HOSTNAME: reportportal-migration-qe.apps.dno.ocp-hub.prod.psi.redhat.com
+      REPORTPORTAL_PROJECT: OADP
+      USER_TAGS: |
+        scenario oadp oadp-qe aws-arm
+    test:
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-aws-oadp-qe
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
