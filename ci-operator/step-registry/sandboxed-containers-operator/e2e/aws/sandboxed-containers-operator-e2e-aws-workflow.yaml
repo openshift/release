@@ -7,6 +7,9 @@ workflow:
       CONTROL_PLANE_REPLICAS: 3
       SPOT_INSTANCES: "false"
       FORCE_SUCCESS_EXIT: "no"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      ENABLE_MUST_GATHER: "true"
     pre:
     - chain: ipi-conf-aws
     - chain: aws-provision-iam-user-minimal-permission
@@ -14,6 +17,7 @@ workflow:
     - chain: ipi-install
     - chain: sandboxed-containers-operator-pre
     post:
+    - ref: sandboxed-containers-operator-gather-must-gather
     - ref: cucushift-installer-wait
     - chain: ipi-aws-post
     test:
