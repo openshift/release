@@ -13,12 +13,14 @@ fi
 
 echo "$MCE_VERSION"
 
-_REPO="quay.io/acm-d/mce-custom-registry"
+MCE_CATALOG_PATH="acm-d/mce-custom-registry"
+_REPO="quay.io/$MCE_CATALOG_PATH"
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
-  _REPO="quay.io/acm-d/mce-dev-catalog"
+  MCE_CATALOG_PATH="acm-d/mce-dev-catalog"
+  _REPO="quay.io:443/$MCE_CATALOG_PATH"
 fi
 if [[ "$DISCONNECTED" == "true" ]]; then
-  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
+  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/$MCE_CATALOG_PATH
   # Setup disconnected quay mirror container repo
   oc apply -f - <<EOF
 apiVersion: operator.openshift.io/v1alpha1
@@ -86,6 +88,9 @@ oc wait mcp master worker --for condition=updated --timeout=20m
 
 echo "Install MCE custom catalog source"
 IMG="${_REPO}:${MCE_VERSION}-latest"
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
+  IMG="${_REPO}:latest-${MCE_VERSION}"
+fi
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
