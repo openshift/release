@@ -3,6 +3,7 @@
 set -ex
 env
 
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -12,16 +13,6 @@ if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
 fi
 
 echo "$MCE_VERSION"
-
-echo "Printing pull secret"
-oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/test_authfile
-
-echo "Printing /tmp/test_authfile"
-cat /tmp/test_authfile
-
-
-echo -n "testtesttest" >> /tmp/test_authfile
-cat /tmp/test_authfile
 
 _REPO="quay.io/acm-d/mce-custom-registry"
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
@@ -128,6 +119,10 @@ echo "Describing pods in openshift-marketplace namespace"
 oc describe po -n openshift-marketplace 
 sleep 30
 
+
+
+
+sleep 1800
 oc wait CatalogSource --timeout=20m --for=jsonpath='{.status.connectionState.lastObservedState}'=READY -n openshift-marketplace multiclusterengine-catalog
 
 oc apply -f - <<EOF
