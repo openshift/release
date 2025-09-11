@@ -14,6 +14,7 @@ export hcp_domain
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 ssh_key=$(cat ${ssh_key_file})
 export ssh_key
+echo "test"
 
 # Creating cluster imageset
 cat <<EOF | oc create -f -
