@@ -8,25 +8,15 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: olmv1-benchmark-test
-  cluster: build05
-  cron: 0 1,5,9 * * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    test:
-    - ref: olmv1-performance
-    - ref: openshift-qe-orion-olmv1
-    workflow: openshift-qe-installer-gcp
 - as: control-plane-etcd-fips-24nodes
-  cron: 0 4 2,16 * *
+  cron: 0 15 4,18 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -37,23 +27,8 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 5h0m0s
-- as: data-path-etcd-fips-9nodes
-  cron: 0 2 1,15 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    env:
-      COMPUTE_NODE_REPLICAS: "9"
-      COMPUTE_NODE_TYPE: n1-standard-8
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: n1-standard-16
-      SET_ENV_BY_PLATFORM: custom
-    test:
-    - ref: openshift-qe-perfscale-gcp-data-path-fw
-    - chain: openshift-qe-data-path-tests
-    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-  timeout: 5h0m0s
 - as: node-density-heavy-etcd-fips-24nodes
-  cron: 0 17 5,19 * *
+  cron: 0 13 5,19 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -134,9 +109,9 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-  timeout: 8h0m0s
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: gcp-4.19-nightly-x86
+  variant: gcp-4.20-nightly-x86
