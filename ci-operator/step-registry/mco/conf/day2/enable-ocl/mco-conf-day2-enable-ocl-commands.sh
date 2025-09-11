@@ -77,6 +77,8 @@ echo "Using MOSC API: $MOSC_API_VERSION"
 
 if [ "$MOSC_API_VERSION" == "$MOSC_V1ALPHA_API_VERSION" ]; then
     for custom_mcp_name in "${mcp_arr[@]}"; do
+        # Define MOSC name with custom pool parameter
+        MOSC_NAME="$custom_mcp_name"
         echo ""
         echo "Enable OCL in pool $custom_mcp_name"
     
@@ -84,7 +86,7 @@ if [ "$MOSC_API_VERSION" == "$MOSC_V1ALPHA_API_VERSION" ]; then
 apiVersion: machineconfiguration.openshift.io/v1alpha1
 kind: MachineOSConfig
 metadata:
-  name: mosc-$custom_mcp_name
+  name: $MOSC_NAME
 spec:
   machineConfigPool:
     name: $custom_mcp_name
@@ -104,12 +106,14 @@ spec:
             LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
 EOF
 
-        oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
+        oc get machineosconfig -oyaml "$MOSC_NAME"
 
     done
 
 elif [ "$MOSC_API_VERSION" == "$MOSC_V1_API_VERSION" ] ; then
     for custom_mcp_name in "${mcp_arr[@]}"; do
+        # Define MOSC name with custom pool parameter
+        MOSC_NAME="$custom_mcp_name"
         echo ""
         echo "Enable OCL in pool $custom_mcp_name"
     
@@ -117,7 +121,7 @@ elif [ "$MOSC_API_VERSION" == "$MOSC_V1_API_VERSION" ] ; then
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineOSConfig
 metadata:
-  name: mosc-$custom_mcp_name
+  name: $MOSC_NAME
 spec:
   machineConfigPool:
     name: $custom_mcp_name
@@ -134,7 +138,7 @@ spec:
           LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
 EOF
 
-        oc get machineosconfig -oyaml "mosc-$custom_mcp_name"
+        oc get machineosconfig -oyaml "$MOSC_NAME"
 
     done
 
@@ -146,15 +150,15 @@ fi
 for custom_mcp_name in "${mcp_arr[@]}"; do
     echo ""
     echo "Wait for the $custom_mcp_name MCP to start building the OCL image"
-    mosc_name="mosc-$custom_mcp_name"
-    echo "Waiting for a MOSB resource to be created for mosc $mosc_name"
-    if ! run_command "oc wait --for=jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}' machineosconfig $mosc_name --timeout=300s"
+    MOSC_NAME="$custom_mcp_name"
+    echo "Waiting for a MOSB resource to be created for mosc $MOSC_NAME"
+    if ! run_command "oc wait --for=jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}' machineosconfig $MOSC_NAME --timeout=300s"
     then
-        echo "ERROR. The $mosc_name MOSC resource was not updated with a new MOSB annotation"
+        echo "ERROR. The $MOSC_NAME MOSC resource was not updated with a new MOSB annotation"
         debug_and_exit
     fi
 
-    machine_os_build_name=$(oc get machineosconfig "$mosc_name" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
+    machine_os_build_name=$(oc get machineosconfig "$MOSC_NAME" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
     echo "Waiting for a $machine_os_build_name MOSB to exist"
     if ! run_command "oc wait --for=create machineosbuild $machine_os_build_name --timeout=300s"
     then
@@ -173,9 +177,9 @@ done
 for custom_mcp_name in "${mcp_arr[@]}"; do
     echo ""
     echo "Wait for the $custom_mcp_name MCP to finish building the OCL image"
-    mosc_name="mosc-$custom_mcp_name"
+    MOSC_NAME="$custom_mcp_name"
 
-    machine_os_build_name=$(oc get machineosconfig "$mosc_name" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
+    machine_os_build_name=$(oc get machineosconfig "$MOSC_NAME" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
 
     echo "Waiting for $machine_os_build_name MOSB to succeed"
     if ! run_command "oc wait --for=condition=Succeeded  machineosbuild $machine_os_build_name --timeout=600s"
