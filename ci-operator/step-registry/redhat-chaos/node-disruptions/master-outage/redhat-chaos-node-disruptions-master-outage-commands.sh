@@ -101,7 +101,15 @@ elif [ "$platform" = "None" ] || [ "$platform" = "bm" ] || [ "$platform" = "bare
                 export BMC_PASSWORD="${bmc_pass}"
                 # shellcheck disable=SC2154
                 # Use bastion with forwarded port instead of direct BMC address for krkn YAML
-                export BMC_ADDR="${AUX_HOST}:${bmc_forwarded_port}"
+                # Hardcoded for equinix-ocp-metal-qe cluster profile with fallback
+                if [[ -n "${bmc_forwarded_port:-}" && "${bmc_forwarded_port}" != "null" ]]; then
+                    export BMC_ADDR="openshift-qe-metal-ci.arm.eng.rdu2.redhat.com:${bmc_forwarded_port}"
+                    echo "Using bastion with forwarded port: ${BMC_ADDR}"
+                else
+                    echo "WARNING: bmc_forwarded_port not available, falling back to direct BMC address"
+                    export BMC_ADDR="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+                    echo "Using direct BMC address: ${BMC_ADDR}"
+                fi
                 # shellcheck disable=SC2154
                 export NODE_NAME="${target_node}"
                 
