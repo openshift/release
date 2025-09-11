@@ -10,7 +10,7 @@ bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 
 lab=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 lab_cloud=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
-compute_count=$(cat ${CLUSTER_PROFILE_DIR}/compute_count)
+compute_count=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".compute_count")
 ctlplane_start_ip=$(cat ${CLUSTER_PROFILE_DIR}/ctlplane_start_ip)
 kubeconfig=$(cat ${CLUSTER_PROFILE_DIR}/kubeconfig)
 username=$(cat ${CLUSTER_PROFILE_DIR}/username)

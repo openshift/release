@@ -86,7 +86,7 @@ tests:
         SubNumaCluster: Disabled
         UncoreFrequency: MaxUFS # Uncore Frequency
       CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.21
-      CATALOGSOURCE_NAME: prega-operators-4.21
+      CATALOGSOURCE_NAME: prega-operators-4-21
       DU_PROFILE: v4.21
       GITEA_NAMESPACE: ztp-gitea
       IMAGE_INDEX_OCP_VERSION: "4.21"
@@ -186,7 +186,8 @@ tests:
                   policyName: "subscriptions-policy"
                   spec:
                     source: prega-operators-4.21
-                    channel: "stable-6.2"
+                    channel: ""
+                    # channel: "stable-6.3"
                 - fileName: ClusterLogOperatorStatus.yaml
                   policyName: "subscriptions-policy"
                 - fileName: ClusterLogServiceAccount.yaml
@@ -232,6 +233,15 @@ tests:
                 group-du-sno: ""
               mcp: "master"
               sourceFiles:
+                - fileName: StorageLV.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    name: local-disks
+                  spec:
+                    storageClassDevices:
+                      - storageClassName: general
+                        devicePaths:
+                          - /dev/disk/by-path/pci-0000:45:00.0-nvme-1
                 - fileName: DisableOLMPprof.yaml
                   policyName: "config-policy"
                 # Set ClusterLogForwarder as example might be better to create another policyTemp-Group
@@ -392,6 +402,7 @@ tests:
     test:
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-telco-operators
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-oslat
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-cpu-util
     workflow: telcov10n-metal-single-node-spoke-kpis
 zz_generated_metadata:
   branch: main
