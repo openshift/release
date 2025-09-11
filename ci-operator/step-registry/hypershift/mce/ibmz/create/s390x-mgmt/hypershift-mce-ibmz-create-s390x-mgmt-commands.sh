@@ -67,9 +67,14 @@ sed -i "s/^COMPUTE_NODE_PROFILE=.*/COMPUTE_NODE_PROFILE=\"$COMPUTE_NODE_PROFILE\
 # Run the create-cluster.sh script to create the OCP cluster in IBM cloud VPC
 if [[ -x ./create-cluster.sh ]]; then
     ./create-cluster.sh
+    sleep 120
 else
     echo "create-cluster.sh not found or not executable"
     exit 1
 fi
 
+echo "Copying kubeconfig into SHARED_DIR"
+if ! timeout 30s cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"; then
+    echo "WARNING: kubeconfig copy failed or timed out (exit code $?)"
+fi
 
