@@ -212,10 +212,33 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
+    --cluster-cidr 10.136.0.0/14  --render --render-sensitive > ${SHARED_DIR}/hc.yaml "
 fi
 
-
+sleep 30m
+if [[ -n ${MCE} ]] ; then
+  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
+    oc annotate hostedclusters -n "${CLUSTER_NAMESPACE_PREFIX}" "${CLUSTER_NAME}" "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
+    oc apply -f - <<EOF
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  annotations:
+    import.open-cluster-management.io/hosting-cluster-name: local-cluster
+    import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
+    open-cluster-management/created-via: other
+  labels:
+    cloud: auto-detect
+    cluster.open-cluster-management.io/clusterset: default
+    name: ${CLUSTER_NAME}
+    vendor: OpenShift
+  name: ${CLUSTER_NAME}
+spec:
+  hubAcceptsClient: true
+  leaseDurationSeconds: 60
+EOF
+  fi
+fi
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
