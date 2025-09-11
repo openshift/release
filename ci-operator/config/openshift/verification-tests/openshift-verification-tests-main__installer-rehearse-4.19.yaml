@@ -24,14 +24,27 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
   latest:
     candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.19"
   multi-latest:
     candidate:
       architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  target:
+    candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.19"
@@ -61,16 +74,49 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      IPSTACK: dualstack
-      SLEEP_DURATION: 1h
-    post:
-    - ref: azure-deprovision-resourcegroup
-    pre:
-    - ref: azure-provision-resourcegroup
-    - ref: azure-provision-vnet
-    - chain: azure-provision-bastionhost
-    test:
-    - ref: cucushift-installer-wait
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v4
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v4
+      CUSTOM_AZURE_REGION: centralus
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+- as: installer-rehearse-azure-1
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ds_v4
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_E8s_v4
+      CUSTOM_AZURE_REGION: centralus
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+- as: installer-rehearse-azure-2
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_E4as_v4
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_E8ds_v4
+      CUSTOM_AZURE_REGION: centralus
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+- as: installer-rehearse-azure-3
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_M12s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_L8s_v3
+      CUSTOM_AZURE_REGION: eastus
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
