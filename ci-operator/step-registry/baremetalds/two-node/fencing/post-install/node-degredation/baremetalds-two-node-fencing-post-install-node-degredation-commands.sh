@@ -123,50 +123,96 @@ for attempt in $(seq 1 30); do
   sleep 30
 done
 
-# If the operator was intentionally removed, skip politely
+# Determine survivor (Ready=True) and list NotReady nodes
+SURV="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
+        | awk '$2=="True"{print $1;exit}')"
+: "${SURV:=master-0}"
+NOTREADY_NODES="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
+        | awk '$2!="True"{print $1}')"
+echo "Survivor node: ${SURV}"
+echo "NotReady nodes: ${NOTREADY_NODES:-<none>}"
+
+# If the operator was intentionally removed, skip
 REG_STATE="$(oc get configs.imageregistry.operator.openshift.io/cluster -o jsonpath='{.spec.managementState}' 2>/dev/null || true)"
 if [[ "${REG_STATE}" != "Removed" ]]; then
-  # 1) Make it runnable on one node: Managed + emptyDir (idempotent)
-  echo "Setting Image Registry to Managed + emptyDir (no-op if already configured)..."
-  oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge \
-    -p '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}' || true
+  # 1) Make it runnable on one node: Managed + emptyDir + pin to survivor (idempotent)
+  echo "Patching Image Registry for single-node survivability (replicas=1, emptyDir, pin to ${SURV})..."
+  oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge -p "{
+    \"spec\":{
+      \"managementState\":\"Managed\",
+      \"replicas\":1,
+      \"storage\":{\"emptyDir\":{}},
+      \"nodeSelector\":{\"kubernetes.io/hostname\":\"${SURV}\"},
+      \"tolerations\":[]
+    }
+  }" || true
 
-  # 2) Ensure the pod (re)schedules now on the surviving master
-  echo "Forcing image-registry rollout..."
-  oc rollout restart deploy/image-registry -n openshift-image-registry || true
-  echo "Waiting up to 12m for image-registry to become Available..."
-  if ! oc rollout status deploy/image-registry -n openshift-image-registry --timeout=12m; then
+  # 2) Kill any old registry pod stuck on NotReady nodes (unblocks rollout)
+  if [[ -n "${NOTREADY_NODES}" ]]; then
+    for nn in ${NOTREADY_NODES}; do
+      OLDPOD="$(oc -n openshift-image-registry get pod -o wide 2>/dev/null \
+        | awk -v N=\"$nn\" '$1 ~ /^image-registry-/ && $7==N {print $1; exit}')"
+      if [[ -n "${OLDPOD:-}" ]]; then
+        echo "Force-deleting stale registry pod on NotReady node ${nn}: ${OLDPOD}"
+        oc -n openshift-image-registry delete pod "${OLDPOD}" --grace-period=0 --force || true
+      fi
+    done
+  fi
+
+  # 3) Ensure the pod (re)schedules now on the surviving master
+  echo "Forcing image-registry rollout and waiting up to 12m..."
+  oc -n openshift-image-registry scale deploy/image-registry --replicas=1 || true
+  oc -n openshift-image-registry rollout restart deploy/image-registry || true
+  if ! oc -n openshift-image-registry rollout status deploy/image-registry --timeout=12m; then
     echo "WARNING: image-registry did not become Available within timeout; continuing anyway."
   fi
 
-  # 3) Wait for internalRegistryHostname to be published (used by OCM/tests)
+  # 4) Wait for internalRegistryHostname to be published (used by OCM/tests)
   echo "Waiting for image.config.openshift.io/cluster.status.internalRegistryHostname..."
-  IRH="$(oc get image.config.openshift.io/cluster -o jsonpath='{.status.internalRegistryHostname}' 2>/dev/null || true)"
-  if [[ -z "${IRH}" ]]; then
-    sleep 30
+  IRH=""
+  for attempt in $(seq 1 20); do
     IRH="$(oc get image.config.openshift.io/cluster -o jsonpath='{.status.internalRegistryHostname}' 2>/dev/null || true)"
-  fi
+    [[ -n "${IRH}" ]] && break
+    echo "$(date) - waiting for internalRegistryHostname (attempt ${attempt}/20)..."
+    sleep 30
+  done
   echo "internalRegistryHostname=${IRH:-<empty>}"
 
-
-  # 4) Pause the OCM operator and roll the operand to a single replica
-  echo "Scaling openshift-controller-manager-operator to 0 to avoid reconciling replicas..."
-  oc -n openshift-controller-manager-operator scale deploy/openshift-controller-manager-operator --replicas=0 || true
-
-  echo "Scaling OpenShift Controller Manager (operand) to 1 replica and restarting..."
+  # 5) Keep OCM operator running; ensure operand at 1 replica and rolled
+  echo "Ensuring OpenShift Controller Manager (operand) is at 1 replica and restarted (operator stays running)..."
   OCM_DEPLOY="$(oc -n openshift-controller-manager get deploy -o name 2>/dev/null | grep controller-manager || true)"
   if [[ -n "${OCM_DEPLOY}" ]]; then
     oc -n openshift-controller-manager scale "${OCM_DEPLOY}" --replicas=1 || true
     oc -n openshift-controller-manager rollout restart "${OCM_DEPLOY}" || true
-    echo "Waiting up to 10m for ${OCM_DEPLOY} rollout to complete..."
-    oc -n openshift-controller-manager rollout status "${OCM_DEPLOY}" --timeout=10m || true
+    echo "Waiting up to 20m for ${OCM_DEPLOY} rollout to complete..."
+    oc -n openshift-controller-manager rollout status "${OCM_DEPLOY}" --timeout=20m || true
     oc -n openshift-controller-manager get pods -o wide || true
   else
     echo "WARN: controller-manager Deployment not found in openshift-controller-manager."
   fi
 
   echo "Final image-registry deployment status:"
-  oc get deploy/image-registry -n openshift-image-registry || true
+  oc -n openshift-image-registry get deploy/image-registry || true
+  oc -n openshift-image-registry get endpoints image-registry -o wide || true
 fi
 
-echo "Node degradation and pcs commands completed successfully"
+echo "Ensuring OLM packageserver is schedulable on the surviving node…"
+SURV="${SURV:-$(oc get nodes -o jsonpath='{.items[?(@.status.conditions[-1].type=="Ready" && @.status.conditions[-1].status=="True")].metadata.name}' | awk '{print $1}')}"
+
+# Scale packageserver to 1 and pin it to the survivor.
+oc -n openshift-operator-lifecycle-manager patch deploy/packageserver --type=merge -p "{
+  \"spec\": {
+    \"replicas\": 1,
+    \"template\": {
+      \"spec\": {
+        \"nodeSelector\": { \"kubernetes.io/hostname\": \"${SURV}\" },
+        \"tolerations\": []
+}}}}"
+
+# Nudge and wait (don’t fail the whole job if it’s slow)
+oc -n openshift-operator-lifecycle-manager rollout restart deploy/packageserver || true
+oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=10m || true
+oc -n openshift-operator-lifecycle-manager get pods -o wide || true
+
+
+echo "Node degradation and post-install registry/OCM/OLM adjustments completed."
