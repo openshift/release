@@ -7,7 +7,6 @@ set -o pipefail
 # Set default values from environment variables
 FUSION_ACCESS_STORAGE_SCALE_VERSION="${FUSION_ACCESS_STORAGE_SCALE_VERSION:-v5.2.3.1}"
 FUSION_ACCESS_NAMESPACE="${FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
 STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
 STORAGE_SCALE_CLIENT_CPU="${STORAGE_SCALE_CLIENT_CPU:-2}"
 STORAGE_SCALE_CLIENT_MEMORY="${STORAGE_SCALE_CLIENT_MEMORY:-4Gi}"
@@ -17,7 +16,7 @@ STORAGE_SCALE_STORAGE_MEMORY="${STORAGE_SCALE_STORAGE_MEMORY:-8Gi}"
 echo "🚀 Starting Fusion Access Operator deployment..."
 echo "Version: ${FUSION_ACCESS_STORAGE_SCALE_VERSION}"
 echo "Namespace: ${FUSION_ACCESS_NAMESPACE}"
-echo "Storage Scale Namespace: ${STORAGE_SCALE_NAMESPACE}"
+echo "Storage Scale Namespace: ${FUSION_ACCESS_NAMESPACE}"
 
 # Check if IBM entitlement credentials are available
 # Try multiple possible locations for the credentials
@@ -50,9 +49,12 @@ if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "false" ]]; then
   echo "Proceeding with deployment without IBM entitlement secret..."
 fi
 
-# Step 1: Create IBM Storage Scale namespace
+# Step 1: Create namespaces
 echo "📁 Creating IBM Storage Scale namespace..."
-oc create namespace "${STORAGE_SCALE_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+oc create namespace "${FUSION_ACCESS_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+echo "📁 Creating Fusion Access namespace..."
+oc create namespace "${FUSION_ACCESS_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
 # Step 2: Create IBM entitlement secret (if credentials are available)
 if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "true" ]]; then
@@ -81,12 +83,13 @@ EOF
 
 # Step 4: Wait for Fusion Access Operator to be ready
 echo "⏳ Waiting for Fusion Access Operator to be ready..."
-timeout 900 bash -c 'until oc get csv -n '"${FUSION_ACCESS_NAMESPACE}"' --no-headers | grep -q "fusion-access-operator.*Succeeded"; do sleep 30; done'
+timeout 900 bash -c 'until oc get csv -n "${FUSION_ACCESS_NAMESPACE}" --no-headers | grep -q "fusion-access-operator.*Succeeded"; do sleep 30; done'
 echo "✅ Fusion Access Operator is ready"
 
 # Step 5: Wait for FusionAccess CR to be ready
 echo "⏳ Waiting for FusionAccess CR to be ready..."
-timeout 1200 bash -c 'until oc get fusionaccess fusionaccess-object -n '"${FUSION_ACCESS_NAMESPACE}"' -o jsonpath="{.status.conditions[?(@.type==\"Ready\")].status}" | grep -q "True"; do sleep 30; done'
+sleep 7200 # DEBUGGING
+timeout 1200 bash -c 'until oc get fusionaccess fusionaccess-object -n "${FUSION_ACCESS_NAMESPACE}" -o jsonpath="{.status.conditions[?(@.type==\"Ready\")].status}" | grep -q "True"; do sleep 30; done'
 echo "✅ FusionAccess CR is ready"
 
 # Step 6: Label worker nodes for storage role
@@ -107,7 +110,7 @@ apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Cluster
 metadata:
   name: ${STORAGE_SCALE_CLUSTER_NAME}
-  namespace: ${STORAGE_SCALE_NAMESPACE}
+  namespace: ${FUSION_ACCESS_NAMESPACE}
 spec:
   pmcollector:
     nodeSelector:
@@ -145,12 +148,12 @@ echo "✅ IBM Storage Scale cluster deployment initiated"
 
 # Step 9: Wait for Storage Scale cluster to be ready
 echo "⏳ Waiting for IBM Storage Scale cluster to be ready..."
-timeout 1200 bash -c 'until oc get cluster '"${STORAGE_SCALE_CLUSTER_NAME}"' -n '"${STORAGE_SCALE_NAMESPACE}"' -o jsonpath="{.status.phase}" | grep -q "Ready"; do sleep 30; done'
+timeout 1200 bash -c 'until oc get cluster '"${STORAGE_SCALE_CLUSTER_NAME}"' -n '"${FUSION_ACCESS_NAMESPACE}"' -o jsonpath="{.status.phase}" | grep -q "Ready"; do sleep 30; done'
 echo "✅ IBM Storage Scale cluster is ready"
 
 # Step 10: Wait for Storage Scale pods to be ready
 echo "⏳ Waiting for IBM Storage Scale pods to be ready..."
-timeout 900 bash -c 'until oc get pods -n '"${STORAGE_SCALE_NAMESPACE}"' --no-headers | grep -v "Completed" | grep -v "Succeeded" | grep -q "Running"; do sleep 30; done'
+timeout 900 bash -c 'until oc get pods -n '"${FUSION_ACCESS_NAMESPACE}"' --no-headers | grep -v "Completed" | grep -v "Succeeded" | grep -q "Running"; do sleep 30; done'
 echo "✅ IBM Storage Scale pods are ready"
 
 echo "🎉 Fusion Access Operator deployment completed successfully!"
