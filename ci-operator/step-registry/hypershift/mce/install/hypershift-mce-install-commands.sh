@@ -322,5 +322,10 @@ fi
 
 # display HyperShift Operator Version and MCE version
 oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
+<<<<<<< HEAD
 oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' > "$ARTIFACT_DIR/hypershiftoperator-image"
 oc logs -n hypershift -lapp=operator --tail=-1 -c operator | head -1 | jq > "$ARTIFACT_DIR/hypershift-version"
+=======
+oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' | tee "$ARTIFACT_DIR/HyperShiftOperatorImage.txt" >/dev/null; echo > "$ARTIFACT_DIR/hypershiftoperator-image"
+oc logs -n hypershift -lapp=operator --tail=-1 -c operator | head -1 | jq > "$ARTIFACT_DIR/hypershift-version"
+>>>>>>> 3fc8e730b09 (4.18 60185 reproduce)

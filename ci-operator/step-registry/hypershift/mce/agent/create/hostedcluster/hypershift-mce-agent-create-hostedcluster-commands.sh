@@ -106,8 +106,7 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} --render-sensitive --render > ${SHARED_DIR}/hc.yaml"
-
-sleep 3600
+sleep 1800
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
