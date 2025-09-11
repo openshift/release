@@ -72,5 +72,7 @@ else
     exit 1
 fi
 
+sleep 600
+
 echo "Copying kubeconfig into SHARED_DIR"
 cp $HOME/$CLUSTER_NAME/auth/kubeconfig $SHARED_DIR/kubeconfig
