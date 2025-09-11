@@ -11,4 +11,8 @@ export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat /var/run/hcp-integration-credentia
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat /var/run/hcp-integration-credentials/client-secret)
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat /var/run/hcp-integration-credentials/tenant)
 
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
+  export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
+fi
+
 ./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml"
