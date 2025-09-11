@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 
 echo "Wait for StorageCluster CRD to be created"
-timeout 30m bash -c '
+timeout 5m bash -c '
   until oc get crd storageclusters.ocs.openshift.io &>/dev/null; do
     sleep 5
   done
