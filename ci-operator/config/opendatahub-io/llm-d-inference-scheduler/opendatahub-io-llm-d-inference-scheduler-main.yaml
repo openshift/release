@@ -4,10 +4,20 @@ base_images:
     namespace: ocp
     tag: "9"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.24
+      
+      # Switch to the root user to install packages
+      USER root
+
+      # Install build tools
+      RUN dnf install -y 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm' && \
+          dnf install -y gcc-c++ libstdc++ libstdc++-devel clang zeromq-devel pkgconfig && \
+          dnf clean all
+
+      # Switch back to the default non-root user (1001) for security
+      USER 1001
 images:
 - dockerfile_path: Dockerfile
   from: ubi_minimal
@@ -26,6 +36,9 @@ resources:
 tests:
 - as: unit
   commands: |
+    # Install the required C library for the zmq4 Go package
+    dnf install -y zeromq-devel
+
     export GOFLAGS="-mod=mod"
     make test
   container:
