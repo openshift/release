@@ -111,7 +111,10 @@ items:
     namespace: ci
     name: ci-operator-configresolver
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-operator-configresolver:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-operator-configresolver\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 1h"
   spec:
     replicas: 3
     strategy:
@@ -169,7 +172,7 @@ items:
           - name: release
             mountPath: /tmp/git-sync
         - name: ci-operator-configresolver
-          image: ci-operator-configresolver:latest
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-configresolver_latest
           args:
           - -release-repo-git-sync-path=/var/repo/release
           - -log-level=debug
