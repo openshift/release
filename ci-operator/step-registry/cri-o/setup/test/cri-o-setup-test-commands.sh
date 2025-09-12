@@ -14,7 +14,9 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     set -xeuo pipefail
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
-    ansible-galaxy collection install ansible.posix
+    sed -i 's/stdout_callback = debug//g' ansible.cfg
+    sed -i "s/ftp.gnu.org/ftpmirror.gnu.org/g" build/parallel.yml
+    sed -i "s/crun_git_version: main/crun_git_version: 1.23.1/g" vars.yml
     ansible-playbook setup-main.yml --connection=local -vvv
     sudo rm -rf "\${SOURCE_DIR}"
 EOF
