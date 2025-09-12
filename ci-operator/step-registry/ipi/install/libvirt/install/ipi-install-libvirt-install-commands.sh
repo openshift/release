@@ -167,6 +167,7 @@ done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 if [[ "${NODE_TUNING}" == "true" ]]; then
   init_worker ${dir}
 fi
+sleep 30m
 
 echo "Installing cluster"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
