@@ -177,9 +177,13 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
   create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
 else
-  if [[ -n "$CATALOG_SOURCE_IMAGE" || -n "$TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
-    echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
-    exit 1
+  # For downstream-release variants, we ignore CATALOG_SOURCE_IMAGE and TRUSTEE_CATALOG_SOURCE_IMAGE
+  # and use the default Red Hat operators catalog instead
+  if [[ "${JOB_NAME:-}" =~ downstream-release ]]; then
+    echo "Downstream-release detected: ignoring CATALOG_SOURCE_IMAGE and TRUSTEE_CATALOG_SOURCE_IMAGE, using Red Hat operators catalog"
+    # Clear these variables so they don't interfere
+    unset CATALOG_SOURCE_IMAGE
+    unset TRUSTEE_CATALOG_SOURCE_IMAGE
   fi
 fi
 
