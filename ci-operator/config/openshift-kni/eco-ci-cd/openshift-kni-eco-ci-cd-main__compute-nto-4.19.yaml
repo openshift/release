@@ -1,0 +1,46 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: compute-nto-functional-tests-cgroups-v2-4-19
+  capabilities:
+  - intranet
+  cron: 0 17 * * 5
+  restrict_network_access: false
+  steps:
+    env:
+      CGROUP_VERSION: v2
+      CLUSTER_NAME: hlxcl15
+      CONTAINER_RUNTIME: crun
+      FEATURES: compute
+      HUGEPAGES_DEFAULT_SIZE: 1G
+      HUGEPAGES_PAGES: '[{"count": 1, "size": "1G"}, {"count": 128, "size": "2M"}]'
+      LABEL_FILTER: tier-0
+      LABELS: nto
+      REPORTER_TEMPLATE_NAME: 'Telco Compute NTO 4_19 Regression - Telco Compute NTO
+        4.19 Regression Testing - Version: <version>; Build: <build>'
+      RT_KERNEL: "true"
+      VERSION: "4.19"
+    test:
+    - ref: telcov10n-functional-compute-nto-eco-gotests
+    workflow: telcov10n-functional-compute-nto-ocp-setup
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: compute-nto-4.19
