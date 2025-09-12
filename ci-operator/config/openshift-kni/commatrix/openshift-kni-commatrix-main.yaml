@@ -10,21 +10,7 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM this-is-ignored
-    RUN dnf install -y git
-    WORKDIR /go/src/github.com/openshift-kni/commatrix
-    RUN mkdir -p /go/src/github.com/openshift-kni/commatrix/vendor && \
-        chmod -R a+w /go/src/github.com/openshift-kni/commatrix
-
-    RUN mkdir -p /tmp/bin && \
-        chgrp root /tmp/bin && \
-        chmod -R a+w /tmp/bin
-
-    COPY oc /usr/bin/oc
-    COPY oc /tmp/bin/
-    COPY app/ .
-  from: ocp_builder_rhel-9-golang-1.23-openshift-4.20
+- dockerfile_path: Dockerfile
   inputs:
     cli:
       paths:
@@ -35,7 +21,7 @@ images:
       - destination_dir: app
         source_path: /go/src/github.com/openshift-kni/commatrix/.
   optional: true
-  to: cli-with-git
+  to: commatrix-binary
 promotion:
   to:
   - name: "4.21"
@@ -79,28 +65,13 @@ tests:
     test:
     - as: commatrix-e2e-tests
       commands: |
-        # Install krew
-        OS="$(uname | tr '[:upper:]' '[:lower:]')"
-        ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/' -e 's/armv7l/arm/')"
-        KREW="krew-${OS}_${ARCH}"
-
-        mkdir -p /tmp
-        curl -fsSL "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" -o /tmp/${KREW}.tar.gz
-        mkdir -p /tmp/krew
-        tar -xvzf /tmp/${KREW}.tar.gz -C /tmp/krew
-
-        /tmp/krew/${KREW} install krew
-        export KREW_ROOT="${KREW_ROOT:-$HOME/.krew}"
-        export PATH="${KREW_ROOT}/bin:$PATH"
-
-        # Install the commatrix krew plugin
-        go mod vendor
-        make build
-        make install INSTALL_DIR=/tmp/bin/
-        # run the make e2e-test
-        PATH="/tmp/bin:$PATH" make e2e-test
-        oc delete ns openshift-commatrix-debug
-      from: cli-with-git
+        # Change to the directory where vendor was created during build
+        cd /go/src/github.com/openshift-kni/commatrix
+        # Verify the binary is available
+        oc-commatrix --help
+        # Use the pre-built commatrix binary from the image
+        PATH="/usr/bin:$PATH" GOCACHE=/tmp/go-cache make e2e-test
+      from: commatrix-binary
       resources:
         requests:
           cpu: 100m
