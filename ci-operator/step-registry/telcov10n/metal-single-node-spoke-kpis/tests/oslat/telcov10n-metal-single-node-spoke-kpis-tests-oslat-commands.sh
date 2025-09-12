@@ -94,7 +94,7 @@ EOF
 function make_up_ansible_playbook {
   ansible_playbook="/tmp/ansible_playbook_for_telco_kpi_tests.yml"
 
-  test_results_artifacts_append=${SHARED_DIR}/telco_kpi_results
+  test_results_artifacts_append=${SHARED_DIR}/telco_${TELCO_KPI_TEST_NAME// /-}_kpi_results
 
   cat << EO-playbook >| ${ansible_playbook}
 ---
@@ -107,7 +107,7 @@ function make_up_ansible_playbook {
 
   - name: Setup a Podman container to run ${TELCO_KPI_TEST_NAME} Telco KPI test
     vars:
-      _helper_image_tag: "telco-kpi-tests-helper-${TELCO_KPI_TEST_NAME}"
+      _helper_image_tag: "telco-kpi-tests-helper-${TELCO_KPI_TEST_NAME// /-}"
       _kubeconfig: "${KUBECONFIG}"
       _run_cmd: "${run_command}"
       _test_results_artifacts_append: "${test_results_artifacts_append}"
@@ -117,7 +117,7 @@ function make_up_ansible_playbook {
       - name: Create temporary remote dir
         ansible.builtin.tempfile:
           state: directory
-          prefix: "telco-kpi-test-"
+          prefix: "telco-kpi-${TELCO_KPI_TEST_NAME// /-}-test-"
         register: _telco_kpis
 
       - name: Set vars and paths relative to temporary dir
@@ -155,7 +155,7 @@ function make_up_ansible_playbook {
             mv oc /usr/local/bin/ && \
             mv kubectl /usr/local/bin/ && \
             rm -f {{ _oc_bin_url | basename }}
-          ENV TELCO_KPI_TEST_NAME=${TELCO_KPI_TEST_NAME}
+          ENV TELCO_KPI_TEST_NAME="${TELCO_KPI_TEST_NAME}"
           EO-Containerfile
 
           podman build \
@@ -228,11 +228,11 @@ function setup_test_result_for_component_readiness {
     -e 's/(<testsuite name=")[^"]+/\1telco-verification/' \
     -e "s/<testcase name=\"([^\"]+)\"/<testcase name='${TEST_COMPONENT} \1'/" \
     ${test_results_artifacts_append}*.xml \
-      >| "${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME}_telco_kpi_test_results.xml"
+      >| "${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME// /-}_telco_kpi_test_results.xml"
   set +x
 
-  ls -l ${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME}_telco_kpi_test_results.xml
-  cat ${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME}_telco_kpi_test_results.xml
+  ls -l ${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME// /-}_telco_kpi_test_results.xml
+  cat ${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME// /-}_telco_kpi_test_results.xml
 }
 
 function test_kpis {
