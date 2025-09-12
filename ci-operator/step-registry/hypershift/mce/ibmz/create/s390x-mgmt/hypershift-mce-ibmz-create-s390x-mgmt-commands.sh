@@ -74,7 +74,9 @@ else
 fi
 
 echo "Copying kubeconfig into SHARED_DIR"
-if ! timeout 30s cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"; then
-    echo "WARNING: kubeconfig copy failed or timed out (exit code $?)"
-fi
+echo "exit code before kubeconfig $?"
+cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" sourc2 "$SHARED_DIR/kubeconfig"
 
+echo "exit code after kubeconfig  $?"
+echo "Kubeconfig copied into SHARED_DIR"
+echo "exit code $?"
