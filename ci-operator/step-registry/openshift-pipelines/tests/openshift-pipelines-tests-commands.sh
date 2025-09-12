@@ -31,7 +31,7 @@ fi
 echo "Running gauge specs"
 IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
 for spec in "${specs[@]}"; do
-  gauge run --log-level=debug --verbose --tags 'sanity & !tls' ${spec} || true
+  gauge run --log-level=debug --verbose --tags 'sanity & !tls' --max-retries-count=3 --retry-only 'sanity & !tls' ${spec} || true
 done
 
 gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec || true

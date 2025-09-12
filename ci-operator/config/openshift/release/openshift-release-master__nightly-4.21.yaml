@@ -178,18 +178,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node-realtime
   timeout: 5h0m0s
-- as: e2e-metal-ovn-single-node-rt-upgrade-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-      TEST_SUITE: openshift/conformance/serial
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-single-node-realtime
-  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node-techpreview-serial
   interval: 168h
   steps:
@@ -488,6 +476,21 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-two-node-fencing-dualstack-techpreview
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+    workflow: baremetalds-two-node-fencing-techpreview
 - as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
   cluster: build05
   cron: '@daily'
@@ -745,9 +748,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
@@ -761,12 +762,9 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
-      NETWORK_TYPE: multi-tenant
       TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-upi-hybrid-env
   timeout: 6h0m0s

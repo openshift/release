@@ -41,8 +41,7 @@ get_latest_osc_catalog_tag() {
 
     if [[ -z "${latest_tag}" ]]; then
         echo "  ERROR: No matching OSC catalog tag found, using default fallback"
-        exit 1
-        latest_tag="1.10.1-1755502791"
+        latest_tag="latest"
     fi
 
     echo "${latest_tag}"
@@ -81,13 +80,29 @@ get_latest_trustee_catalog_tag() {
 
         # Safety limit to prevent infinite loops
         if [[ ${page} -gt 50 ]]; then
-            echo "ERROR: Reached maximum page limit (50) while searching for tags"
+            echo "ERROR: Reached maximum page limit (50) while searching for trustee tags"
             exit 1
-            break
         fi
     done
 
     echo "${latest_tag}"
+}
+
+
+get_expected_version() {
+    # Extract expected version from catalog tag
+    # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
+    # If input is "latest", returns "0.0.0"
+    # Otherwise returns empty string
+    local catalog_tag="$1"
+
+    if [[ "${catalog_tag}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[0-9]+$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    elif [[ "${catalog_tag}" == "latest" ]]; then
+        echo "0.0.0"
+    else
+        echo ""
+    fi
 }
 
 echo "=========================================="
@@ -128,12 +143,22 @@ else
     KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
 fi
 
-# Prow Configuration
-PROW_RUN_TYPE="${PROW_RUN_TYPE:-candidate}"
-# Validate PROW_RUN_TYPE
-if [[ "${PROW_RUN_TYPE}" != "candidate" && "${PROW_RUN_TYPE}" != "release" ]]; then
-    echo "ERROR: PROW_RUN_TYPE should be 'candidate' or 'release', got: ${PROW_RUN_TYPE}"
+# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
+# this triggers the mirror redirect install, creating brew & trustee catsrc,
+TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
+# Validate TEST_RELEASE_TYPE
+if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
+    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
     exit 1
+fi
+
+# Prow Run Type depends on TEST_RELEASE_TYPE
+if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+    PROW_RUN_TYPE="candidate"
+else
+    PROW_RUN_TYPE="release"
+    CATALOG_SOURCE_NAME="redhat-operators"
+    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
 fi
 
 # After the tests finish, wait before killing the cluster
@@ -144,14 +169,9 @@ if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
     exit 1
 fi
 
-# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
-# this triggers the mirror redirect install, creating brew & trustee catsrc,
-TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
-# Validate TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
-    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
-    exit 1
-fi
+
+# Allow override of test scenarios
+TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
 
 # Let the tests run for this many minutes before killing the cluster and interupting the test
 TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
@@ -171,8 +191,16 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
+
     else
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
+    fi
+
+    # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
+    extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
+    if [[ -n "${extracted_version}" ]]; then
+        EXPECTED_OSC_VERSION="${extracted_version}"
+        echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
     fi
 
     CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
@@ -192,11 +220,23 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
     TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
 
+    # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
+    extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
+    if [[ -n "${extracted_trustee_version}" ]]; then
+        EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
+        echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
+    else
+        EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
+        echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
+    fi
+
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
 else # GA
-    CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-redhat-operators}"
-    TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-redhat-operators}"
+    CATALOG_SOURCE_NAME="redhat-operators"
+    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+    CATALOG_SOURCE_IMAGE="none"
+    TRUSTEE_CATALOG_SOURCE_IMAGE="none"
 fi
 
 # Generate output file path
@@ -252,7 +292,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -274,7 +314,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -297,7 +337,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -319,7 +359,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -341,7 +381,7 @@ tests:
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
       TEST_TIMEOUT: "${TEST_TIMEOUT}"
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
@@ -370,8 +410,8 @@ fi
 
 # Basic YAML syntax validation if yq is available
 if command -v yq &> /dev/null; then
-    echo "Validating YAML syntax with yq..."
-    if yq eval '.' "${OUTPUT_FILE}" >/dev/null 2>&1; then
+    echo "Validating YAML: yq eval '.' ${OUTPUT_FILE}"
+    if yq eval '.' "${OUTPUT_FILE}" ; then
         echo "✓ YAML syntax is valid"
     else
         echo "✗ YAML syntax validation failed"
@@ -388,6 +428,7 @@ echo "  • OCP Version: ${OCP_VERSION}"
 echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
 echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
 echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
+echo "  • Expected Trustee Version: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
 echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
 echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
 echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
@@ -411,8 +452,13 @@ echo "1. Review the generated configuration file:"
 echo "   cat ${OUTPUT_FILE}"
 echo ""
 echo "2. Move it to the appropriate directory:"
-echo "   mv ${OUTPUT_FILE} ci-operator/config/openshift/sandboxed-containers-operator/"
+echo "mv ${OUTPUT_FILE} ci-operator/config/openshift/sandboxed-containers-operator/"
 echo ""
-echo "3. Generate and update CI configuration before creating PR:"
-echo "   make ci-operator-config && make prow-config && make jobs && make update"
+echo "3. Add to git:"
+echo "git add ci-operator/config/openshift/sandboxed-containers-operator/${OUTPUT_FILE}"
+echo ""
+echo "4. Generate and update CI configuration before creating PR:"
+echo "make ci-operator-config && make registry-metadata && make prow-config && make jobs && make update"
+echo ""
+echo "5. git add changes, commit and push to PR"
 echo ""
