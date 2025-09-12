@@ -86,7 +86,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-controller-manager\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 1h"
   labels:
     app: dptp-controller-manager
   name: dptp-controller-manager
@@ -140,7 +143,7 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "0.5"
-      - image: dptp-controller-manager
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-controller-manager_latest
         name: dptp-controller-manager
         args:
         - --leader-election-namespace=ci
