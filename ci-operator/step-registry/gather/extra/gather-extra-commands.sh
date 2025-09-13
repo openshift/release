@@ -163,6 +163,111 @@ for path in "${paths[@]}" ; do
   done < ${output_dir}.audit_logs_listing
 done
 
+set -x
+echo "INFO: running sosreport on each node and capturing packet-drop counters"
+gather_sos_and_drops() {
+  local out_dir
+
+  while IFS= read -r n; do
+    out_dir="${ARTIFACT_DIR}/nodes/${n}"
+    mkdir -p "${out_dir}"
+
+    # --- 1) sosreport (with guaranteed fallback bundle) ----------------------
+    # shellcheck disable=SC2016
+    queue "${out_dir}/sosreport.tar.xz" oc --insecure-skip-tls-verify --request-timeout=30m -n default \
+      debug "node/${n}" -T -- bash -ceu '
+        set -o pipefail
+
+        # Try sos from the debug image, targeting the host; else try on the host.
+        if command -v sos >/dev/null 2>&1; then
+          sos report --batch --sysroot /host --tmp-dir /host/var/tmp --compression-type xz --name ocp-ci \
+            &> /host/var/tmp/sosreport.ocp-ci.log || true
+        elif command -v sosreport >/dev/null 2>&1; then
+          sosreport --batch --sysroot /host --tmp-dir /host/var/tmp --compression-type xz \
+            &> /host/var/tmp/sosreport.ocp-ci.log || true
+        else
+          chroot /host bash -ceu "
+            if command -v sos >/dev/null 2>&1; then
+              sos report --batch --tmp-dir /var/tmp --compression-type xz --name ocp-ci >/dev/null 2>&1 || true
+            elif command -v sosreport >/dev/null 2>&1; then
+              sosreport --batch --tmp-dir /var/tmp --compression-type xz >/dev/null 2>&1 || true
+            fi
+          "
+        fi
+
+        f=$(ls -1t /host/var/tmp/sosreport-*.tar.* 2>/dev/null | head -n1 || true)
+        if [[ -n "${f}" && -f "${f}" ]]; then
+          cat "${f}" || true
+          rm -f "${f}" || true
+        else
+          echo "no sosreport generated; creating mini bundle" >&2
+          work="/host/var/tmp/node-bundle"
+          bundle="/host/var/tmp/node-bundle.tar.xz"
+          rm -rf "${work}" "${bundle}" || true
+          mkdir -p "${work}"
+
+          # Collect focused host data for networking + journals
+          chroot /host bash -ceu "
+            journalctl -b --no-pager > /var/tmp/journalctl-b.txt || true
+            journalctl -k --no-pager > /var/tmp/journalctl-k.txt || true
+            ip -s link > /var/tmp/ip-link.txt || true
+            ip route > /var/tmp/ip-route.txt || true
+            ip addr  > /var/tmp/ip-addr.txt  || true
+            if command -v nstat >/dev/null 2>&1; then nstat -az > /var/tmp/nstat.txt || true; fi
+            for nic in \$(ls -1 /sys/class/net 2>/dev/null); do
+              case \"\$nic\" in lo|br*|veth*|tap*|tun*|cni*|ovn*|docker*) continue;; esac
+              ethtool -i \"\$nic\" > \"/var/tmp/ethtool-\$nic-i.txt\" 2>/dev/null || true
+              ethtool -S \"\$nic\" > \"/var/tmp/ethtool-\$nic-S.txt\" 2>/dev/null || true
+            done
+          "
+
+          cp -a /host/etc/os-release "${work}/" 2>/dev/null || true
+          cp -a /host/var/tmp/journalctl-*.txt "${work}/" 2>/dev/null || true
+          cp -a /host/var/tmp/ip-*.txt        "${work}/" 2>/dev/null || true
+          cp -a /host/var/tmp/nstat.txt       "${work}/" 2>/dev/null || true
+          cp -a /host/var/tmp/ethtool-*.txt   "${work}/" 2>/dev/null || true
+
+          tar -C "$(dirname "${work}")" -I "xz -T0 -9" -c -f "${bundle}" "$(basename "${work}")" || true
+          if [[ -s "${bundle}" ]]; then
+            cat "${bundle}" || true
+          else
+            echo "mini bundle creation failed; see sosreport.ocp-ci.log if present" >&2
+          fi
+          rm -rf "${work}" "${bundle}" || true
+        fi
+      ' 2>"${out_dir}/sosreport.err"
+
+    # --- 2) Packet-drop counters (fixed quoting) -----------------------------
+    # shellcheck disable=SC2016
+    queue "${out_dir}/packet-drops.txt" oc --insecure-skip-tls-verify --request-timeout=120s -n default \
+      debug "node/${n}" -T -- bash -ceu '
+        chroot /host bash -ceu "
+          echo \"== /proc/net/dev - per-interface rx/tx including drops ==\"
+          cat /proc/net/dev || true
+          echo
+          echo \"== nstat kernel counters containing drop ==\"
+          if command -v nstat >/dev/null 2>&1; then nstat -az | grep -i drop || true; else echo \"nstat not present\"; fi
+          echo
+          echo \"== ip -s link: per-interface packet stats ==\"
+          ip -s link || true
+          echo
+          echo \"== ethtool -S: per-NIC hardware drop or error counters ==\"
+          for d in /sys/class/net/*; do
+            nic=\$(basename \"\$d\")
+            case \"\$nic\" in lo|br*|veth*|tap*|tun*|cni*|ovn*|docker*) continue;; esac
+            echo \"--- \$nic ---\"
+            ethtool -S \"\$nic\" 2>/dev/null | grep -Ei \"drop|dropped|error|rx_no_buffer|rx_missed|rx_miss|rx_drop|tx_drop\" || true
+          done
+          echo
+          echo \"== dmesg: network-related lines ==\"
+          dmesg --ctime | grep -Ei \"net|eth|mlx|ixg|bnx|enic|virtio|drop|reset|timeout\" || true
+        "
+      ' 2>"${out_dir}/packet-drops.err"
+  done < /tmp/nodes
+}
+gather_sos_and_drops
+
+
 # change to the network artifact dir
 mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
 pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
