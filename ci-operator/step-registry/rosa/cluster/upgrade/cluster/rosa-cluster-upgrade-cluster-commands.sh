@@ -79,7 +79,16 @@ function get_recommended_version_for_machinepool () {
 
 # check_admin_gates function for ROSA
 function check_admin_gates() {
-    check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')
+    # Attempt to fetch the admin gates data. Redirect stderr to suppress "not found" errors.
+    check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json 2>/dev/null | jq -r '.data')
+
+    # Check if the command failed, or if the data is null or empty.
+    if [[ "$check_admin_gates" == "null" || -z "$check_admin_gates" ]]; then
+        log "No admin gates found that require acknowledgement. Skipping patch."
+        return 0 # Exit the function successfully
+    fi
+
+    # If we get here, there are gates to process.
     log -e "Admin ack required for these:\n$check_admin_gates"
 
     ack_list=$(echo $check_admin_gates | jq -r 'keys[]')
