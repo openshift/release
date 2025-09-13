@@ -74,18 +74,36 @@ resources:
 tests:
 - as: powervs-ipi-f7
   cluster: build01
-  cron: 0 0 * * 3
+  cron: 0 0 * * 1
   steps:
     cluster_profile: powervs-4
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.20
     env:
       ARCH: ppc64le
       BASE_DOMAIN: ipi-ppc64le.cis.ibm.net
       BRANCH: "4.19"
+      CLUSTERCSIDRIVER: smb.csi.k8s.io
+      TRUECONDITIONS: SambaDriverControllerServiceControllerAvailable SambaDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-samba.yaml
+      TEST_SUITE: openshift/csi
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      # TIMEOUT: +5 hours
     test:
     - ref: enable-qe-catalogsource
-    - chain: openshift-e2e-test-qe
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-smb
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-obj-save
+    # - ref: wait
+    - ref: openshift-e2e-test
+    - ref: storage-obj-check
+    - ref: storage-destroy-csi-smb
     workflow: ipi-powervs
 - as: powervs-ipi-f7-destructive
   cluster: build01
