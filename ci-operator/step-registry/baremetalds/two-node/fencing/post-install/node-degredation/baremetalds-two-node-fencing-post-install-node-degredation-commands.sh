@@ -41,30 +41,29 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 # ====== BASELINE SNAPSHOT (before degradation, before any scaling) ======
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+OC_URL_USED=""
 
 ensure_oc_mirror() {
   command -v oc >/dev/null 2>&1 && return 0
 
-  local CLI_TAG="${CLI_TAG:-4.20}"
+  local CLI_TAG_LOCAL="${CLI_TAG:-4.20}"
+  local UNAME_M MIRROR_ARCH_DIR OC_TARBALL url
 
-  # Detect client arch + mirror subdir and tarball name
-  local UNAME_M MIRROR_ARCH_DIR OC_TARBALL
   UNAME_M="$(uname -m)"
   case "$UNAME_M" in
-    x86_64)           MIRROR_ARCH_DIR="x86_64"; OC_TARBALL="openshift-client-linux.tar.gz" ;;
-    aarch64|arm64)    MIRROR_ARCH_DIR="arm64";   OC_TARBALL="openshift-client-linux-arm64.tar.gz" ;;
-    *)                MIRROR_ARCH_DIR="x86_64";  OC_TARBALL="openshift-client-linux.tar.gz" ;;
+    x86_64)        MIRROR_ARCH_DIR="x86_64"; OC_TARBALL="openshift-client-linux.tar.gz" ;;
+    aarch64|arm64) MIRROR_ARCH_DIR="arm64";   OC_TARBALL="openshift-client-linux-arm64.tar.gz" ;;
+    *)             MIRROR_ARCH_DIR="x86_64";  OC_TARBALL="openshift-client-linux.tar.gz" ;;
   esac
 
-  local OC_CLIENT_URL="${OC_CLIENT_URL:-https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH_DIR}/clients/ocp/latest-${CLI_TAG}/${OC_TARBALL}}"
+  url="${OC_CLIENT_URL:-https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH_DIR}/clients/ocp/latest-${CLI_TAG_LOCAL}/${OC_TARBALL}}"
+  OC_URL_USED="$url"   # global for logging
 
   mkdir -p /tmp/ocbin
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 15 "$OC_CLIENT_URL" \
-      | tar -xz -C /tmp/ocbin oc kubectl || return 1
+    curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 15 "$url" | tar -xz -C /tmp/ocbin oc kubectl || return 1
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO- --tries=5 --timeout=15 "$OC_CLIENT_URL" \
-      | tar -xz -C /tmp/ocbin oc kubectl || return 1
+    wget -qO- --tries=5 --timeout=15 "$url" | tar -xz -C /tmp/ocbin oc kubectl || return 1
   else
     echo "[FATAL] Neither curl nor wget available to fetch oc client."
     return 1
@@ -76,7 +75,9 @@ ensure_oc_mirror() {
   command -v oc >/dev/null 2>&1
 }
 
-ensure_oc_mirror || { echo "[FATAL] Could not fetch 'oc' from ${OC_CLIENT_URL}"; exit 12; }
+# safe logging with set -u
+ensure_oc_mirror || { echo "[FATAL] Could not fetch 'oc' from ${OC_URL_USED:-<unknown URL>}"; exit 12; }
+
 [[ -f "$KUBECONFIG" ]] || { echo "[FATAL] kubeconfig missing at $KUBECONFIG"; exit 12; }
 oc version --client || true
 
@@ -107,7 +108,7 @@ printf '%s\n' "${SURV}" > "${ART_BASE}/00_survivor.txt"
 # ====== PRE-DEGRADATION AVAILABILITY PROBE (no scaling) ======
 log "Starting 5-minute pre-degradation availability probe from an in-cluster pod..."
 set +e
-oc -n openshift-image-registry run precheck --rm -it --restart=Never \
+oc -n openshift-image-registry run precheck --rm -i --restart=Never \
   --image=registry.access.redhat.com/ubi9/ubi-minimal -- bash -lc \
   'for i in $(seq 1 150); do date "+%F %T"; getent hosts image-registry.openshift-image-registry.svc || true; curl -sS -k https://image-registry.openshift-image-registry.svc:5000/v2/ || echo FAIL; sleep 2; done' \
   | tee "${ART_BASE}/01_precheck_probe.log"
@@ -188,7 +189,7 @@ if [[ -n "${MASTER0_IP:-}" ]]; then :; fi # placeholder if you keep pcs steps el
 # ====== POST-DEGRADATION AVAILABILITY PROBE (no scaling yet) ======
 log "Starting 10-minute post-degradation availability probe (do not scale during this window)..."
 set +e
-oc -n openshift-image-registry run postcheck --rm -it --restart=Never \
+oc -n openshift-image-registry run postcheck --rm -i --restart=Never \
   --image=registry.access.redhat.com/ubi9/ubi-minimal -- bash -lc \
   'for i in $(seq 1 300); do date "+%F %T"; getent hosts image-registry.openshift-image-registry.svc || true; curl -sS -k https://image-registry.openshift-image-registry.svc:5000/v2/ || echo FAIL; sleep 2; done' \
   | tee "${ART_BASE}/06_postcheck_probe.log"
