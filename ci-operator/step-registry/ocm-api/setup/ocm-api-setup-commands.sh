@@ -34,22 +34,23 @@ make cmds
 chmod +x ./testcmd/*
 cp ./testcmd/* $ocmTempDir/
 export PATH=$ocmTempDir:$PATH
-
 export ORG_MEMBER_TOKEN=${OCM_TOKEN}
+export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json
 export CLUSTER_PROFILE=${TEST_PROFILE}
-export CLUSTER_PROFILE_DIR=${SHARED_DIR}
+export CLUSTER_PROFILE_DIR=${ocmTempDir}
 export OCM_ENV=${OCM_LOGIN_ENV}
 export OCPE2E_TEST=true
 export DEBUG=false
 export QE_FLAG="prow-test"
 export QE_USAGE="prow-test"
-
-
+sleep 1800
+logger "INFO" "Start to prepare cluster: cms --ginkgo.v --ginkgo.no-color --ginkgo.timeout 2h --ginkgo.focus CreateClusterByYAMLProfile --ginkgo.label-filter feature-cluster-creation "
 cms --ginkgo.v --ginkgo.no-color --ginkgo.timeout 2h --ginkgo.focus CreateClusterByYAMLProfile --ginkgo.label-filter feature-cluster-creation 
 
-IDline=$(cat $SHARED_DIR/cluster.ini|grep "^\s*ID\s*=");
+sleep 1800
+IDline=$(cat $CLUSTER_PROFILE_DIR/cluster.ini|grep "^\s*ID\s*=");
 echo $IDline|awk -F " " '{print $NF}' > "${SHARED_DIR}/cluster-id"
-
+cp $CLUSTER_PROFILE_DIR/cluster.ini ${SHARED_DIR}/
 # Store the cluster information
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 CLUSTER_NAME=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.name')
