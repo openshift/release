@@ -65,19 +65,19 @@ sed -i "s/^CONTROL_NODE_PROFILE=.*/CONTROL_NODE_PROFILE=\"$CONTROL_NODE_PROFILE\
 sed -i "s/^COMPUTE_NODE_PROFILE=.*/COMPUTE_NODE_PROFILE=\"$COMPUTE_NODE_PROFILE\"/" "$VARS_FILE"
 
 # Run the create-cluster.sh script to create the OCP cluster in IBM cloud VPC
-if [[ -x ./create-cluster.sh ]]; then
-    ./create-cluster.sh
-    sleep 120
-else
-    echo "create-cluster.sh not found or not executable"
-    exit 1
-fi
+#if [[ -x ./create-cluster.sh ]]; then
+#    ./create-cluster.sh
+#    sleep 120
+#else
+#    echo "create-cluster.sh not found or not executable"
+#    exit 1
+#fi
 
 echo "Copying kubeconfig into SHARED_DIR"
 echo "exit code before kubeconfig $?"
-cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"
+#cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"
 
 echo "exit code after kubeconfig  $?"
 echo "Kubeconfig copied into SHARED_DIR"
 echo "exit code $?"
-exit 0 
+
