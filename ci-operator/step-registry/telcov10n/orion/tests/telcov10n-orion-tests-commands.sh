@@ -77,7 +77,7 @@ fi
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-ES_IDX=${ES_METADATA_INDEX} ES_SERVER=${ES_SERVER} orion cmd --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+orion --config ${CONFIG} --es-server=${ES_SERVER} --metadata-index=${ES_METADATA_INDEX} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
