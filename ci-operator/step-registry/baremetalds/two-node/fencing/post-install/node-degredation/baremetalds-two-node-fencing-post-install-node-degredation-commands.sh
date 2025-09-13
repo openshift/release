@@ -42,6 +42,21 @@ source "${SHARED_DIR}/packet-conf.sh"
 # ====== BASELINE SNAPSHOT (before degradation, before any scaling) ======
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+# --- pull oc from the CI CLI image ---
+if ! command -v oc >/dev/null 2>&1; then
+  CLI_TAG="${CLI_TAG:-4.20}"
+  IMG="registry.ci.openshift.org/ocp/${CLI_TAG}:cli"
+  mkdir -p /tmp/ocbin
+  ctr="$(podman create --pull=always "${IMG}")"
+  podman cp "${ctr}:/usr/bin/oc" /tmp/ocbin/oc
+  podman cp "${ctr}:/usr/bin/kubectl" /tmp/ocbin/kubectl || true
+  podman rm "${ctr}"
+  chmod +x /tmp/ocbin/oc /tmp/ocbin/kubectl 2>/dev/null || true
+  export PATH="/tmp/ocbin:$PATH"
+fi
+
+command -v oc || { echo "[FATAL] oc still not found"; exit 12; }
+
 log "Collecting baseline cluster snapshots (pre-degradation)..."
 oc whoami            | tee "${ART_BASE}/00_whoami.txt" || true
 oc get nodes -o wide | tee "${ART_BASE}/00_nodes.txt"  || true
@@ -253,3 +268,4 @@ If FORCE_DOWNSHIFT=true (mitigations applied):
 EOF
 
 log "Node degradation and debug capture completed. See ${ART_BASE}/README.txt"
+
