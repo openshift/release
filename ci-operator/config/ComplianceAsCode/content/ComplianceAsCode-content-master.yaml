@@ -30,6 +30,50 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
+- always_run: true
+  as: e2e-aws-openshift-platform-compliance
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        make e2e-platform
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+  timeout: 4h0m0s
+- always_run: true
+  as: e2e-aws-openshift-node-compliance
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        make e2e-node
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+  timeout: 4h0m0s
 - always_run: false
   as: e2e-aws-ocp4-bsi
   steps:
