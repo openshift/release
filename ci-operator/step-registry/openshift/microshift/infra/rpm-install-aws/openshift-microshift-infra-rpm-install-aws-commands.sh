@@ -40,6 +40,8 @@ if [[ "${JOB_NAME_SAFE}" =~ .*ocp-conformance-optional.* ]]; then
   sudo tee /etc/microshift/config.d/kubelet-qps.yaml >/dev/null <<2EOF2
 kubelet:
   registryPullQPS: 10
+debugging:
+  logLevel: "Debug"
 
 2EOF2
 fi
