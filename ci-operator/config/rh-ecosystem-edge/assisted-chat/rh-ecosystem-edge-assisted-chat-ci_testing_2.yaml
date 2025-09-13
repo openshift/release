@@ -1,0 +1,46 @@
+base_images:
+  assisted-service-mcp:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: assisted-service-mcp
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.17
+images:
+- dockerfile_path: Containerfile.assisted-chat
+  to: rh-ecosystem-edge-assisted-chat-install
+- dockerfile_path: test/prow/Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-test
+promotion: {}
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: local-development
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.17"
+  optional: true
+  steps:
+    test:
+    - ref: rh-ecosystem-edge-assisted-chat-local-development
+zz_generated_metadata:
+  branch: ci_testing_2
+  org: rh-ecosystem-edge
+  repo: assisted-chat
