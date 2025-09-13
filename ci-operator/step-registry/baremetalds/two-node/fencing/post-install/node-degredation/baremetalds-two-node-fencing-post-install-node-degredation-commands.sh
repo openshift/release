@@ -42,20 +42,43 @@ source "${SHARED_DIR}/packet-conf.sh"
 # ====== BASELINE SNAPSHOT (before degradation, before any scaling) ======
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-# --- pull oc from the CI CLI image ---
-if ! command -v oc >/dev/null 2>&1; then
-  CLI_TAG="${CLI_TAG:-4.20}"
-  IMG="registry.ci.openshift.org/ocp/${CLI_TAG}:cli"
+ensure_oc_mirror() {
+  command -v oc >/dev/null 2>&1 && return 0
+
+  local CLI_TAG="${CLI_TAG:-4.20}"
+
+  # Detect client arch + mirror subdir and tarball name
+  local UNAME_M MIRROR_ARCH_DIR OC_TARBALL
+  UNAME_M="$(uname -m)"
+  case "$UNAME_M" in
+    x86_64)           MIRROR_ARCH_DIR="x86_64"; OC_TARBALL="openshift-client-linux.tar.gz" ;;
+    aarch64|arm64)    MIRROR_ARCH_DIR="arm64";   OC_TARBALL="openshift-client-linux-arm64.tar.gz" ;;
+    *)                MIRROR_ARCH_DIR="x86_64";  OC_TARBALL="openshift-client-linux.tar.gz" ;;
+  esac
+
+  local OC_CLIENT_URL="${OC_CLIENT_URL:-https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH_DIR}/clients/ocp/latest-${CLI_TAG}/${OC_TARBALL}}"
+
   mkdir -p /tmp/ocbin
-  ctr="$(podman create --pull=always "${IMG}")"
-  podman cp "${ctr}:/usr/bin/oc" /tmp/ocbin/oc
-  podman cp "${ctr}:/usr/bin/kubectl" /tmp/ocbin/kubectl || true
-  podman rm "${ctr}"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 15 "$OC_CLIENT_URL" \
+      | tar -xz -C /tmp/ocbin oc kubectl || return 1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- --tries=5 --timeout=15 "$OC_CLIENT_URL" \
+      | tar -xz -C /tmp/ocbin oc kubectl || return 1
+  else
+    echo "[FATAL] Neither curl nor wget available to fetch oc client."
+    return 1
+  fi
+
   chmod +x /tmp/ocbin/oc /tmp/ocbin/kubectl 2>/dev/null || true
   export PATH="/tmp/ocbin:$PATH"
-fi
+  hash -r
+  command -v oc >/dev/null 2>&1
+}
 
-command -v oc || { echo "[FATAL] oc still not found"; exit 12; }
+ensure_oc_mirror || { echo "[FATAL] Could not fetch 'oc' from ${OC_CLIENT_URL}"; exit 12; }
+[[ -f "$KUBECONFIG" ]] || { echo "[FATAL] kubeconfig missing at $KUBECONFIG"; exit 12; }
+oc version --client || true
 
 log "Collecting baseline cluster snapshots (pre-degradation)..."
 oc whoami            | tee "${ART_BASE}/00_whoami.txt" || true
