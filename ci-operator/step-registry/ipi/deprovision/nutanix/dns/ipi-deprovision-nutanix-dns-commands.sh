@@ -36,10 +36,23 @@ fi
 
 HOSTED_ZONE_ID="$(cat "${SHARED_DIR}/hosted-zone.txt")"
 
-id=$(aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" --change-batch "file:///${SHARED_DIR}/dns-delete.json" --query '"ChangeInfo"."Id"' --output text)
+if [[ -f "${SHARED_DIR}/dns-create.json" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Converting UPSERTs to DELETEs..."
+  sed '
+	    s/UPSERT/DELETE/;
+	    s/Upsert/Delete/;
+	    ' "${SHARED_DIR}/dns-create.json" > "${SHARED_DIR}/dns-delete.json"
+  cp "${SHARED_DIR}/dns-delete.json" "${ARTIFACT_DIR}/"
 
-echo "$(date -u --rfc-3339=seconds) - Waiting for Route53 DNS records to be deleted..."
+  echo "$(date -u --rfc-3339=seconds) - Submitting DNS record deletions to Route53..."
+  id=$(aws route53 change-resource-record-sets \
+    --hosted-zone-id "${HOSTED_ZONE_ID}" \
+    --change-batch "file://${SHARED_DIR}/dns-delete.json" \
+    --query 'ChangeInfo.Id' --output text)
 
-aws route53 wait resource-record-sets-changed --id "$id"
-
-echo "$(date -u --rfc-3339=seconds) - Delete successful."
+  echo "$(date -u --rfc-3339=seconds) - Waiting for DNS record deletion to complete..."
+  aws route53 wait resource-record-sets-changed --id "$id"
+  echo "$(date -u --rfc-3339=seconds) - DNS record deletion successful."
+else
+  echo "$(date -u --rfc-3339=seconds) - File '${SHARED_DIR}/dns-create.json' not found. Skipping DNS deletion."
+fi
