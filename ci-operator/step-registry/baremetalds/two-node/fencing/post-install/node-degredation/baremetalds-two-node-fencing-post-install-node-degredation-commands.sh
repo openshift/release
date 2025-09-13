@@ -56,7 +56,7 @@ ensure_oc_mirror() {
     *)             MIRROR_ARCH_DIR="x86_64";  OC_TARBALL="openshift-client-linux.tar.gz" ;;
   esac
 
-  url="${OC_CLIENT_URL:-https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH_DIR}/clients/ocp/latest-${CLI_TAG_LOCAL}/${OC_TARBALL}}"
+  url="${OC_CLIENT_URL:-https://mirror.openshift.com/pub/openshift-v4/clients/ocp/candidate-${CLI_TAG_LOCAL}/${OC_TARBALL}}"
   OC_URL_USED="$url"   # global for logging
 
   mkdir -p /tmp/ocbin
