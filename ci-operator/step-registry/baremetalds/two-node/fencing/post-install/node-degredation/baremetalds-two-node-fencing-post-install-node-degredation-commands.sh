@@ -13,7 +13,7 @@ echo "Artifacts will be written to: ${ART_BASE}"
 # Toggle: capture-only vs. force downshift of selected operands
 # - false: DO NOT scale/patch registry/OCM/OLM (debug only, recommended to reproduce)
 # - true:  Apply single-replica & rollout nudges after degradation (stabilize run)
-FORCE_DOWNSHIFT="${FORCE_DOWNSHIFT:-false}"
+FORCE_DOWNSHIFT="${FORCE_DOWNSHIFT:-true}"
 echo "FORCE_DOWNSHIFT=${FORCE_DOWNSHIFT}"
 
 # ====== HELPERS ======
