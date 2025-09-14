@@ -73,7 +73,7 @@ else
 fi
 
 echo "Killing any ssh processes started by this script"
-pkill -f 'ssh -o StrictHostKeyChecking=no -i /output/'
+#pkill -f 'ssh -o StrictHostKeyChecking=no -i /output/'
 
 
 echo "Copying kubeconfig into SHARED_DIR"
