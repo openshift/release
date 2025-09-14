@@ -1,32 +1,30 @@
-#!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+#!/usr/bin/env bash
+set -o errexit -o nounset -o pipefail
 
-echo "baremetalds-two-node-fencing-post-install-node-degredation starting..."
+echo "baremetalds-two-node-fencing-post-install-node-degradation starting..."
 
 # ====== CONFIG / OUTPUT LOCATIONS ======
 ART_BASE="${ARTIFACT_DIR:-/tmp/artifacts}/degraded-two-node"
 mkdir -p "${ART_BASE}"
 echo "Artifacts will be written to: ${ART_BASE}"
 
-# Toggle: capture-only vs. force downshift of selected operands
-# - false: DO NOT scale/patch registry/OCM/OLM (debug only, recommended to reproduce)
-# - true:  Apply single-replica & rollout nudges after degradation (stabilize run)
 FORCE_DOWNSHIFT="${FORCE_DOWNSHIFT:-true}"
-echo "FORCE_DOWNSHIFT=${FORCE_DOWNSHIFT}"
 
-# ====== HELPERS ======
 log() { echo "[$(date +'%F %T%z')] $*"; }
 run() { log "RUN: $*"; bash -c "$*" | tee -a "${ART_BASE}/commands.log"; }
 
+# ====== CLEANUP GUARD ======
+PID_WATCH=""; PID_EVENTS=""
+cleanup() {
+  log "Stopping background watchers..."
+  [[ -n "$PID_WATCH"  ]] && kill "$PID_WATCH"  2>/dev/null || true
+  [[ -n "$PID_EVENTS" ]] && kill "$PID_EVENTS" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 # ====== GATE: ENV ======
-if [[ -z "${DEGRADED_NODE:-}" ]]; then
-  log "DEGRADED_NODE is not set, skipping node degradation"
-  exit 0
-fi
-if [[ "${DEGRADED_NODE}" != "true" ]]; then
-  log "DEGRADED_NODE is '${DEGRADED_NODE}', not 'true' - skipping"
+if [[ -z "${DEGRADED_NODE:-}" || "${DEGRADED_NODE}" != "true" ]]; then
+  log "DEGRADED_NODE not true; skipping"
   exit 0
 fi
 
@@ -38,289 +36,221 @@ fi
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
+: "${IP:?IP not set from packet-conf.sh}"
+: "${SSHOPTS:?SSHOPTS not set from packet-conf.sh}"
+[[ -n "${SSHOPTS[*]}" ]] || { echo "[FATAL] SSHOPTS empty"; exit 12; }
 
-# ====== BASELINE SNAPSHOT (before degradation, before any scaling) ======
+# ====== OC CLIENT ======
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-OC_URL_USED=""
+[[ -f "$KUBECONFIG" ]] || { echo "[FATAL] kubeconfig missing at $KUBECONFIG"; exit 12; }
 
 ensure_oc_mirror() {
   command -v oc >/dev/null 2>&1 && return 0
-
-  local CLI_TAG_LOCAL="${CLI_TAG:-4.20}"
-  local UNAME_M MIRROR_ARCH_DIR OC_TARBALL url
-
+  local CLI_TAG_LOCAL="${CLI_TAG:-4.20}" UNAME_M OC_TARBALL url
   UNAME_M="$(uname -m)"
   case "$UNAME_M" in
-    x86_64)        MIRROR_ARCH_DIR="x86_64"; OC_TARBALL="openshift-client-linux.tar.gz" ;;
-    aarch64|arm64) MIRROR_ARCH_DIR="arm64";   OC_TARBALL="openshift-client-linux-arm64.tar.gz" ;;
-    *)             MIRROR_ARCH_DIR="x86_64";  OC_TARBALL="openshift-client-linux.tar.gz" ;;
+    x86_64)        OC_TARBALL="openshift-client-linux.tar.gz" ;;
+    aarch64|arm64) OC_TARBALL="openshift-client-linux-arm64.tar.gz" ;;
   esac
-
   url="${OC_CLIENT_URL:-https://mirror.openshift.com/pub/openshift-v4/clients/ocp/candidate-${CLI_TAG_LOCAL}/${OC_TARBALL}}"
-  OC_URL_USED="$url"   # global for logging
-
   mkdir -p /tmp/ocbin
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 15 "$url" | tar -xz -C /tmp/ocbin oc kubectl || return 1
-  elif command -v wget >/dev/null 2>&1; then
-    wget -qO- --tries=5 --timeout=15 "$url" | tar -xz -C /tmp/ocbin oc kubectl || return 1
+    curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 15 "$url" | tar -xz -C /tmp/ocbin oc kubectl
   else
-    echo "[FATAL] Neither curl nor wget available to fetch oc client."
-    return 1
+    wget -qO- --tries=5 --timeout=15 "$url" | tar -xz -C /tmp/ocbin oc kubectl
   fi
-
-  chmod +x /tmp/ocbin/oc /tmp/ocbin/kubectl 2>/dev/null || true
-  export PATH="/tmp/ocbin:$PATH"
-  hash -r
-  command -v oc >/dev/null 2>&1
+  chmod +x /tmp/ocbin/oc /tmp/ocbin/kubectl || true
+  export PATH="/tmp/ocbin:$PATH"; hash -r
+  oc version --client >/dev/null 2>&1
 }
+ensure_oc_mirror
 
-# safe logging with set -u
-ensure_oc_mirror || { echo "[FATAL] Could not fetch 'oc' from ${OC_URL_USED:-<unknown URL>}"; exit 12; }
-
-[[ -f "$KUBECONFIG" ]] || { echo "[FATAL] kubeconfig missing at $KUBECONFIG"; exit 12; }
-oc version --client || true
-
+# ====== BASELINE SNAPSHOT ======
 log "Collecting baseline cluster snapshots (pre-degradation)..."
-oc whoami            | tee "${ART_BASE}/00_whoami.txt" || true
-oc get nodes -o wide | tee "${ART_BASE}/00_nodes.txt"  || true
-oc get co -o wide    | tee "${ART_BASE}/00_cos.txt"    || true
-
-oc -n openshift-image-registry get svc image-registry -o wide \
-  | tee "${ART_BASE}/00_registry_svc.txt" || true
-oc -n openshift-image-registry get endpoints image-registry -o yaml \
-  | tee "${ART_BASE}/00_registry_endpoints.yaml" || true
-oc -n openshift-image-registry get deploy/image-registry -oyaml \
-  | tee "${ART_BASE}/00_registry_deploy.yaml" || true
+oc whoami                                 | tee "${ART_BASE}/00_whoami.txt" || true
+oc get nodes -o wide                      | tee "${ART_BASE}/00_nodes.txt"  || true
+oc get co -o wide                         | tee "${ART_BASE}/00_cos.txt"    || true
+oc -n openshift-image-registry get svc,image-registry,endpoints -o wide \
+  | tee "${ART_BASE}/00_registry_svcs.txt" || true
 oc get configs.imageregistry.operator.openshift.io/cluster -oyaml \
   | tee "${ART_BASE}/00_imageregistry_config.yaml" || true
 
-# Detect survivor & not-ready nodes now (pre-degrade view)
+# Survivor detection (pre-degrade)
 SURV="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
         | awk '$2=="True"{print $1;exit}')"
 : "${SURV:=master-0}"
-NOTREADY_NODES="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
-        | awk '$2!="True"{print $1}')"
+echo "$SURV" > "${ART_BASE}/00_survivor.txt"
 log "Pre-degrade survivor guess: ${SURV}"
-log "Pre-degrade NotReady nodes: ${NOTREADY_NODES:-<none>}"
-printf '%s\n' "${SURV}" > "${ART_BASE}/00_survivor.txt"
 
-# ====== PRE-DEGRADATION AVAILABILITY PROBE (no scaling) ======
-log "Starting 5-minute pre-degradation availability probe from an in-cluster pod..."
+# ====== PRE-DEGRADATION PROBE (PINNED TO SURVIVOR) ======
+NS_JSON=$(printf '{"spec":{"nodeSelector":{"kubernetes.io/hostname":"%s"}}}' "$SURV")
+
 set +e
-oc -n openshift-image-registry run precheck --rm -i --restart=Never \
-  --image=registry.access.redhat.com/ubi9/ubi-minimal -- bash -lc \
-  'for i in $(seq 1 150); do date "+%F %T"; getent hosts image-registry.openshift-image-registry.svc || true; curl -sS -k https://image-registry.openshift-image-registry.svc:5000/v2/ || echo FAIL; sleep 2; done' \
-  | tee "${ART_BASE}/01_precheck_probe.log"
+oc -n openshift-image-registry delete pod precheck --ignore-not-found
+oc -n openshift-image-registry run precheck --overrides="$NS_JSON" \
+  --image=registry.access.redhat.com/ubi9/ubi-minimal --restart=Never -- \
+  bash -lc '
+    for i in $(seq 1 150); do
+      date "+%F %T"
+      getent hosts image-registry.openshift-image-registry.svc || true
+      code="$(curl -s -o /dev/null -w "%{http_code}" -k https://image-registry.openshift-image-registry.svc:5000/v2/ || echo 000)"
+      case "$code" in 200|401|403) echo "OK registry HTTP:$code";; *) echo "FAIL registry HTTP:$code";; esac
+      timeout 3 bash -lc '\''cat < /dev/null > /dev/tcp/image-registry.openshift-image-registry.svc/5000'\'' && echo "OK tcp" || echo "FAIL tcp"
+      sleep 2
+    done
+  ' | tee "${ART_BASE}/01_precheck_probe.log"
+oc -n openshift-image-registry delete pod precheck --wait=false --ignore-not-found
 set -e
 
-# ====== CONTINUOUS WATCHERS (background) ======
-log "Starting background watchers (endpoints/deploy/pods/events/operator logs)..."
+# ====== LIGHT WATCHERS (non-blocking) ======
 (
   set +e
   while true; do
     echo "----- $(date +'%F %T')"
-    oc -n openshift-image-registry get endpoints image-registry -o wide
-    oc -n openshift-image-registry get deploy image-registry
-    oc -n openshift-image-registry get pods -o wide
+    oc -n openshift-image-registry get endpoints image-registry -o wide || true
+    oc -n openshift-image-registry get deploy image-registry || true
     sleep 10
   done
-) | tee "${ART_BASE}/02_watch_ep_deploy_pods.log" &
+) | tee "${ART_BASE}/02_watch_registry.log" &
 PID_WATCH=$!
 
 (
   set +e
-  oc -n openshift-image-registry logs deploy/cluster-image-registry-operator --since=1h -f
-) | tee "${ART_BASE}/03_operator.log" &
-PID_OPLOG=$!
-
-(
-  set +e
-  echo "=== Describe deploy once ==="
-  oc -n openshift-image-registry describe deploy/image-registry
   echo "=== Events (follow) ==="
-  oc -n openshift-image-registry get events --sort-by=.lastTimestamp -w
-) | tee "${ART_BASE}/04_events_deploy.log" &
+  oc -n openshift-image-registry get events --sort-by=.lastTimestamp -w || true
+) | tee "${ART_BASE}/03_events_registry.log" &
 PID_EVENTS=$!
 
-(
-  set +e
-  while true; do
-    echo "----- $(date +'%F %T')"
-    oc -n openshift-image-registry get pvc -o wide || true
-    oc get pv | egrep 'image|registry' || true
-    sleep 30
-  done
-) | tee "${ART_BASE}/05_storage_watch.log" &
-PID_STORAGE=$!
-
-# ====== DEGRADE THE SECOND NODE ======
+# ====== DEGRADE THE SECOND NODE (POWER OFF master-1 VM) ======
 log "Connecting to host and shutting down ostest_master_1..."
 timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -xeo pipefail
-echo "Host VM list:"
-virsh -c qemu:///system list --all
-
-echo "Attempting graceful shutdown of ostest_master_1..."
 if virsh -c qemu:///system domstate ostest_master_1 >/dev/null 2>&1; then
   virsh -c qemu:///system shutdown ostest_master_1 || true
-  # Fallback to hard stop if still running after ~120s
   for i in {1..12}; do
-    st=$(virsh -c qemu:///system domstate ostest_master_1 2>/dev/null || true)
-    [[ "$st" == "shut off" ]] && break
+    [[ "$(virsh -c qemu:///system domstate ostest_master_1 2>/dev/null || true)" == "shut off" ]] && break
     sleep 10
   done
-  st=$(virsh -c qemu:///system domstate ostest_master_1 2>/dev/null || true)
-  if [[ "$st" != "shut off" ]]; then
-    echo "Forcing destroy of ostest_master_1"
-    virsh -c qemu:///system destroy ostest_master_1 || true
-  fi
-else
-  echo "WARNING: ostest_master_1 not found"
+  [[ "$(virsh -c qemu:///system domstate ostest_master_1 2>/dev/null || true)" == "shut off" ]] || virsh -c qemu:///system destroy ostest_master_1 || true
 fi
-
-echo "VMs after degradation:"
-virsh -c qemu:///system list --all
 EOF
 
-# Optional: cluster-side pacemaker actions (left as-is from your script)
-if [[ -n "${MASTER0_IP:-}" ]]; then :; fi # placeholder if you keep pcs steps elsewhere
-
-# ====== POST-DEGRADATION AVAILABILITY PROBE (no scaling yet) ======
-log "Starting 10-minute post-degradation availability probe (do not scale during this window)..."
+# ====== POST-DEGRADATION PROBE (PINNED TO SURVIVOR) ======
 set +e
-oc -n openshift-image-registry run postcheck --rm -i --restart=Never \
-  --image=registry.access.redhat.com/ubi9/ubi-minimal -- bash -lc \
-  'for i in $(seq 1 300); do date "+%F %T"; getent hosts image-registry.openshift-image-registry.svc || true; curl -sS -k https://image-registry.openshift-image-registry.svc:5000/v2/ || echo FAIL; sleep 2; done' \
-  | tee "${ART_BASE}/06_postcheck_probe.log"
+oc -n openshift-image-registry delete pod postcheck --ignore-not-found
+oc -n openshift-image-registry run postcheck --overrides="$NS_JSON" \
+  --image=registry.access.redhat.com/ubi9/ubi-minimal --restart=Never -- \
+  bash -lc '
+    for i in $(seq 1 300); do
+      date "+%F %T"
+      getent hosts image-registry.openshift-image-registry.svc || true
+      code="$(curl -s -o /dev/null -w "%{http_code}" -k https://image-registry.openshift-image-registry.svc:5000/v2/ || echo 000)"
+      case "$code" in 200|401|403) echo "OK registry HTTP:$code";; *) echo "FAIL registry HTTP:$code";; esac
+      timeout 3 bash -lc '\''cat < /dev/null > /dev/tcp/image-registry.openshift-image-registry.svc/5000'\'' && echo "OK tcp" || echo "FAIL tcp"
+      sleep 2
+    done
+  ' | tee "${ART_BASE}/06_postcheck_probe.log"
+oc -n openshift-image-registry delete pod postcheck --wait=false --ignore-not-found
 set -e
 
-# ====== SNAPSHOTS AFTER PROBE WINDOW ======
+# ====== SNAPSHOTS AFTER PROBE ======
 log "Capturing post-degradation snapshots..."
-oc get nodes -o wide                                 | tee "${ART_BASE}/10_nodes_post.txt"  || true
-oc get co image-registry -o yaml                     | tee "${ART_BASE}/10_co_image_registry.yaml" || true
-oc -n openshift-image-registry get deploy/image-registry -oyaml \
-  | tee "${ART_BASE}/10_registry_deploy_post.yaml" || true
-oc -n openshift-image-registry get pods -o wide      | tee "${ART_BASE}/10_registry_pods_post.txt" || true
-oc -n openshift-image-registry get endpoints image-registry -o yaml \
-  | tee "${ART_BASE}/10_registry_endpoints_post.yaml" || true
-oc -n openshift-image-registry logs -l docker-registry=default --since=30m --all-containers=true \
-  | tee "${ART_BASE}/10_registry_pod_logs_post.log" || true
+oc get nodes -o wide | tee "${ART_BASE}/10_nodes_post.txt" || true
 
-# ====== OPTIONAL MITIGATION (force downshift) ======
+# ====== OPTIONAL MITIGATION (FORCE DOWNSHIFT) ======
 if [[ "${FORCE_DOWNSHIFT}" == "true" ]]; then
-  log "FORCE_DOWNSHIFT=true -> applying single-replica patches & rollout nudges"
+  log "Applying single-replica patches & tolerant rollouts"
 
-  # Recompute survivor/NotReady after degradation
+  # Recompute survivor (exclude NotReady nodes)
   SURV="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
           | awk '$2=="True"{print $1;exit}')"
   : "${SURV:=master-0}"
-  NOTREADY_NODES="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
-          | awk '$2!="True"{print $1}')"
-  echo "${SURV}" > "${ART_BASE}/11_survivor_post.txt"
+  NS_JSON=$(printf '{"spec":{"nodeSelector":{"kubernetes.io/hostname":"%s"}}}' "$SURV")
 
-  # Image Registry: operator-level patch to single replica + emptyDir + pin to survivor
+  # Image Registry operator: single replica, emptyDir, pin to survivor
   run "oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge -p '{
-    \"spec\": {\"managementState\":\"Managed\", \"replicas\":1, \"storage\": {\"emptyDir\":{}},
-               \"nodeSelector\":{\"kubernetes.io/hostname\":\"${SURV}\"}, \"tolerations\":[]}}'"
+    \"spec\": {\"managementState\":\"Managed\",\"replicas\":1,\"storage\":{\"emptyDir\":{}},
+    \"nodeSelector\":{\"kubernetes.io/hostname\":\"${SURV}\"},\"tolerations\":[]}}'"
 
-  # Force-delete any stale registry pod on NotReady nodes to unblock rollout
-  if [[ -n "${NOTREADY_NODES}" ]]; then
-    for nn in ${NOTREADY_NODES}; do
-      OLDPOD="$(oc -n openshift-image-registry get pod -o wide 2>/dev/null \
-        | awk -v N=\"$nn\" '$1 ~ /^image-registry-/ && $7==N {print $1; exit}')"
-      if [[ -n "${OLDPOD:-}" ]]; then
-        run "oc -n openshift-image-registry delete pod '${OLDPOD}' --grace-period=0 --force"
-      fi
+  # Deployment strategy tolerant to marooned pod on dead node
+  run "oc -n openshift-image-registry patch deploy/image-registry --type=merge -p '{
+    \"spec\": {\"strategy\":{\"type\":\"Recreate\"},\"progressDeadlineSeconds\":1800,\"minReadySeconds\":0}}'"
+
+  # Best-effort: delete any registry pod on NotReady nodes
+  NNR="$(oc get nodes | awk '$2 !~ /^Ready(,|$)/ {print $1}')"
+  if [[ -n "${NNR:-}" ]]; then
+    for nn in $NNR; do
+      pod="$(oc -n openshift-image-registry get pod -o wide 2>/dev/null | awk -v N=\"$nn\" '\$1 ~ /^image-registry-/ && \$7==N {print \$1; exit}')"
+      [[ -n "${pod:-}" ]] && oc -n openshift-image-registry delete pod "$pod" --force --grace-period=0 || true
     done
   fi
-  run "oc -n openshift-image-registry scale   deploy/image-registry --replicas=1"
+
   run "oc -n openshift-image-registry rollout restart deploy/image-registry"
-  ( set +e; oc -n openshift-image-registry rollout status deploy/image-registry --timeout=12m; echo RC=$?; set -e ) \
-    | tee -a "${ART_BASE}/11_registry_rollout_status.log"
+  ( set +e
+    oc -n openshift-image-registry wait --for=condition=Available deploy/image-registry --timeout=20m
+    echo "RC=$?"
+    oc -n openshift-image-registry get pod -o wide | awk -v N="$SURV" '$1 ~ /^image-registry-/ && $3=="Running" && $7==N {found=1} END{exit !found}'
+    echo "AssertRC=$?"
+    set -e
+  ) | tee -a "${ART_BASE}/11_registry_rollout_status.log"
 
-  # Wait for IRH (for OCM/tests)
-  IRH=""
-  for attempt in $(seq 1 20); do
-    IRH="$(oc get image.config.openshift.io/cluster -o jsonpath='{.status.internalRegistryHostname}' 2>/dev/null || true)"
-    [[ -n "${IRH}" ]] && break
-    log "waiting for internalRegistryHostname (${attempt}/20)..."
-    sleep 30
-  done
-  echo "internalRegistryHostname=${IRH:-<empty>}" | tee "${ART_BASE}/11_internal_registry_hostname.txt"
-
-  # OCM operand single replica (operator stays running)
+  # OCM (controller-manager) single replica (tolerant)
   OCM_DEPLOY="$(oc -n openshift-controller-manager get deploy -o name 2>/dev/null | grep controller-manager || true)"
   if [[ -n "${OCM_DEPLOY}" ]]; then
-    run "oc -n openshift-controller-manager scale '${OCM_DEPLOY}' --replicas=1"
-    run "oc -n openshift-controller-manager rollout restart '${OCM_DEPLOY}'"
-    ( set +e; oc -n openshift-controller-manager rollout status "${OCM_DEPLOY}" --timeout=20m; echo RC=$?; set -e ) \
-      | tee -a "${ART_BASE}/11_ocm_rollout_status.log"
+    run "oc -n openshift-controller-manager patch ${OCM_DEPLOY} --type=merge -p '{
+      \"spec\": {\"replicas\":1, \"strategy\":{\"type\":\"Recreate\"},
+      \"template\":{\"spec\":{\"nodeSelector\":{\"kubernetes.io/hostname\":\"${SURV}\"}}}, \"progressDeadlineSeconds\":1800}}'"
+    run "oc -n openshift-controller-manager rollout restart ${OCM_DEPLOY}"
+    ( set +e
+      oc -n openshift-controller-manager wait --for=condition=Available "${OCM_DEPLOY}" --timeout=20m
+      echo "RC=$?"
+      set -e
+    ) | tee -a "${ART_BASE}/11_ocm_rollout_status.log"
   fi
 
-  # OLM packageserver: scale/pin to survivor (tolerations left empty intentionally)
+  # OLM packageserver single replica (pin + tolerant)
   run "oc -n openshift-operator-lifecycle-manager patch deploy/packageserver --type=merge -p '{
-    \"spec\": {
-      \"replicas\": 1,
-      \"template\": {
-        \"spec\": {
-          \"nodeSelector\": { \"kubernetes.io/hostname\": \"${SURV}\" }
-        }
-      }
-    }
-  }'"
+    \"spec\": {\"replicas\":1, \"strategy\":{\"type\":\"Recreate\"},
+    \"template\":{\"spec\":{\"nodeSelector\":{\"kubernetes.io/hostname\":\"${SURV}\"}}},
+    \"progressDeadlineSeconds\":1800, \"minReadySeconds\":0}}'"
 
-  # Clean up any packageserver pod stuck on the NotReady node (unblocks rollout)
-  NNR=$(oc get nodes | awk '$2!="Ready"{print $1}')
-  if [[ -n "$NNR" ]]; then
+  # Delete any packageserver pod on NotReady nodes (best effort)
+  if [[ -n "${NNR:-}" ]]; then
     for nn in $NNR; do
-      PSPOD=$(oc -n openshift-operator-lifecycle-manager get pod -o wide 2>/dev/null \
-        | awk -v N="$nn" '$1 ~ /^packageserver-/ && $7==N {print $1; exit}')
-      [[ -n "$PSPOD" ]] && run "oc -n openshift-operator-lifecycle-manager delete pod $PSPOD --grace-period=0 --force"
+      ps="$(oc -n openshift-operator-lifecycle-manager get pod -o wide 2>/dev/null | awk -v N=\"$nn\" '\$1 ~ /^packageserver-/ && \$7==N {print \$1; exit}')"
+      [[ -n "${ps:-}" ]] && oc -n openshift-operator-lifecycle-manager delete pod "$ps" --force --grace-period=0 || true
     done
   fi
 
-  # Restart once and wait longer; if it still wedges, do a 0->1 fallback and wait again
   run "oc -n openshift-operator-lifecycle-manager rollout restart deploy/packageserver"
-  ( set +e; oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=20m; RC=$?; echo RC=$RC; exit $RC ) \
-    | tee -a "${ART_BASE}/11_packageserver_rollout_status.log" || {
-      run "oc -n openshift-operator-lifecycle-manager scale deploy/packageserver --replicas=0"
-      ( set +e; oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=10m; set -e ) || true
-      run "oc -n openshift-operator-lifecycle-manager scale deploy/packageserver --replicas=1"
-      run "oc -n openshift-operator-lifecycle-manager rollout restart deploy/packageserver"
-      ( set +e; oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=20m; echo RC=$?; set -e ) \
-        | tee -a "${ART_BASE}/11_packageserver_rollout_status.log"
-    }
+  ( set +e
+    oc -n openshift-operator-lifecycle-manager wait --for=condition=Available deploy/packageserver --timeout=20m
+    echo "RC=$?"
+    oc -n openshift-operator-lifecycle-manager get pod -o wide | awk -v N="$SURV" '$1 ~ /^packageserver-/ && $3=="Running" && $7==N {found=1} END{exit !found}'
+    echo "AssertRC=$?"
+    set -e
+  ) | tee -a "${ART_BASE}/11_packageserver_rollout_status.log"
 
-  # Evidence of placement
-  oc -n openshift-operator-lifecycle-manager get pods -l app=packageserver -o wide \
-    | tee -a "${ART_BASE}/11_packageserver_pods.txt" || true
+  # Internal registry hostname (bounded wait)
+  IRH=""
+  for attempt in $(seq 1 10); do
+    IRH="$(oc get image.config.openshift.io/cluster -o jsonpath='{.status.internalRegistryHostname}' 2>/dev/null || true)"
+    [[ -n "${IRH}" ]] && break
+    log "waiting for internalRegistryHostname (${attempt}/10)..."
+    sleep 15
+  done
+  echo "internalRegistryHostname=${IRH:-<empty>}" | tee "${ART_BASE}/11_internal_registry_hostname.txt"
 fi
 
-# ====== CLEANUP WATCHERS ======
-log "Stopping background watchers..."
-kill "${PID_WATCH}"   2>/dev/null || true
-kill "${PID_OPLOG}"   2>/dev/null || true
-kill "${PID_EVENTS}"  2>/dev/null || true
-kill "${PID_STORAGE}" 2>/dev/null || true
-
-# ====== FINAL SUMMARY POINTERS ======
+# ====== FINAL SUMMARY ======
 cat <<EOF | tee "${ART_BASE}/README.txt"
-Artifacts captured for degraded two-node run:
-
-- ${ART_BASE}/00_*           : Baseline (pre-degradation) state
-- ${ART_BASE}/01_precheck_probe.log : 5-min pre-degrade registry availability probe
-- ${ART_BASE}/02_watch_ep_deploy_pods.log : Continuous watch of endpoints/deploy/pods
-- ${ART_BASE}/03_operator.log : cluster-image-registry-operator logs (follow)
-- ${ART_BASE}/04_events_deploy.log : Deployment describe + live events
-- ${ART_BASE}/05_storage_watch.log : PVC/PV watch (if applicable)
-- ${ART_BASE}/06_postcheck_probe.log : 10-min post-degrade availability probe
-
-If FORCE_DOWNSHIFT=true (mitigations applied):
-- ${ART_BASE}/11_* : Patches, rollout statuses, and IRH
-- ${ART_BASE}/10_* : Post-degradation snapshots
-
+Artifacts for degraded two-node run:
+- 00_* : Baseline
+- 01_precheck_probe.log : Pre-degrade probe (pinned to survivor)
+- 02_watch_registry.log, 03_events_registry.log : Lightweight watchers
+- 06_postcheck_probe.log : Post-degrade probe (pinned to survivor)
+- 10_* : Post snapshots
+- 11_* : Mitigation patches & rollout status (if FORCE_DOWNSHIFT=true)
 EOF
 
-log "Node degradation and debug capture completed. See ${ART_BASE}/README.txt"
-
+log "Node degradation and debug capture completed."
