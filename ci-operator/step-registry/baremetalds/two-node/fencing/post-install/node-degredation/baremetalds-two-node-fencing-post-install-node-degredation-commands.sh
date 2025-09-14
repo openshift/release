@@ -260,10 +260,41 @@ if [[ "${FORCE_DOWNSHIFT}" == "true" ]]; then
 
   # OLM packageserver: scale/pin to survivor (tolerations left empty intentionally)
   run "oc -n openshift-operator-lifecycle-manager patch deploy/packageserver --type=merge -p '{
-    \"spec\": {\"replicas\":1, \"template\": {\"spec\": {\"nodeSelector\": {\"kubernetes.io/hostname\":\"${SURV}\"}, \"tolerations\":[]}}}}'"
+    \"spec\": {
+      \"replicas\": 1,
+      \"template\": {
+        \"spec\": {
+          \"nodeSelector\": { \"kubernetes.io/hostname\": \"${SURV}\" }
+        }
+      }
+    }
+  }'"
+
+  # Clean up any packageserver pod stuck on the NotReady node (unblocks rollout)
+  NNR=$(oc get nodes | awk '$2!="Ready"{print $1}')
+  if [[ -n "$NNR" ]]; then
+    for nn in $NNR; do
+      PSPOD=$(oc -n openshift-operator-lifecycle-manager get pod -o wide 2>/dev/null \
+        | awk -v N="$nn" '$1 ~ /^packageserver-/ && $7==N {print $1; exit}')
+      [[ -n "$PSPOD" ]] && run "oc -n openshift-operator-lifecycle-manager delete pod $PSPOD --grace-period=0 --force"
+    done
+  fi
+
+  # Restart once and wait longer; if it still wedges, do a 0->1 fallback and wait again
   run "oc -n openshift-operator-lifecycle-manager rollout restart deploy/packageserver"
-  ( set +e; oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=10m; echo RC=$?; set -e ) \
-    | tee -a "${ART_BASE}/11_packageserver_rollout_status.log"
+  ( set +e; oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=20m; RC=$?; echo RC=$RC; exit $RC ) \
+    | tee -a "${ART_BASE}/11_packageserver_rollout_status.log" || {
+      run "oc -n openshift-operator-lifecycle-manager scale deploy/packageserver --replicas=0"
+      ( set +e; oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=10m; set -e ) || true
+      run "oc -n openshift-operator-lifecycle-manager scale deploy/packageserver --replicas=1"
+      run "oc -n openshift-operator-lifecycle-manager rollout restart deploy/packageserver"
+      ( set +e; oc -n openshift-operator-lifecycle-manager rollout status deploy/packageserver --timeout=20m; echo RC=$?; set -e ) \
+        | tee -a "${ART_BASE}/11_packageserver_rollout_status.log"
+    }
+
+  # Evidence of placement
+  oc -n openshift-operator-lifecycle-manager get pods -l app=packageserver -o wide \
+    | tee -a "${ART_BASE}/11_packageserver_pods.txt" || true
 fi
 
 # ====== CLEANUP WATCHERS ======
