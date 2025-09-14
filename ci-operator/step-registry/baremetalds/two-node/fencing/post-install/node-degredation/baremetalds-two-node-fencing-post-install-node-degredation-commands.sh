@@ -13,15 +13,6 @@ FORCE_DOWNSHIFT="${FORCE_DOWNSHIFT:-true}"
 log() { echo "[$(date +'%F %T%z')] $*"; }
 run() { log "RUN: $*"; bash -c "$*" | tee -a "${ART_BASE}/commands.log"; }
 
-# ====== CLEANUP GUARD ======
-PID_WATCH=""; PID_EVENTS=""
-cleanup() {
-  log "Stopping background watchers..."
-  [[ -n "$PID_WATCH"  ]] && kill "$PID_WATCH"  2>/dev/null || true
-  [[ -n "$PID_EVENTS" ]] && kill "$PID_EVENTS" 2>/dev/null || true
-}
-trap cleanup EXIT
-
 # ====== GATE: ENV ======
 if [[ -z "${DEGRADED_NODE:-}" || "${DEGRADED_NODE}" != "true" ]]; then
   log "DEGRADED_NODE not true; skipping"
