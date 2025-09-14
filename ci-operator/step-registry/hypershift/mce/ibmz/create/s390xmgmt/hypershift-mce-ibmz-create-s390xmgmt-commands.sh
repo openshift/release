@@ -78,7 +78,4 @@ echo "Copying kubeconfig into SHARED_DIR"
 cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"
 echo "Kubeconfig copied into SHARED_DIR"
 
-echo "Killing any ssh processes started by this script"
-#pkill -f 'ssh -o StrictHostKeyChecking=no -i /output/'
 
-pkill -f 'ssh -o StrictHostKeyChecking=no -i /output/' || true
