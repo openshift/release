@@ -3,13 +3,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 1h
+sleep 30m
 
 export OCP_VERSION
 export DATAROUTER_RESULTS="${SHARED_DIR}/results/*.xml"
-export REPORTPORTAL_HOSTNAME
-export REPORTPORTAL_PROJECT="lp-interop"
-export REPORTPORTAL_LAUNCH_NAME="lp-interop-${OCP_VERSION}"
+# export REPORTPORTAL_HOSTNAME
+# export REPORTPORTAL_PROJECT="lp-interop"
+# export REPORTPORTAL_LAUNCH_NAME="lp-interop-${OCP_VERSION}"
 export REPORTPORTAL_APPLY_TFA="${AAPLY_TFA}"
 export REPORTPORTAL_CMP
 
@@ -19,6 +19,6 @@ export REPORTPORTAL_LAUNCH_ATTRIBUTES="[
   {\"key\": \"component\", \"value\": \"${REPORTPORTAL_CMP}\"},
   {\"key\": \"team\", \"value\": \"mpiit\"}
 ]"
-export DATAROUTER_METADATA_URL="https://raw.githubusercontent.com/openshift/release/1bf8eeea33187be897d912cb7149602461cf5975/ci-operator/step-registry/mpiit/data-router-reporter/metadata.json"
+export DATAROUTER_METADATA_URL="https://raw.githubusercontent.com/oharan2/cspi-utils/8fadc6dde0d67f549dfea0acd8356b8184aac99a/data-router/metadata.json"
 
 datarouter-openshift-ci
