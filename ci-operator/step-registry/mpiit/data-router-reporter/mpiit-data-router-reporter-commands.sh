@@ -5,10 +5,10 @@ set -o pipefail
 
 sleep 30m
 
-export OCP_VERSION
-export DATAROUTER_RESULTS="${SHARED_DIR}/results/*.xml"
+export DATAROUTER_RESULTS="${SHARED_DIR}/*.xml"
 # export REPORTPORTAL_HOSTNAME
 # export REPORTPORTAL_PROJECT="lp-interop"
+# export OCP_VERSION
 # export REPORTPORTAL_LAUNCH_NAME="lp-interop-${OCP_VERSION}"
 export REPORTPORTAL_APPLY_TFA="${AAPLY_TFA}"
 export REPORTPORTAL_CMP
