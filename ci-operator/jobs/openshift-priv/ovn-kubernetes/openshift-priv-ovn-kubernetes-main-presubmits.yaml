@@ -1,306 +1,26 @@
 presubmits:
-  openshift/ovn-kubernetes:
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build11
-    context: ci/prow/4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade
-    decorate: true
-    decoration_config:
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
-      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade
-    rerun_command: /test 4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-upgrade
-        - --variant=4.20-upgrade-from-stable-4.19
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build11
-    context: ci/prow/4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade-ipsec
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade-ipsec
-    optional: true
-    rerun_command: /test 4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade-ipsec
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-upgrade-ipsec
-        - --variant=4.20-upgrade-from-stable-4.19
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade-ipsec,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
-    context: ci/prow/4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-rt-upgrade
-    decorate: true
-    decoration_config:
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-rt-upgrade
-    rerun_command: /test 4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-rt-upgrade
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gcp-ovn-rt-upgrade
-        - --variant=4.20-upgrade-from-stable-4.19
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-rt-upgrade,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build11
-    context: ci/prow/4.20-upgrade-from-stable-4.19-images
-    decorate: true
-    labels:
-      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.20-upgrade-from-stable-4.19-images
-    rerun_command: /test 4.20-upgrade-from-stable-4.19-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=4.20-upgrade-from-stable-4.19
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-images,?($|\s.*)
+  openshift-priv/ovn-kubernetes:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-agent-compact-ipv4
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-agent-compact-ipv4
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-agent-compact-ipv4
     spec:
       containers:
@@ -308,6 +28,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-agent-compact-ipv4
@@ -329,6 +50,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -349,6 +73,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -362,20 +89,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn
     spec:
       containers:
@@ -383,6 +112,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn
@@ -404,6 +134,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -424,6 +157,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -437,21 +173,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-clusternetwork-cidr-expansion
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-clusternetwork-cidr-expansion
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-clusternetwork-cidr-expansion
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-clusternetwork-cidr-expansion
     spec:
       containers:
@@ -459,6 +197,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-clusternetwork-cidr-expansion
@@ -480,6 +219,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -500,6 +242,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -513,19 +258,21 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-edge-zones
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-edge-zones
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-edge-zones
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-edge-zones
     spec:
       containers:
@@ -533,6 +280,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-edge-zones
@@ -554,6 +302,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -574,6 +325,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -587,21 +341,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-fdp-qe
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-fdp-qe
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-fdp-qe
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-fdp-qe
     spec:
       containers:
@@ -609,6 +365,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-fdp-qe
@@ -630,6 +387,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -650,6 +410,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -663,20 +426,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-hypershift
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-hypershift
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-hypershift
     spec:
       containers:
@@ -684,6 +449,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-hypershift
@@ -705,6 +471,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -725,6 +494,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -738,21 +510,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-hypershift-conformance-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift
       ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-hypershift-conformance-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-hypershift-conformance-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-hypershift-conformance-techpreview
     spec:
       containers:
@@ -760,6 +534,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-hypershift-conformance-techpreview
@@ -781,6 +556,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -801,6 +579,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -814,21 +595,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-hypershift-kubevirt
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-hypershift-kubevirt
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-hypershift-kubevirt
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-hypershift-kubevirt
     spec:
       containers:
@@ -836,6 +619,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-hypershift-kubevirt
@@ -857,6 +641,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -877,6 +664,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -890,20 +680,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-local-gateway
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-local-gateway
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-local-gateway
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-local-gateway
     spec:
       containers:
@@ -911,6 +703,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-local-gateway
@@ -932,6 +725,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -952,6 +748,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -965,20 +764,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-local-to-shared-gateway-mode-migration
     spec:
       containers:
@@ -986,6 +787,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -1007,6 +809,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1027,6 +832,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1040,20 +848,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-serial
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-serial
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-serial
     spec:
       containers:
@@ -1061,6 +871,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-serial
@@ -1082,6 +893,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1102,6 +916,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1115,21 +932,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-serial-ipsec
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-serial-ipsec
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-serial-ipsec
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-serial-ipsec
     spec:
       containers:
@@ -1137,6 +956,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-serial-ipsec
@@ -1158,6 +978,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1178,6 +1001,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1191,20 +1017,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-shared-to-local-gateway-mode-migration
     spec:
       containers:
@@ -1212,6 +1040,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -1233,6 +1062,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1253,6 +1085,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1266,21 +1101,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-single-node-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-single-node-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-single-node-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-single-node-techpreview
     spec:
       containers:
@@ -1288,6 +1125,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-single-node-techpreview
@@ -1309,6 +1147,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1329,6 +1170,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1342,21 +1186,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-techpreview
     spec:
       containers:
@@ -1364,6 +1210,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-techpreview
@@ -1385,6 +1232,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1405,6 +1255,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1418,20 +1271,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h30m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-upgrade
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-upgrade
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-upgrade
     spec:
       containers:
@@ -1439,6 +1294,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-upgrade
@@ -1460,6 +1316,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1480,6 +1339,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1493,20 +1355,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-upgrade-ipsec
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-upgrade-ipsec
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-upgrade-ipsec
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-upgrade-ipsec
     spec:
       containers:
@@ -1514,6 +1378,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-upgrade-ipsec
@@ -1535,6 +1400,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1555,6 +1423,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1568,20 +1439,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-upgrade-local-gateway
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-upgrade-local-gateway
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-upgrade-local-gateway
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-upgrade-local-gateway
     spec:
       containers:
@@ -1589,6 +1462,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-upgrade-local-gateway
@@ -1610,6 +1484,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1630,6 +1507,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1643,20 +1523,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-windows
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-aws-ovn-windows
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-aws-ovn-windows
     spec:
       containers:
@@ -1664,6 +1546,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-windows
@@ -1685,6 +1568,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1705,6 +1591,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1718,21 +1607,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-azure-ovn
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-azure-ovn
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-azure-ovn
     spec:
       containers:
@@ -1740,6 +1631,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-azure-ovn
@@ -1761,6 +1653,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1781,6 +1676,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1794,21 +1692,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-azure-ovn-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-azure-ovn-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-azure-ovn-techpreview
     spec:
       containers:
@@ -1816,6 +1716,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-azure-ovn-techpreview
@@ -1837,6 +1738,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1857,6 +1761,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1870,20 +1777,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h30m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-azure-ovn-upgrade
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-azure-ovn-upgrade
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-azure-ovn-upgrade
     spec:
       containers:
@@ -1891,6 +1800,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-azure-ovn-upgrade
@@ -1912,6 +1822,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1932,6 +1845,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1945,20 +1861,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build04
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-gcp-ovn
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-gcp-ovn
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-gcp-ovn
     spec:
       containers:
@@ -1966,6 +1884,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-gcp-ovn
@@ -1987,6 +1906,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2007,6 +1929,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2020,20 +1945,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build04
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-gcp-ovn-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-gcp-ovn-techpreview
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-gcp-ovn-techpreview
     spec:
       containers:
@@ -2041,6 +1968,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-gcp-ovn-techpreview
@@ -2062,6 +1990,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2082,6 +2013,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2095,22 +2029,24 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-bgp-virt-dualstack
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-bgp-virt-dualstack
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-bgp-virt-dualstack
     spec:
       containers:
@@ -2118,6 +2054,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-bgp-virt-dualstack
@@ -2139,6 +2076,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2159,6 +2099,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2172,22 +2115,24 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     spec:
       containers:
@@ -2195,6 +2140,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
@@ -2216,6 +2162,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2236,6 +2185,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2249,21 +2201,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-dualstack
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-dualstack
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-dualstack
     spec:
       containers:
@@ -2271,6 +2225,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-dualstack
@@ -2292,6 +2247,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2312,6 +2270,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2325,21 +2286,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-dualstack-bgp
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-dualstack-bgp
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-bgp
     spec:
       containers:
@@ -2347,6 +2310,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-dualstack-bgp
@@ -2368,6 +2332,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2388,6 +2355,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2401,21 +2371,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-dualstack-bgp-local-gw
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-dualstack-bgp-local-gw
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     spec:
       containers:
@@ -2423,6 +2395,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-dualstack-bgp-local-gw
@@ -2444,6 +2417,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2464,6 +2440,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2477,22 +2456,24 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-dualstack-local-gateway
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-dualstack-local-gateway
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-local-gateway
     spec:
       containers:
@@ -2500,6 +2481,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-dualstack-local-gateway
@@ -2521,6 +2503,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2541,6 +2526,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2554,22 +2542,24 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
     spec:
       containers:
@@ -2577,6 +2567,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
@@ -2598,6 +2589,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2618,6 +2612,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2631,22 +2628,24 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-dualstack-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-dualstack-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-techpreview
     spec:
       containers:
@@ -2654,6 +2653,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-dualstack-techpreview
@@ -2675,6 +2675,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2695,6 +2698,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2708,22 +2714,24 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-ipv4
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-ipv4
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-ipv4
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-ipv4
     spec:
       containers:
@@ -2731,6 +2739,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-ipv4
@@ -2752,6 +2761,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2772,6 +2784,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2785,21 +2800,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-ipv6
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-ipv6
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
     spec:
       containers:
@@ -2807,6 +2824,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-ipv6
@@ -2828,6 +2846,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2848,6 +2869,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2861,22 +2885,24 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-ipv6-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-ipv6-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-ipv6-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-ipv6-techpreview
     spec:
       containers:
@@ -2884,6 +2910,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-ipv6-techpreview
@@ -2905,6 +2932,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -2925,6 +2955,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2938,22 +2971,24 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-metal-ipi-ovn-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-metal-ipi-ovn-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-metal-ipi-ovn-techpreview
     spec:
       containers:
@@ -2961,6 +2996,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-metal-ipi-ovn-techpreview
@@ -2982,6 +3018,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3002,6 +3041,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3015,21 +3057,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-openstack-ovn
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-openstack-ovn
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-openstack-ovn
     spec:
       containers:
@@ -3037,6 +3081,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-openstack-ovn
@@ -3058,6 +3103,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3078,6 +3126,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3091,21 +3142,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-ovn-hybrid-step-registry
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-ovn-hybrid-step-registry
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-ovn-hybrid-step-registry
     spec:
       containers:
@@ -3113,6 +3166,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-ovn-hybrid-step-registry
@@ -3134,6 +3188,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3154,6 +3211,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3167,21 +3227,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-vsphere-ovn
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-vsphere-ovn
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-vsphere-ovn
     spec:
       containers:
@@ -3189,6 +3251,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-vsphere-ovn
@@ -3210,6 +3273,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3230,6 +3296,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3243,21 +3312,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-vsphere-ovn-techpreview
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-vsphere-ovn-techpreview
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-vsphere-ovn-techpreview
     spec:
       containers:
@@ -3265,6 +3336,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-vsphere-ovn-techpreview
@@ -3286,6 +3358,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3306,6 +3381,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3319,21 +3397,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-windows
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-vsphere-windows
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-e2e-vsphere-windows
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test e2e-vsphere-windows
     spec:
       containers:
@@ -3341,6 +3421,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-vsphere-windows
@@ -3362,6 +3443,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3382,6 +3466,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3395,23 +3482,26 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-gofmt
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-gofmt
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test gofmt
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=gofmt
         command:
@@ -3426,6 +3516,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3437,6 +3530,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3450,26 +3546,28 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-images
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-images
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -3482,6 +3580,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3493,6 +3594,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3506,23 +3610,26 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-lint
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-lint
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test lint
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=lint
         command:
@@ -3537,6 +3644,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3548,6 +3658,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3559,159 +3672,25 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build11
-    context: ci/prow/okd-scos-e2e-aws-ovn
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: okd-scos
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-okd-scos-e2e-aws-ovn
-    optional: true
-    rerun_command: /test okd-scos-e2e-aws-ovn
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn
-        - --variant=okd-scos
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-scos-e2e-aws-ovn,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
-    context: ci/prow/okd-scos-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: okd-scos
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-okd-scos-images
-    rerun_command: /test okd-scos-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=[release:latest]
-        - --variant=okd-scos
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/openshift-e2e-gcp-ovn-techpreview-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 6h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-openshift-e2e-gcp-ovn-techpreview-upgrade
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-openshift-e2e-gcp-ovn-techpreview-upgrade
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test openshift-e2e-gcp-ovn-techpreview-upgrade
     spec:
       containers:
@@ -3719,6 +3698,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=openshift-e2e-gcp-ovn-techpreview-upgrade
@@ -3740,6 +3720,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3760,6 +3743,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3773,21 +3759,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/ovncore-perfscale-aws-ovn-large-cluster-density-v2
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-ovncore-perfscale-aws-ovn-large-cluster-density-v2
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-ovncore-perfscale-aws-ovn-large-cluster-density-v2
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test ovncore-perfscale-aws-ovn-large-cluster-density-v2
     spec:
       containers:
@@ -3795,6 +3783,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ovncore-perfscale-aws-ovn-large-cluster-density-v2
@@ -3816,6 +3805,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3836,6 +3828,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3849,21 +3844,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/ovncore-perfscale-aws-ovn-large-node-density-cni
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-ovncore-perfscale-aws-ovn-large-node-density-cni
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-ovncore-perfscale-aws-ovn-large-node-density-cni
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test ovncore-perfscale-aws-ovn-large-node-density-cni
     spec:
       containers:
@@ -3871,6 +3868,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ovncore-perfscale-aws-ovn-large-node-density-cni
@@ -3892,6 +3890,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3912,6 +3913,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3925,20 +3929,22 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     spec:
       containers:
@@ -3946,6 +3952,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
@@ -3967,6 +3974,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -3987,6 +3997,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4000,21 +4013,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     spec:
       containers:
@@ -4022,6 +4037,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ovncore-perfscale-aws-ovn-xlarge-node-density-cni
@@ -4043,6 +4059,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4063,6 +4082,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4076,21 +4098,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/perfscale-aws-ovn-medium-cluster-density-v2
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-perfscale-aws-ovn-medium-cluster-density-v2
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-perfscale-aws-ovn-medium-cluster-density-v2
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test perfscale-aws-ovn-medium-cluster-density-v2
     spec:
       containers:
@@ -4098,6 +4122,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=perfscale-aws-ovn-medium-cluster-density-v2
@@ -4119,6 +4144,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4139,6 +4167,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4152,21 +4183,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/perfscale-aws-ovn-medium-node-density-cni
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-perfscale-aws-ovn-medium-node-density-cni
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-perfscale-aws-ovn-medium-node-density-cni
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test perfscale-aws-ovn-medium-node-density-cni
     spec:
       containers:
@@ -4174,6 +4207,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=perfscale-aws-ovn-medium-node-density-cni
@@ -4195,6 +4229,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4215,6 +4252,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4228,21 +4268,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/perfscale-aws-ovn-small-cluster-density-v2
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-perfscale-aws-ovn-small-cluster-density-v2
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-perfscale-aws-ovn-small-cluster-density-v2
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test perfscale-aws-ovn-small-cluster-density-v2
     spec:
       containers:
@@ -4250,6 +4292,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=perfscale-aws-ovn-small-cluster-density-v2
@@ -4271,6 +4314,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4291,6 +4337,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4304,21 +4353,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/perfscale-aws-ovn-small-node-density-cni
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-perfscale-aws-ovn-small-node-density-cni
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-perfscale-aws-ovn-small-node-density-cni
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test perfscale-aws-ovn-small-node-density-cni
     spec:
       containers:
@@ -4326,6 +4377,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=perfscale-aws-ovn-small-node-density-cni
@@ -4347,6 +4399,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4367,6 +4422,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4380,21 +4438,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-churn-l3
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-qe-perfscale-aws-ovn-small-udn-density-churn-l3
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-qe-perfscale-aws-ovn-small-udn-density-churn-l3
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-churn-l3
     spec:
       containers:
@@ -4402,6 +4462,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=qe-perfscale-aws-ovn-small-udn-density-churn-l3
@@ -4423,6 +4484,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4443,6 +4507,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4456,21 +4523,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l2
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-qe-perfscale-aws-ovn-small-udn-density-l2
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-qe-perfscale-aws-ovn-small-udn-density-l2
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-l2
     spec:
       containers:
@@ -4478,6 +4547,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=qe-perfscale-aws-ovn-small-udn-density-l2
@@ -4499,6 +4569,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4519,6 +4592,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4532,21 +4608,23 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l3
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 8h0m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-qe-perfscale-aws-ovn-small-udn-density-l3
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-qe-perfscale-aws-ovn-small-udn-density-l3
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-l3
     spec:
       containers:
@@ -4554,6 +4632,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=qe-perfscale-aws-ovn-small-udn-density-l3
@@ -4575,6 +4654,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4595,6 +4677,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4608,20 +4693,22 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/qe-perfscale-payload-control-plane-6nodes
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 3h30m0s
+    hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-qe-perfscale-payload-control-plane-6nodes
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-qe-perfscale-payload-control-plane-6nodes
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test qe-perfscale-payload-control-plane-6nodes
     spec:
       containers:
@@ -4629,6 +4716,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=qe-perfscale-payload-control-plane-6nodes
@@ -4650,6 +4738,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4670,6 +4761,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4683,25 +4777,28 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/security
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-security
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-security
     optional: true
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test security
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -4720,6 +4817,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4734,6 +4834,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4747,23 +4850,26 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-unit
+    name: pull-ci-openshift-priv-ovn-kubernetes-main-unit
+    path_alias: github.com/openshift/ovn-kubernetes
     rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=unit
         command:
@@ -4778,6 +4884,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -4789,6 +4898,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
