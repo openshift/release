@@ -312,6 +312,7 @@ EOF
 # function when the structure is homogenised in all the active releases.
 function get_source_dir() {
   declare -A SCENARIO_DIRS=(
+    [bootc-upstream]="scenarios-bootc/upstream:scenarios-bootc"
     [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
     [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
     [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"

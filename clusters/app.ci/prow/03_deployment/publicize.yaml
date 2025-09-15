@@ -22,7 +22,10 @@ items:
       app: prow
       component: publicize
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"publicize:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"publicize\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 1h"
     namespace: ci
   spec:
     replicas: 1
@@ -39,7 +42,7 @@ items:
       spec:
         containers:
         - name: publicize
-          image: publicize:latest
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_publicize_latest
           args:
           - --dry-run=false
           - --endpoint=/

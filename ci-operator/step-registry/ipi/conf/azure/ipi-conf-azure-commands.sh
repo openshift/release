@@ -152,6 +152,16 @@ else
   echo "Omit baseDomainResourceGroupName for private cluster"
 fi
 
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  patch_user_provisioned_dns="${SHARED_DIR}/install-config-user-provisioned-dns.yaml.patch"
+  cat > "${patch_user_provisioned_dns}" << EOF
+platform:
+  azure:
+    userProvisionedDNS: Enabled
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi
+
 # starting from 4.19, cluster sp only needs Contributor role
 #if (( minor_version > 18 && major_version == 4 )) && [[ -f "${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json" ]]; then
 #    echo "Copy Azure credential azure-sp-contributor.json to SHARED_DIR"
