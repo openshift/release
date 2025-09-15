@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Set AWS credentials
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.aws"
+
+# Set AWS region
+export AWS_REGION="${AWS_REGION:-$LEASED_RESOURCE}"
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
