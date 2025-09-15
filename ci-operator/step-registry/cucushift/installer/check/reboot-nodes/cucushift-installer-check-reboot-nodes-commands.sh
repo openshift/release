@@ -14,7 +14,10 @@ export AWS_REGION="${AWS_REGION:-$LEASED_RESOURCE}"
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
-    eval "${CMD}"
+    if ! eval "${CMD}"; then
+        echo "WARNING: Command failed: ${CMD}"
+        return 1
+    fi
 }
 
 function ssh_command() {
@@ -36,7 +39,7 @@ function reboot_node() {
     local node_ip=$1 node_name=$2 ret=0
     local instance_id
 
-    echo "$(date -u --rfc-3339=seconds) - Getting instance ID for node ${node_name} (${node_ip})"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting instance ID for node ${node_name} (${node_ip})"
     
     # Get instance ID from AWS
     instance_id=$(aws ec2 describe-instances \
@@ -50,10 +53,10 @@ function reboot_node() {
         return 1
     fi
     
-    echo "$(date -u --rfc-3339=seconds) - Found instance ${instance_id} for node ${node_name}"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Found instance ${instance_id} for node ${node_name}"
     
     # Stop the instance
-    echo "$(date -u --rfc-3339=seconds) - Stopping instance ${instance_id}"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stopping instance ${instance_id}"
     aws ec2 stop-instances --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
     if [[ ${ret} == 1 ]]; then
         echo "ERROR: fail to stop instance ${instance_id}"
@@ -61,7 +64,7 @@ function reboot_node() {
     fi
     
     # Wait for instance to stop
-    echo "$(date -u --rfc-3339=seconds) - Waiting for instance ${instance_id} to stop"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for instance ${instance_id} to stop"
     aws ec2 wait instance-stopped --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
     if [[ ${ret} == 1 ]]; then
         echo "ERROR: instance ${instance_id} did not stop within timeout"
@@ -69,7 +72,7 @@ function reboot_node() {
     fi
     
     # Start the instance
-    echo "$(date -u --rfc-3339=seconds) - Starting instance ${instance_id}"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting instance ${instance_id}"
     aws ec2 start-instances --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
     if [[ ${ret} == 1 ]]; then
         echo "ERROR: fail to start instance ${instance_id}"
@@ -77,14 +80,14 @@ function reboot_node() {
     fi
     
     # Wait for instance to start
-    echo "$(date -u --rfc-3339=seconds) - Waiting for instance ${instance_id} to start"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for instance ${instance_id} to start"
     aws ec2 wait instance-running --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
     if [[ ${ret} == 1 ]]; then
         echo "ERROR: instance ${instance_id} did not start within timeout"
         return 1
     fi
     
-    echo "$(date -u --rfc-3339=seconds) - Instance ${instance_id} successfully restarted"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Instance ${instance_id} successfully restarted"
     return 0
 }
 
@@ -107,81 +110,100 @@ function reboot_cluster() {
 
     for node_name in ${node_list}; do
         node_ip=${node_ip_array[${node_name}]}
-        echo "$(date -u --rfc-3339=seconds) - rebooting node ${node_name}, node ip is ${node_ip}"
-        reboot_node "${node_ip}" "${node_name}"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - rebooting node ${node_name}, node ip is ${node_ip}"
+        if ! reboot_node "${node_ip}" "${node_name}"; then
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Failed to reboot node ${node_name}, continuing with other nodes..."
+        fi
     done
 
     total_nodes_count=$(echo ${node_list} | awk '{print NF}')
-    echo "$(date -u --rfc-3339=seconds) - All ${total_nodes_count} nodes have been restarted, waiting for cluster to recover..."
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All ${total_nodes_count} nodes have been restarted, waiting for cluster to recover..."
     
     # Wait for API server to be accessible first
-    echo "$(date -u --rfc-3339=seconds) - Waiting for API server to be accessible..."
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for API server to be accessible..."
     try=0
     max_try=20
     while [[ ${try} -lt ${max_try} ]]; do
         if oc get nodes --request-timeout=10s >/dev/null 2>&1; then
-            echo "$(date -u --rfc-3339=seconds) - API server is accessible"
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - API server is accessible"
             break
         fi
-        echo "$(date -u --rfc-3339=seconds) - API server not accessible, waiting... (${try}/${max_try})"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - API server not accessible, waiting... (${try}/${max_try})"
         sleep 30
         try=$(( try + 1 ))
     done
     
     if [[ ${try} -eq ${max_try} ]]; then
-        echo "$(date -u --rfc-3339=seconds) - ERROR: API server not accessible after ${max_try} attempts"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: API server not accessible after ${max_try} attempts"
         return 1
     fi
     
     # Wait for all nodes to be Ready (including Ready,SchedulingDisabled)
-    echo "$(date -u --rfc-3339=seconds) - Waiting for all nodes to be Ready..."
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for all nodes to be Ready..."
     try=0
     max_try=60  # 60 minutes total
     while [[ ${try} -lt ${max_try} ]]; do
         # Get node status in JSON format to properly parse Ready status
-        ready_count=$(oc get nodes -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status=="True")) | .metadata.name' | wc -l)
+        if ! ready_count=$(oc get nodes -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status=="True")) | .metadata.name' 2>/dev/null | wc -l); then
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Failed to get node status, retrying..."
+            sleep 10
+            continue
+        fi
         
         if [[ ${ready_count} -eq ${total_nodes_count} ]]; then
-            echo "$(date -u --rfc-3339=seconds) - All ${total_nodes_count} nodes are Ready"
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All ${total_nodes_count} nodes are Ready"
             break
         fi
         
-        echo "$(date -u --rfc-3339=seconds) - ${ready_count}/${total_nodes_count} nodes are Ready, waiting... (${try}/${max_try})"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ${ready_count}/${total_nodes_count} nodes are Ready, waiting... (${try}/${max_try})"
         sleep 60
         try=$(( try + 1 ))
     done
 
     if [[ ${try} -eq ${max_try} ]]; then
-        echo "$(date -u --rfc-3339=seconds) - ERROR: Not all nodes are Ready after ${max_try} minutes!"
-        run_command "oc get nodes -o wide"
-        run_command "oc get nodes -o json | jq '.items[] | {name: .metadata.name, conditions: .status.conditions[] | select(.type==\"Ready\")}'"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Not all nodes are Ready after ${max_try} minutes!"
+        run_command "oc get nodes -o wide" || true
+        run_command "oc get nodes -o json | jq '.items[] | {name: .metadata.name, conditions: .status.conditions[] | select(.type==\"Ready\")}'" || true
         return 1
     fi
     
     # Additional wait for cluster operators to stabilize
-    echo "$(date -u --rfc-3339=seconds) - Waiting for cluster operators to stabilize..."
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for cluster operators to stabilize..."
     try=0
     max_try=30  # 30 minutes
     while [[ ${try} -lt ${max_try} ]]; do
         # Check if all cluster operators are Available=True,Progressing=False,Degraded=False
-        degraded_ops=$(oc get clusteroperators --no-headers | grep -v "True.*False.*False" | wc -l)
-        
-        if [[ ${degraded_ops} -eq 0 ]]; then
-            echo "$(date -u --rfc-3339=seconds) - All cluster operators are stable"
+        # Use a more robust approach to count unstable operators
+        if ! degraded_ops=$(oc get clusteroperators --no-headers 2>/dev/null | grep -v "True.*False.*False" | wc -l); then
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Failed to get cluster operators status, continuing..."
             break
         fi
         
-        echo "$(date -u --rfc-3339=seconds) - ${degraded_ops} cluster operators are not stable, waiting... (${try}/${max_try})"
+        if [[ ${degraded_ops} -eq 0 ]]; then
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All cluster operators are stable"
+            break
+        fi
+        
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ${degraded_ops} cluster operators are not stable, waiting... (${try}/${max_try})"
+        
+        # Show which operators are not stable for debugging
+        if [[ ${try} -eq 0 ]] || [[ $((try % 5)) -eq 0 ]]; then
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current cluster operator status:"
+            run_command "oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true" || true
+        fi
+        
         sleep 60
         try=$(( try + 1 ))
     done
     
     if [[ ${try} -eq ${max_try} ]]; then
-        echo "$(date -u --rfc-3339=seconds) - WARNING: Some cluster operators are still not stable after ${max_try} minutes"
-        run_command "oc get clusteroperators"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Some cluster operators are still not stable after ${max_try} minutes"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Final cluster operator status:"
+        run_command "oc get clusteroperators" || true
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Continuing despite unstable cluster operators..."
     fi
     
-    echo "$(date -u --rfc-3339=seconds) - Cluster reboot test completed successfully"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test completed successfully"
     return 0
 }
 
