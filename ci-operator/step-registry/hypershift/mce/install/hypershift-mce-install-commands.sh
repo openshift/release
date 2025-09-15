@@ -283,7 +283,7 @@ EOF
 fi
 
 # display HyperShift cli version
-HYPERSHIFT_NAME=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )) && echo "hypershift" || echo "hcp" )
+HYPERSHIFT_NAME="hcp"
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
   downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
