@@ -1,6 +1,6 @@
 base_images:
   ocp_4.19_base-rhel9:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-base-nodejs-openshift-4.19:
@@ -46,12 +46,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -62,12 +62,35 @@ resources:
       memory: 4Gi
 tests:
 - as: e2e-monitoring
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
     test:
     - ref: monitoring-plugin-tests-monitoring-ui
-    workflow: ipi-aws
+    workflow: generic-claim
+- as: e2e-coo
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  cron: 0 5 * * *
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-coo-ui
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
