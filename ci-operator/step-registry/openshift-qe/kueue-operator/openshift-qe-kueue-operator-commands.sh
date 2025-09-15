@@ -3,14 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-cat /etc/os-release
 
-oc config view
-oc projects
-python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
@@ -45,4 +39,4 @@ spec:
 EOF
 oc wait Kueue cluster --for=jsonpath='{.status.conditions[?(@.type=="Available")].status}'='True' --timeout=300s
 
-WORKLOAD=kueue-operator-$WORKLOAD_TYPE ./run.sh
+./run.sh

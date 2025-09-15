@@ -37,6 +37,19 @@ tests:
   cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-publish-release-notes
+- as: rebase-on-nightlies
+  cron: 0 4 * * 1-5
+  steps:
+    workflow: openshift-microshift-rebase
+- as: e2e-aws-tests
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: presubmits
+    workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-cache-nightly
   capabilities:
   - intranet
@@ -65,6 +78,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-bootc-arm-nightly
   cron: 0 2 * * *
@@ -73,6 +87,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-nightly
   cron: 30 2 * * *
@@ -81,6 +96,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-arm-nightly
   cron: 30 2 * * *
@@ -89,6 +105,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-ovn-ocp-conformance
   cron: 0 4 * * *
@@ -149,6 +166,42 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SUITE: ai-model-serving
     workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-tests-release-periodic
+  cron: 0 3 * * 0,2,4
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: releases
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-release-periodic
+  cron: 0 3 * * 0,2,4
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: releases
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-release-periodic
+  cron: 0 3 * * 0,2,4
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-releases
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-arm-bootc-release-periodic
+  cron: 0 3 * * 0,2,4
+  steps:
+    cluster_profile: aws-3
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-releases
+    workflow: openshift-microshift-e2e-metal-tests
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

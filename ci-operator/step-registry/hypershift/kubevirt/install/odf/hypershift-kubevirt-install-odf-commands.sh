@@ -11,8 +11,8 @@ ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
 ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
 
-# TODO: update to 4.19 once ODF 4.19 is released in the official redhat-operators 4.19 catalog
-ODF_MAX_VERSION="4.18"
+# TODO: update to 4.20 once ODF 4.20 is released in the official redhat-operators 4.20 catalog
+ODF_MAX_VERSION="4.19"
 ODF_MAX_VERSION_NUMERIC=$(echo "${ODF_MAX_VERSION}" | awk -F. '{ printf "%d%02d", $1, $2 }')
 
 function ocp_version() {
@@ -114,6 +114,13 @@ echo "Preparing nodes"
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
   --selector='node-role.kubernetes.io/worker' --overwrite
 
+echo "Wait for StorageCluster CRD to be created"
+timeout 30m bash -c '
+  until oc get crd storageclusters.ocs.openshift.io &>/dev/null; do
+    sleep 5
+  done
+'
+
 echo "Create StorageCluster"
 cat <<EOF | oc apply -f -
 kind: StorageCluster
@@ -133,10 +140,8 @@ spec:
         memory: "0"
   monDataDirHostPath: /var/lib/rook
   managedResources:
-    cephFilesystems:
-      reconcileStrategy: ignore
-    cephObjectStores:
-      reconcileStrategy: ignore
+    cephFilesystems: {}
+    cephObjectStores: {}
   multiCloudGateway:
     reconcileStrategy: ignore
   storageDeviceSets:
@@ -165,6 +170,15 @@ oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m'
 
 echo "ODF/OCS Operator is deployed successfully"
+
+echo "Wait for the storage class ocs-storagecluster-ceph-rbd to be created"
+timeout 30m bash -c '
+  until oc get storageclass ocs-storagecluster-ceph-rbd &>/dev/null; do
+    sleep 5
+  done
+' || true
+
+oc get sc
 
 # Setting ocs-storagecluster-ceph-rbd the default storage class
 for item in $(oc get sc --no-headers | awk '{print $1}'); do

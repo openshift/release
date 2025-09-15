@@ -130,6 +130,29 @@ tests:
     - ref: oadp-execute-tests
     workflow: oadp-ipi-aws-proxy-oadp-qe
   timeout: 8h0m0s
+- as: oadp-qe-aws-sno
+  cron: 30 3 * * *
+  steps:
+    cluster_profile: aws-oadp-qe
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs/oadp-oadp-operator-bundle:1.5.1-32
+      OO_INDEX: brew.registry.redhat.io/rh-osbs/iib:1033954
+    env:
+      BASE_DOMAIN: mig-qe-aws.devcluster.openshift.com
+      BUCKET_NAME: oadp-sno
+      OADP_TEST_FOCUS: interop
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: redhat-oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      REPORTPORTAL_HOSTNAME: reportportal-migration-qe.apps.dno.ocp-hub.prod.psi.redhat.com
+      REPORTPORTAL_PROJECT: OADP
+      USER_TAGS: |
+        scenario oadp-qe aws-sno
+    test:
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-aws-sno-oadp-qe
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: oadp-qe

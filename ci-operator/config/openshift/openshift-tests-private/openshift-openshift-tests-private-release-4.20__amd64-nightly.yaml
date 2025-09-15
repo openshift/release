@@ -11,10 +11,6 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
@@ -33,6 +29,10 @@ base_images:
     tag: latest
   nested-environment-builder:
     name: nested-environment-builder
+    namespace: ci
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
     namespace: ci
     tag: latest
   openstack-installer:
@@ -731,6 +731,22 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-guest-ipv4-k8sconfig-advanced-f14
+  cron: 38 7 1,15 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: p4d.24xlarge
+      ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_NODE_COUNT: "1"
+      OVN_IPV4_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-advanced
 - as: aws-ipi-ovn-hypershift-guest-dynamic-dns-ondemand-advanced-f7
   cron: 3 7 2,9,16,25 * *
   steps:
@@ -1634,8 +1650,7 @@ tests:
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_CUSTOM_AZURE_AZ: '[''2'']'
-      COMPUTE_NODE_TYPE: Standard_EC4es_v6
+      COMPUTE_NODE_TYPE: Standard_EC4es_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v5
       ENABLE_CONFIDENTIAL_COMPUTE: "true"
       ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
@@ -1650,8 +1665,7 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_DC4ads_v5
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4es_v6
-      CP_CUSTOM_AZURE_AZ: '[''2'']'
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4es_v5
       ENABLE_CONFIDENTIAL_DEFAULT_MACHINE: "true"
       ENABLE_ENCRYPTIONATHOST_DEFAULT_MACHINE: "false"
     test:
@@ -1819,6 +1833,21 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-guest
+- as: azure-aks-hypershift-ephemeral-creds-guest-global-ps-f7
+  cron: 22 21 1,8,15,24 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_CA_BUNDLE_FILE: additional-ca.crt
+      DYNAMIC_ADDITIONAL_TRUST_BUNDLE_ENABLED: "true"
+      DYNAMIC_GLOBAL_PULL_SECRET_ENABLED: "true"
+      DYNAMIC_IMAGE_REGISTRY_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_IMPORTANCE: Critical
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-guest
 - as: azure-aks-hypershift-etcd-disk-encryption-guest-f7
   cron: 10 6 7,16,23,30 * *
   steps:
@@ -1872,6 +1901,21 @@ tests:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-install
+- as: aws-ipi-ovn-hypershift-guest-disable-caps-f14
+  capabilities:
+  - intranet
+  cron: 26 14 11,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HC_DISABLED_CAPS: ImageRegistry,Insights,NodeTuning,baremetal,openshift-samples,Ingress,Console
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: azure-ipi-private-fips-f28-disasterrecovery
   cron: 35 19 25 * *
   steps:

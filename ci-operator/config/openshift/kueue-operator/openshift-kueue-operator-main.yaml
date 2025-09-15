@@ -48,6 +48,12 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -83,24 +89,6 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
-- as: test-e2e-4-17
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
-  optional: true
-  steps:
-    env:
-      BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-0-12
-      OPERATOR_COMPONENT: kueue-operator-main
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e
 - as: test-e2e-4-18
   cluster_claim:
     architecture: amd64
@@ -114,7 +102,7 @@ tests:
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-0-12
+      OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
     post:
     - chain: kueue-operator-post
@@ -133,22 +121,33 @@ tests:
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-0-12
+      OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
+- as: test-e2e-4-19-hypershift
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-dev-bundle
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
-  as: perfscale-payload-kueue-operator-10nodes
+  as: perfscale-payload-kueue-operator-9nodes
   optional: true
   steps:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       BUNDLE_COMPONENT: kueue-bundle-main
-      COMPUTE_NODE_REPLICAS: "10"
-      OPERAND_COMPONENT: kueue-0-12
+      COMPUTE_NODE_REPLICAS: "9"
+      OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
       ZONES_COUNT: "3"
     test:

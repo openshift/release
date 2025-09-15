@@ -32,8 +32,7 @@ operator:
     with: stable:must-gather
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -69,19 +68,23 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: must-gather-operator-codecov-token
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: lint
   commands: make lint
   container:
     from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: test
   commands: make test
   container:
     from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: validate-boilerplate
   commands: make validate
   container:
     from: src
   optional: true
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
