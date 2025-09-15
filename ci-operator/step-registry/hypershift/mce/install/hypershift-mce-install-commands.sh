@@ -87,7 +87,7 @@ sleep 60
 oc wait mcp master worker --for condition=updated --timeout=20m
 
 echo "Install MCE custom catalog source"
-IMG="${_REPO}:${MCE_VERSION}-latest"
+IMG="quay.io:443/acm-d/mce-dev-catalog:2.10.0-DOWNSTREAM-2025-09-11-15-12-31"
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource

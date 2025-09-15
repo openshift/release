@@ -77,5 +77,3 @@ fi
 echo "Copying kubeconfig into SHARED_DIR"
 cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"
 echo "Kubeconfig copied into SHARED_DIR"
-
-
