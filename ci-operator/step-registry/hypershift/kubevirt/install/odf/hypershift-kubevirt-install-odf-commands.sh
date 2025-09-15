@@ -170,21 +170,22 @@ oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m'
 
 echo "ODF/OCS Operator is deployed successfully"
+ODF_VIRT_SC=ocs-storagecluster-ceph-rbd-virtualization
 
-echo "Wait for the storage class ocs-storagecluster-ceph-rbd to be created"
-timeout 30m bash -c '
-  until oc get storageclass ocs-storagecluster-ceph-rbd &>/dev/null; do
+echo "Wait for the storage class ${ODF_VIRT_SC} to be created"
+timeout 30m bash -c "
+  until oc get storageclass ${ODF_VIRT_SC} &>/dev/null; do
     sleep 5
   done
-' || true
+" || true
 
 oc get sc
 
-# Setting ocs-storagecluster-ceph-rbd the default storage class
+# Setting ocs-storagecluster-ceph-rbd-virtualization the default storage class
 for item in $(oc get sc --no-headers | awk '{print $1}'); do
 	oc annotate --overwrite sc $item storageclass.kubernetes.io/is-default-class='false'
 done
-oc annotate --overwrite sc ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class='true'
+oc annotate --overwrite sc ${ODF_VIRT_SC} storageclass.kubernetes.io/is-default-class='true'
 oc annotate --overwrite volumesnapshotclass ocs-storagecluster-rbdplugin-snapclass snapshot.storage.kubernetes.io/is-default-class='true'
 echo "ocs-storagecluster-ceph-rbd is set as default storage class"
 
@@ -214,4 +215,3 @@ echo "managing deployment again, will restore to needed value"
 oc patch csisnapshotcontroller cluster --type=json -p='[{"op": "add", "path": "/spec/managementState", "value": "Managed"}]' -n openshift-cluster-storage-operator
 echo "waiting for deployment to be ready"
 oc rollout status deployment/csi-snapshot-controller -n openshift-cluster-storage-operator
-

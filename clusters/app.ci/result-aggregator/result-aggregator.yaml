@@ -63,7 +63,10 @@ items:
     namespace: ci
     name: result-aggregator
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"result-aggregator:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"result-aggregator\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 1h"
   spec:
     replicas: 3
     strategy:
@@ -80,7 +83,7 @@ items:
       spec:
         containers:
         - name: result-aggregator
-          image: result-aggregator:latest
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_result-aggregator_latest
           args:
           - -log-level=debug
           - -passwd-file=/etc/report/passwd
