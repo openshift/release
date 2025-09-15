@@ -40,11 +40,17 @@ fi
 # Create self scheduling assignment
 echo
 echo "Create self scheduling assignment ..."
-if [ -z "${VLAN_ID}" ]; then
-  CLOUD_OUTPUT=$(curl -fsSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"description": "Temporary allocation from openshift-ci", "owner": "metal-perfscale-cpt", "qinq": 1, "wipe": "true"}' $QUADS_INSTANCE/api/v3/assignments/self)
-else
-  CLOUD_OUTPUT=$(curl -fsSk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"description": "Temporary allocation from openshift-ci", "owner": "metal-perfscale-cpt", "qinq": 1, "vlan": "'"$VLAN_ID"'", "wipe": "true"}' $QUADS_INSTANCE/api/v3/assignments/self)
-fi
+CLOUD_OUTPUT=$(curl -fsSk -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"description\":\"Temporary allocation from openshift-ci: $REPO_OWNER-$REPO_NAME-$JOB_TYPE-$PULL_NUMBER\",
+    \"owner\":\"metal-perfscale-cpt\",
+    \"qinq\":1,
+    $([ -n "$VLAN_ID" ] && echo "\"vlan\":\"$VLAN_ID\",")
+    \"wipe\":\"true\"}" \
+  "$QUADS_INSTANCE/api/v3/assignments/self")
+
 echo $CLOUD_OUTPUT | jq .
 CLOUD=$(echo $CLOUD_OUTPUT | jq -r .'cloud.name')
 echo "The cloud name is: $CLOUD"
