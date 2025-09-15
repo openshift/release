@@ -249,12 +249,4 @@ oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
-if [ -n "${KUBEVIRT_CSI_INFRA}" ]
-then
-  for item in $(oc get sc --no-headers | awk '{print $1}'); do
-  oc annotate --overwrite sc "${item}" storageclass.kubernetes.io/is-default-class='false'
-  done
-  oc annotate --overwrite sc "${KUBEVIRT_CSI_INFRA}" storageclass.kubernetes.io/is-default-class='true'
-fi
-
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
