@@ -840,7 +840,14 @@ tests:
     test:
     - as: e2e
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig HIVE_KUBECONFIG=/tmp/hive/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json \
+        REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret \
+        LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret \
+        KUBECONFIG=/auth/kubeconfig \
+        HIVE_KUBECONFIG=/tmp/hive/kubeconfig \
+        MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson \
+        LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 \
+        make e2e
       credentials:
       - collection: ""
         mount_path: /auth
@@ -862,6 +869,10 @@ tests:
         mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
         namespace: test-credentials
+      - collection: test-platform-infra
+        mount_path: /tmp/gcp-creds
+        name: gsm-e2e-test-sa-key
+        namespace: test-credentials
       - collection: ""
         mount_path: /tmp/hive
         name: hive-hive-credentials
@@ -870,6 +881,16 @@ tests:
         mount_path: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         namespace: test-credentials
+      env:
+      - default: openshift-ci-secrets-dev
+        documentation: The GCP project ID to use for GSM e2e test
+        name: GCP_DEV_PROJECT_ID
+      - default: "636987594243"
+        documentation: The GCP project number to use for GSM e2e test
+        name: GCP_DEV_PROJECT_NUMBER
+      - default: /tmp/gcp-creds/gsm-e2e-test-sa-key
+        documentation: The GCP service account credentials file
+        name: GCP_SECRETS_DEV_CREDENTIALS_FILE
       from: test-bin
       resources:
         requests:
@@ -999,10 +1020,6 @@ tests:
     env:
       PROJECT_NAME: ci-tools
     workflow: openshift-ci-security
-- as: gsm-secret-sync-e2e
-  run_if_changed: ^(cmd/gsm-secret-sync/|pkg/gsm-secrets/)
-  steps:
-    workflow: openshift-ci-tools-gsm-e2e
 zz_generated_metadata:
   branch: main
   org: openshift
