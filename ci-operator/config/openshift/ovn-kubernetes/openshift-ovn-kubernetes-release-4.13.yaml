@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.19-openshift-4.13
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
 build_root:
   image_stream_tag:
     name: release
@@ -279,6 +283,15 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: ovn-kubernetes
     workflow: openshift-ci-security
+- always_run: true
+  as: e2e-aws-ovn-fdp-qe
+  steps:
+    cluster_profile: aws
+    env:
+      PARALLEL: "1"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: release-4.13
   org: openshift
