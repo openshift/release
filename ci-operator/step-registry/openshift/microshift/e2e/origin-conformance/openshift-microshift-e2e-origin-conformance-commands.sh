@@ -86,4 +86,10 @@ if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_
     fi
 fi
 
-openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} -f "${CONFORMANCE_TEST_LIST}" -v 2 --provider=none -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
+openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-}  \
+  -f "${CONFORMANCE_TEST_LIST}" \
+  --max-parallel-tests 15 \
+  -v 2 \
+  --provider=none \
+  -o "${ARTIFACT_DIR}/e2e.log" \
+  --junit-dir "${ARTIFACT_DIR}/junit"
