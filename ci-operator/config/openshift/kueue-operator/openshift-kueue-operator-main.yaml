@@ -22,7 +22,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ci
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.ci
   inputs:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
@@ -31,7 +33,9 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: kueue-operator
-- dockerfile_literal: |
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
   from: src
@@ -49,6 +53,12 @@ images:
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
 releases:
+  arm64-4-19-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.19"
   latest:
     release:
       architecture: multi
@@ -108,6 +118,23 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
+- as: test-e2e-4-19-arm64
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-4-19-latest
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      OCP_ARCH: arm64
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
+    workflow: ipi-aws
 - as: test-e2e-4-19
   cluster_claim:
     architecture: amd64
