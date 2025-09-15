@@ -6,6 +6,16 @@ items:
   metadata:
     name: content-mirror
     namespace: ci
+  spec:
+    lookupPolicy:
+      local: false
+    tags:
+    - name: latest
+      from:
+        kind: DockerImage
+        name: "quay.io/openshift/ci:ci_content-mirror_latest"
+      referencePolicy:
+        type: Source
 - kind: BuildConfig
   apiVersion: build.openshift.io/v1
   metadata:
@@ -16,8 +26,8 @@ items:
     failedBuildsHistoryLimit: 2
     output:
       to:
-        kind: ImageStreamTag
-        name: content-mirror:latest
+        kind: "DockerImage"
+        name: "quay.io/openshift/ci:ci_content-mirror_latest"
     source:
       git:
         ref: main
@@ -26,6 +36,8 @@ items:
     strategy:
       dockerStrategy:
         imageOptimizationPolicy: SkipLayers
+        pullSecret:
+          name: registry-push-credentials-ci-images-mirror
       type: Docker
     triggers:
     - type: ConfigChange
