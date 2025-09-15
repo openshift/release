@@ -6,7 +6,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.62.2
+    tag: v1.64.8
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -15,14 +15,14 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
@@ -30,16 +30,17 @@ canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-network-operator
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -72,12 +73,12 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-upgrade-gcp-ovn
 - always_run: true
-  as: e2e-aws-ovn-ipsec-upgrade
+  as: e2e-aws-ovn-upgrade-ipsec
   steps:
     cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
-    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 - as: e2e-ovn-step-registry
   optional: true
   steps:
@@ -111,19 +112,21 @@ tests:
     workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-aws-ovn-serial
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
 - always_run: true
-  as: e2e-aws-ovn-ipsec-serial
+  as: e2e-aws-ovn-serial-ipsec
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
-    workflow: openshift-e2e-aws-ovn-ipsec-serial
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
   timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
@@ -173,7 +176,8 @@ tests:
         Services Secondary IP Family \[LinuxOnly\] should function for service endpoints
         using hostNetwork\| should have ipv4 and ipv6 internal node ip
     workflow: openshift-e2e-vsphere-ovn-dualstack
-- as: e2e-vsphere-ovn-dualstack-primaryv6
+- always_run: false
+  as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -233,6 +237,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-techpreview-serial
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: aws-3
     env:
@@ -428,8 +433,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: eastus2
-      TECH_PREVIEW_NO_UPGRADE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:

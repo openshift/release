@@ -1,90 +1,83 @@
-kind: List
-apiVersion: v1
-items:
-- apiVersion: image.openshift.io/v1
-  kind: ImageStream
-  metadata:
-    name: ipi-deprovision
-    namespace: ci
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    name: ipi-deprovision
-    namespace: ci
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: ipi-deprovision
+  namespace: ci
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_ipi-deprovision_latest
+  source:
+    images:
+    - from:
         kind: ImageStreamTag
-        name: ipi-deprovision:latest
-    source:
-      images:
-      - from:
-          kind: ImageStreamTag
-          name: 4.12:cli
-          namespace: ocp
-        paths:
-        - destinationDir: .
-          sourcePath: /usr/bin/oc
-      - from:
-          kind: ImageStreamTag
-          name: 4.12:installer
-          namespace: ocp
-        paths:
-        - destinationDir: .
-          sourcePath: /bin/openshift-install
-      - from:
-          kind: ImageStreamTag
-          name: 4.12:hypershift-operator
-          namespace: ocp
-        paths:
-        - destinationDir: .
-          sourcePath: /bin/hypershift
-      dockerfile: |
-        FROM quay.io/centos/centos:stream8
-        LABEL maintainer="nmoraiti@redhat.com"
+        name: 4.20:cli
+        namespace: ocp
+      paths:
+      - destinationDir: .
+        sourcePath: /usr/bin/oc
+    - from:
+        kind: ImageStreamTag
+        name: 4.20:installer
+        namespace: ocp
+      paths:
+      - destinationDir: .
+        sourcePath: /usr/bin/openshift-install
+    - from:
+        kind: ImageStreamTag
+        name: hypershift-operator:4.19
+        namespace: hypershift
+      paths:
+      - destinationDir: .
+        sourcePath: /usr/bin/hypershift
+    dockerfile: |
+      FROM quay.io/centos/centos:stream9
+      LABEL maintainer="nmoraiti@redhat.com"
 
-        ARG JQ_VERSION=1.6
+      ARG JQ_VERSION=1.6
 
-        RUN echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\nenabled=1" > /etc/yum.repos.d/google-cloud-sdk.repo
+      RUN echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\nenabled=1" > /etc/yum.repos.d/google-cloud-sdk.repo
 
-        COPY ./oc /usr/bin/oc
-        COPY ./openshift-install /usr/bin/openshift-install
-        COPY ./hypershift /usr/bin/hypershift
+      COPY ./oc /usr/bin/oc
+      COPY ./openshift-install /usr/bin/openshift-install
+      COPY ./hypershift /usr/bin/hypershift
 
-        RUN dnf install --nogpg -y google-cloud-sdk unzip jq less && \
-              dnf clean all && \
-              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-              unzip awscliv2.zip && ./aws/install
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: ImageStreamTag
-          name: centos:stream8
-          namespace: origin
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
-    triggers:
-    - type: ConfigChange
-    - type: ImageChange
-      imageChange: {}
-    - type: ImageChange
-      imageChange:
-        from:
-          kind: ImageStreamTag
-          name: 4.12:cli
-          namespace: ocp
-    - type: ImageChange
-      imageChange:
-        from:
-          kind: ImageStreamTag
-          name: 4.12:installer
-          namespace: ocp
-    - type: ImageChange
-      imageChange:
-        from:
-          kind: ImageStreamTag
-          name: 4.12:hypershift-operator
-          namespace: ocp
+      RUN dnf install --nogpg -y google-cloud-sdk unzip jq less && \
+            dnf clean all && \
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+            unzip awscliv2.zip && ./aws/install
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - type: ConfigChange
+  - type: ImageChange
+    imageChange: {}
+  - type: ImageChange
+    imageChange:
+      from:
+        kind: ImageStreamTag
+        name: 4.20:cli
+        namespace: ocp
+  - type: ImageChange
+    imageChange:
+      from:
+        kind: ImageStreamTag
+        name: 4.20:installer
+        namespace: ocp
+  - type: ImageChange
+    imageChange:
+      from:
+        kind: ImageStreamTag
+        name: 4.20:hypershift-operator
+        namespace: hypershift

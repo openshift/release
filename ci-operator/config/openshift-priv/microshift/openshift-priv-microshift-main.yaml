@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+    tag: rhel-9-release-golang-1.24-openshift-4.21
 canonical_go_repository: github.com/openshift/microshift
 images:
 - dockerfile_literal: |
@@ -26,25 +26,25 @@ promotion:
   to:
   - excluded_images:
     - microshift-test-rpm
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
   nightly-amd64:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -81,7 +81,7 @@ tests:
     workflow: openshift-ci-security
 - as: test-rebase
   optional: true
-  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod|vendor/.*|deps/.*)$
   steps:
     env:
       DRY_RUN: "y"
@@ -93,6 +93,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-arm
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
@@ -101,6 +102,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-cache
   capabilities:
@@ -130,6 +132,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-periodic-arm
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
@@ -138,6 +141,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-bootc
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
@@ -146,6 +150,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-bootc-arm
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
@@ -154,6 +159,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-bootc-periodic
   run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
@@ -162,6 +168,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-bootc-periodic-arm
   run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
@@ -170,6 +177,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-full-conformance-rhel-eus
   run_if_changed: ^(origin/.*|assets/.*|etcd/.*|pkg/.*|vendor/.*)$
@@ -203,6 +211,60 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SUITE: ai-model-serving
     workflow: openshift-microshift-e2e-bare-metal-tests
+- as: e2e-aws-tests-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: releases
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-release-arm
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: releases
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-release
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-releases
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-release-arm
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-releases
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-upstream
+  run_if_changed: ^(test/scenarios-bootc/upstream/.*)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-upstream
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-upstream-arm
+  run_if_changed: ^(test/scenarios-bootc/upstream/.*)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-upstream
+    workflow: openshift-microshift-e2e-metal-tests
 zz_generated_metadata:
   branch: main
   org: openshift-priv

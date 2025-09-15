@@ -7,18 +7,18 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: "4.19"
+  ocp_4.20_base-rhel9:
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.23-openshift-4.19
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    tag: rhel-8-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -31,26 +31,26 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -188,6 +188,21 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
   timeout: 5h30m0s
+- as: e2e-aws-ovn-upgrade-ipsec
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
+- as: e2e-aws-ovn-serial-ipsec
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-upgrade-local-gateway
   steps:
     cluster_profile: aws
@@ -241,7 +256,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-ibmcloud-ipi-ovn-periodic
-  cron: 0 0 * * *
+  cron: 54 13 * * 6
   steps:
     cluster_profile: ibmcloud
     env:
@@ -256,7 +271,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
+  cron: 3 1 * * 0
   steps:
     cluster_profile: aws-2
     env:
@@ -272,7 +287,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
+  cron: 43 23 * * 0
   steps:
     cluster_profile: aws
     env:
@@ -296,22 +311,16 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+- as: e2e-metal-ipi-ovn-dualstack-bgp
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
   timeout: 5h0m0s
 - as: e2e-aws-ovn-hypershift

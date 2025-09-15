@@ -38,7 +38,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
-      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
       IGNORE_JOB_ITERATIONS: "true"
       ITERATION_MULTIPLIER_ENV: "15"
       OUTPUT_FORMAT: JUNIT
@@ -274,19 +274,26 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: openshift-qe-installer-aws
-- always_run: false
-  as: aws-ovn-payload-node-density-heavy
+- as: node-density-heavy-max-pods-6nodes
+  cron: 0 9 19 * *
   steps:
-    allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
     env:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      BURST: "10"
       CLUSTER_NETWORK_CIDR: 10.128.0.0/14
       CLUSTER_NETWORK_HOST_PREFIX: "20"
-      EXTRA_FLAGS: --pods-per-node=250 --pod-ready-threshold=85s
+      COMPUTE_NODE_TYPE: c6a.16xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTRA_FLAGS: --pod-ready-threshold=500s
       ITERATIONS_PER_NAMESPACE: "100"
-      MAX_PODS: "250"
+      MAX_PODS: "2750"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      PODS_PER_NODE: "2750"
+      PPROF: "false"
       PROFILE_TYPE: both
+      QPS: "5"
+      SET_ENV_BY_PLATFORM: custom
       ZONES_COUNT: "3"
     post:
     - chain: ipi-aws-post
@@ -297,7 +304,7 @@ tests:
     - ref: openshift-qe-set-max-pods
     - chain: create-infra-move-ingress-monitoring-registry
     test:
-    - chain: workers-scale
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws
   timeout: 8h0m0s

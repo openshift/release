@@ -1,14 +1,9 @@
-base_images:
-  ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
-    tag: base-rhel9
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.23
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_literal: |
     FROM src
@@ -16,7 +11,7 @@ images:
     RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
     RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
     RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli
+    RUN dnf install -y azure-cli libicu
   from: src
   to: src-plus-az
 resources:
@@ -30,15 +25,143 @@ resources:
       memory: 4Gi
 tests:
 - as: create-aro-hcp-in-integration
-  cron: '@daily'
+  cron: 0 */4 * * *
   steps:
     env:
       CLUSTER_NAME: periodic-integration-cluster
-      CUSTOMER_RG_NAME: periodic-integration-customer-rg
+      CUSTOMER_RESOURCE_GROUP_PREFIX: periodic-integration-customer-rg
       LOCATION: uksouth
       SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    pre:
+    - ref: aro-hcp-provision-generate-resource-group-name
     test:
     - chain: aro-hcp-provision-create-functional-cluster
+- as: delete-expired-integration-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      CUSTOMER_SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+    test:
+    - ref: aro-hcp-provision-delete-all-expired-resource-groups
+- as: integration-e2e-parallel
+  cron: 0 */4 * * *
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: integration/parallel
+      CUSTOMER_SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- as: create-aro-hcp-in-stage
+  cron: 0 */4 * * *
+  steps:
+    env:
+      CLUSTER_NAME: periodic-stage-cluster
+      CUSTOMER_RESOURCE_GROUP_PREFIX: periodic-stage-customer-rg
+      LOCATION: uksouth
+      SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    pre:
+    - ref: aro-hcp-provision-generate-resource-group-name
+    test:
+    - chain: aro-hcp-provision-create-functional-cluster
+- as: stage-e2e-parallel
+  cron: 0 */4 * * *
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: stage/parallel
+      CUSTOMER_SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- as: delete-expired-stage-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      CUSTOMER_SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+    test:
+    - ref: aro-hcp-provision-delete-all-expired-resource-groups
+- as: create-aro-hcp-in-prod-uksouth
+  cron: 0 */4 * * *
+  steps:
+    env:
+      CLUSTER_NAME: periodic-prod-uksouth-cluster
+      CUSTOMER_RESOURCE_GROUP_PREFIX: periodic-prod-uksouth-customer-rg
+      LOCATION: uksouth
+      SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    pre:
+    - ref: aro-hcp-provision-generate-resource-group-name
+    test:
+    - chain: aro-hcp-provision-create-functional-cluster
+- as: prod-uksouth-e2e-parallel
+  cron: 0 */4 * * *
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- as: delete-expired-prod-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+    test:
+    - ref: aro-hcp-provision-delete-all-expired-resource-groups
+- as: prod-brazilsouth-e2e-parallel
+  cron: '@daily'
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      LOCATION: brazilsouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- as: prod-centralindia-e2e-parallel
+  cron: '@daily'
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      LOCATION: centralindia
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- as: prod-e2e-parallel
+  cron: 0 0 31 2 0
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
 zz_generated_metadata:
   branch: main
   org: Azure

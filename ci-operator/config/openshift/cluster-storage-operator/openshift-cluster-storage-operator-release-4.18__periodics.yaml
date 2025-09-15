@@ -1,0 +1,66 @@
+base_images:
+  aws-ebs-csi-driver-operator-test:
+    name: "4.18"
+    namespace: ocp
+    tag: aws-ebs-csi-driver-operator-test
+  cluster-storage-operator-test:
+    name: "4.18"
+    namespace: ocp
+    tag: cluster-storage-operator-test
+build_root:
+  from_repository: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
+  cron: 47 3 22 12 *
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws-storage-symlinks
+- as: periodic-e2e-gcp-ovn-upgrade-check-dev-symlinks
+  cron: 2 15 24 3 *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-storage-symlinks
+- as: periodic-e2e-aws-selinux-alpha
+  cron: 21 20 22 10 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_GATES: '[''SELinuxMount=true'']'
+      FEATURE_SET: CustomNoUpgrade
+      TEST_ARGS: --run=sig-storage.*SELinux
+      TEST_SKIPS: Disruptive\|disruptive\|SELinuxMountReadWriteOncePodOnly
+      TEST_SUITE: all
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-csi
+- as: e2e-aws-group-snapshot-tp
+  cron: 27 23 25 11 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --run=Driver:.csi-hostpath-groupsnapshot.*Feature:(volumegroupsnapshot|VolumeSnapshotDataSource)
+      TEST_SUITE: all
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: cluster-storage-operator
+  variant: periodics

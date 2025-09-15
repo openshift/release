@@ -59,6 +59,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-gh-automation
   to: check-gh-automation
+- context_dir: images/gsm-secret-sync/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/gsm-secret-sync
+  to: gsm-secret-sync
 - context_dir: images/check-cluster-profiles-config/
   from: os
   inputs:
@@ -173,6 +181,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/multi-pr-prow-plugin
   to: multi-pr-prow-plugin
+- context_dir: images/ai-plugin/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ai-plugin
+  to: ai-plugin
 - context_dir: images/pj-rehearse/
   from: os
   inputs:
@@ -408,12 +424,14 @@ images:
 - additional_architectures:
   - arm64
   context_dir: images/tide-config-manager
-  from: os
+  from: centos9
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/tide-config-manager
+      - destination_dir: .
+        source_path: /go/bin/determinize-prow-config
   to: tide-config-manager
 - additional_architectures:
   - arm64
@@ -857,7 +875,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: e2e-oo
+- always_run: false
+  as: e2e-oo
   cluster: build11
   optional: true
   pipeline_run_if_changed: pkg/steps/(index|bundle).*.go

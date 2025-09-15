@@ -50,9 +50,9 @@ function download_automation_code() {
     mkdir -p ${IBMCLOUD_HOME}
     echo "Downloading the head for ocp4-upi-compute-powervs"
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}"-per.tar.gz -o "${IBMCLOUD_HOME}"/ocp-"${OCP_VERSION}".tar.gz \
-        && tar -xzf "${IBMCLOUD_HOME}"/ocp-"${OCP_VERSION}".tar.gz \
-        && mv "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs
+        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/main.tar.gz -o "${IBMCLOUD_HOME}"/ocp-main.tar.gz \
+        && tar -xzf "${IBMCLOUD_HOME}"/ocp-main.tar.gz \
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs
     echo "Down ... Downloading the head for ocp4-upi-compute-powervs"
 }
 
@@ -69,22 +69,30 @@ function download_terraform_binary() {
 
 # Cleans up the failed prior jobs
 function cleanup_prior() {
+
+    # Delete the current TGW VPC Connection from the static transit gateway
     echo "Clean up transit gateway - VPC connection"
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
-    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+    POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    echo ":started searching for gateway... output expected:"
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg name "multi-arch-x-px-${POWERVS_REGION}-1-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $name) | .id')
     do
-        VPC_CONN="${WORKSPACE_NAME}-vpc"
-        VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
-        if [ -n "${VPC_CONN_ID}" ]
-        then
-            echo "deleting VPC connection"
-            ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
-            sleep 120
-            echo "Done Cleaning up GW VPC Connection"
-        else
-            echo "GW VPC Connection not found. VPC Cleanup not needed."
-        fi
-        break
+        echo ":gateway: ${GW}"
+        VPC_NAME_PREFIX=$(yq-v4 -r '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+        for VPC_NAME in $(ibmcloud is vpcs --output json | jq -r --arg mn "${VPC_NAME_PREFIX}" '.[] | select(.name | contains($mn)).name')
+        do
+            echo ":VPC: ${VPC_NAME}"
+            VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_NAME}-vpc" | awk '{print $3}')"
+            if [ -n "${VPC_CONN_ID}" ]
+            then
+                echo "deleting VPC connection"
+                ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+                sleep 120
+                echo "Done Cleaning up GW VPC Connection"
+            else
+                echo "GW VPC Connection not found. VPC Cleanup not needed."
+            fi
+        done
     done
 
     echo "Cleaning up workspaces for ${WORKSPACE_NAME}"
@@ -132,6 +140,8 @@ function configure_automation() {
     # create workspace for powervs from cli
     echo "Display all the variable values:"
     POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
+
     echo "VPC Region is ${REGION}"
     echo "PowerVS region is ${POWERVS_REGION}"
     echo "Resource Group is ${RESOURCE_GROUP}"
@@ -172,14 +182,18 @@ function configure_automation() {
 
     #Create the VPC to fixed transit gateway Connection for the TG
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
-    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+    echo ":started searching for gateway... output expected:"
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg name "multi-arch-x-px-${POWERVS_REGION}-1-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $name) | .id')
     do
-        for CS in $(ibmcloud is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
+        echo ":gateway: ${GW}" 
+        VPC_NAME_PREFIX=$(yq-v4 -r '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+        for VPC_NAME in $(ibmcloud is vpcs --output json | jq -r --arg mn "${VPC_NAME_PREFIX}" '.[] | select(.name | contains($mn)).name')
         do
-            VPC_CONN_NAME=$(ibmcloud is vpc "${CS}" --output json | jq -r .name)
-            VPC_NW_ID=$(ibmcloud is vpc "${CS}" --output json | jq -r .crn)
+            echo ":VPC: ${VPC_NAME}"
+            VPC_CONN_NAME=$(ibmcloud is vpc "${VPC_NAME}" --output json | jq -r .name)
+            VPC_NW_ID=$(ibmcloud is vpc "${VPC_NAME}" --output json | jq -r .crn)
             echo "Creating new VPC connection for gateway now."
-            ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
+            ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}-vpc" --network-id "${VPC_NW_ID}" --network-type vpc || true
         done
     done
 }

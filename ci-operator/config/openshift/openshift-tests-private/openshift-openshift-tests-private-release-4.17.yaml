@@ -70,7 +70,7 @@ images:
         curl -skL ${MIRRORURL}/ocp/latest-4.17/opm-linux-rhel9.tar.gz -o opm-linux.tar.gz  && \
         tar -C /usr/bin/ -xzvf opm-linux.tar.gz && mv /usr/bin/opm-rhel9 /usr/bin/opm && opm version && rm -f opm-linux.tar.gz && \
         curl -skL ${MIRRORURL}/ocp/latest-4.17/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
-        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
+        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && oc-mirror version && rm -f oc-mirror.tar.gz && \
         VER=$(curl -skL ${MIRRORURL}/operator-sdk/ | grep 'class="name"' | grep -o -E '4.17.[0-9]+' | sort -V | tail -1) && \
         curl -skL ${MIRRORURL}/operator-sdk/${VER}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
         tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
@@ -199,6 +199,7 @@ tests:
   commands: make name-check
   container:
     from: src
+  skip_if_only_changed: OWNERS$
 - as: bindata-check
   commands: |
     make update
@@ -212,6 +213,7 @@ tests:
     fi
   container:
     from: src
+  skip_if_only_changed: ^images/|OWNERS$
 - as: code-check
   commands: |
     unset GOFLAGS
@@ -220,10 +222,12 @@ tests:
     make check-code
   container:
     from: src
+  skip_if_only_changed: OWNERS$
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$
+  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$|OWNERS$
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-3
     test:
     - ref: enable-qe-catalogsource
@@ -231,16 +235,16 @@ tests:
       cli: latest
       commands: |
         oc version
-        export HOME="/tmp/home"
-        mkdir -p "${HOME}"
+        export tmphome="/tmp/home"
+        mkdir -p "${tmphome}"
 
-        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${HOME} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
-        mkdir -p ${HOME}/gcloudconfig && export CLOUDSDK_CONFIG=${HOME}/gcloudconfig && export PATH=$PATH:${HOME}/google-cloud-sdk/bin
+        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${tmphome} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
+        mkdir -p ${tmphome}/gcloudconfig && export CLOUDSDK_CONFIG=${tmphome}/gcloudconfig && export PATH=$PATH:${tmphome}/google-cloud-sdk/bin
 
-        export PATH="$PATH:/usr/local/krew/bin:$HOME/.krew/bin:/opt/OpenShift4-tools"
+        export PATH="$PATH:/usr/local/krew/bin:$HOME/.krew/bin:/opt/OpenShift4-tools:$tmphome"
 
         if ! which kubectl; then
-          ln -s "$(which oc)" ${HOME}/kubectl
+          ln -s "$(which oc)" ${tmphome}/kubectl
         fi
 
         python3 ./hack/pr.py

@@ -37,6 +37,15 @@ else
   exit 1
 fi
 
+# We need to modify BASE_DOMAIN based on which account this job is running.
+if [[ -z "$BASE_DOMAIN" ]]; then
+	if [[ "${CLUSTER_PROFILE_NAME}" == "aws" ]]; then
+		BASE_DOMAIN='hypershift.origin-ci-int-aws.dev.rhcloud.com'
+	else
+		BASE_DOMAIN="hypershift.${CLUSTER_PROFILE_NAME}.ci.openshift.org"
+	fi
+fi
+
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
 echo "DOMAIN is ${DOMAIN}"
@@ -161,7 +170,6 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --power-edge-router true \
       --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
       --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \

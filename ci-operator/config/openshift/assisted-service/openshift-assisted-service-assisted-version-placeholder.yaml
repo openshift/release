@@ -223,21 +223,6 @@ tests:
         OPENSHIFT_VERSION=ocp-version-placeholder
       PLATFORM: vsphere
     workflow: assisted-vsphere
-- as: e2e-nutanix-assisted
-  cluster: build01
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
-  steps:
-    cluster_profile: nutanix
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=assisted-version-placeholder
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=ocp-version-placeholder
-      PLATFORM: nutanix
-    workflow: assisted-nutanix
 - as: e2e-metal-assisted-none
   cluster: build05
   run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
@@ -288,8 +273,9 @@ tests:
         OPENSHIFT_VERSION=4.18
         NVIDIA_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ai-amd-4-18
+- as: e2e-metal-assisted-ai-amd-4-19
   cluster: build05
   run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
   steps:
@@ -297,9 +283,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.19
         AMD_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: assisted-version-placeholder

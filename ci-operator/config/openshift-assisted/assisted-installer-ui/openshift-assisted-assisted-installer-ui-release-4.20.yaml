@@ -1,8 +1,8 @@
 base_images:
-  node18-minimal:
-    name: nodejs-18-minimal
-    namespace: edge-infrastructure
-    tag: latest
+  ocp_builder_rhel-9-base-nodejs-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-4.19
   ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
@@ -19,20 +19,19 @@ build_root:
 images:
 - dockerfile_path: apps/assisted-disconnected-ui/Containerfile.ocp
   inputs:
-    node18-minimal:
+    ocp_builder_rhel-9-base-nodejs-openshift-4.19:
       as:
-      - registry.ci.openshift.org/edge-infrastructure/nodejs-18-minimal:latest
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.19
     ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
     ocp_ubi-micro_9:
       as:
       - registry.ci.openshift.org/ocp/ubi-micro:9
-  to: assisted-install-ui
+  to: agent-installer-ui
 promotion:
   to:
-  - disabled: true
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:

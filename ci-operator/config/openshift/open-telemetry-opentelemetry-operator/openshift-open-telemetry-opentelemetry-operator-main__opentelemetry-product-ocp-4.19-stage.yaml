@@ -25,8 +25,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: opentelemetry-stage-tests
+- as: opentelemetry-stage-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -36,23 +35,21 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.19"
+  cron: 0 0 30 2 *
   steps:
     env:
       OPERATORS: |
         [
-            {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:986878
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-openshift/must-gather
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:987948
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
-    - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
     workflow: generic-claim

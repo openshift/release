@@ -20,7 +20,7 @@ build_root:
   image_stream_tag:
     name: builder-priv
     namespace: ocp-private
-    tag: rhel-9-golang-1.23-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.20
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
 - dockerfile_literal: |
@@ -49,7 +49,8 @@ images:
   to: tests-private-pr
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - tests-private-ui
     - tests-private-pr
     name: 4.21-priv
@@ -83,6 +84,7 @@ tests:
   commands: make name-check
   container:
     from: src
+  skip_if_only_changed: OWNERS$
 - as: bindata-check
   commands: |
     make update
@@ -96,18 +98,21 @@ tests:
     fi
   container:
     from: src
+  skip_if_only_changed: ^images/|OWNERS$
 - as: code-check
   commands: |
     unset GOFLAGS
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2 2> /dev/null
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.2.2 2> /dev/null
     which golangci-lint
     make check-code
   container:
     from: src
+  skip_if_only_changed: OWNERS$
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$
+  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$|OWNERS$
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws
     test:
     - ref: enable-qe-catalogsource
@@ -115,16 +120,16 @@ tests:
       cli: latest
       commands: |
         oc version
-        export HOME="/tmp/home"
-        mkdir -p "${HOME}"
+        export tmphome="/tmp/home"
+        mkdir -p "${tmphome}"
 
-        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${HOME} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
-        mkdir -p ${HOME}/gcloudconfig && export CLOUDSDK_CONFIG=${HOME}/gcloudconfig && export PATH=$PATH:${HOME}/google-cloud-sdk/bin
+        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${tmphome} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
+        mkdir -p ${tmphome}/gcloudconfig && export CLOUDSDK_CONFIG=${tmphome}/gcloudconfig && export PATH=$PATH:${tmphome}/google-cloud-sdk/bin
 
-        export PATH=$PATH:$HOME/.krew/bin:/usr/local/krew/bin:/opt/OpenShift4-tools
+        export PATH="$PATH:$HOME/.krew/bin:/usr/local/krew/bin:/opt/OpenShift4-tools:$tmphome"
 
         if ! which kubectl; then
-          ln -s "$(which oc)" ${HOME}/kubectl
+          ln -s "$(which oc)" ${tmphome}/kubectl
         fi
 
         python3 ./hack/pr.py

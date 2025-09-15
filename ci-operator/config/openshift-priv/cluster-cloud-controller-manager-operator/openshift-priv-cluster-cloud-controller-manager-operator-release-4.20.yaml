@@ -1,16 +1,20 @@
 base_images:
-  ocp_4.19_base-rhel9:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
+  ocp_4.20_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.20"
 binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
 build_root:
   from_repository: true
@@ -18,17 +22,16 @@ canonical_go_repository: github.com/openshift/cluster-cloud-controller-manager-o
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-cloud-controller-manager-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -106,10 +109,11 @@ tests:
     workflow: openshift-upgrade-azure
 - as: level0-clusterinfra-azure-ipi-proxy-tests
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     env:
-      TEST_FILTERS: LEVEL0
+      TEST_FILTERS: ~ChkUpgrade&;LEVEL0
       TEST_SCENARIOS: Cluster_Infrastructure
     test:
     - ref: openshift-extended-test
@@ -149,19 +153,18 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: regression-vsphere-ipi-ccmo
+- as: regression-clusterinfra-vsphere-ipi-ccm
   optional: true
-  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: vsphere-elastic
     env:
-      TEST_FILTERS: CCM
-      TEST_SCENARIOS: Cluster_Infrastructure
-      TEST_TIMEOUT: "1200"
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: e2e-nutanix-ovn
   cluster: build01
   optional: true

@@ -3,6 +3,12 @@ set -e
 set -o pipefail
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 process_inventory() {
     local directory="$1"
     local dest_file="$2"
@@ -51,7 +57,7 @@ done
 echo "Create host_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-if [[ "$CLUSTER_NAME" == "hlxcl3" ]]; then
+if [[ "$CLUSTER_NAME" == "hlxcl3" || "$CLUSTER_NAME" == "hlxcl7" ]]; then
   mkdir /tmp/"${CLUSTER_NAME}"
   cp -r "${MOUNTED_HOST_INVENTORY}"/hlxcl2/hypervisor /tmp/"${CLUSTER_NAME}"/hypervisor
   cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/

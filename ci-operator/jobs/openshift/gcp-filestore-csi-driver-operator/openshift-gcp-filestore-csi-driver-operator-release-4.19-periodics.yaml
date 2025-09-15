@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build04
-  cron: 24 22 * * *
+  cron: 4 7 * * 0
   decorate: true
   extra_refs:
   - base_ref: release-4.19
@@ -10,17 +10,19 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-gcp-filestore-csi-driver-operator-release-4.19-periodic-e2e-gcp-filestore-csi
+  name: periodic-ci-openshift-gcp-filestore-csi-driver-operator-release-4.19-periodics-periodic-e2e-gcp-filestore-csi
   reporter_config:
     slack:
       channel: '#forum-ocp-storage'
       job_states_to_report:
       - failure
       - error
-      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -30,9 +32,10 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=periodic-e2e-gcp-filestore-csi
+      - --variant=periodics
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:

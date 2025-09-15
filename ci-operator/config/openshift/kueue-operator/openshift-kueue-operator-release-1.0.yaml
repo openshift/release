@@ -12,9 +12,17 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
   operator-sdk:
-    name: "4.17"
+    name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -30,6 +38,7 @@ images:
 - dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
   from: src
   to: kueue-operator-src
 - dockerfile_literal: |
@@ -44,6 +53,12 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -87,74 +102,12 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
+  optional: true
   steps:
+    post:
+    - chain: kueue-operator-post
     test:
-    - ref: kueue-operator-image-env-setup
-    - as: run-sdk
-      commands: |
-        source "${SHARED_DIR}/env"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
-    - ref: kueue-operator-image-patch
-    - as: e2e-kueue
-      cli: latest
-      commands: |
-        source "${SHARED_DIR}/env"
-        make e2e-ci-test
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
-- as: test-e2e-upstream-4-17
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
-  steps:
-    test:
-    - ref: kueue-operator-image-env-setup
-    - as: run-sdk
-      commands: |
-        source "${SHARED_DIR}/env"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
-    - ref: kueue-operator-image-patch
-    - as: e2e-kueue
-      cli: latest
-      commands: |
-        source "${SHARED_DIR}/env"
-        make e2e-upstream-test
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
+    - chain: kueue-operator-test-e2e
 - as: test-e2e-4-18
   cluster_claim:
     architecture: amd64
@@ -163,76 +116,13 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
-  optional: true
+  minimum_interval: 96h
+  presubmit: true
   steps:
+    post:
+    - chain: kueue-operator-post
     test:
-    - ref: kueue-operator-image-env-setup
-    - as: run-sdk
-      commands: |
-        source "${SHARED_DIR}/env"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
-    - ref: kueue-operator-image-patch
-    - as: e2e-kueue
-      cli: latest
-      commands: |
-        source "${SHARED_DIR}/env"
-        make e2e-ci-test
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
-- as: test-e2e-upstream-4-18
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  optional: true
-  steps:
-    test:
-    - ref: kueue-operator-image-env-setup
-    - as: run-sdk
-      commands: |
-        source "${SHARED_DIR}/env"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
-    - ref: kueue-operator-image-patch
-    - as: e2e-kueue
-      cli: latest
-      commands: |
-        source "${SHARED_DIR}/env"
-        make e2e-upstream-test
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
+    - chain: kueue-operator-test-e2e
 - as: test-e2e-4-19
   cluster_claim:
     architecture: amd64
@@ -241,76 +131,57 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.19"
-  optional: true
+  minimum_interval: 96h
+  presubmit: true
   steps:
+    post:
+    - chain: kueue-operator-post
     test:
-    - ref: kueue-operator-image-env-setup
-    - as: run-sdk
-      commands: |
-        source "${SHARED_DIR}/env"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
-    - ref: kueue-operator-image-patch
-    - as: e2e-kueue
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-disconnected
+  minimum_interval: 96h
+  steps:
+    cluster_profile: gcp
+    env:
+      CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.19
+      CATSRC_NAME: redhat-operators
+      MIRROR_OPERATORS: "true"
+    post:
+    - as: kueue-must-gather-disconnected
       cli: latest
       commands: |
         source "${SHARED_DIR}/env"
-        make e2e-ci-test
-      env:
-      - default: /shared
-        name: SHARED_DIR
+        export MUST_GATHER_IMAGE
+        echo "Running must-gather to gather diagnostics..."
+        mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
+        oc adm must-gather --image=${MUST_GATHER_IMAGE} --dest-dir=${ARTIFACT_DIR:-must-gather}/must-gather
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
-- as: test-e2e-upstream-4-19
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.19"
-  optional: true
-  steps:
-    test:
-    - ref: kueue-operator-image-env-setup
-    - as: run-sdk
-      commands: |
-        source "${SHARED_DIR}/env"
-        echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
-      env:
-      - default: /shared
-        name: SHARED_DIR
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
-    - ref: kueue-operator-image-patch
-    - as: e2e-kueue
+    - as: kueue-cleanup-disconnected
       cli: latest
-      commands: |
-        source "${SHARED_DIR}/env"
-        make e2e-upstream-test
-      env:
-      - default: /shared
-        name: SHARED_DIR
+      commands: make undeploy-ocp
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
+    test:
+    - chain: cert-manager-install
+    - chain: kueue-operator-disconnected
+    - as: e2e-kueue
+      cli: latest
+      commands: |
+        export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        make test-e2e
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 zz_generated_metadata:
   branch: release-1.0
   org: openshift

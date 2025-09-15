@@ -4,22 +4,24 @@ images:
 - dockerfile_path: Dockerfile
   to: jenkins
 - dockerfile_literal: |
-    FROM quay.io/openshift/origin-jenkins-agent-maven:4.11.0 AS builder
-    WORKDIR /home/jenkins
+    FROM registry.access.redhat.com/ubi9/openjdk-21:1.20 AS builder
+    WORKDIR /home/default
     COPY . .
     USER 0
-    # We need a newer maven version as the RHEL package is still on 3.6.2
-    RUN curl -L -o maven.tar.gz https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz && \
-    mkdir maven && \
-    tar -xvzf maven.tar.gz -C maven --strip-component 1 && \
-    cp -R maven /opt && \
-    ln -sf /opt/maven/bin/mvn /usr/bin/mvn && \
-    chmod -R 777 $HOME && \
-    mvn --version
+    # We need a newer maven version as the RHEL package is still on 3.8.5
+    RUN microdnf -y install gzip && \
+        curl -L -o maven.tar.gz https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz && \
+        mkdir maven && \
+        tar -xvzf maven.tar.gz -C maven --strip-component 1 && \
+        cp -R maven /opt && \
+        ln -sf /opt/maven/bin/mvn /usr/bin/mvn && \
+        chmod -R 777 $HOME && \
+        mvn --version
   to: jenkins-maven-builder
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - jenkins
     - jenkins-maven-builder
     name: "4.21"

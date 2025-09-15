@@ -4,13 +4,15 @@
 import click
 from google.api_core.exceptions import NotFound, PermissionDenied
 from google.cloud import secretmanager
+from google.cloud.secretmanager import SecretPayload
 from util import (
     PROJECT_ID,
     create_payload,
     get_secret_name,
-    validate_secret_source,
+    get_secrets_from_index,
     validate_collection,
     validate_secret_name,
+    validate_secret_source,
 )
 
 
@@ -47,23 +49,47 @@ def update(collection: str, secret: str, from_file: str, from_literal: str):
     validate_secret_source(from_file, from_literal)
 
     client = secretmanager.SecretManagerServiceClient()
-    secret_name = client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
+    secret_name = get_secret_name(collection, secret)
+    full_secret_path = client.secret_path(PROJECT_ID, secret_name)
+
+    # Check if secret exists in both index and GSM
+    index_secrets = get_secrets_from_index(client, collection)
+    secret_in_index = secret in index_secrets
 
     try:
-        client.get_secret(name=secret_name)
-        client.add_secret_version(
-            parent=secret_name,
-            payload={
-                "data": create_payload(from_file, from_literal),
-            },
-        )
+        client.get_secret(request={"name": full_secret_path})
+        secret_in_gsm = True
     except NotFound:
+        secret_in_gsm = False
+
+    # Simple existence checks - tell user to delete/recreate if inconsistent
+    if not secret_in_index and not secret_in_gsm:
         raise click.ClickException(
-            f"Secret '{secret}' not found in collection '{collection}'"
+            f"Secret '{secret}' does not exist in collection '{collection}'."
         )
+
+    if secret_in_index and not secret_in_gsm:
+        raise click.ClickException(
+            f"Secret '{secret}' is in inconsistent state. "
+            f"Run 'delete -c {collection} -s {secret}', then 'create' to fix."
+        )
+
+    if not secret_in_index and secret_in_gsm:
+        raise click.ClickException(
+            f"Secret '{secret}' is in inconsistent state (GSM only). "
+            f"Run 'delete -c {collection} -s {secret}', then 'create' to fix."
+        )
+
+    # Secret exists in both places - proceed with update
+    try:
+        client.add_secret_version(
+            parent=full_secret_path,
+            payload=SecretPayload(data=create_payload(from_file, from_literal)),
+        )
+        click.echo(f"Secret '{secret}' updated successfully.")
     except PermissionDenied:
-        raise click.UsageError(
-            f"Access denied: You do not have permission to create secrets in collection '{collection}'"
+        raise click.ClickException(
+            f"You don't have permission to update secrets in collection '{collection}'"
         )
     except Exception as e:
-        raise click.ClickException(f"Failed to create secret '{secret}': {e}")
+        raise click.ClickException(f"Failed to update secret '{secret}': {e}.")

@@ -1,29 +1,28 @@
 base_images:
-  ocp_4.19_base-rhel9:
-    name: "4.19"
+  ocp_4.20_base-rhel9:
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/Dockerfile.rhel
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: openshift-apiserver
 promotion:
   to:
-  - disabled: true
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -82,10 +81,24 @@ tests:
     cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-serial
+  shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
+- as: e2e-tests-extension
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary openshift-apiserver-tests-ext"
+        make tests-ext-build
+        echo "Running ./openshift-apiserver-tests-ext with sanity test"
+        ./openshift-apiserver-tests-ext run-test -n "[Jira:openshift-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/openshift-apiserver/conformance/parallel]"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

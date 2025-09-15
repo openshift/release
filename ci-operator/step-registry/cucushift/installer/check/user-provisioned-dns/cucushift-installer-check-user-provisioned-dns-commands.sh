@@ -7,10 +7,8 @@ set -o pipefail
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov)
     export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-    # BASE_DOMAIN=$(yq-go r "${INSTALL_CONFIG}" 'baseDomain')
     ;;
 gcp)
-    BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
     GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
     export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
     sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -20,6 +18,44 @@ gcp)
         gcloud config set project "${GOOGLE_PROJECT_ID}"
     fi
     ;;
+azure4|azuremag|azurestack)
+    # set the parameters we'll need as env vars
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+    AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+    AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+    AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+    AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
+
+    # log in with az
+    if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
+        az cloud set --name AzureUSGovernment
+    elif [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+        if [ ! -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]; then
+            echo "Unable to get specific ASH cloud name!"
+            exit 1
+        fi
+        cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
+
+        AZURESTACK_ENDPOINT=$(cat "${SHARED_DIR}"/AZURESTACK_ENDPOINT)
+        SUFFIX_ENDPOINT=$(cat "${SHARED_DIR}"/SUFFIX_ENDPOINT)
+
+        if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+            cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
+            cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+            export REQUESTS_CA_BUNDLE=/tmp/ca.pem
+        fi
+        az cloud register \
+            -n ${cloud_name} \
+            --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
+            --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
+        az cloud set --name ${cloud_name}
+        az cloud update --profile 2019-03-01-hybrid
+    else
+        az cloud set --name AzureCloud
+    fi
+    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+    az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
+    ;;
 *)
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"
     exit 1
@@ -27,12 +63,13 @@ gcp)
 esac
 
 # REGION="${LEASED_RESOURCE}"
-# INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
+INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 # CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 CLUSTER_NAME=$(yq-go r "${INSTALL_CONFIG}" 'metadata.name')
 PUBLISH_STRATEGY=$(yq-go r "${INSTALL_CONFIG}" 'publish')
+BASE_DOMAIN=$(yq-go r "${INSTALL_CONFIG}" 'baseDomain')
 
 
 ret=0
@@ -58,8 +95,7 @@ aws|aws-arm64|aws-usgov)
                 echo "PASS: No DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
             fi
         else
-            echo "ERROR: No valid PUBLIC_ZONE_ID found."
-            ret=$((ret+1))    
+            echo "PASS: No valid PUBLIC_ZONE_ID found on this platform, no public records would be created."
         fi
     fi
 
@@ -89,8 +125,7 @@ gcp)
                 echo "PASS: No DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
             fi
         else
-            echo "ERROR: No valid base_domain_zone_name found."
-            ret=$((ret + 1))
+            echo "PASS: No valid base_domain_zone_name found on this platform, no records would be created."
         fi
     fi
 
@@ -102,6 +137,54 @@ gcp)
         ret=$((ret+1))
     else
         echo "PASS: No private hosted zone created."
+    fi
+    ;;
+azure4|azuremag|azurestack)
+    # record in public zone
+    BASE_DOMAIN_RG="$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.baseDomainResourceGroupName')"
+    CLUSTER_RESOURCE_GROUP=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.resourceGroupName')
+    if [[ -z "${CLUSTER_RESOURCE_GROUP}" ]]; then
+        CLUSTER_RESOURCE_GROUP="${INFRA_ID}-rg"
+    fi
+    dns_records_list=""
+
+    if [[ "${PUBLISH_STRATEGY}" == "External" ]]; then
+        dns_records_list="api.${CLUSTER_NAME} *.apps.${CLUSTER_NAME}"
+    elif [[ "${PUBLISH_STRATEGY}" == "Mixed" ]]; then
+        api_publish_strategy=$(yq-go r "${INSTALL_CONFIG}" 'operatorPublishingStrategy.apiserver')
+        ingress_publish_strategy=$(yq-go r "${INSTALL_CONFIG}" 'operatorPublishingStrategy.ingress')
+        if [[ "${api_publish_strategy}" == "External" ]] || [[ -z "${api_publish_strategy}" ]]; then
+             dns_records_list="api.${CLUSTER_NAME}"
+        fi
+
+        if [[ "${ingress_publish_strategy}" == "External" ]] || [[ -z "${ingress_publish_strategy}" ]]; then
+             dns_records_list="${dns_records_list} *.apps.${CLUSTER_NAME}"
+        fi
+    fi
+
+    if [[ -n "${dns_records_list}" ]]; then
+        echo "Checking records in public zone."
+        for record in ${dns_records_list}; do
+            public_record_sets=$(az network dns record-set list -g ${BASE_DOMAIN_RG} -z ${BASE_DOMAIN} --query "[?contains(name, '${record}')]" -otsv)
+            if [[ -z "${public_record_sets}" ]]; then
+                echo "PASS: record ${record} is not found in base domain ${BASE_DOMAIN}!"
+            else
+               echo "ERROR: found record ${record} in base domain ${BASE_DOMAIN}!"
+               echo "${public_record_sets}"
+               ret=$((ret+1))
+            fi
+        done
+    fi
+
+    # private zone
+    echo "Checking private dns zone for ${CLUSTER_NAME}.${BASE_DOMAIN}"
+    private_dns_zone="$(az network private-dns zone list -g ${CLUSTER_RESOURCE_GROUP} -otsv)"
+    if [[ -z "${private_dns_zone}" ]]; then
+        echo "PASS: No private dns zone created."
+    else
+        echo "ERROR: found private dns zone in cluster resource group ${CLUSTER_RESOURCE_GROUP}!"
+        echo "${private_dns_zone}"
+        ret=$((ret+1))
     fi
     ;;
 esac

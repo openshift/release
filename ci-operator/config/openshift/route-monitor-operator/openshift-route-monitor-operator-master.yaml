@@ -19,12 +19,35 @@ resources:
 tests:
 - as: e2e-binary-build-success
   commands: |
-    make e2e-harness-build
+    make e2e-binary-build
   container:
     from: src
   run_if_changed: ^(test/e2e/.*|go\.mod|go\.sum)$
 - as: generate
   commands: make generate --always-make && git diff --exit-code
+  container:
+    from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: route-monitor-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: route-monitor-operator-codecov-token
+- as: lint
+  commands: make lint
   container:
     from: src
 - as: test

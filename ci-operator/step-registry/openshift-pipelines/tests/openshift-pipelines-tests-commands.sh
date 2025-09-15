@@ -11,6 +11,7 @@ export API_URL
 export gauge_reports_dir=${ARTIFACT_DIR}
 export overwrite_reports=false
 export KUBECONFIG=$SHARED_DIR/kubeconfig
+export GOPROXY="https://proxy.golang.org/"
 
 # Add timeout to ignore runner connection error
 gauge config runner_connection_timeout 600000 && gauge config runner_request_timeout 300000
@@ -30,7 +31,7 @@ fi
 echo "Running gauge specs"
 IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
 for spec in "${specs[@]}"; do
-  gauge run --log-level=debug --verbose --tags 'sanity & !tls' ${spec} || true
+  gauge run --log-level=debug --verbose --tags 'sanity & !tls' --max-retries-count=3 --retry-only 'sanity & !tls' ${spec} || true
 done
 
 gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec || true

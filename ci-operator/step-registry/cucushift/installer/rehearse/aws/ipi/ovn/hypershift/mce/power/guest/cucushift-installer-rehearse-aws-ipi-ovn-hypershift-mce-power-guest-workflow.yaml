@@ -2,16 +2,18 @@ workflow:
   as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-power-guest
   steps:
     pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-ovn-ingress-nlb-provision
-    - ref: hypershift-mce-install
-    - ref: hypershift-mce-conf-os-images
-    - chain: hypershift-mce-power-create
-    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
-    - ref: cucushift-hypershift-extended-enable-guest
+      - chain: cucushift-installer-rehearse-aws-ipi-ovn-ingress-nlb-provision
+      - ref: hypershift-mce-install
+      - ref: hypershift-mce-conf-os-images
+      - chain: hypershift-mce-power-create
+      - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+      - ref: cucushift-hypershift-extended-enable-guest
+      - ref: cucushift-installer-reportportal-marker
     post:
-    - ref: cucushift-hypershift-extended-disable-guest
-    - ref: hypershift-mce-power-destroy
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+      - ref: cucushift-hypershift-extended-disable-guest
+      - ref: hypershift-mce-power-destroy
+      - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+      - ref: send-results-to-reportportal
     env:
       CP_AVAILABILITY_POLICY: HighlyAvailable
       ENABLE_ICSP: "true"
@@ -31,7 +33,5 @@ workflow:
       USAGE_CLUSTER_TYPE: "hypershift-mgmt"
       ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
         NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
-
-
   documentation: |-
     This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow

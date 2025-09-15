@@ -70,13 +70,7 @@ function select_baremetal_host_from_pool {
     fi
   done
 
-  echo
-  echo "[FATAL] There is not available baremetal host where deploy the current Spoke cluster!!!"
-  echo "For manual clean up, check out /var/run/lock/ztp-baremetal-pool/*.lock folder in your bastion host"
-  echo "and remove the lock files that release those baremental host you consider is saved to unlock."
-  echo
-  echo -n "no" >| ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt
-  exit 1
+  return 1
 }
 
 function update_host_and_master_yaml_files {
@@ -207,7 +201,16 @@ function hack_spoke_deployment {
 
   echo "************ telcov10n hack spoke deployment values ************"
 
-  select_baremetal_host_from_pool
+  wait_until_command_is_ok "select_baremetal_host_from_pool" 1m "${LOCK_ACQUIRE_ATTEMPTS}" || ( \
+    echo
+    echo "[FATAL] There is not available baremetal host where deploy the current Spoke cluster!!!"
+    echo "For manual clean up, check out /var/run/lock/ztp-baremetal-pool/*.lock folder in your bastion host"
+    echo "and remove the lock files that release those baremental host you consider is saved to unlock."
+    echo
+    echo -n "no" >| ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt
+    exit 1
+  )
+
   update_base_domain
   update_dns_domains
 }

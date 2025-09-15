@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   commitchecker:
     name: commitchecker
     namespace: ci
@@ -11,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
 binary_build_commands: go build .
 build_root:
   from_repository: true
@@ -27,8 +35,7 @@ images:
   to: ibm-cloud-controller-manager
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -71,6 +78,19 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
+- as: regression-clusterinfra-ibmcloud-ipi-ccm
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      BASE_DOMAIN: ci-ibmcloud.devcluster.openshift.com
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-main}

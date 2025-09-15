@@ -2,7 +2,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.63.4
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -12,17 +12,21 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.20_base-rhel9:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
   yamllint:
     name: rust
     namespace: cincinnati-ci-public
-    tag: boot-root-1.79.0
+    tag: boot-root-1.84.1
 build_root:
   from_repository: true
 images:
@@ -37,17 +41,17 @@ images:
   to: cluster-version-operator
 promotion:
   to:
-  - name: "4.20"
+  - name: "4.21"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -70,7 +74,7 @@ tests:
     clone: true
     from: golangci-lint
 - as: unit
-  commands: go test ./...
+  commands: make test
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -92,6 +96,18 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-extended-tests
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&
+      TEST_SCENARIOS: OTA cvo
+    test:
+    - chain: openshift-e2e-test-ota-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 8h0m0s
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -154,7 +170,8 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
-- as: e2e-agnostic-operator-devpreview
+- always_run: false
+  as: e2e-agnostic-operator-devpreview
   optional: true
   steps:
     cluster_profile: azure4

@@ -29,6 +29,9 @@ chain:
           default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
           default: /var/run/brew-pull-secret/token
+        - name: PUBLIC_ONLY
+          default: "false"
+          documentation: "If true, only public subnets are created (requires release version 4.16 or higher)"
         - name: EXTRA_ARGS
           default: ""
           documentation: "Extra args to pass to the create cluster aws command"
@@ -38,11 +41,18 @@ chain:
         trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
         
         debug() {
-          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
-          oc get pod -n local-cluster-${CLUSTER_NAME}
-          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
-          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster
+          oc get pod -n local-cluster-${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster_cp_pods
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml > $ARTIFACT_DIR/hostedcluster.yaml
+          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml > $ARTIFACT_DIR/hostedcluster_cp_pods.yaml
+          oc get managedcluster > $ARTIFACT_DIR/managedcluster
+          oc get managedcluster -oyaml > $ARTIFACT_DIR/managedcluster.yaml
           oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
+          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+          oc get clusterversion/version > $ARTIFACT_DIR/guestcluster_clusterversion
+          oc get clusterversion/version -oyaml > $ARTIFACT_DIR/guestcluster_clusterversion.yaml
+          oc get clusteroperator > $ARTIFACT_DIR/guestcluster_clusteroperator
+          oc get clusteroperator -oyaml > $ARTIFACT_DIR/guestcluster_clusteroperator.yaml
         }
 
         support_np_skew() {
@@ -82,7 +92,7 @@ chain:
           cd -
         fi
 
-        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 
         PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
@@ -119,7 +129,11 @@ chain:
           CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
           sleep 60
         fi
-      
+        
+        if [[ $PUBLIC_ONLY == "true" ]]; then
+          EXTRA_ARGS+=" --public-only "
+        fi
+        
         eval "/tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
@@ -161,21 +175,27 @@ chain:
         /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
         echo "Waiting for clusteroperators to be ready"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        until \
-        oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
-        echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-        oc get clusterversion 2>/dev/null || true
-        sleep 10s
-        done
+        
+        timeout 20m bash -c '
+          until \
+            oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
+            echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+            oc get clusterversion 2>/dev/null || true
+            sleep 10s
+          done
+        '
         echo "Waiting for ManagedCluster to be ready"
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        until \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
-        echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
-        sleep 10s
-        done
+        
+        timeout 20m bash -c '
+          until \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
+            echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
+            sleep 10s
+          done
+        '        
         echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
       from_image:
         namespace: ocp
@@ -186,7 +206,7 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 30m0s
+      timeout: 60m0s
       credentials:
         - mount_path: /etc/ci-pull-credentials
           name: ci-pull-credentials

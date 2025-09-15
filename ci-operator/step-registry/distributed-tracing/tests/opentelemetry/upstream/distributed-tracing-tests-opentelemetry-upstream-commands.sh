@@ -48,13 +48,20 @@ any_errors=false
 
 # Set the operator args required for tests execution.
 OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--feature-gates=+operator.observability.prometheus\", \"--enable-nginx-instrumentation=true\"]}]"
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
 sleep 60
 if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
     echo "CSV updated successfully, continuing script execution..."
 else
     echo "Operator CSV update failed, exiting with error."
     exit 1
+fi
+
+# Determine OpenShift version and set sidecar selector (unified parsing)
+oc_version_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null | cut -d . -f 2 || true)
+selector="sidecar=legacy"
+if [[ -n "$oc_version_minor" ]] && [[ "$oc_version_minor" -ge 16 ]]; then
+  selector="sidecar=native"
 fi
 
 # Execute OpenTelemetry e2e tests
@@ -65,8 +72,8 @@ chainsaw test \
 --test-dir \
 tests/e2e \
 tests/e2e-autoscale \
+tests/e2e-crd-validations \
 tests/e2e-openshift \
-tests/e2e-prometheuscr \
 tests/e2e-instrumentation \
 tests/e2e-pdb \
 tests/e2e-opampbridge \
@@ -75,9 +82,19 @@ tests/e2e-multi-instrumentation \
 tests/e2e-targetallocator-cr \
 tests/e2e-targetallocator || any_errors=true
 
+# Execute sidecar-related tests with version-dependent selector
+chainsaw test \
+--report-name "junit_otel_e2e_sidecar_prometheuscr" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--selector "$selector" \
+--test-dir \
+tests/e2e-prometheuscr \
+tests/e2e-sidecar || any_errors=true
+
 # Set the operator args required for tests execution.
 OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\"]}]"
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
 sleep 60
 if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
     echo "CSV updated successfully, continuing script execution..."
@@ -93,6 +110,25 @@ chainsaw test \
 --report-format "XML" \
 --test-dir \
 tests/e2e-metadata-filters || any_errors=true
+
+# Set the operator args with instrumentation images for e2e-instrumentation tests.
+OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--auto-instrumentation-nodejs-image=${INSTRUMENTATION_NODEJS_IMG}\", \"--auto-instrumentation-python-image=${INSTRUMENTATION_PYTHON_IMG}\", \"--auto-instrumentation-dotnet-image=${INSTRUMENTATION_DOTNET_IMG}\", \"--auto-instrumentation-apache-httpd-image=${INSTRUMENTATION_APACHE_HTTPD_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
+sleep 60
+if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
+    echo "CSV updated successfully with instrumentation images, continuing script execution..."
+else
+    echo "Operator CSV update with instrumentation images failed, exiting with error."
+    exit 1
+fi
+
+# Execute OpenTelemetry e2e-instrumentation tests with pipeline instrumentation images
+chainsaw test \
+--report-name "junit_otel_e2e_instrumentation_pipeline_images" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--test-dir \
+tests/e2e-instrumentation || any_errors=true
 
 # Check if any errors occurred
 if $any_errors; then

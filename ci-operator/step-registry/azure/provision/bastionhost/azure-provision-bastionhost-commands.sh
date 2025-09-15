@@ -212,6 +212,10 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     else
         vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
     fi
+    if [[ "${IPSTACK}" == "dualstack" ]]; then
+        bastion_subnet_cidr_ipv6=$(echo ${AZURE_VNET_IPV6_ADDRESS_PREFIXES%/*} | awk -F':' '{print $1":"$2":"$3":99::/64"}')
+        vnet_subnet_address_parameter="${vnet_subnet_address_parameter} ${bastion_subnet_cidr_ipv6}"
+    fi
     run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
 else
     # bastion subnet and nsg already exist, create additional nsg rule
@@ -347,7 +351,13 @@ EOF
     ign_b64="$(cat ${bastion_ignition_file} | base64 -w0)"
     run_command "az deployment group create --resource-group ${bastion_rg} --name ${arm_deployment_name} --template-file '${bastion_vm_arm_template}' --parameters ignitionContent='${ign_b64}' --parameters vmName=${bastion_name} --parameters vnetName=${bastion_vnet_name} --parameters subnetName=${bastion_subnet} --parameters vmSize=Standard_DS1_v2 --parameters vmImageId=${bastion_image_id}"
 else
-    run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --public-ip-sku 'Standard' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'"
+    run_command "az network public-ip create --resource-group ${bastion_rg} --name ${bastion_name}PublicIPv4 --sku Standard --version IPv4"
+    run_command "az network nic create --resource-group ${bastion_rg} --name ${bastion_name}NIC --vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet} --network-security-group ${bastion_nsg} --public-ip-address ${bastion_name}PublicIPv4"
+    if [[ "${IPSTACK}" == "dualstack" ]]; then
+        run_command "az network public-ip create --resource-group ${bastion_rg} --name ${bastion_name}PublicIPv6 --sku Standard --version IPv6"
+        run_command "az network nic ip-config create --resource-group ${bastion_rg} --name ${bastion_name}IPv6config --nic-name ${bastion_name}NIC --private-ip-address-version IPv6 --vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet} --public-ip-address ${bastion_name}PublicIPv6"
+    fi
+    run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --public-ip-sku 'Standard' --os-disk-size-gb 199 --nics ${bastion_name}NIC --size ${BASTION_VM_SIZE} --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'"
 fi
 
 # sleep for a while to wait registry/proxy image get pulled and services boot up after vm is running
@@ -355,9 +365,14 @@ sleep 180
 
 if [ -f "${SHARED_DIR}/${bastion_name}_output.json" ]; then
     # directly get public IP from bastion vm creation output
-    bastion_private_ip=$(jq -r ".privateIpAddress" "${SHARED_DIR}/${bastion_name}_output.json")
-    bastion_public_ip=$(jq -r ".publicIpAddress" "${SHARED_DIR}/${bastion_name}_output.json")
+    bastion_private_ip=$(jq -r ".privateIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $1}')
+    bastion_public_ip=$(jq -r ".publicIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $1}')
+    if [[ "${IPSTACK}" == "dualstack" ]]; then
+        #bastion_private_ipv6=$(jq -r ".privateIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $2}')
+        bastion_public_ipv6=$(jq -r ".publicIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $2}')
+    fi
 else
+    # for azure stack hub, no ipv6 supported
     vm_ip_info_file=$(mktemp)
     run_command "az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | tee '${vm_ip_info_file}'" || exit 2
     bastion_private_ip=$(jq -r ".[].virtualMachine.network.privateIpAddresses[]" "${vm_ip_info_file}")
@@ -399,6 +414,9 @@ fi
 #####################################
 echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
 echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
+if [[ "${IPSTACK}" == "dualstack" ]]; then
+    echo "${bastion_public_ipv6}" > "${SHARED_DIR}/bastion_ipv6_address"
+fi
 echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
 proxy_credential=$(cat /var/run/vault/proxy/proxy_creds)

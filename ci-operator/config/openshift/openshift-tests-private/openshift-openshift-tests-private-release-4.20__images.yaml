@@ -28,7 +28,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_literal: |
     FROM src AS builder
@@ -63,8 +63,8 @@ images:
         MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
         curl -skL ${MIRRORURL}/ocp/candidate/opm-linux-rhel9.tar.gz -o opm-linux.tar.gz  && \
         tar -C /usr/bin/ -xzvf opm-linux.tar.gz && mv /usr/bin/opm-rhel9 /usr/bin/opm && opm version && rm -f opm-linux.tar.gz && \
-        curl -skL ${MIRRORURL}/ocp/candidate/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
-        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz && \
+        curl -skL ${MIRRORURL}/ocp-dev-preview/latest/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
+        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && oc-mirror version && rm -f oc-mirror.tar.gz && \
         curl -skL ${MIRRORURL}/operator-sdk/latest/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
         tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
         curl -skL https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o govc_Linux_x86_64.tar.gz && \
@@ -124,17 +124,6 @@ images:
       - src
   to: tests-private-burner
 - dockerfile_literal: |
-    FROM this-is-ignored-and-not-used
-    RUN set -x && \
-        curl -skL https://repository-basic.engineering.redhat.com/nexus/repository/dno-raw/droute-client/latest/droute-linux-amd64 -o /usr/local/bin/droute && \
-        chmod +x /usr/local/bin/droute && \
-        pushd /etc/pki/ca-trust/source/anchors && \
-        curl -skL -O https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem && \
-        update-ca-trust extract && \
-        popd
-  from: ci_tests-private-base
-  to: datarouter
-- dockerfile_literal: |
     FROM bin AS bin
     FROM this-is-ignored-and-not-used
     COPY --from=bin /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
@@ -159,8 +148,6 @@ promotion:
   to:
   - namespace: ci
     tag: "4.20"
-  - namespace: ci
-    tag: latest
 resources:
   '*':
     limits:

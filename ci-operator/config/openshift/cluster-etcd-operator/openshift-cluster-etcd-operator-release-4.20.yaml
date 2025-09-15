@@ -27,31 +27,30 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.18_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.18_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-etcd-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -231,16 +230,16 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1800"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1825"
+      CLUSTER_AGE_STEP: "365"
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown
   optional: true
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1800"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1825"
+      CLUSTER_AGE_STEP: "365"
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-aws-cpms
   steps:

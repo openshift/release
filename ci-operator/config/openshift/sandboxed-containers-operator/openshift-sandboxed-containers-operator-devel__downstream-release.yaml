@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: "4.20"
   upi-installer:
-    name: "4.18"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -12,7 +12,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -25,13 +25,72 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      KATA_RPM_BUILD_MD5SUM: da576553a2d5925b67ddaf0591454e48
-      KATA_RPM_VERSION: 3.13.0-1.rhaos4.18.el9
+      EXPECTED_OPERATOR_VERSION: 1.10.0
       SLEEP_DURATION: "0"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: C00102
+      TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "75"
     workflow: sandboxed-containers-operator-e2e-azure
+- as: azure-ipi-peerpods
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.10.0
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-azure
+- as: azure-ipi-coco
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.10.0
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: coco
+    workflow: sandboxed-containers-operator-e2e-azure
+- as: aws-ipi-peerpods
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_REGION_OVERRIDE: us-east-2
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.10.0
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aws
+- as: aws-ipi-coco
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_REGION_OVERRIDE: us-east-2
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.10.0
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: "0"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: coco
+    workflow: sandboxed-containers-operator-e2e-aws
 zz_generated_metadata:
   branch: devel
   org: openshift

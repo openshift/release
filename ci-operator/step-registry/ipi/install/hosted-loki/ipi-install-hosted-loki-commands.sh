@@ -514,7 +514,7 @@ $PROXYLINE
           name: shared-data
         image: quay.io/observatorium/token-refresher
       serviceAccountName: loki-promtail
-      terminationGracePeriodSeconds: 180
+      terminationGracePeriodSeconds: 30
       tolerations:
       - operator: Exists
       priorityClassName: system-cluster-critical

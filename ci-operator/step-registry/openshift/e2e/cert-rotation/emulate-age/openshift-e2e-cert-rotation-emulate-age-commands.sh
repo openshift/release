@@ -28,6 +28,8 @@ source /usr/local/share/cert-rotation-functions.sh
 
 export KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
 
+run-on-first-master "echo -n \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\" > /var/cluster-shutdown-time"
+
 # Set date for host
 sudo timedatectl set-time +${1}d
 

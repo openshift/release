@@ -7,6 +7,18 @@ SCRIPTS_FOLDER="/eco-ci-cd/scripts"
 CLUSTER_VERSION_FILE="${SHARED_DIR}/cluster_version"
 JIRA_TOKEN_FILE=/var/run/jira-token/token
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
+echo "Validate JOB_TYPE variable: ${JOB_TYPE}"
+if [ "$JOB_TYPE" = "presubmit" ]; then
+  echo "JOB_TYPE=presubmit — skipping script"
+  exit 0
+fi
+
 if [[ ! -f "$CLUSTER_VERSION_FILE" ]]; then
   echo "Error: Cluster version file not found: '$CLUSTER_VERSION_FILE'." >&2
   exit 1
@@ -34,10 +46,9 @@ echo "Content of shared_dir is: $(ls -la $SHARED_DIR)"
 
 echo "Running Z stream issue clone - $Z_STREAM_VERSION"
 
-export JIRA_TOKEN
-export Z_STREAM_VERSION
-export SHARED_DIR
-
 cd $SCRIPTS_FOLDER
-python3 $PYTHON_SCRIPT
+python3 $PYTHON_SCRIPT \
+  --z-stream-version "$Z_STREAM_VERSION" \
+  --jira-token "$JIRA_TOKEN" \
+  --shared-dir "$SHARED_DIR"
 

@@ -25,26 +25,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: tempo-stage-tests
+- as: tempo-stage-tests
+  cron: 0 0 30 2 *
   steps:
     env:
+      FIPS_ENABLED: "false"
+      OCP_CLUSTER_VERSION: stable-4.17
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator", "target_namespaces": "", "operator_group":"coo-og"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:986877
       SKIP_TESTS: tests/e2e/generate tests/e2e/gateway tests/e2e-openshift/monolithic-multitenancy-static
-        tests/e2e-openshift-ossm/* tests/e2e-openshift-object-stores/*
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:987949
+        tests/e2e-openshift-ossm/* tests/e2e-openshift-object-stores/* tests/e2e-openshift-serverless/*
     test:
-    - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
+    - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: distributed-tracing-tests-tempo-downstream
     workflow: openshift-observability-ibm-p
 zz_generated_metadata:

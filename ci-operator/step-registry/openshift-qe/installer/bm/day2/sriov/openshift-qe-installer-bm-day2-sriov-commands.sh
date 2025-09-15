@@ -5,7 +5,7 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/sriov_num_vfs)
+SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".sriov_num_vfs")
 SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
 
 oc config view
@@ -50,7 +50,7 @@ until [ "$(kubectl get csv -n openshift-sriov-network-operator | grep sriov-netw
   do echo "Waiting for SRIOV operator"
   sleep 5
 done
-kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname)"
+kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname | grep sriov)"
 sleep 60
 
 {

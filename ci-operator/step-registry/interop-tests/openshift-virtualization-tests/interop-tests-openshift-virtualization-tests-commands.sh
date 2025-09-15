@@ -159,6 +159,34 @@ function cnv::reimport_datavolumes() {
   oc get pvc -n "${dvnamespace}"
 }
 
+function install_yq_if_not_exists() {
+    # Install yq manually if not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
+        echo "Installing yq"
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+    fi
+}
+
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            install_yq_if_not_exists
+            echo "Mapping Test Suite Name To: CNV-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        fi
+    fi
+}
+
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
 
@@ -168,7 +196,7 @@ export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapp
 export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
 export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
 set +x # We don't wan't to see it in the logs
-ARTIFACTORY_USER=ci-bot-read-interop
+ARTIFACTORY_USER=$(head -1 "${BW_PATH}"/artifactory-user || printf ci-read-only-user)
 ARTIFACTORY_TOKEN=$(head -1 "${BW_PATH}"/artifactory-token)
 ARTIFACTORY_SERVER=$(head -1 "${BW_PATH}"/artifactory-server)
 ACCESS_TOKEN=$(head -1 "${BW_PATH}"/bitwarden-client-secret)
@@ -225,5 +253,8 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
 #         | sed --regexp-extended 's#</?testsuites([^>]+)?>##g' \
 #         | xmllint --format - > "${JUNIT_RESULTS_FILE}"
 # fi
+
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
 
 exit ${rc}

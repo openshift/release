@@ -11,7 +11,8 @@ export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
 export KUBECONFIG="/home/jenkins/.kube/config"
-export OADP_TEST_FOCUS="--ginkgo.focus=${OADP_TEST_FOCUS}"
+export OADP_TEST_FOCUS="--focus=${OADP_TEST_FOCUS}"
+export TEMP_TEST_FOCUS=$OADP_TEST_FOCUS
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -65,14 +66,22 @@ go mod tidy
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class- &&\
   oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd" storageclass.kubernetes.io/is-default-class=true &&\
+  OADP_TEST_FOCUS=""
   export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
-  export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
+  export EXTRA_GINKGO_PARAMS="--skip=tc-id:OADP-555" &&\
   (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
+  OADP_TEST_FOCUS=$TEMP_TEST_FOCUS
 fi
 
 # Run OADP tests with the focus
+if [[ "$OADP_TEST_FOCUS" == "--focus=ALL_TESTS" ]]; then
+  echo "Running all tests in oadp-e2e-qe"
+  OADP_TEST_FOCUS=""
+fi
+# export NUM_OF_OADP_INSTANCES=3
 export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
+export TESTS_FOLDER="/alabama/cspi/e2e" &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
 (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
 

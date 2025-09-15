@@ -43,8 +43,7 @@ images:
   to: cluster-capi-controllers
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -162,17 +161,16 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
-- as: regression-clusterinfra-aws-ipi-techpreview
+- as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     env:
       E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_FILTERS: CAPI
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
       TEST_SCENARIOS: Cluster_Infrastructure CAPI
-      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi

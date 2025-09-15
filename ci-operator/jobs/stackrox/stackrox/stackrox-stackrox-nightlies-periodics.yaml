@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build05
-  cron: 0 6 * * Mon
+  cron: 0 6 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -13,11 +13,22 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-stackrox
-    ci-operator.openshift.io/variant: ocp-4-18
+    ci-operator.openshift.io/variant: ocp-4-19
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-stackrox-nightlies-ocp-4-18-24nodes-scale-scannerv4-test
+  name: periodic-ci-stackrox-stackrox-nightlies-ocp-4-19-24nodes-scale-scannerv4-test
+  reporter_config:
+    slack:
+      channel: '#acs-perfscale'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -27,10 +38,10 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=24nodes-scale-scannerv4-test
-      - --variant=ocp-4-18
+      - --variant=ocp-4-19
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -89,11 +100,22 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-stackrox
-    ci-operator.openshift.io/variant: ocp-4-18
+    ci-operator.openshift.io/variant: ocp-4-19
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-stackrox-nightlies-ocp-4-18-24nodes-scale-test
+  name: periodic-ci-stackrox-stackrox-nightlies-ocp-4-19-24nodes-scale-test
+  reporter_config:
+    slack:
+      channel: '#acs-perfscale'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -103,10 +125,10 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=24nodes-scale-test
-      - --variant=ocp-4-18
+      - --variant=ocp-4-19
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:

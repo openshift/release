@@ -4,12 +4,12 @@ build_root:
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -26,6 +26,32 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      credentials:
+      - collection: ""
+        mount_path: /usr/local/sandbox-secrets
+        name: sandbox-devsso
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: "3"
+          memory: 250Mi
+    workflow: codeready-toolchain-aws
+- as: ci-daily
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: devsandboxci-aws
+    env:
+      BASE_DOMAIN: devsandboxci.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e CI_DISABLE_PAIRING=true DEPLOY_LATEST=true
+      credentials:
+      - collection: ""
+        mount_path: /usr/local/sandbox-secrets
+        name: sandbox-devsso
+        namespace: test-credentials
       from: src
       resources:
         requests:
