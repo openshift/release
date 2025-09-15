@@ -160,7 +160,7 @@ else
     }
   }" || true
 
-  # delete any registry pod marooned on NotReady nodes (no awk-quote traps)
+  # delete any registry pod marooned on NotReady nodes (no awk-quote)
   NNR="$(oc get nodes -o jsonpath='{range .items[?(@.status.conditions[?(@.type=="Ready")].status!="True")]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
   if [[ -z "$NNR" ]]; then
   # Fallback: derive from full conditions line; avoid quote-escape issues
