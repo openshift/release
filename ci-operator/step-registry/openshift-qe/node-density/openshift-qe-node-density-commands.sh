@@ -11,6 +11,7 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
+ENABLE_MG_LOG_COLLECTION=${ENABLE_MG_LOG_COLLECTION:-true}
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
@@ -90,17 +91,25 @@ gather_loop() {
 }
 
 # Run the gather loop in background
-gather_loop &
-GATHER_LOOP_PID=$!
+if [[ "${ENABLE_MG_LOG_COLLECTION}" == "true" ]]; then
+  echo "Enabling mg log collection loop..."
+  gather_loop &
+  GATHER_LOOP_PID=$!
+fi
 
 # Run workload immediately
+set +e
 ./run.sh
+rc=$?
+set -e
 
 # After workload finishes, kill background gather loop
-echo "Workload finished. Stopping gather loop (PID $GATHER_LOOP_PID)..."
-kill "$GATHER_LOOP_PID" 2>/dev/null || true
-wait "$GATHER_LOOP_PID" 2>/dev/null || true
-echo "Gather loop stopped."
+if [[ "${ENABLE_MG_LOG_COLLECTION}" == "true" ]]; then
+  echo "Workload finished. Stopping gather loop (PID $GATHER_LOOP_PID)..."
+  kill "$GATHER_LOOP_PID" 2>/dev/null || true
+  wait "$GATHER_LOOP_PID" 2>/dev/null || true
+  echo "Gather loop stopped."
+fi
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
@@ -112,3 +121,5 @@ fi
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+
+exit $rc
