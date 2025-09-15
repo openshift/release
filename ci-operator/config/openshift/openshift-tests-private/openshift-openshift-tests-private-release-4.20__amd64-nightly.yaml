@@ -755,6 +755,7 @@ tests:
       ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: m5.large
       ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CP_INSTANCES_NUMBER: "2"
       DYNAMIC_DNS_ENABLED: "true"
       HYPERSHIFT_DYNAMIC_DNS: hypershift-qe-dns.qe.devcluster.openshift.com
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
@@ -2295,10 +2296,12 @@ tests:
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.20
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-19:latest
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: File_Integrity_Operator
     test:
+    - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
@@ -3131,6 +3134,8 @@ tests:
   cron: 46 21 4,11,18,25 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      USE_KUBEADMIN_IDP: "true"
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-gcp-upi
@@ -4658,6 +4663,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-sno
+- as: baremetal-upi-ipv6-static-disk-etcd-encryption-f7
+  capabilities:
+  - intranet
+  cron: 31 17 4,11,18,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      ENABLE_ETCD_ENCRYPTION: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-ipv6-static
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

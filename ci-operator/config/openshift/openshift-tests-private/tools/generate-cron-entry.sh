@@ -39,7 +39,7 @@ if ! [[ "$TEST_NAME" =~ (p[1-3])?-f[0-9]+ ]] ; then
 fi
 
 FN="$(echo $TEST_NAME | sed -E 's/.*-f([0-9]+)(.*)?/\1/')"
-NUMBERS="$(echo $TEST_NAME $YAML_FILE | md5sum | tr [a-f] [1-6] | tr -d ' -')"
+NUMBERS="$(echo $TEST_NAME $YAML_FILE | md5sum | tr 'a-f' '1-6' | tr -d ' -')"
 if [[ $DEBUG = "true" ]] ; then
 	echo "FN: $FN"
 	echo "NUMBERS: $NUMBERS"
