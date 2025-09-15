@@ -22,7 +22,7 @@ postsubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -84,7 +84,7 @@ postsubmits:
         - --variant=okd-scos
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -120,3 +120,55 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    max_concurrency: 1
+    name: post-ci-openshift-operator-framework-operator-controller-main-refresh-bumper-pr
+    reporter_config:
+      slack:
+        channel: '#team-operator-fw'
+        job_states_to_report:
+        - failure
+        report_template: Refresh job {{.Spec.Job}} failed. https://prow.ci.openshift.org/?job={{.Spec.Job}}
+    spec:
+      containers:
+      - args:
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-login=openshift-bot
+        - --git-name=openshift-bot
+        - --git-email=openshift-bot@redhat.com
+        - --operator-controller-dir=/home/prow/go/src/github.com/openshift/operator-framework-operator-controller
+        - --mode=publish
+        - --fetch-mode=https
+        - --log-level=debug
+        - --self-approve=true
+        - --dry-run=false
+        command:
+        - /usr/bin/bumper
+        env:
+        - name: GOROOT
+          value: /usr/lib/golang
+        - name: HOME
+          value: /home/prow/go
+        image: quay-proxy.ci.openshift.org/openshift/ci:operator-lifecycle-manager_olm-v1-bumper_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      serviceAccountName: olm-image-puller
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-bot

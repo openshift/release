@@ -57,7 +57,7 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
   if [[ "${compute_arch}" == "arm64" ]]; then
     COMPUTE_NODE_TYPE="t2a-standard-4"
   else
-    COMPUTE_NODE_TYPE="e2-standard-4"
+    COMPUTE_NODE_TYPE="e2-custom-6-16384"
   fi
 fi
 

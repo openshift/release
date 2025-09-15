@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -12,7 +12,7 @@ base_images:
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: manila-csi-driver-operator-test
   ocp_4.20_base-rhel9:
@@ -28,7 +28,7 @@ base_images:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
   openstack-cinder-csi-driver-operator-test:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
 build_root:
@@ -65,7 +65,7 @@ promotion:
   - excluded_images:
     - hypershift-operator
     - hypershift-tests
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
   - additional_images:
       hypershift-operator: hypershift-operator
@@ -79,23 +79,18 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
-  initial-419:
+      version: "4.21"
+  initial-420:
     candidate:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.19"
+      version: "4.20"
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
-  latest-417:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.17"
   latest-418:
     candidate:
       product: ocp
@@ -106,16 +101,21 @@ releases:
       product: ocp
       stream: ci
       version: "4.19"
+  latest-420:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.19"
+      version: "4.20"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -134,14 +134,14 @@ tests:
   commands: make verify
   container:
     from: custom-verify-src
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
 - as: unit
   commands: make test
   container:
     from: src
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
 - as: e2e-aks
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -149,12 +149,29 @@ tests:
       OCP_IMAGE_N2: release:n2minor
     env:
       AUTH_THROUGH_CERTS: "true"
+      ENABLE_AKS_KMS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-4-20
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-420
+      OCP_IMAGE_N1: release:latest-419
+      OCP_IMAGE_N2: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-420
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_AKS_KMS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
   - build-tmpfs
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -193,7 +210,7 @@ tests:
 - as: e2e-aws-upgrade-hypershift-operator
   capabilities:
   - build-tmpfs
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -214,23 +231,23 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-4-19
+- as: e2e-aws-4-20
   capabilities:
   - build-tmpfs
   run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-419
-      OCP_IMAGE_N1: release:latest-418
-      OCP_IMAGE_N2: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-419
+      OCP_IMAGE_LATEST: release:latest-420
+      OCP_IMAGE_N1: release:latest-419
+      OCP_IMAGE_N2: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-420
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     env:
@@ -297,7 +314,7 @@ tests:
     cluster_profile: hypershift
     workflow: hypershift-azure-aks-conformance
 - as: security
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high

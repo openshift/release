@@ -8,10 +8,10 @@ SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
-LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
-  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".num_worker_nodes")
   export NUM_WORKER_NODES
 fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})

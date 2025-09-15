@@ -66,6 +66,7 @@ promotion:
   to:
   - additional_images:
       cloud-provider-gcp-rpms: rpms
+    disabled: true
     excluded_images:
     - rhel-coreos
     name: 4.21-priv
@@ -132,10 +133,16 @@ tests:
     env:
       PROJECT_NAME: cloud-provider-gcp
     workflow: openshift-ci-security
-- as: verify-deps
+- as: verify-vendor-work
   commands: openshift-hack/verify-vendor.sh
   container:
     from: src
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 - as: unit
   commands: openshift-hack/test-unit.sh
   container:

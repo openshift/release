@@ -89,7 +89,7 @@ def update(collection: str, secret: str, from_file: str, from_literal: str):
         click.echo(f"Secret '{secret}' updated successfully.")
     except PermissionDenied:
         raise click.ClickException(
-            f"Access denied: You do not have permission to update secrets in collection '{collection}'"
+            f"You don't have permission to update secrets in collection '{collection}'"
         )
     except Exception as e:
         raise click.ClickException(f"Failed to update secret '{secret}': {e}.")
