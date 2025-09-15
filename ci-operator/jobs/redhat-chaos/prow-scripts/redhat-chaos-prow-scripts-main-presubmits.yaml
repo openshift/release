@@ -4578,7 +4578,7 @@ presubmits:
         - --variant=metal-4.19-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -4641,7 +4641,7 @@ presubmits:
         - --variant=metal-4.19-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -4693,10 +4693,10 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build09
-    context: ci/prow/metal-4.19-nightly-x86-krkn-hub-node-tests-metal
+    context: ci/prow/metal-4.19-nightly-x86-krkn-hub-node-tests-metal-cp
     decorate: true
     decoration_config:
-      timeout: 7h0m0s
+      timeout: 8h0m0s
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4705,8 +4705,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.19"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-prow-scripts-main-metal-4.19-nightly-x86-krkn-hub-node-tests-metal
-    rerun_command: /test metal-4.19-nightly-x86-krkn-hub-node-tests-metal
+    name: pull-ci-redhat-chaos-prow-scripts-main-metal-4.19-nightly-x86-krkn-hub-node-tests-metal-cp
+    rerun_command: /test metal-4.19-nightly-x86-krkn-hub-node-tests-metal-cp
     spec:
       containers:
       - args:
@@ -4715,11 +4715,11 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=krkn-hub-node-tests-metal
+        - --target=krkn-hub-node-tests-metal-cp
         - --variant=metal-4.19-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -4764,7 +4764,85 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.19-nightly-x86-krkn-hub-node-tests-metal|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(metal-4.19-nightly-x86-krkn-hub-node-tests-metal-cp|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/metal-4.19-nightly-x86-krkn-hub-node-tests-metal-worker
+    decorate: true
+    decoration_config:
+      timeout: 8h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+      ci-operator.openshift.io/variant: metal-4.19-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-metal-4.19-nightly-x86-krkn-hub-node-tests-metal-worker
+    rerun_command: /test metal-4.19-nightly-x86-krkn-hub-node-tests-metal-worker
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-hub-node-tests-metal-worker
+        - --variant=metal-4.19-nightly-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(metal-4.19-nightly-x86-krkn-hub-node-tests-metal-worker|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -4797,7 +4875,7 @@ presubmits:
         - --variant=metal-4.19-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -4868,7 +4946,7 @@ presubmits:
         - --variant=metal-4.20-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -4931,7 +5009,7 @@ presubmits:
         - --variant=metal-4.20-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -5009,7 +5087,7 @@ presubmits:
         - --variant=metal-4.20-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -5087,7 +5165,7 @@ presubmits:
         - --variant=metal-4.20-nightly-x86
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
