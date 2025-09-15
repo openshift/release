@@ -191,7 +191,6 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
-
     else
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
     fi
