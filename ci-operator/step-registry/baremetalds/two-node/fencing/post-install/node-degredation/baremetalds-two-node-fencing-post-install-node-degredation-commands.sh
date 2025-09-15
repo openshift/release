@@ -3,6 +3,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# logging first (so it's usable everywhere)
+log(){ echo "[$(date +'%F %T%z')] $*"; }
+
 echo "[INFO] degraded two-node fencing pre step starting..."
 
 ART_BASE="${ARTIFACT_DIR:-/tmp/artifacts}/degraded-two-node"
@@ -12,7 +15,27 @@ FORCE_DOWNSHIFT="${FORCE_DOWNSHIFT:-true}"
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
 
-log(){ echo "[$(date +'%F %T%z')] $*"; }
+# --- ensure oc client is present (no root required) ---
+if ! command -v oc >/dev/null 2>&1; then
+  log "oc not found, installing client..."
+  CLI_TAG_LOCAL="${CLI_TAG:-4.20}"
+  UNAME_M="$(uname -m)"
+  case "$UNAME_M" in
+    x86_64)   OC_TARBALL="openshift-client-linux.tar.gz" ;;
+    aarch64|arm64) OC_TARBALL="openshift-client-linux-arm64.tar.gz" ;;
+    *)        log "Unsupported arch: $UNAME_M"; exit 1 ;;
+  esac
+  url="${OC_CLIENT_URL:-https://mirror.openshift.com/pub/openshift-v4/clients/ocp/candidate-${CLI_TAG_LOCAL}/${OC_TARBALL}}"
+  mkdir -p /tmp/ocbin
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" | tar -xz -C /tmp/ocbin oc
+  else
+    wget -qO- "$url" | tar -xz -C /tmp/ocbin oc
+  fi
+  chmod +x /tmp/ocbin/oc || true
+  export PATH="/tmp/ocbin:$PATH"
+  hash -r
+fi
 
 # --- global timebox (110 min) ---
 GLOBAL_DEADLINE=$(( $(date +%s) + 6600 ))
@@ -133,7 +156,6 @@ if oc -n openshift-cluster-storage-operator get deploy/cluster-storage-operator 
   }" || true
   oc -n openshift-cluster-storage-operator delete pod --all --force --grace-period=0 || true
 fi
-
 
 log "Pre step complete (degraded mode). Exiting clean."
 exit 0
