@@ -214,11 +214,15 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
     fi
 
-    # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
-    extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
-    if [[ -n "${extracted_version}" ]]; then
-        EXPECTED_OSC_VERSION="${extracted_version}"
-        echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+    # Extract expected OSC version from catalog tag if not already provided by user
+    if [[ -z "${EXPECTED_OSC_VERSION:-}" ]]; then
+        extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
+        if [[ -n "${extracted_version}" ]]; then
+            EXPECTED_OSC_VERSION="${extracted_version}"
+            echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+        fi
+    else
+        echo "Using user-provided EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}"
     fi
 
     CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
@@ -238,14 +242,18 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
     TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
 
-    # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
-    extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
-    if [[ -n "${extracted_trustee_version}" ]]; then
-        EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
-        echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
+    # Extract expected Trustee version from catalog tag if not already provided by user
+    if [[ -z "${EXPECTED_TRUSTEE_VERSION:-}" ]]; then
+        extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
+        if [[ -n "${extracted_trustee_version}" ]]; then
+            EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
+            echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
+        else
+            EXPECTED_TRUSTEE_VERSION="0.4.1"
+            echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
+        fi
     else
-        EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
-        echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
+        echo "Using user-provided EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
     fi
 
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
@@ -256,7 +264,7 @@ else # GA
     CATALOG_SOURCE_IMAGE="none"
     TRUSTEE_CATALOG_SOURCE_IMAGE="none"
     EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-0.0.0}"
-    EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
+    EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.4.1}"
     echo "Using default EXPECTED_OSC_VERSION for GA: ${EXPECTED_OSC_VERSION}"
     echo "Using default EXPECTED_TRUSTEE_VERSION for GA: ${EXPECTED_TRUSTEE_VERSION}"
 fi
@@ -466,25 +474,26 @@ fi
 # Show configuration summary
 echo "=========================================="
 echo "Configuration details:"
-echo "  • OCP Version: ${OCP_VERSION}"
-echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
-echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
-echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
-echo "  • Expected Trustee Version: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
-echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
-echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
-echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
-echo "  • Must-gather: ${ENABLE_MUST_GATHER} (${MUST_GATHER_IMAGE})"
-echo "  • Must-gather on failure only: ${MUST_GATHER_ON_FAILURE_ONLY}"
-echo "  • Sleep Duration: ${SLEEP_DURATION}"
-echo "  • Test Timeout: ${TEST_TIMEOUT}"
+echo "  • OCP_VERSION: ${OCP_VERSION}"
+echo "  • PROW_RUN_TYPE: ${PROW_RUN_TYPE}"
+echo "  • TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}"
+echo "  • EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}"
+echo "  • EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
+echo "  • AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}"
+echo "  • CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}"
+echo "  • INSTALL_KATA_RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
+echo "  • ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}"
+echo "  • MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
+echo "  • MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}"
+echo "  • SLEEP_DURATION: ${SLEEP_DURATION}"
+echo "  • TEST_TIMEOUT: ${TEST_TIMEOUT}"
 
 if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
-    echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
+    echo "  • CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
+    echo "  • TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
 else
-    echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
-    echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME}"
+    echo "  • CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}"
+    echo "  • TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}"
 fi
 
 echo "=========================================="

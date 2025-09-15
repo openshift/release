@@ -31,6 +31,7 @@ tests:
       AWS_REGION_OVERRIDE: us-east-2
       ENABLEPEERPODS: "true"
       EXPECTED_OPERATOR_VERSION: 1.10.0
+      EXPECTED_TRUSTEE_VERSION: 0.4.1
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: "0"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
@@ -51,6 +52,7 @@ tests:
       AWS_ALLOWED_REGIONS: "us-east-1 us-west-2 eu-west-1 ap-southeast-1"
       ENABLEPEERPODS: "true"
       EXPECTED_OPERATOR_VERSION: 1.10.0
+      EXPECTED_TRUSTEE_VERSION: 0.4.1
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: "0"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
@@ -72,6 +74,7 @@ tests:
       AWS_ALLOWED_REGIONS: "ap-southeast-1 ap-northeast-1 ap-south-1"
       ENABLEPEERPODS: "true"
       EXPECTED_OPERATOR_VERSION: 1.10.0
+      EXPECTED_TRUSTEE_VERSION: 0.4.1
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: "0"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
