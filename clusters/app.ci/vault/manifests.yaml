@@ -131,7 +131,10 @@ metadata:
   labels:
     app: vault
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"vault-subpath-proxy:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"subpath-proxy\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 1h"
   name: vault
   namespace: vault
 spec:
@@ -178,7 +181,7 @@ spec:
       terminationGracePeriodSeconds: 60
       priorityClassName: openshift-user-critical
       containers:
-      - image: vault-subpath-proxy:latest
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_vault-subpath-proxy_latest
         name: subpath-proxy
         args:
         - -kv-mount-path=kv
