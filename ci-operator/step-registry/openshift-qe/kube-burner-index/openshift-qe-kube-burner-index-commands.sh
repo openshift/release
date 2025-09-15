@@ -20,7 +20,6 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=index
-export PPROF=false 
 
 EXTRA_FLAGS="$METRIC_PROFILES --check-health=false"
 

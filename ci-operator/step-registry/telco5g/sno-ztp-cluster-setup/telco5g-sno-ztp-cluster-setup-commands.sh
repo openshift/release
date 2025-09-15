@@ -319,6 +319,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e ztphub_wait_install_timeout=90 \
     -e disconnected_env=true \
     -e disconnected_env_pull_secret=/home/kni/pull-secret.txt \
+    -e gitops_sno_single_ip=true \
     -e ztphub_wait_install_timeout=150 $PLAYBOOK_ARGS || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.

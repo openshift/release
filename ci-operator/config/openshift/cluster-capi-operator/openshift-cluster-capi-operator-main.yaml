@@ -8,7 +8,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.20_base-rhel9:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
@@ -34,17 +34,17 @@ images:
   to: cluster-capi-operator
 promotion:
   to:
-  - name: "4.20"
+  - name: "4.21"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -82,33 +82,38 @@ tests:
   commands: make build
   container:
     from: src
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   shard_count: 2
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-serial
-- as: e2e-aws-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-techpreview-upgrade
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-upgrade
-- as: e2e-aws-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-capi-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: aws
     env:
@@ -121,30 +126,17 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
-- as: e2e-aws-capi-customnoupgrade-migration
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws-2
-    env:
-      FEATURE_GATES: '["MachineAPIMigration=true"]'
-      FEATURE_SET: CustomNoUpgrade
-    test:
-    - as: test
-      commands: make e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-aws
-- as: e2e-gcp-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-capi-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: gcp
     env:
@@ -157,8 +149,9 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp
-- as: e2e-openstack-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-openstack-ovn-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -166,8 +159,9 @@ tests:
       CONFIG_TYPE: minimal
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-openstack-capi-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -180,23 +174,26 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-azure-ovn-techpreview
+- always_run: false
+  as: e2e-azure-ovn-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
-- as: e2e-azure-ovn-techpreview-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-ovn-techpreview-upgrade
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure-upgrade
-- as: e2e-azure-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-capi-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: azure4
     env:
@@ -209,8 +206,9 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-azure
-- as: e2e-vsphere-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-vsphere-capi-techpreview
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -223,10 +221,11 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
-- as: e2e-metal3-capi-techpreview
+- always_run: false
+  as: e2e-metal3-capi-techpreview
   cluster: build05
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -244,9 +243,10 @@ tests:
         requests:
           cpu: 100m
     workflow: baremetalds-e2e-ovn-ipv6
-- as: regression-clusterinfra-aws-ipi-techpreview-capi
+- always_run: false
+  as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
     cluster_profile: aws-3
     env:

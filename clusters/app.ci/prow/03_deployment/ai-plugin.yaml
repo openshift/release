@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ai-plugin
+  namespace: ci
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-plugin
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: ai-plugin
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-plugin
+  labels:
+    app: prow
+    component: ai-plugin
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 1h"
+  namespace: ci
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: prow
+      component: ai-plugin
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: ai-plugin
+    spec:
+      containers:
+      - name: ai-plugin
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ai-plugin_latest
+        imagePullPolicy: Always
+        args:
+        - --log-level=debug
+        - --ai-url=https://bedrock-runtime.us-west-2.amazonaws.com/model/openai.gpt-oss-20b-1:0/converse
+        - --ai-token-file=/etc/ai-token/oauth
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --dry-run=false
+        - --endpoint=/
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        ports:
+        - name: http
+          containerPort: 8888
+        volumeMounts:
+        - name: hmac
+          mountPath: /etc/webhook
+          readOnly: true
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: ai-token-file
+          mountPath: /etc/ai-token
+          readOnly: true
+        resources:
+          requests:
+            memory: "300Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      serviceAccountName: ai-plugin
+      volumes:
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: ai-token-file
+        secret:
+          secretName: aws-bedrock-token

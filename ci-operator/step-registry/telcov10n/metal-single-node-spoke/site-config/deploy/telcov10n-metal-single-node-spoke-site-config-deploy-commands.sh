@@ -356,7 +356,7 @@ function generate_ztp_cluster_manifests {
     if [ "${root_device}" != "" ]; then
         ignition_config_override="$(
           echo "${NODE_IGNITION_CONF_OVERRIDE}" \
-          | sed "s#\${root_device}#${root_device}#" \
+          | sed "s#\${root_device}#${root_device}#g" \
           | jq --compact-output)"
 
       if [ "${root_dev_hctl}" != "" ]; then

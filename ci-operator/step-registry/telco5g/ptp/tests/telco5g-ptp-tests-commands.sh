@@ -88,10 +88,11 @@ spec:
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
           export LATEST_RELEASE="LATEST_RELEASE_VAL"
+          export USE_UPSTREAM="USE_UPSTREAM_VAL"
 
           # run latest release on upstream main branch
-          if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
-            echo "Running latest release $LATEST_RELEASE on upstream main branch"
+          if [[ "${USE_UPSTREAM:-false}" == "true" ]]; then
+            echo "Running on upstream main branch"
             git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/ptp-operator.git
           else
             git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
@@ -139,6 +140,7 @@ spec:
   jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#LATEST_RELEASE_VAL#${LATEST_RELEASE}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
@@ -235,7 +237,7 @@ export CNF_ORIGIN_TESTS
 export TEST_BRANCH="main"
 
 # run latest release on upstream main branch
-if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
   export PTP_UNDER_TEST_BRANCH="main"
 else
   export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
@@ -264,9 +266,8 @@ export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-op
 build_images
 
 # deploy ptp-operator
-# run latest release on upstream main branch
-if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
-  echo "Running latest release $LATEST_RELEASE on upstream main branch"
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+  echo "Running on upstream main branch"
   git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 else
   git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
@@ -325,8 +326,8 @@ cd ptp-operator-conformance-test
 cat <<'EOF' >"${SHARED_DIR}"/test-config.yaml
 ---
 global:
- maxoffset: 100
- minoffset: -100
+  maxoffset: 100
+  minoffset: -100
 soaktest:
   disable_all: false
   event_output_file: "./event-output.csv"

@@ -8,6 +8,12 @@ pwd && ls -ltr
 cd frontend || exit 0
 pwd && ls -ltr
 
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
+fi
+
 ## skip all tests when console is not installed
 if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
   echo "console is not installed, skipping all console tests."

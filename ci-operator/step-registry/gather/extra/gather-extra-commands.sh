@@ -166,7 +166,13 @@ done
 # change to the network artifact dir
 mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
 pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
-oc get node -oname | xargs oc adm must-gather --volume-percentage=100 -- /usr/bin/gather_multus_logs
+
+VOLUME_PERCENTAGE_FLAG=""
+if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+fi
+
+oc get node -oname | xargs oc adm must-gather $VOLUME_PERCENTAGE_FLAG -- /usr/bin/gather_multus_logs
 popd || return
 
 # If the tcpdump-service or conntrackdump-service step was used, grab the files.
