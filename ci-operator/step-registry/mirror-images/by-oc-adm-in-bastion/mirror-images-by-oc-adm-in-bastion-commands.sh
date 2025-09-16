@@ -69,6 +69,8 @@ echo "readable_version: $readable_version"
 target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 target_release_image_repo="${target_release_image%:*}"
 target_release_image_repo="${target_release_image_repo%@sha256*}"
+# add nested level for testing !!
+target_release_image_repo="${target_release_image_repo}/first/second/third"
 # ensure mirror release image by tag name, refer to https://github.com/openshift/oc/pull/1331
 target_release_image="${target_release_image_repo}:${readable_version}"
 
@@ -187,3 +189,13 @@ sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_co
 
 run_command "cat '${install_config_mirror_patch}'"
 rm -f "${new_pull_secret}"
+
+
+# hack just for testing so that I can get the aws credential to create HO in local.
+set -x
+if [[ -f "/var/run/secrets/ci.openshift.io/cluster-profile/.awscred" ]]; then
+    cp /var/run/secrets/ci.openshift.io/cluster-profile/.awscred "${SHARED_DIR}/awscredentials"
+fi
+if [[ -f "/var/run/secrets/ci.openshift.io/cluster-profile/.awscred_shared_account" ]]; then
+    cp /var/run/secrets/ci.openshift.io/cluster-profile/.awscred_shared_account "${SHARED_DIR}/awscredentials_shared"
+fi
