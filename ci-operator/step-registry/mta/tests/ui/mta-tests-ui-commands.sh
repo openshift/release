@@ -15,9 +15,8 @@ export CYPRESS_INCLUDE_TAGS=$MTA_TESTS_UI_SCOPE
 # Always return true, otherwise the script will fail before it is able to archive anything
 echo "Executing Cypress tests..."
 npx cypress run \
-    --config video=false \
-    --spec $CYPRESS_SPEC \
-    --env "tackleUrl=${TARGET_URL}" || true
+    --config video=false,baseUrl=${TARGET_URL} \
+    --spec $CYPRESS_SPEC || true
 
 # Combine results into one JUnit results file
 echo "Merging results reports..."
