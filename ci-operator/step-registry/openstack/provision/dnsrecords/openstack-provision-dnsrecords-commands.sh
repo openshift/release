@@ -10,7 +10,7 @@ export AWS_DEFAULT_OUTPUT=json
 
 if [ -z "${AWS_PROFILE:-}" ]; then
   unset AWS_PROFILE
-fi 
+fi
 
 TMP_DIR=$(mktemp -d)
 
@@ -18,6 +18,10 @@ if [ -f "${SHARED_DIR}/CLUSTER_NAME" ]; then
   CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 else
   CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
+fi
+
+if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ]; then
+  echo "Credentials file is not correctly mounted"
 fi
 
 echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"

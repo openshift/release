@@ -12,6 +12,10 @@ if [ -z "${AWS_PROFILE:-}" ]; then
   unset AWS_PROFILE
 fi 
 
+if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ]; then
+  echo "Credentials file is not correctly mounted"
+fi
+
 echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"
 HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name \
             --dns-name "${BASE_DOMAIN}" \
