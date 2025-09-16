@@ -5,6 +5,16 @@ set -euo pipefail
 EXPLAIN="${EXPLAIN:-false}"
 JUNIT_REPORT="${JUNIT_REPORT:-false}"
 
+OS="$(uname -s)_$(uname -m)"
+K8SGPT_VERSION=${K8SGPT_VERSION:-0.4.25}
+K8SGPT_DIR=${K8SGPT_DIR:-/tmp}
+
+download_binary(){
+  local url="https://github.com/k8sgpt-ai/k8sgpt/releases/download/v${K8SGPT_VERSION}/k8sgpt_${OS}.tar.gz"
+  curl --fail --retry 8 --retry-all-errors -sS -L "${url}" | tar -xzC "${K8SGPT_DIR}/"
+  chmod +x "${K8SGPT_DIR}/k8sgpt"
+}
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"
@@ -21,6 +31,10 @@ if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
 fi
 
 set_proxy
+
+download_binary
+
+export PATH="${K8SGPT_DIR}:${PATH}"
 
 k8sgpt version
 
