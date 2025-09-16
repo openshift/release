@@ -191,7 +191,7 @@ metadata:
   namespace: default
 data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
-  operatorVer: "${EXPECTED_OPERATOR_VERSION}"
+  operatorVer: "${EXPECTED_OSC_VERSION}"
   channel: "${OPERATOR_UPDATE_CHANNEL}"
   redirectNeeded: "true"
   exists: "true"
