@@ -7,8 +7,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: "4.21"
   hypershift-operator-init:
     name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
@@ -35,11 +43,6 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.20_base-rhel9:
@@ -49,12 +52,6 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
-  to: hypershift-tests
 - dockerfile_literal: |
     FROM base
     RUN dnf install -y python3-pip
@@ -79,7 +76,7 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.21"
+      version: "4.20"
   latest:
     integration:
       include_built_images: true
@@ -89,27 +86,27 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.21"
+      version: "4.18"
   latest-419:
     candidate:
       product: ocp
       stream: ci
-      version: "4.21"
+      version: "4.19"
   latest-420:
     candidate:
       product: ocp
       stream: ci
-      version: "4.21"
+      version: "4.20"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.21"
+      version: "4.20"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.21"
+      version: "4.19"
 resources:
   '*':
     limits:
