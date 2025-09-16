@@ -411,7 +411,7 @@ function generate_results() {
   else
     generate_result_teststeps
   fi
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' ! -empty -exec cp {} "$LOCAL_DIR_RST" \;
 }
 
 function fix_xmls() {
