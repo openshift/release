@@ -48,7 +48,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-images-mirror:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-images-mirror\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 1h"
   labels:
     app: ci-images-mirror
   name: ci-images-mirror
@@ -98,7 +101,7 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "0.5"
-      - image: ci-images-mirror
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-images-mirror_latest
         name: ci-images-mirror
         args:
         - --leader-election-namespace=ci
