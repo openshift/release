@@ -39,7 +39,11 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-heavy
 
-EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS} --pprof=${PPROF}"
+# A non-indexed warmup run
+ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50  --pod-ready-threshold=2m" ./run.sh
+
+# The measurable run
+EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS} --pprof=${PPROF} --log-level=debug"
 
 export CLEANUP_WHEN_FINISH=true
 
