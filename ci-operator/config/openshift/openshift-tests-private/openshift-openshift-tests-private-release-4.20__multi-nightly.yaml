@@ -416,37 +416,20 @@ tests:
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_SUBNETS_COUNT: "1"
-      ASSIGN_ROLES_TO_SUBNETS: "yes"
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_CUSTOM_SG_CONTROL_PLANE: "true"
+      ENABLE_CUSTOM_SG_CUMPUTE: "true"
+      ENABLE_CUSTOM_SG_DEFAULT_MACHINE: "false"
       OCP_ARCH: arm64
-      SUBNET_ROLES: |-
-        [
-          [
-            {
-              "private": "ClusterNode ControlPlaneInternalLB",
-              "public": "IngressControllerLB BootstrapNode"
-            },
-            {
-              "private": "",
-              "public": "ControlPlaneExternalLB"
-            }
-          ]
-        ]
-      ZONES_COUNT: "1"
-    test:
-    - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: aws-ipi-byo-subnet-role-share-lb-tags-sg-arm-f28-destructive
   cron: 20 11 27 * *
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_SUBNETS_COUNT: "1"
-      ASSIGN_ROLES_TO_SUBNETS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
@@ -454,22 +437,6 @@ tests:
       ENABLE_CUSTOM_SG_CUMPUTE: "false"
       ENABLE_CUSTOM_SG_DEFAULT_MACHINE: "true"
       OCP_ARCH: arm64
-      SUBNET_ROLES: |-
-        [
-          [
-            {
-              "private": "ClusterNode ControlPlaneInternalLB",
-              "public": "IngressControllerLB BootstrapNode"
-            },
-            {
-              "private": "",
-              "public": "ControlPlaneExternalLB"
-            }
-          ]
-        ]
-      ZONES_COUNT: "1"
-    test:
-    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: aws-ipi-private-byo-subnet-role-mini-perm-arm-f14
   cron: 31 22 2,16 * *
