@@ -228,7 +228,7 @@ while true; do
 
   # Get specified target version when UPGRADE_ENABLED is set true and compare with avaiable path version
   # Upgrade cluster to specidied target version
-  if [[ "$UPGRADE_ENABLED" == "true" ]];then
+  if [[ "$UPGRADE_ENABLED" == "true" && -n "$UPGRADED_TO_VERSION" ]];then
     target_x=$(echo "$UPGRADED_TO_VERSION" | cut -d'.' -f1)
     target_y=$(echo "$UPGRADED_TO_VERSION" | cut -d'.' -f2)
 
@@ -242,7 +242,7 @@ while true; do
     fi
 
     if (( is_greater == 1 )); then
-      log "The cluster has been in $UPGRADED_TO_VERSION"
+      log "Upgrade failed: target version $UPGRADED_TO_VERSION is below the minimum supported version $available_version."
       break
     fi
   fi
