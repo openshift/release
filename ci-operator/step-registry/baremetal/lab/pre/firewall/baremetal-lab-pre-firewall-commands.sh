@@ -75,10 +75,7 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   IP_ARRAY=("${@:4}")
   for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
-    if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
-      iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
-    fi
-    iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
   if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
     iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
