@@ -24,7 +24,7 @@ By default, IPI workflows determine the AWS region through the `LEASED_RESOURCE`
 
 ```yaml
 tests:
-- as: aws-ipi-peerpods
+- as: aws-ipi-peerpodsgather-must-gather/sandboxed-containers-operator-gather-must-gather-commands.sh gather-must-gather/sandboxed-containers-operator-gather-must-gather-ref.metadata.json gather-must-gather/sandboxed-containers-operator-gather-must-gather-ref.yaml
   steps:
     cluster_profile: aws
     env:
