@@ -73,27 +73,27 @@ tests:
       DEPLOY_TIMEOUT: "2700"
       PIPELINE_STAGE: integration
     test:
-      - as: import
-        commands: |
-          KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
-        from: root
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
-      - as: e2e-test
-        commands: |
-          SKIP_UI_TEST=true SKIP_API_TEST=false ./run-prow-e2e.sh
-        credentials:
-          - collection: ""
-            mount_path: /etc/secret
-            name: ocm-obs-usa-acmcreds
-            namespace: test-credentials
-        from: search-e2e
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        SKIP_UI_TEST=true SKIP_API_TEST=false ./run-prow-e2e.sh
+      credentials:
+      - collection: ""
+        mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
+      from: search-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-e2e-clusterpool
 - as: deploy-and-run-e2e-ui
   run_if_changed: ^tests/cypress/.*$
@@ -112,27 +112,27 @@ tests:
       DEPLOY_TIMEOUT: "2700"
       PIPELINE_STAGE: integration
     test:
-      - as: import
-        commands: |
-          KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
-        from: root
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
-      - as: e2e-test
-        commands: |
-          SKIP_UI_TEST=false SKIP_API_TEST=true ./run-prow-e2e.sh
-        credentials:
-          - collection: ""
-            mount_path: /etc/secret
-            name: ocm-obs-usa-acmcreds
-            namespace: test-credentials
-        from: search-e2e
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        SKIP_UI_TEST=false SKIP_API_TEST=true ./run-prow-e2e.sh
+      credentials:
+      - collection: ""
+        mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
+      from: search-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-e2e-clusterpool
 - as: lint
   commands: |
