@@ -192,6 +192,7 @@ metadata:
 data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
   operatorVer: "${EXPECTED_OSC_VERSION}"
+  trusteeOperatorVer: "${EXPECTED_TRUSTEE_VERSION}"
   channel: "${OPERATOR_UPDATE_CHANNEL}"
   redirectNeeded: "true"
   exists: "true"
