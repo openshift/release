@@ -21,9 +21,10 @@ PATCH="${SHARED_DIR}/install-config-patch.yaml"
 cat > "${PATCH}" << EOF
 platform:
   gcp:
-    privateZone: 
-      zone: ${private_zone_name}
-      projectID: ${PRIVATE_ZONE_PROJECT}
+    dns:
+      privateZone: 
+        name: ${private_zone_name}
+        projectID: ${PRIVATE_ZONE_PROJECT}
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"

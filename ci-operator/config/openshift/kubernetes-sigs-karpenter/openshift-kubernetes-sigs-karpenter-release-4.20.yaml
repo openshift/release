@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -20,6 +24,18 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
+- dockerfile_literal: |
+    FROM replaced-by-from
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | sh
+  from: bin
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: bin-oc-kubectl-helm
 - dockerfile_literal: |-
     FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
     WORKDIR /go/src/github.com/openshift/kubernetes-sigs-karpenter
@@ -46,8 +62,7 @@ images:
   to: aws-karpenter-provider-aws
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - '*'
     name: "4.20"
     namespace: ocp
@@ -92,6 +107,7 @@ tests:
 - always_run: false
   as: e2e-hypershift
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: hypershift
     env:
@@ -99,6 +115,24 @@ tests:
       HYPERSHIFT_NODE_COUNT: "1"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external
+- as: e2e-kwok
+  cron: 0 5 * * 1
+  presubmit: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        # log in to the cluster in order for the script to log in to the internal registry
+        oc login -u kubeadmin "$(oc whoami --show-server)" < "${KUBEADMIN_PASSWORD_FILE}"
+        CLEANUP=false ./hack/openshift-kwok-e2e.sh
+      from: bin-oc-kubectl-helm
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

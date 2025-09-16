@@ -1,6 +1,6 @@
 base_images:
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
@@ -21,17 +21,17 @@ images:
   to: cluster-dns-operator
 promotion:
   to:
-  - name: 4.20-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -48,10 +48,12 @@ tests:
   container:
     from: src
 - as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -64,20 +66,25 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-techpreview
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     env:

@@ -46,12 +46,11 @@ tests:
       COMPUTE_NODE_REPLICAS: "3"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
+      LOGGING_TEST_VERSION: "6.2"
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "qe-app-registry", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "qe-app-registry", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: CPaasrunOnly;CPaasrunBoth
@@ -60,7 +59,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
     test:
-    - ref: openshift-logging-install-konflux-catalogsource
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
@@ -70,13 +69,12 @@ tests:
     cluster_profile: gcp-observability
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      LOGGING_TEST_VERSION: "6.2"
       OCP_ARCH: arm64
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~AZWIF&;~AZMonitor&;~Splunk&
@@ -85,7 +83,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
-    - ref: openshift-logging-install-konflux-catalogsource
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
@@ -98,13 +96,12 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       FILTERS_ADDITIONAL: ""
+      LOGGING_TEST_VERSION: "6.2"
       OCP_ARCH: arm64
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~AZWIF&;~Splunk&
@@ -113,7 +110,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "30"
     test:
-    - ref: openshift-logging-install-konflux-catalogsource
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-azure-ipi
@@ -127,14 +124,12 @@ tests:
       AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       FIPS_ENABLED: "true"
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
+      LOGGING_TEST_VERSION: "6.2"
       MINIMAL_ISO: "true"
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       RESERVE_BOOTSTRAP: "false"
       TEST_ADDITIONAL: ""
@@ -148,7 +143,7 @@ tests:
       masters: "1"
       workers: "0"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: baremetal-lab-agent-install-network-static
@@ -162,13 +157,11 @@ tests:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       DISCONNECTED: "false"
       FIPS_ENABLED: "true"
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.2
+      LOGGING_TEST_VERSION: "6.2"
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       PRIMARY_NET: ipv4
       RESERVE_BOOTSTRAP: "false"
@@ -183,7 +176,7 @@ tests:
       masters: "3"
       workers: "2"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: baremetal-lab-agent-install-network-dynamic
@@ -201,13 +194,12 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
       EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
+      LOGGING_TEST_VERSION: "6.2"
       OCP_ARCH: amd64
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: ~Disruptive&;~Longduration&;~AZWIF&;~AZMonitor&;~GCL&
@@ -218,7 +210,7 @@ tests:
       TEST_TIMEOUT: "15"
     test:
     - ref: ipi-install-heterogeneous
-    - ref: openshift-logging-install-konflux-catalogsource
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service

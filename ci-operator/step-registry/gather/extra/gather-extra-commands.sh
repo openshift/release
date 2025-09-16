@@ -166,7 +166,13 @@ done
 # change to the network artifact dir
 mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
 pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
-oc get node -oname | xargs oc adm must-gather -- /usr/bin/gather_multus_logs
+
+VOLUME_PERCENTAGE_FLAG=""
+if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+fi
+
+oc get node -oname | xargs oc adm must-gather $VOLUME_PERCENTAGE_FLAG -- /usr/bin/gather_multus_logs
 popd || return
 
 # If the tcpdump-service or conntrackdump-service step was used, grab the files.
@@ -234,7 +240,16 @@ function gather_network() {
 
 # Gather network details both from SDN and OVN. One of them should succeed.
 gather_network openshift-sdn app=sdn sdn
-gather_network openshift-ovn-kubernetes app=ovnkube-node ovnkube-node
+sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
+sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')
+if [ "${sample_node}" = "${sample_node_zone}" ]; then
+  echo "INFO: INTERCONNECT MODE"
+  ovnkube_container=ovnkube-controller
+else
+  echo "INFO: LEGACY MODE"
+  ovnkube_container=ovnkube-node
+fi
+gather_network openshift-ovn-kubernetes app=ovnkube-node $ovnkube_container
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"

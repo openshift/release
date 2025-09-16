@@ -119,6 +119,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
@@ -146,8 +147,8 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-techpreview
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)
+- always_run: false
+  as: e2e-aws-techpreview
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -211,7 +212,6 @@ tests:
 - always_run: false
   as: e2e-kubevirt-aws-ovn
   optional: true
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: aws
     env:
@@ -225,7 +225,6 @@ tests:
 - always_run: false
   as: e2e-kubevirt-azure-ovn
   optional: true
-  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: azure4
     env:
@@ -243,7 +242,8 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-metrics
-- as: e2e-conformance
+- always_run: false
+  as: e2e-conformance
   steps:
     cluster_profile: hypershift
     env:

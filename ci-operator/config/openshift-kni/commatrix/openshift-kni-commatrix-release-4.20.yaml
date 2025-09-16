@@ -3,10 +3,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.23-openshift-4.20
 build_root:
   from_repository: true
 images:
@@ -24,7 +24,7 @@ images:
     COPY oc /usr/bin/oc
     COPY oc /tmp/bin/
     COPY app/ .
-  from: ocp_builder_rhel-9-golang-1.24-openshift-4.20
+  from: ocp_builder_rhel-9-golang-1.23-openshift-4.20
   inputs:
     cli:
       paths:
@@ -36,6 +36,10 @@ images:
         source_path: /go/src/github.com/openshift-kni/commatrix/.
   optional: true
   to: cli-with-git
+promotion:
+  to:
+  - name: "4.20"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -61,10 +65,10 @@ tests:
   container:
     from: src
 - as: commatrix-e2e-tests
+  shard_count: 2
   steps:
-    cluster_profile: aws-telco
+    cluster_profile: aws-2
     env:
-      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch main
@@ -95,6 +99,7 @@ tests:
         make install INSTALL_DIR=/tmp/bin/
         # run the make e2e-test
         PATH="/tmp/bin:$PATH" make e2e-test
+        oc delete ns openshift-commatrix-debug
       from: cli-with-git
       resources:
         requests:
@@ -102,6 +107,7 @@ tests:
           memory: 200Mi
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: security
   optional: true
   steps:

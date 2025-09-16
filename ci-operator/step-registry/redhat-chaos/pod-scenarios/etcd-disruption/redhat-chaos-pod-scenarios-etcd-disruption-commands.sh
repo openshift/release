@@ -19,7 +19,7 @@ export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE 
 export ALERTS_PATH="/home/krkn/kraken/config/alerts_openshift.yaml"
-telemetry_password=$(cat "/secret/telemetry/telemetry_password"  || "")
+telemetry_password=$(cat "/secret/telemetry/telemetry_password" || true)
 export TELEMETRY_PASSWORD=$telemetry_password
 
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG

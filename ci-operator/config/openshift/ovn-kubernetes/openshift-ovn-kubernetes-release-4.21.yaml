@@ -11,14 +11,14 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.23-openshift-4.19
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    tag: rhel-8-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -38,23 +38,24 @@ images:
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "4.21"
+  - disabled: true
+    name: "4.21"
     namespace: ocp
 releases:
   initial:
@@ -257,6 +258,14 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
+- as: e2e-ibmcloud-ipi-ovn-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-ibmcloud-ovn
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
     cluster_profile: aws-3
@@ -264,9 +273,26 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   steps:
     cluster_profile: aws-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
+  steps:
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local

@@ -1,18 +1,20 @@
 periodics:
 - agent: kubernetes
   cluster: build10
+  cron: 27 23 25 11 *
   decorate: true
   extra_refs:
   - base_ref: release-4.18
     org: openshift
     repo: cluster-storage-operator
-  interval: 8h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-3
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-storage-operator-release-4.18-e2e-aws-group-snapshot-tp
+  name: periodic-ci-openshift-cluster-storage-operator-release-4.18-periodics-e2e-aws-group-snapshot-tp
   spec:
     containers:
     - args:
@@ -22,9 +24,10 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-group-snapshot-tp
+      - --variant=periodics
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -71,18 +74,28 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
+  cron: 47 3 22 12 *
   decorate: true
   extra_refs:
   - base_ref: release-4.18
     org: openshift
     repo: cluster-storage-operator
-  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-storage-operator-release-4.18-e2e-aws-selinux-alpha
+  name: periodic-ci-openshift-cluster-storage-operator-release-4.18-periodics-periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
+  reporter_config:
+    slack:
+      channel: '#forum-ocp-storage'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -91,10 +104,173 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-selinux-alpha
+      - --target=periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
+      - --variant=periodics
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
+  cron: 21 20 22 10 *
+  decorate: true
+  extra_refs:
+  - base_ref: release-4.18
+    org: openshift
+    repo: cluster-storage-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    job-release: "4.18"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-cluster-storage-operator-release-4.18-periodics-periodic-e2e-aws-selinux-alpha
+  reporter_config:
+    slack:
+      channel: '#forum-ocp-storage'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=periodic-e2e-aws-selinux-alpha
+      - --variant=periodics
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 2 15 24 3 *
+  decorate: true
+  extra_refs:
+  - base_ref: release-4.18
+    org: openshift
+    repo: cluster-storage-operator
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    job-release: "4.18"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-cluster-storage-operator-release-4.18-periodics-periodic-e2e-gcp-ovn-upgrade-check-dev-symlinks
+  reporter_config:
+    slack:
+      channel: '#forum-ocp-storage'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=periodic-e2e-gcp-ovn-upgrade-check-dev-symlinks
+      - --variant=periodics
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:

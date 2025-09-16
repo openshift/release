@@ -28,8 +28,7 @@ images:
   to: cluster-storage-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -75,11 +74,6 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-upgrade-check-dev-symlinks
-  cron: '@daily'
-  steps:
-    cluster_profile: aws-2
-    workflow: openshift-upgrade-aws-storage-symlinks
 - as: e2e-aws-csi
   steps:
     cluster_profile: aws
@@ -99,11 +93,6 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
-- as: e2e-gcp-ovn-upgrade-check-dev-symlinks
-  cron: '@daily'
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-upgrade-gcp-storage-symlinks
 - always_run: false
   as: e2e-ovn-vsphere
   optional: true
@@ -220,26 +209,13 @@ tests:
     env:
       PROJECT_NAME: cluster-storage-operator
     workflow: openshift-ci-security
-- as: e2e-aws-selinux-alpha
-  interval: 24h
-  steps:
-    cluster_profile: aws-3
-    env:
-      FEATURE_GATES: '[''SELinuxMount=true'']'
-      FEATURE_SET: CustomNoUpgrade
-      TEST_ARGS: --run=sig-storage.*SELinux
-      TEST_SKIPS: Disruptive\|disruptive\|SELinuxMountReadWriteOncePodOnly
-      TEST_SUITE: all
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-csi
 - as: hypershift-e2e-aks
   steps:
     cluster_profile: hypershift
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: eastus
     workflow: hypershift-azure-aks-e2e
 zz_generated_metadata:
   branch: release-4.20

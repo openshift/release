@@ -62,8 +62,7 @@ images:
   to: custom-verify-src
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - hypershift-operator
     - hypershift-tests
     name: "4.20"
@@ -128,14 +127,14 @@ tests:
   commands: make verify
   container:
     from: custom-verify-src
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
 - as: unit
   commands: make test
   container:
     from: src
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
 - as: e2e-aks
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -144,11 +143,26 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-4-19
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-419
+      OCP_IMAGE_N1: release:latest-418
+      OCP_IMAGE_N2: release:latest-417
+      OCP_IMAGE_PREVIOUS: release:initial-419
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
   - build-tmpfs
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -187,7 +201,7 @@ tests:
 - as: e2e-aws-upgrade-hypershift-operator
   capabilities:
   - build-tmpfs
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -224,7 +238,7 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift
     env:
@@ -291,7 +305,7 @@ tests:
     cluster_profile: hypershift
     workflow: hypershift-azure-aks-conformance
 - as: security
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)
+  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
@@ -365,45 +379,19 @@ tests:
       resource_type: openstack-vh-mecha-central-quota-slice
     workflow: hypershift-openstack-aws-conformance
 - always_run: false
-  as: e2e-aws-karpenter-core
+  as: e2e-aws-autonode
   optional: true
   steps:
     cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
     env:
-      HYPERSHIFT_AUTONODE: "true"
-      HYPERSHIFT_NODE_COUNT: "1"
+      CI_TESTS_RUN: ^TestKarpenter$
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
-    test:
-    - as: e2e-aws-karpenter-core
-      cli: latest
-      commands: |-
-        export CLUSTER="$(<"${SHARED_DIR}/cluster-name")"
-        export HYPERSHIFT_NAMESPACE="$(<"${SHARED_DIR}/management_cluster_namespace")"
-
-        mkdir -p /tmp/karpenter
-        YQ="/tmp/karpenter/yq"
-        curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-        chmod +x ${YQ}
-        export PATH="/tmp/karpenter:$PATH"
-
-        dir=$(mktemp -d)
-        git clone https://github.com/openshift/kubernetes-sigs-karpenter.git --depth=1 $dir
-        go -C $dir mod vendor
-
-        export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
-        oc annotate -n ${HYPERSHIFT_NAMESPACE}-${CLUSTER} hcp/${CLUSTER} hypershift.openshift.io/karpenter-core-e2e-override=true
-
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        # delete the binding to allow ec2nodeclass to be deleted; the karpenter-core-e2e-override annotation allows the binding to be deleted
-        oc delete validatingadmissionpolicybindings.admissionregistration.k8s.io karpenter-binding.ec2nodeclass.hypershift.io
-        KARPENTER_CORE_DIR=$dir make karpenter-upstream-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 2h0m0s
-    workflow: hypershift-aws-e2e-cluster
+    workflow: hypershift-aws-e2e-external
 - as: verify-deps
   steps:
     env:

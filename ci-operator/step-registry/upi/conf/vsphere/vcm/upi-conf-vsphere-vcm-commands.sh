@@ -69,11 +69,11 @@ function getFailureDomainsWithDSwitch() {
     echo "+getFailureDomainsWithDSwitch"
 
     FAILURE_DOMAIN_OUT="[]"
-    
+
     echo "[" > ${FAILURE_DOMAIN_PATH}
-    
-    for LEASE in "${SHARED_DIR}"/LEASE*; do      
-      if [[ $LEASE =~ "single" ]]; then 
+
+    for LEASE in "${SHARED_DIR}"/LEASE*; do
+      if [[ $LEASE =~ "single" ]]; then
         continue
       fi
 
@@ -90,7 +90,7 @@ function getFailureDomainsWithDSwitch() {
       FIRST=0
 
       jq -r .status.envVars "${LEASE}" > /tmp/envvars
-      
+
       # shellcheck source=/dev/null
       source /tmp/envvars
 
@@ -108,17 +108,17 @@ function getFailureDomainsWithDSwitch() {
       datastoreName=$(basename "${GOVC_DATASTORE}")
 
       {
-        echo "        server = \"${GOVC_URL}\"" 
+        echo "        server = \"${GOVC_URL}\""
         echo "        datacenter = \"${GOVC_DATACENTER}\""
         echo "        cluster = \"${CLUSTER}\""
         echo "        datastore = \"$(echo "${GOVC_DATASTORE}" | rev | cut -d '/' -f 1 | rev)\""
-        echo "        network = \"${GOVC_NETWORK}\"" 
+        echo "        network = \"${GOVC_NETWORK}\""
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
       } >> "${FAILURE_DOMAIN_PATH}"
-      
+
       FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"server":"'"${GOVC_URL}"'","datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]');
     done
-    echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
+    echo "    }" >> "${FAILURE_DOMAIN_PATH}"
     echo "]" >> "${FAILURE_DOMAIN_PATH}"
 
     echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
@@ -162,8 +162,8 @@ if jq -e --argjson IPS "$((end_worker_num + 1))" '.spec.ipAddresses | length < $
   exit 1
 fi
 
-dns_server=$(jq -r '.spec.gateway' "${NETWORK_CONFIG}")
-gateway=${dns_server}
+gateway=$(jq -r '.spec.gateway' "${NETWORK_CONFIG}")
+dns_server=$(jq -r '.spec.nameservers[0]' "${NETWORK_CONFIG}")
 netmask=$(jq -r '.spec.netmask' "${NETWORK_CONFIG}")
 
 lb_ip_address=$(jq -r '.spec.ipAddresses[2]' "${NETWORK_CONFIG}")
@@ -293,7 +293,7 @@ if command -v pwsh &> /dev/null
 then
   ROUTE53_CREATE_JSON='{"Comment": "Create public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
   ROUTE53_DELETE_JSON='{"Comment": "Delete public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
-  
+
   # shellcheck disable=SC2016
   DNS_RECORD='{
   "Action": "${ACTION}",
@@ -490,6 +490,17 @@ else
     VCENTERS_JSON=""
 fi
 
+SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
+
+# Older versions of UPI image do not support changing coresPerSocket.  It is hard coded to 4 for CPS.  In these environments, We'll default to 4 cores.
+control_plane_cpu=$(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
+compute_cpu=$(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
+if [ "${Z_VERSION}" -lt 20 ]; then
+    echo "$(date -u --rfc-3339=seconds) - Detected legacy jobs.  Configuring CPU counts to 4 ..."
+    control_plane_cpu=4
+    compute_cpu=4
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
 cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$clustername = "${cluster_name}"
@@ -516,18 +527,24 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$netmask ="${netmask}"
 
 \$bootstrap_ip_address = "${bootstrap_ip_address}"
+
+\$lb_memory =  $(jq -r '.spec.lb.memoryMB' ${SPEC_CONFIG})
+\$lb_num_cpus = $(jq -r '.spec.lb.cpus' ${SPEC_CONFIG})
+\$lb_cores_per_socket = $(jq -r '.spec.lb.coresPerSocket' ${SPEC_CONFIG})
 \$lb_ip_address = "${lb_ip_address}"
 
-\$control_plane_memory = 16384
-\$control_plane_num_cpus = 4
+\$control_plane_memory =  $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})
+\$control_plane_num_cpus = ${control_plane_cpu}
+\$control_plane_cores_per_socket = $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
 \$control_plane_count = ${CONTROL_PLANE_REPLICAS}
-\$control_plane_ip_addresses = $(echo "${control_plane_ip_addresses}" | tr -d [])
+\$control_plane_ip_addresses = $(echo "${control_plane_ip_addresses}" | tr -d '[]')
 \$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
 
-\$compute_memory = 16384
-\$compute_num_cpus = 4
+\$compute_memory =  $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})
+\$compute_num_cpus = ${compute_cpu}
+\$compute_cores_per_socket = $(jq -r '.spec.compute.coresPerSocket' ${SPEC_CONFIG})
 \$compute_count = ${COMPUTE_NODE_REPLICAS}
-\$compute_ip_addresses = $(echo "${compute_ip_addresses}" | tr -d [])
+\$compute_ip_addresses = $(echo "${compute_ip_addresses}" | tr -d '[]')
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
 
 \$failure_domains = @"
@@ -594,7 +611,7 @@ spec:
         mode: 0777
         overwrite: true
         path: /var/journal-gather-forwarder/forward.sh
-    
+
     ignition:
       version: 3.2.0
     systemd:
@@ -633,7 +650,7 @@ spec:
         mode: 0777
         overwrite: true
         path: /var/journal-gather-forwarder/forward.sh
-    
+
     ignition:
       version: 3.2.0
     systemd:
@@ -654,7 +671,7 @@ spec:
             [Install]
             WantedBy=multi-user.target
 EOF
-fi 
+fi
 
 # remove channel from CVO
 sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"

@@ -235,8 +235,7 @@ images:
   to: virtctl
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-oc
     name: "4.20"
     namespace: ocp
@@ -406,15 +405,22 @@ tests:
     - chain: cucushift-installer-check-cluster-health
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
+  as: e2e-aws-custom-dns-techpreview
   optional: true
+  run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-aws-custom-dns
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
@@ -588,17 +594,20 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: gcp-custom-dns
+  as: e2e-gcp-custom-dns-techpreview
   optional: true
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNSInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
-    test:
-    - chain: cucushift-installer-check-cluster-health
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
@@ -943,7 +952,8 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-techpreview
+- always_run: false
+  as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -980,11 +990,10 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
-      FEATURE_GATES: '["VSphereMultiDisk=true"]'
-      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-disk-setup
+- always_run: false
+  as: e2e-vsphere-ovn-disk-setup-techpreview
   optional: true
   run_if_changed: vsphere
   steps:
@@ -992,8 +1001,7 @@ tests:
     env:
       ADDITIONAL_DISK: "true"
       DISK_SETUP: "true"
-      FEATURE_GATES: '[VSphereMultiDisk=true,MultiDiskSetup=true]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
@@ -1002,14 +1010,16 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-upi-zones
+- always_run: false
+  as: e2e-vsphere-ovn-upi-zones
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones
+- always_run: false
+  as: e2e-vsphere-ovn-zones
   optional: true
   run_if_changed: vsphere
   steps:
@@ -1044,9 +1054,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
@@ -1382,7 +1390,6 @@ tests:
 - always_run: false
   as: e2e-external-aws-ccm
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws-3
     env:

@@ -1,0 +1,41 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.63.4
+  govulncheck:
+    name: govulncheck
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: HOME=/tmp golangci-lint run --timeout=20m
+  container:
+    from: golangci-lint
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+- as: govulncheck
+  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
+  container:
+    from: govulncheck
+  optional: true
+- as: verify
+  commands: |
+    go mod verify
+    go mod tidy
+    git diff --exit-code go.mod go.sum
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: cyborg-data

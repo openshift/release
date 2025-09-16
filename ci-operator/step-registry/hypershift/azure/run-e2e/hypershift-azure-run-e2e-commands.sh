@@ -16,6 +16,10 @@ AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-azurecreds/serviceaccoun
 AZURE_OIDC_ISSUER_URL_LOCATION="/etc/hypershift-ci-jobs-azurecreds/oidc-issuer-url.json"
 AZURE_OIDC_ISSUER_URL="$(<"${AZURE_OIDC_ISSUER_URL_LOCATION}" jq -r .oidcIssuerURL)"
 
+AZURE_KMS_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
+AKS_KMS_KEY="$(jq -r '."aks-kms-key"' "${AZURE_KMS_INFO_LOCATION}")"
+AKS_KMS_CREDENTIALS_SECRET="$(jq -r '."aks-kms-credentials-secret"' "${AZURE_KMS_INFO_LOCATION}")"
+
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
@@ -100,6 +104,8 @@ hack/ci-test-e2e.sh -test.v \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
+  --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
+  --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
   --e2e.azure-marketplace-publisher "azureopenshift" \
   --e2e.azure-marketplace-offer "aro4" \
   --e2e.azure-marketplace-sku "aro_419" \

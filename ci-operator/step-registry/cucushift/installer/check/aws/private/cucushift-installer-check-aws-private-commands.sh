@@ -39,14 +39,13 @@ done
 
 
 PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
-
 if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
     PUBLIC_RECORD_SETS=$(aws route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
 
     if [[ -n "${PUBLIC_RECORD_SETS}" ]]; then
         echo "Error: there's public Route 53 DNS records that matches this cluster"
-	echo "${PUBLIC_RECORD_SETS}"
-	ret=$((ret + 1))
+        echo "${PUBLIC_RECORD_SETS}"
+        ret=$((ret + 1))
     else
         echo "PASS: no public Route 53 DNS records that matches this cluster"
     fi

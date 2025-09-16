@@ -75,9 +75,10 @@ function waitingStatus() {
         sleep 10
         counter=$(expr $counter + 1)
         status=$(ibmcloud is endpoint-gateway $endpoint --output JSON | jq -r ."lifecycle_state")
+		rc="$?"
         if [[ "${status}" == "stable" ]]; then
             return 0
-        elif [[ "$?" != "0" ]]; then ## fail to get the status, directly exit 1
+        elif [[ "$rc" != "0" ]]; then ## fail to get the status, directly exit 1
             return 1
         fi
     done

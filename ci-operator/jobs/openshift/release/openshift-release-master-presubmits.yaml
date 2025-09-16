@@ -1061,7 +1061,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250709-d01b8af18
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250903-f49c6158b
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1100,7 +1100,7 @@ presubmits:
         - --target=core-valid
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1498,7 +1498,7 @@ presubmits:
         - --target=services-valid
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1556,7 +1556,7 @@ presubmits:
         - --variant=stackrox-stackrox
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1639,6 +1639,32 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )step-registry-shellcheck,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/verified-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-verified-config
+    rerun_command: /test verified-config
+    run_if_changed: ^core-services/verified/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-verified-config.sh
+        image: quay.io/openshift/ci-public:ci_tide-config-manager_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )verified-config,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
