@@ -214,6 +214,18 @@ for pqn in $(oc get pods -n openshift-etcd -l app=etcd --no-headers -o=name); do
 done
 echo "INFO: done attempting to fetch etcd debug info"
 
+echo "INFO: gathering coredumps if present"
+output_dir="${ARTIFACT_DIR}/coredumps"
+mkdir -p "$output_dir"
+while IFS= read -r node; do
+	oc debug "node/$node" -- ls -1 /host/var/lib/systemd/coredump/ | awk "{ print \"${node} \" \$1 }" | tee ${output_dir}/.coredumps_listing
+done < /tmp/nodes
+while IFS= read -r item; do
+  node=$(echo $item |cut -d ' ' -f 1)
+  fname=$(echo $item |cut -d ' ' -f 2)
+  echo "INFO: Queueing download of /var/lib/systemd/coredump/${fname} from ${node}";
+  queue "${output_dir}/${node}-${fname}" oc debug "node/${node}" -- cat "/host/var/lib/systemd/coredump/${fname}"
+done < "${output_dir}/.coredumps_listing"
 
 function gather_network() {
   local namespace=$1
