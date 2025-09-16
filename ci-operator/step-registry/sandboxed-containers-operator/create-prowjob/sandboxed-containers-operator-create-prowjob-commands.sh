@@ -90,18 +90,14 @@ get_latest_trustee_catalog_tag() {
 
 
 get_expected_version() {
-    # Extract expected version from catalog tag
-    # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
-    # If input is "latest", returns "0.0.0"
-    # Otherwise returns empty string
+    # Extract expected version from catalog tag if it matches X.Y.Z-[0-9]+ format
+    # Otherwise returns input
     local catalog_tag="$1"
 
     if [[ "${catalog_tag}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[0-9]+$ ]]; then
         echo "${BASH_REMATCH[1]}"
-    elif [[ "${catalog_tag}" == "latest" ]]; then
-        echo "0.0.0"
     else
-        echo ""
+        echo "${catalog_tag}"
     fi
 }
 
@@ -136,11 +132,17 @@ if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; th
     exit 1
 fi
 
-# Kata RPM version (includes OCP version)
+# Kata RPM version configuration
 if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
+    # Require KATA_RPM_VERSION when INSTALL_KATA_RPM is true
+    if [[ -z "${KATA_RPM_VERSION:-}" ]]; then
+        echo "ERROR: KATA_RPM_VERSION must be provided when INSTALL_KATA_RPM=true"
+        exit 1
+    fi
+    echo "Using provided KATA_RPM_VERSION: ${KATA_RPM_VERSION}"
 else
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
+    # Set default when INSTALL_KATA_RPM is false (for compatibility)
+    KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
 fi
 
 # test is Pre-GA for brew builds or GA for operators/rpms already on OCP
@@ -150,15 +152,6 @@ TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
 if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
     echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
     exit 1
-fi
-
-# Prow Run Type depends on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    PROW_RUN_TYPE="candidate"
-else
-    PROW_RUN_TYPE="release"
-    CATALOG_SOURCE_NAME="redhat-operators"
-    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
 fi
 
 # After the tests finish, wait before killing the cluster
@@ -188,15 +181,15 @@ echo "Configuring catalog sources..."
 
 # Set catalog source variables based on TEST_RELEASE_TYPE
 if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+    PROW_RUN_TYPE="candidate" # filename suffix
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
-
     else
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
     fi
 
-    # Extract expected OSC version from catalog tag if not already provided by user
+    # Only extract if EXPECTED_OSC_VERSION is not already provided by user
     if [[ -z "${EXPECTED_OSC_VERSION:-}" ]]; then
         extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
         if [[ -n "${extracted_version}" ]]; then
@@ -224,15 +217,12 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
     TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
 
-    # Extract expected Trustee version from catalog tag if not already provided by user
+    # Only extract if EXPECTED_TRUSTEE_VERSION is not already provided by user
     if [[ -z "${EXPECTED_TRUSTEE_VERSION:-}" ]]; then
         extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
         if [[ -n "${extracted_trustee_version}" ]]; then
             EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
             echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
-        else
-            EXPECTED_TRUSTEE_VERSION="0.4.1"
-            echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
         fi
     else
         echo "Using user-provided EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
@@ -241,10 +231,11 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
 else # GA
+    PROW_RUN_TYPE="release" # filename suffix
     CATALOG_SOURCE_NAME="redhat-operators"
     TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-    CATALOG_SOURCE_IMAGE="none"
-    TRUSTEE_CATALOG_SOURCE_IMAGE="none"
+    CATALOG_SOURCE_IMAGE="GA"
+    TRUSTEE_CATALOG_SOURCE_IMAGE="GA"
     EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.2}"
     EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.4.1}"
 fi
