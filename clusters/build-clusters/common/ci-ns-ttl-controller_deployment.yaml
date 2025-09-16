@@ -4,7 +4,10 @@ metadata:
   labels:
     app: namespace-ttl-controller
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-ns-ttl-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"namespace-ttl-controller\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 1h"
   name: namespace-ttl-controller
   namespace: ci
 spec:
@@ -23,8 +26,9 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
       containers:
-      - image: ci-ns-ttl-controller:latest
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-ns-ttl-controller_latest
         name: namespace-ttl-controller
+        imagePullPolicy: Always
         command:
         - /ci-ns-ttl-controller
         - --projected-token-file=/var/sa-token/token

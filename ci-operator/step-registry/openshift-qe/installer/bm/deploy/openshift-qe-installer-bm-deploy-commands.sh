@@ -16,7 +16,7 @@ export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
-  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".num_worker_nodes")
   export NUM_WORKER_NODES
 fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
@@ -47,6 +47,7 @@ use_bastion_registry: false
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
+image_type: "minimal-iso"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
@@ -54,7 +55,7 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
-  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/hypervisor_nic_interface")
+  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/config" | jq ".hypervisor_nic_interface")
   export HV_NIC_INTERFACE
 
   cat <<EOF >>/tmp/all.yml
@@ -145,6 +146,21 @@ if [[ ${TYPE} == 'sno' ]]; then
 else
   KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
 fi
+
+collect_ai_logs() {
+  echo "Collecting AI logs ..."
+  ssh ${SSH_ARGS} root@${bastion} "
+    AI_CLUSTER_ID=\$(curl -sS http://$bastion2:8080/api/assisted-install/v2/clusters/  | jq -r .[0].id)
+    echo 'Cluster ID is:' \$AI_CLUSTER_ID
+    mkdir -p /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE
+    curl -LsSo /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
+    rm -rf /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar.gz
+    gzip /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar
+  "
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar.gz ${ARTIFACT_DIR}
+}
+
+trap 'collect_ai_logs' EXIT
 
 ssh ${SSH_ARGS} root@${bastion} "
    set -e

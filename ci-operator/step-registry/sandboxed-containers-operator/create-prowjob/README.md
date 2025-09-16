@@ -9,14 +9,18 @@ The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates pr
 ## Files
 
 - `sandboxed-containers-operator-create-prowjob-commands.sh` - Main script to generate prowjob configurations
+- The output file is created in the current directory and named `openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_VERSION}.yaml`
+  - `PROW_RUN_TYPE` is based on ``TEST_RELEASE_TYPE.  It is `candidate` for `Pre-GA` and `release` otherwise
+- If the output file exists, it will be moved to a `.backup` file
 
 ## Key Features
 
-- **Intelligent Catalog Discovery**: Automatically queries Quay API for latest catalog tags
-- **Comprehensive Validation**: Strict parameter validation with clear error messages
-- **Release Type Awareness**: Different behavior for Pre-GA vs GA releases
-- **Robust Error Handling**: Graceful failure handling with meaningful diagnostics
-- **Configuration Backup**: Automatic backup of existing configuration files
+- Automatically queries Quay API for latest catalog tags
+  - If the tag is in X.Y.Z-epoch_time, it is used as the expected version of OSC and Trustee
+- Different behavior for Pre-GA vs GA releases
+- Generated files are not merged
+  - /PJ-REHEARSE in the PR to run prowjobs
+
 
 ## Usage
 
@@ -35,31 +39,33 @@ OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-
 
 ### Environment Variables
 
-| Variable               | Default Value            | Description                                   | Validation               |
-| ---------------------- | ------------------------ | --------------------------------------------- | ------------------------ |
-| `OCP_VERSION`          | `4.19`                   | OpenShift Container Platform version          | Format: X.Y (e.g., 4.19) |
-| `AWS_REGION_OVERRIDE`  | `us-east-2`              | AWS region for testing                        | Any valid AWS region     |
-| `CUSTOM_AZURE_REGION`  | `eastus`                 | Azure region for testing                      | Any valid Azure region   |
-| `EXPECTED_OSC_VERSION` | `1.10.1`                 | Expected OSC operator version                 | Semantic version format  |
-| `INSTALL_KATA_RPM`     | `true`                   | Whether to install Kata RPM                   | `true` or `false`        |
-| `KATA_RPM_VERSION`     | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when INSTALL_KATA_RPM=true) | RPM version format       |
-| `PROW_RUN_TYPE`        | `candidate`              | Prow job run type                             | `candidate` or `release` |
-| `SLEEP_DURATION`       | `0h`                     | Time to keep cluster alive after tests        | 0-12 followed by 'h'     |
-| `TEST_RELEASE_TYPE`    | `Pre-GA`                 | Release type for testing                      | `Pre-GA` or `GA`         |
-| `TEST_TIMEOUT`         | `90`                     | Test timeout in minutes                       | Numeric value            |
+| Variable                   | Default Value            | Description                                                                 | Validation               |
+| -------------------------- | ------------------------ | --------------------------------------------------------------------------- | ------------------------ |
+| `OCP_VERSION`              | `4.19`                   | OpenShift Container Platform version                                        | Format: X.Y (e.g., 4.19) |
+| `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
+| `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
+| `OSC_CATALOG_TAG`          | derived latest           | Can be overridden.  Also sets EXPECTED_OSC_VERSION                          | repo tag                 |
+| `TRUSTEE_CATALOG_TAG`      | derived latest           | Can be overridden.  Also sets EXPECTED_TRUSTEE_VERSION                      | repo tag                 |
+| `EXPECTED_OSC_VERSION`     | `1.10.1`                 | Derived from X.Y.X-epoch_time catalog tag or OSC_CATALOG_TAG                | Semantic version format  |
+| `EXPECTED_TRUSTEE_VERSION` | `0.4.0`                  | Derived from X.Y.X-epoch_time catalog tag IFF exists or TRUSTEE_CATALOG_TAG | Semantic version format  |
+| `INSTALL_KATA_RPM`         | `true`                   | Whether to install Kata RPM                                                 | `true` or `false`        |
+| `KATA_RPM_VERSION`         | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when `INSTALL_KATA_RPM=true`)                             | RPM version format       |
+| `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
+| `SLEEP_DURATION`           | `0h`                     | Time to keep cluster alive after tests                                      | 0-12 followed by 'h'     |
+| `TEST_RELEASE_TYPE`        | `Pre-GA`                 | Release type for testing                                                    | `Pre-GA` or `GA`         |
+| `TEST_TIMEOUT`             | `90`                     | Test timeout in minutes                                                     | Numeric value            |
 
 ### Pre-GA vs GA Configuration
 
 #### Pre-GA (Development) Mode
-- **Catalog Discovery**: Automatically queries Quay API for latest OSC catalog tags
-- **Custom Catalogs**: Creates `brew-catalog` and `trustee-catalog` sources
-- **Development Images**: Uses development builds from `quay.io/redhat-user-workloads`
-- **Dynamic Tag Resolution**: Finds latest tags matching `X.Y[.Z]-epoch_time` format
+- Automatically queries Quay API for latest OSC catalog tags of development branch
+  - OSC searches for X.Y.Z-epoch_time tag
+  - trustee uses an algorhythm
+- Creates `brew-catalog` and `trustee-catalog` sources with latest catalog tag
+  - if catalog tag is X.Y.Z-, the expected version of the operator is set
 
 #### GA (Production) Mode
-- **Production Catalogs**: Uses `redhat-operators` catalog source
-- **Stable Images**: Uses production registry images
-- **No Custom Sources**: Skips development catalog creation
+- Uses `redhat-operators` catalog source with GA images
 
 ### Advanced Configuration Examples
 
@@ -68,8 +74,7 @@ OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-
 # Test latest development builds
 TEST_RELEASE_TYPE=Pre-GA \
 PROW_RUN_TYPE=candidate \
-OCP_VERSION=4.20 \
-EXPECTED_OSC_VERSION=1.11.0 \
+OCP_VERSION=4.18 \
 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
 ```
 
