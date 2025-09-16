@@ -5,11 +5,15 @@ workflow:
       SLEEP_DURATION: 3h
       TEST_PARALLEL: 1
       FORCE_SUCCESS_EXIT: no
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      ENABLE_MUST_GATHER: "true"
+      MUST_GATHER_ON_FAILURE_ONLY: "false"
     pre:
     - chain: sandboxed-containers-operator-ipi-azure-pre
     - chain: sandboxed-containers-operator-pre
     post:
-    # TODO: remove this step once this process is automated to avoid unnecessary delay
+    - ref: sandboxed-containers-operator-gather-must-gather
     - ref: cucushift-installer-wait
     - chain: ipi-azure-post
     test:
