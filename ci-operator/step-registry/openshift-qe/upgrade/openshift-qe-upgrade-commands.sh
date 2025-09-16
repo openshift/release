@@ -84,4 +84,3 @@ echo $START_TIME > ${SHARED_DIR}/workload_start_time.txt
 ./upgrade.sh $TARGET_RELEASES -f $ENABLE_FORCE -s $SCALE -u $MAX_UNAVAILABLE -e $EUS_UPGRADE -c $EUS_CHANNEL
 END_TIME=$(date +%s)
 echo $END_TIME > ${SHARED_DIR}/workload_end_time.txt
-
