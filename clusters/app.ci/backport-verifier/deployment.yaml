@@ -22,7 +22,10 @@ items:
       app: prow
       component: backport-verifier
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"backport-verifier:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"backport-verifier\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 12h"
     namespace: ci
   spec:
     replicas: 1
@@ -39,7 +42,8 @@ items:
       spec:
         containers:
         - name: backport-verifier
-          image: backport-verifier:latest
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_backport-verifier_latest
+          imagePullPolicy: Always
           args:
           - --endpoint=/
           - --port=8888

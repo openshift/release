@@ -26,7 +26,10 @@ metadata:
     app: prow
     component: ai-plugin
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ai-plugin:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ai-plugin\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 12h"
   namespace: ci
 spec:
   replicas: 1
@@ -45,7 +48,7 @@ spec:
     spec:
       containers:
       - name: ai-plugin
-        image: ai-plugin:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ai-plugin_latest
         imagePullPolicy: Always
         args:
         - --log-level=debug
