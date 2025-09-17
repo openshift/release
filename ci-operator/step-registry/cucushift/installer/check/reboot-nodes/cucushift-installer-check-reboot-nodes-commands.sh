@@ -122,7 +122,7 @@ function reboot_cluster() {
     # Wait for API server to be accessible first
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for API server to be accessible..."
     try=0
-    max_try=20
+    max_try=30  # 30 attempts × 30 seconds = 15 minutes
     while [[ ${try} -lt ${max_try} ]]; do
         if oc get nodes --request-timeout=10s >/dev/null 2>&1; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - API server is accessible"
@@ -141,7 +141,7 @@ function reboot_cluster() {
     # Wait for all nodes to be Ready (including Ready,SchedulingDisabled)
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for all nodes to be Ready..."
     try=0
-    max_try=60  # 60 minutes total
+    max_try=90  # 90 attempts × 60 seconds = 90 minutes
     while [[ ${try} -lt ${max_try} ]]; do
         # Get node status in JSON format to properly parse Ready status
         if ! ready_count=$(oc get nodes -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status=="True")) | .metadata.name' 2>/dev/null | wc -l); then
@@ -161,7 +161,7 @@ function reboot_cluster() {
     done
 
     if [[ ${try} -eq ${max_try} ]]; then
-        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Not all nodes are Ready after ${max_try} minutes!"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Not all nodes are Ready after ${max_try} minutes (1.5 hours)!"
         run_command "oc get nodes -o wide" || true
         run_command "oc get nodes -o json | jq '.items[] | {name: .metadata.name, conditions: .status.conditions[] | select(.type==\"Ready\")}'" || true
         return 1
@@ -170,14 +170,38 @@ function reboot_cluster() {
     # Additional wait for cluster operators to stabilize
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for cluster operators to stabilize..."
     try=0
-    max_try=30  # 30 minutes
+    max_try=120  # 120 attempts × 60 seconds = 120 minutes (2 hours) - based on 1 hour cluster recovery time
+    consecutive_failures=0
+    max_consecutive_failures=5  # Allow up to 5 consecutive failures before giving up
+    
     while [[ ${try} -lt ${max_try} ]]; do
         # Check if all cluster operators are Available=True,Progressing=False,Degraded=False
         # Use a more robust approach to count unstable operators
-        if ! degraded_ops=$(oc get clusteroperators --no-headers 2>/dev/null | grep -v "True.*False.*False" | wc -l); then
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Failed to get cluster operators status, continuing..."
-            break
+        # Capture both output and error for debugging
+        clusteroperators_output=$(oc get clusteroperators --no-headers 2>&1)
+        oc_exit_code=$?
+        
+        if [[ ${oc_exit_code} -ne 0 ]]; then
+            consecutive_failures=$(( consecutive_failures + 1 ))
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Failed to get cluster operators status (attempt ${consecutive_failures}/${max_consecutive_failures})"
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Error details: ${clusteroperators_output}"
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Exit code: ${oc_exit_code}"
+            
+            if [[ ${consecutive_failures} -ge ${max_consecutive_failures} ]]; then
+                echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Too many consecutive failures getting cluster operators status, giving up"
+                echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test failed due to inability to check cluster operators"
+                return 1
+            fi
+            
+            sleep 10
+            continue
         fi
+        
+        # Reset consecutive failures counter on successful command
+        consecutive_failures=0
+        
+        # Count unstable operators from successful output
+        degraded_ops=$(echo "${clusteroperators_output}" | grep -v "True.*False.*False" | wc -l)
         
         if [[ ${degraded_ops} -eq 0 ]]; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All cluster operators are stable"
@@ -197,10 +221,11 @@ function reboot_cluster() {
     done
     
     if [[ ${try} -eq ${max_try} ]]; then
-        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Some cluster operators are still not stable after ${max_try} minutes"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Some cluster operators are still not stable after ${max_try} minutes (2 hours)"
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Final cluster operator status:"
         run_command "oc get clusteroperators" || true
-        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Continuing despite unstable cluster operators..."
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test failed due to unstable cluster operators"
+        return 1
     fi
     
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test completed successfully"
