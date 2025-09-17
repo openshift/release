@@ -17,6 +17,11 @@ objects:
     labels:
       app: prow
       component: boskos
+    annotations:
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 12h"
   spec:
     replicas: 3
     selector:
@@ -78,7 +83,8 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: secret-boskos-proxy
         - name: boskos
-          image: image-registry.openshift-image-registry.svc:5000/ci/boskos
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_boskos_latest
+          imagePullPolicy: Always
           args:
           - --config=/etc/config/boskos.yaml
           - --namespace=${namespace}
