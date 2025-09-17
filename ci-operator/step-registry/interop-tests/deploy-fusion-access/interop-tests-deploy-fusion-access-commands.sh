@@ -166,23 +166,28 @@ fi
 echo "Worker nodes found:"
 echo "$WORKER_NODES"
 
-# Get the first worker node for the LocalDisk
-FIRST_NODE=$(echo "$WORKER_NODES" | head -n1)
-echo "Using first worker node: $FIRST_NODE"
+# Convert worker nodes to array for processing
+readarray -t NODE_ARRAY <<< "$WORKER_NODES"
+NODE_COUNT=${#NODE_ARRAY[@]}
+echo "Total worker nodes: $NODE_COUNT"
 
-# Create LocalDisk for shared storage
-echo "Creating LocalDisk resource..."
-if oc apply -f=- <<EOF
+# Create LocalDisk for each worker node to ensure shared access
+DISK_COUNT=1
+for NODE in "${NODE_ARRAY[@]}"; do
+  if [[ -n "$NODE" ]]; then
+    echo "Creating LocalDisk for node: $NODE"
+    
+    if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: LocalDisk
 metadata:
-  name: shareddisk1
+  name: shareddisk${DISK_COUNT}
   namespace: ibm-spectrum-scale
 spec:
   # Use configurable device path
   device: ${LOCALDISK_DEVICE_PATH}
   # The Kubernetes node where the specified device exists at creation time
-  node: ${FIRST_NODE}
+  node: ${NODE}
   # nodeConnectionSelector defines the nodes that have the shared lun directly attached to them
   nodeConnectionSelector:
     matchExpressions:
@@ -191,17 +196,26 @@ spec:
   # Set below only during testing, this will wipe existing stuff
   existingDataSkipVerify: true
 EOF
-then
-  echo "✅ LocalDisk created successfully"
+    then
+      echo "✅ LocalDisk shareddisk${DISK_COUNT} created successfully for node $NODE"
+    else
+      echo "❌ Failed to create LocalDisk shareddisk${DISK_COUNT} for node $NODE"
+    fi
+    
+    ((DISK_COUNT++))
+  fi
+done
+
+echo "Created $((DISK_COUNT-1)) LocalDisk resources for shared storage across all worker nodes"
+
+echo "Verifying LocalDisk resources..."
+LOCALDISK_COUNT=$(oc get localdisks -n ibm-spectrum-scale --no-headers 2>/dev/null | wc -l)
+if [[ $LOCALDISK_COUNT -gt 0 ]]; then
+  echo "✅ Found $LOCALDISK_COUNT LocalDisk resources in ibm-spectrum-scale namespace:"
+  oc get localdisks -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
 else
-  echo "❌ Failed to create LocalDisk"
-  echo "This may be expected if the device ${LOCALDISK_DEVICE_PATH} doesn't exist on the node"
-  echo "You may need to adjust the LOCALDISK_DEVICE_PATH environment variable based on your environment"
-  echo "Common device paths to try:"
-  echo "  - /dev/nvme1n1 (NVMe SSD)"
-  echo "  - /dev/sdb (SATA/SCSI disk)"
-  echo "  - /dev/xvdb (Xen virtual disk)"
-  echo "  - /dev/vdb (KVM virtual disk)"
+  echo "⚠️  No LocalDisk resources found in ibm-spectrum-scale namespace"
+  echo "This may be expected if the device ${LOCALDISK_DEVICE_PATH} doesn't exist on the nodes"
 fi
 
 echo "✅ Fusion Access deployment completed!"
