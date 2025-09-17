@@ -11,17 +11,38 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: functional-tests-4-18
+- as: functional-tests-cgroups-v1-4-18
   capabilities:
   - intranet
-  cron: 0 22 31 2 5
+  cron: 0 8 * * 6
   steps:
     env:
-      CLUSTER_NAME: hlxcl15
-      CONTAINER_RUNTIME: runc
+      CGROUP_VERSION: v1
+      CLUSTER_NAME: hlxcl52
+      CONTAINER_RUNTIME: crun
       FEATURES: compute
       HUGEPAGES_DEFAULT_SIZE: 1G
       HUGEPAGES_PAGES: '[{"count": 1, "size": "1G"}, {"count": 128, "size": "2M"}]'
+      LABEL_FILTER: tier-0
+      LABELS: nto
+      RT_KERNEL: "true"
+      VERSION: "4.18"
+    test:
+    - ref: telcov10n-functional-compute-nto-eco-gotests
+    workflow: telcov10n-functional-compute-nto-ocp-setup
+- as: functional-tests-cgroups-v2-4-18
+  capabilities:
+  - intranet
+  cron: 0 8 * * 6
+  steps:
+    env:
+      CGROUP_VERSION: v2
+      CLUSTER_NAME: hlxcl51
+      CONTAINER_RUNTIME: crun
+      FEATURES: compute
+      HUGEPAGES_DEFAULT_SIZE: 1G
+      HUGEPAGES_PAGES: '[{"count": 1, "size": "1G"}, {"count": 128, "size": "2M"}]'
+      LABEL_FILTER: tier-0
       LABELS: nto
       RT_KERNEL: "true"
       VERSION: "4.18"
@@ -31,34 +52,19 @@ tests:
 - as: functional-tests-4-19
   capabilities:
   - intranet
-  cron: 0 22 31 2 5
+  cron: 0 8 * * 5
   steps:
     env:
-      CLUSTER_NAME: hlxcl51
-      CONTAINER_RUNTIME: runc
+      CGROUP_VERSION: v2
+      CLUSTER_NAME: hlxcl52
+      CONTAINER_RUNTIME: crun
       FEATURES: compute
       HUGEPAGES_DEFAULT_SIZE: 1G
       HUGEPAGES_PAGES: '[{"count": 1, "size": "1G"}, {"count": 128, "size": "2M"}]'
+      LABEL_FILTER: tier-0
       LABELS: nto
       RT_KERNEL: "true"
       VERSION: "4.19"
-    test:
-    - ref: telcov10n-functional-compute-nto-eco-gotests
-    workflow: telcov10n-functional-compute-nto-ocp-setup
-- as: functional-tests-4-20
-  capabilities:
-  - intranet
-  cron: 0 22 31 2 5
-  steps:
-    env:
-      CLUSTER_NAME: hlxcl52
-      CONTAINER_RUNTIME: runc
-      FEATURES: compute
-      HUGEPAGES_DEFAULT_SIZE: 1G
-      HUGEPAGES_PAGES: '[{"count": 1, "size": "1G"}, {"count": 128, "size": "2M"}]'
-      LABELS: nto
-      RT_KERNEL: "true"
-      VERSION: "4.20"
     test:
     - ref: telcov10n-functional-compute-nto-eco-gotests
     workflow: telcov10n-functional-compute-nto-ocp-setup

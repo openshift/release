@@ -43,6 +43,10 @@ if [[ -z "$IMAGE_TAG" ]]; then
             log "INFO Building default image tag for a $JOB_TYPE job"
             IMAGE_TAG="${RELEASE_VERSION}-nightly-${current_date}"
             ;;
+        batch)
+            log "INFO Building default image tag for a $JOB_TYPE job"
+            IMAGE_TAG="${RELEASE_VERSION}-batch-${current_date}"
+            ;;
         *)
             log "ERROR Cannot publish an image from a $JOB_TYPE job"
             exit 1

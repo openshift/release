@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 set -o pipefail
+set -x
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
 process_inventory() {
@@ -53,13 +54,11 @@ main() {
     echo "Create host_vars directory"
     mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-    if [[ "$CLUSTER_NAME" == "hlxcl15" ]]; then
-        mkdir /tmp/"${CLUSTER_NAME}"
-        cp -r "${MOUNTED_HOST_INVENTORY}"/hlxcl15/hypervisor /tmp/"${CLUSTER_NAME}"/hypervisor
-        cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/
-        ls -l /tmp/"${CLUSTER_NAME}"/
-        MOUNTED_HOST_INVENTORY="/tmp"
-    fi
+    mkdir /tmp/"${CLUSTER_NAME}"
+    cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/hypervisor" /tmp/"${CLUSTER_NAME}"/hypervisor
+    cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/
+    ls -l /tmp/"${CLUSTER_NAME}"/
+    MOUNTED_HOST_INVENTORY="/tmp"
 
     find ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/ -mindepth 1 -type d | while read -r dir; do
         echo "Process group inventory file: ${dir}"
