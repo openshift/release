@@ -20,6 +20,22 @@ function run_command() {
     fi
 }
 
+function print_cluster_diagnostics() {
+    local failure_type="$1"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - === CLUSTER DIAGNOSTICS FOR ${failure_type} ==="
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current node status:"
+    run_command "oc get nodes -o wide" || true
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current cluster operators status:"
+    run_command "oc get clusteroperators" || true
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current etcd status:"
+    run_command "oc get etcd -o yaml" || true
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current machine config pools:"
+    run_command "oc get machineconfigpools" || true
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current API server status:"
+    run_command "oc get apiservers cluster -o yaml" || true
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - === END CLUSTER DIAGNOSTICS ==="
+}
+
 function ssh_command() {
     local node_ip="$1"
     local cmd="$2"
@@ -135,6 +151,7 @@ function reboot_cluster() {
     
     if [[ ${try} -eq ${max_try} ]]; then
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: API server not accessible after ${max_try} attempts"
+        print_cluster_diagnostics "API SERVER FAILURE"
         return 1
     fi
     
@@ -162,7 +179,8 @@ function reboot_cluster() {
 
     if [[ ${try} -eq ${max_try} ]]; then
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Not all nodes are Ready after ${max_try} minutes (1.5 hours)!"
-        run_command "oc get nodes -o wide" || true
+        print_cluster_diagnostics "NODE READY FAILURE"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Detailed node conditions:"
         run_command "oc get nodes -o json | jq '.items[] | {name: .metadata.name, conditions: .status.conditions[] | select(.type==\"Ready\")}'" || true
         return 1
     fi
@@ -189,6 +207,7 @@ function reboot_cluster() {
             
             if [[ ${consecutive_failures} -ge ${max_consecutive_failures} ]]; then
                 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Too many consecutive failures getting cluster operators status, giving up"
+                print_cluster_diagnostics "COMMAND FAILURE"
                 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test failed due to inability to check cluster operators"
                 return 1
             fi
@@ -222,8 +241,9 @@ function reboot_cluster() {
     
     if [[ ${try} -eq ${max_try} ]]; then
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Some cluster operators are still not stable after ${max_try} minutes (2 hours)"
-        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Final cluster operator status:"
-        run_command "oc get clusteroperators" || true
+        print_cluster_diagnostics "CLUSTER OPERATOR FAILURE"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Unstable cluster operators details:"
+        run_command "oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true" || true
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test failed due to unstable cluster operators"
         return 1
     fi
