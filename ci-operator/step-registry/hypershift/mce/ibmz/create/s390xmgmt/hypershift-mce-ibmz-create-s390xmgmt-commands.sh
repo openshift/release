@@ -77,3 +77,7 @@ fi
 echo "Copying kubeconfig into SHARED_DIR"
 cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"
 echo "Kubeconfig copied into SHARED_DIR"
+
+echo "Getting default_os_images.json from assisted-service"
+git clone https://github.com/openshift/assisted-service.git
+cp ${HOME}/assisted-service/data/default_os_images.json ${SHARED_DIR}/default_os_images.json
