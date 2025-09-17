@@ -64,11 +64,20 @@ function reboot_node() {
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting instance ID for node ${node_name} (${node_ip})"
     
     # Get instance ID from AWS
+    # Temporarily disable errexit to handle AWS CLI failures gracefully
+    set +o errexit
     instance_id=$(aws ec2 describe-instances \
         --region "${AWS_REGION:-us-east-1}" \
         --filters "Name=private-ip-address,Values=${node_ip}" \
         --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' \
         --output text | grep -E '\s+running$' | awk '{print $1}' | head -1)
+    aws_exit_code=$?
+    set -o errexit
+    
+    if [[ ${aws_exit_code} -ne 0 ]]; then
+        echo "ERROR: AWS CLI failed to describe instances for IP ${node_ip} (exit code: ${aws_exit_code})"
+        return 1
+    fi
     
     if [[ -z "${instance_id}" ]]; then
         echo "ERROR: Could not find running instance for IP ${node_ip}"
@@ -116,11 +125,31 @@ function reboot_node() {
 function reboot_cluster() {
     local try max_try total_nodes_count=0 master_list node_list="" worker_list
     declare -A node_ip_array
+    
+    # Get node lists with error handling
+    set +o errexit
     master_list=$(oc get node -o wide --no-headers | grep 'master' | awk '{print $1":"$6}' | sort)
+    oc_exit_code=$?
+    set -o errexit
+    
+    if [[ ${oc_exit_code} -ne 0 ]]; then
+        echo "ERROR: Failed to get master nodes list (exit code: ${oc_exit_code})"
+        return 1
+    fi
+    
     if [[ "${SIZE_VARIANT}" == "compact" ]]; then
         node_list="${master_list}"
     else
+        set +o errexit
         worker_list=$(oc get node -o wide --no-headers | grep 'worker' | awk '{print $1":"$6}' | sort)
+        oc_exit_code=$?
+        set -o errexit
+        
+        if [[ ${oc_exit_code} -ne 0 ]]; then
+            echo "ERROR: Failed to get worker nodes list (exit code: ${oc_exit_code})"
+            return 1
+        fi
+        
         node_info_list="${worker_list} ${master_list}"
     fi
     for node_info in ${node_info_list}; do
