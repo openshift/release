@@ -77,7 +77,13 @@ echo "Waiting for IBM Storage Scale CRDs to be available..."
 oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeout=300s
 
 echo "Creating IBM Storage Scale Cluster..."
-if oc apply -f=- <<EOF
+MAX_ATTEMPTS=3
+ATTEMPT=1
+
+while [[ $ATTEMPT -le $MAX_ATTEMPTS ]]; do
+  echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+  
+  if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Cluster
 metadata:
@@ -115,12 +121,22 @@ spec:
     accept: true
     license: data-management
 EOF
-then
-  echo "✅ IBM Storage Scale Cluster created successfully"
-else
-  echo "❌ Failed to create IBM Storage Scale Cluster"
-  exit 1
-fi
+  then
+    echo "✅ IBM Storage Scale Cluster created successfully on attempt $ATTEMPT"
+    break
+  else
+    echo "❌ Failed to create IBM Storage Scale Cluster on attempt $ATTEMPT"
+    if [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; then
+      echo "⏳ Waiting 1 minute before retry..."
+      sleep 60
+    else
+      echo "❌ All $MAX_ATTEMPTS attempts failed"
+      exit 1
+    fi
+  fi
+  
+  ((ATTEMPT++))
+done
 
 echo "Verifying IBM Storage Scale Cluster exists..."
 if oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale >/dev/null 2>&1; then
