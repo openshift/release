@@ -77,14 +77,25 @@ export AWS_REGION="${AWS_REGION:-$LEASED_RESOURCE}"
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
-    # Execute command and capture exit code
-    eval "${CMD}"
+    # Execute command and capture both output and exit code
+    local output
+    output=$(eval "${CMD}" 2>&1)
     local exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
         echo "WARNING: Command failed: ${CMD} (exit code: ${exit_code})"
+        echo "Output: ${output}"
         return ${exit_code}
     fi
+    
+    # Return the output for command substitution
+    echo "${output}"
+}
+
+function run_command_silent() {
+    local CMD="$1"
+    # Execute command silently and return output for command substitution
+    eval "${CMD}" 2>/dev/null || echo ""
 }
 
 function print_cluster_diagnostics() {
@@ -186,24 +197,28 @@ function reboot_cluster() {
     declare -A node_ip_array
     
     # Get node lists with error handling
-    master_list=$(run_command "oc get node -o wide --no-headers | grep 'master' | awk '{print \$1\":\"\$6}' | sort" 2>/dev/null || echo "")
-    oc_exit_code=$?
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting master nodes list..."
+    master_list=$(run_command_silent "oc get node -o wide --no-headers | grep 'master' | awk '{print \$1\":\"\$6}' | sort")
     
-    if [[ ${oc_exit_code} -ne 0 ]]; then
-        echo "ERROR: Failed to get master nodes list (exit code: ${oc_exit_code})"
+    if [[ -z "${master_list}" ]]; then
+        echo "ERROR: Failed to get master nodes list or no master nodes found"
         return 1
     fi
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Found master nodes: ${master_list}"
     
     if [[ "${SIZE_VARIANT}" == "compact" ]]; then
         node_list="${master_list}"
     else
-        worker_list=$(run_command "oc get node -o wide --no-headers | grep 'worker' | awk '{print \$1\":\"\$6}' | sort" 2>/dev/null || echo "")
-        oc_exit_code=$?
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting worker nodes list..."
+        worker_list=$(run_command_silent "oc get node -o wide --no-headers | grep 'worker' | awk '{print \$1\":\"\$6}' | sort")
         
-        if [[ ${oc_exit_code} -ne 0 ]]; then
-            echo "ERROR: Failed to get worker nodes list (exit code: ${oc_exit_code})"
+        if [[ -z "${worker_list}" ]]; then
+            echo "ERROR: Failed to get worker nodes list or no worker nodes found"
             return 1
         fi
+        
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Found worker nodes: ${worker_list}"
         
         node_info_list="${worker_list} ${master_list}"
     fi
@@ -222,7 +237,8 @@ function reboot_cluster() {
         fi
     done
 
-    total_nodes_count=$(echo ${node_list} | awk '{print NF}' || echo "0")
+    total_nodes_count=$(echo ${node_list} | awk '{print NF}' 2>/dev/null || echo "0")
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Total nodes to reboot: ${total_nodes_count}"
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All ${total_nodes_count} nodes have been restarted, waiting for cluster to recover..."
     
     # Wait for API server to be accessible first
@@ -253,7 +269,7 @@ function reboot_cluster() {
     while [[ ${try} -lt ${max_try} ]]; do
         # Get node status in JSON format to properly parse Ready status
         # Get ready node count
-        ready_count=$(run_command "oc get nodes -o json | jq -r '.items[] | select(.status.conditions[] | select(.type==\"Ready\" and .status==\"True\")) | .metadata.name' | wc -l" 2>/dev/null || echo "0")
+        ready_count=$(run_command_silent "oc get nodes -o json | jq -r '.items[] | select(.status.conditions[] | select(.type==\"Ready\" and .status==\"True\")) | .metadata.name' | wc -l")
         oc_exit_code=$?
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
@@ -325,7 +341,7 @@ function reboot_cluster() {
         
         # Count unstable operators from successful output
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Counting unstable operators..."
-        degraded_ops=$(echo "${clusteroperators_output}" | grep -v "True.*False.*False" | wc -l || echo "0")
+        degraded_ops=$(echo "${clusteroperators_output}" | grep -v "True.*False.*False" | wc -l 2>/dev/null || echo "0")
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Found ${degraded_ops} unstable operators"
         
         if [[ ${degraded_ops} -eq 0 ]]; then
