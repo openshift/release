@@ -14,9 +14,15 @@ export AWS_REGION="${AWS_REGION:-$LEASED_RESOURCE}"
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
-    if ! eval "${CMD}"; then
-        echo "WARNING: Command failed: ${CMD}"
-        return 1
+    # Temporarily disable errexit to prevent script exit on command failure
+    set +o errexit
+    eval "${CMD}"
+    local exit_code=$?
+    set -o errexit
+    
+    if [[ ${exit_code} -ne 0 ]]; then
+        echo "WARNING: Command failed: ${CMD} (exit code: ${exit_code})"
+        return ${exit_code}
     fi
 }
 
