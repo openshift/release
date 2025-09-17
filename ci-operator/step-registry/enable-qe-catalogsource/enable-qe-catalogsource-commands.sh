@@ -271,6 +271,6 @@ create_icsp_connected
 check_olm_capability
 check_marketplace
 create_catalog_sources
-sleep 50000
+sleep 50001
 #support hypershift config guest cluster's icsp
 oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_icsp.yaml
