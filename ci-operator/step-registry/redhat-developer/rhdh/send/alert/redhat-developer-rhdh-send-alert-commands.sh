@@ -51,13 +51,13 @@ else
       # Override part_2 based for specific cases that do not follow the standard naming convention.
       case "$JOB_NAME" in
         *osd-gcp*)
-        part_2="redhat-developer-rhdh-osd-gcp-nightly"
+        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
         ;;
         *auth-providers*)
         part_2="redhat-developer-rhdh-auth-providers-nightly"
         ;;
         *ocp-v*)
-        part_2="redhat-developer-rhdh-nightly"
+        part_2="redhat-developer-rhdh-ocp-helm-nightly"
         ;;
       esac
       artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${project}"
