@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
+# set -o errexit  # Disabled to prevent script exit on command failures
 set -o pipefail
 
 # Set AWS credentials
@@ -14,11 +14,9 @@ export AWS_REGION="${AWS_REGION:-$LEASED_RESOURCE}"
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
-    # Temporarily disable errexit to prevent script exit on command failure
-    set +o errexit
+    # Execute command and capture exit code
     eval "${CMD}"
     local exit_code=$?
-    set -o errexit
     
     if [[ ${exit_code} -ne 0 ]]; then
         echo "WARNING: Command failed: ${CMD} (exit code: ${exit_code})"
@@ -64,15 +62,13 @@ function reboot_node() {
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting instance ID for node ${node_name} (${node_ip})"
     
     # Get instance ID from AWS
-    # Temporarily disable errexit to handle AWS CLI failures gracefully
-    set +o errexit
+    # Get instance ID from AWS
     instance_id=$(aws ec2 describe-instances \
         --region "${AWS_REGION:-us-east-1}" \
         --filters "Name=private-ip-address,Values=${node_ip}" \
         --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' \
         --output text | grep -E '\s+running$' | awk '{print $1}' | head -1)
     aws_exit_code=$?
-    set -o errexit
     
     if [[ ${aws_exit_code} -ne 0 ]]; then
         echo "ERROR: AWS CLI failed to describe instances for IP ${node_ip} (exit code: ${aws_exit_code})"
@@ -127,10 +123,8 @@ function reboot_cluster() {
     declare -A node_ip_array
     
     # Get node lists with error handling
-    set +o errexit
     master_list=$(oc get node -o wide --no-headers | grep 'master' | awk '{print $1":"$6}' | sort)
     oc_exit_code=$?
-    set -o errexit
     
     if [[ ${oc_exit_code} -ne 0 ]]; then
         echo "ERROR: Failed to get master nodes list (exit code: ${oc_exit_code})"
@@ -140,10 +134,8 @@ function reboot_cluster() {
     if [[ "${SIZE_VARIANT}" == "compact" ]]; then
         node_list="${master_list}"
     else
-        set +o errexit
         worker_list=$(oc get node -o wide --no-headers | grep 'worker' | awk '{print $1":"$6}' | sort)
         oc_exit_code=$?
-        set -o errexit
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
             echo "ERROR: Failed to get worker nodes list (exit code: ${oc_exit_code})"
@@ -175,14 +167,11 @@ function reboot_cluster() {
     try=0
     max_try=30  # 30 attempts × 30 seconds = 15 minutes
     while [[ ${try} -lt ${max_try} ]]; do
-        # Temporarily disable errexit to handle oc command failures gracefully
-        set +o errexit
+        # Check if API server is accessible
         if oc get nodes --request-timeout=10s >/dev/null 2>&1; then
-            set -o errexit
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - API server is accessible"
             break
         fi
-        set -o errexit
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - API server not accessible, waiting... (${try}/${max_try})"
         sleep 30
         try=$(( try + 1 ))
@@ -200,11 +189,9 @@ function reboot_cluster() {
     max_try=90  # 90 attempts × 60 seconds = 90 minutes
     while [[ ${try} -lt ${max_try} ]]; do
         # Get node status in JSON format to properly parse Ready status
-        # Temporarily disable errexit to handle oc command failures gracefully
-        set +o errexit
+        # Get ready node count
         ready_count=$(oc get nodes -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status=="True")) | .metadata.name' 2>/dev/null | wc -l)
         oc_exit_code=$?
-        set -o errexit
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Failed to get node status, retrying..."
@@ -241,11 +228,9 @@ function reboot_cluster() {
         # Check if all cluster operators are Available=True,Progressing=False,Degraded=False
         # Use a more robust approach to count unstable operators
         # Capture both output and error for debugging
-        # Temporarily disable errexit to handle oc command failures gracefully
-        set +o errexit
+        # Get cluster operators status
         clusteroperators_output=$(oc get clusteroperators --no-headers 2>&1)
         oc_exit_code=$?
-        set -o errexit
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
             consecutive_failures=$(( consecutive_failures + 1 ))
