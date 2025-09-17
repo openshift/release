@@ -96,4 +96,6 @@ fi
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+echo "----------------------------------------------------------------------"
+for ns_name  in `oc get ns |grep v2| awk '{print $1}'`;do echo $ns_name;oc -n $ns_name get pods;done
 sleep 7200
