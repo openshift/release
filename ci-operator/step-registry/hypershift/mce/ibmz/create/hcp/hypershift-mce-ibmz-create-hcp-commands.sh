@@ -14,7 +14,6 @@ export hcp_domain
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 ssh_key=$(cat ${ssh_key_file})
 export ssh_key
-echo "test"
 
 # Creating cluster imageset
 cat <<EOF | oc create -f -
@@ -45,7 +44,7 @@ fi
 # Installing hypershift cli
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_CLI_NAME=hcp
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+if [[ "$(printf '%s\n' "$MCE_VERSION" "2.4" | sort -V | head -n1)" != "2.4" ]]; then
  echo "MCE version is less than 2.4, using the hypershift cli name."
  HYPERSHIFT_CLI_NAME=hypershift
 fi
@@ -232,3 +231,4 @@ echo "$(date) ISO Download url is ready"
 echo "$(date) Create hosted cluster kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/nested_kubeconfig
 echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
+
