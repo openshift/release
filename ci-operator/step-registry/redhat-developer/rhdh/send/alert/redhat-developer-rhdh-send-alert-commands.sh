@@ -54,7 +54,7 @@ else
         part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
         ;;
         *auth-providers*)
-        part_2="redhat-developer-rhdh-auth-providers-nightly"
+        part_2="redhat-developer-rhdh-ocp-helm-auth-providers-nightly"
         ;;
         *ocp-v*)
         part_2="redhat-developer-rhdh-ocp-helm-nightly"
