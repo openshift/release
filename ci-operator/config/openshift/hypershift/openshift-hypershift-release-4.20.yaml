@@ -7,8 +7,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-operator-init:
     name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
@@ -35,11 +43,6 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.20_base-rhel9:
@@ -49,12 +52,6 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
-  to: hypershift-tests
 - dockerfile_literal: |
     FROM base
     RUN dnf install -y python3-pip
@@ -62,10 +59,7 @@ images:
   to: custom-verify-src
 promotion:
   to:
-  - excluded_images:
-    - hypershift-operator
-    - hypershift-tests
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -78,7 +72,7 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.20"
+      version: "4.19"
   latest:
     integration:
       include_built_images: true
@@ -88,27 +82,27 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.17"
   latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.18"
   latest-419:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.19"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.19"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -142,8 +136,8 @@ tests:
       OCP_IMAGE_N2: release:n2minor
     env:
       AUTH_THROUGH_CERTS: "true"
-      ENABLE_AKS_KMS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aks-4-19
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
@@ -157,6 +151,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:

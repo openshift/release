@@ -411,7 +411,7 @@ function generate_results() {
   else
     generate_result_teststeps
   fi
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' ! -empty -exec cp {} "$LOCAL_DIR_RST" \;
 }
 
 function fix_xmls() {
@@ -464,14 +464,14 @@ function droute_send() {
                                 --wait
                    2>&1
                   '
-  for (( i=1; i<=3; i++ ))
+  for (( i=1; i<=10; i++ ))
   do
     if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
       break
     fi
-    echo "Retry 'droute send' after sleep $i minutes"
-    sleep ${i}m
+    echo "Retry 'droute send' after sleep 2 minutes"
+    sleep 2m
   done
 }
 
