@@ -328,11 +328,11 @@ fi
 
 # Wait for FileSystem to be in a ready state
 echo "Waiting for FileSystem to reach ready state..."
-echo "Note: IBM Spectrum Scale FileSystem creation can take up to 16+ minutes according to documentation"
-if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/localfilesystem -n ibm-spectrum-scale --timeout=1200s 2>/dev/null; then
+echo "Note: IBM Spectrum Scale FileSystem creation can take up to 1 hour in CI environments"
+if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/localfilesystem -n ibm-spectrum-scale --timeout=3600s 2>/dev/null; then
   echo "✅ FileSystem is ready"
 else
-  echo "⚠️  FileSystem may still be initializing (timeout after 20 minutes), checking current status..."
+  echo "⚠️  FileSystem may still be initializing (timeout after 1 hour), checking current status..."
   oc get filesystem localfilesystem -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,STATUS:.status.phase"
 fi
 
@@ -358,7 +358,7 @@ sleep 5
 # Check for StorageClass with retry logic since it may take time to appear
 echo "Waiting for StorageClass to be created by the FileSystem..."
 STORAGECLASS_FOUND=false
-for i in {1..12}; do  # Check every 30 seconds for up to 6 minutes
+for i in {1..24}; do  # Check every 30 seconds for up to 12 minutes
   STORAGECLASS_COUNT=$(oc get storageclass --no-headers 2>/dev/null | grep -i spectrum | wc -l)
   if [[ $STORAGECLASS_COUNT -gt 0 ]]; then
     echo "✅ Found $STORAGECLASS_COUNT IBM Spectrum Scale StorageClass(es):"
@@ -366,13 +366,13 @@ for i in {1..12}; do  # Check every 30 seconds for up to 6 minutes
     STORAGECLASS_FOUND=true
     break
   else
-    echo "⏳ StorageClass not found yet (attempt $i/12), waiting 30 seconds..."
+    echo "⏳ StorageClass not found yet (attempt $i/24), waiting 30 seconds..."
     sleep 30
   fi
 done
 
 if [[ "$STORAGECLASS_FOUND" == "false" ]]; then
-  echo "⚠️  No IBM Spectrum Scale StorageClass found after 6 minutes"
+  echo "⚠️  No IBM Spectrum Scale StorageClass found after 12 minutes"
   echo "StorageClass creation may take longer or there may be an issue"
   echo "Current StorageClasses:"
   oc get storageclass
