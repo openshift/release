@@ -61,6 +61,9 @@ def validate_secret_name(_ctx, _param, value):
         )
     if not re.fullmatch("[A-Za-z0-9-]+", value):
         raise click.BadParameter("May only contain letters, numbers or dashes.")
+    # GCP limit for a secret name is 255 chars, 200 should be plenty.
+    if len(value) > 200:
+        raise click.BadParameter("Secret name must be max 200 characters.")
     return value
 
 
