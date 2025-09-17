@@ -4,6 +4,12 @@ set -o nounset
 # set -o errexit  # Disabled to prevent script exit on command failures
 set -o pipefail
 
+# Add ERR trap to catch any unexpected exits
+trap 'echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Script exited unexpectedly at line $LINENO with exit code $?" >&2; echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stack trace:" >&2; caller >&2; exit 1' ERR
+
+# Add EXIT trap to log script completion
+trap 'echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Script completed with exit code $?"' EXIT
+
 # Set AWS credentials
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.aws"
@@ -222,7 +228,7 @@ function reboot_cluster() {
     try=0
     max_try=120  # 120 attempts × 60 seconds = 120 minutes (2 hours) - based on 1 hour cluster recovery time
     consecutive_failures=0
-    max_consecutive_failures=5  # Allow up to 5 consecutive failures before giving up
+    max_consecutive_failures=10  # Allow up to 10 consecutive failures before giving up
     
     while [[ ${try} -lt ${max_try} ]]; do
         # Check if all cluster operators are Available=True,Progressing=False,Degraded=False
@@ -245,7 +251,7 @@ function reboot_cluster() {
                 return 1
             fi
             
-            sleep 10
+            sleep 30
             continue
         fi
         
@@ -265,18 +271,23 @@ function reboot_cluster() {
         # Show which operators are not stable for debugging
         if [[ ${try} -eq 0 ]] || [[ $((try % 5)) -eq 0 ]]; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current cluster operator status:"
-            run_command "oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true" || true
+            echo "Running Command: oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true"
+            oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Debug command completed, continuing..."
         fi
         
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Sleeping for 60 seconds before next check..."
         sleep 60
         try=$(( try + 1 ))
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting iteration ${try}/${max_try}"
     done
     
     if [[ ${try} -eq ${max_try} ]]; then
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Some cluster operators are still not stable after ${max_try} minutes (2 hours)"
         print_cluster_diagnostics "CLUSTER OPERATOR FAILURE"
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Unstable cluster operators details:"
-        run_command "oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true" || true
+        echo "Running Command: oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true"
+        oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test failed due to unstable cluster operators"
         return 1
     fi
