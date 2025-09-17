@@ -84,6 +84,41 @@ bastion_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
 
 echo "Gathering log-bundle from private cluster"
 
+# OCP-25786 Step 3: Test gathering bootstrap logs from outside VPC (should fail)
+echo "=== OCP-25786 Step 3: Testing bootstrap log gathering from outside VPC (should fail) ==="
+
+# Get bootstrap and master internal IPs from metadata
+if [[ -f "${SHARED_DIR}/metadata.json" ]]; then
+    bootstrap_ip=$(jq -r '.bootstrapIP' "${SHARED_DIR}/metadata.json" 2>/dev/null || echo "")
+    master_ips=$(jq -r '.masterIPs[]' "${SHARED_DIR}/metadata.json" 2>/dev/null | head -1 || echo "")
+    
+    if [[ -n "${bootstrap_ip}" && -n "${master_ips}" ]]; then
+        echo "Bootstrap IP: ${bootstrap_ip}"
+        echo "Master IP: ${master_ips}"
+        
+        # Try to gather bootstrap logs directly from outside VPC (should fail)
+        echo "Attempting to gather bootstrap logs directly from outside VPC..."
+        echo "Command: openshift-install gather bootstrap --bootstrap ${bootstrap_ip} --master ${master_ips} --key ${ssh_key}"
+        
+        # This should fail with connection timeout
+        if timeout 30 openshift-install gather bootstrap --bootstrap "${bootstrap_ip}" --master "${master_ips}" --key "${ssh_key}" 2>&1 | tee "${ARTIFACT_DIR}/bootstrap-gather-outside-vpc.log"; then
+            echo "ERROR: Expected failure when gathering bootstrap logs from outside VPC, but command succeeded!"
+            echo "This indicates a potential security issue - bootstrap node should not be accessible from outside VPC"
+            exit 1
+        else
+            echo "SUCCESS: As expected, gathering bootstrap logs from outside VPC failed"
+            echo "This confirms that bootstrap node is properly isolated in private subnet"
+        fi
+    else
+        echo "WARNING: Could not determine bootstrap or master IPs from metadata.json"
+        echo "Skipping OCP-25786 Step 3 test"
+    fi
+else
+    echo "WARNING: metadata.json not found, skipping OCP-25786 Step 3 test"
+fi
+
+echo "=== OCP-25786 Step 4: Gathering bootstrap logs from inside VPC (should succeed) ==="
+
 run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "${installer_bin}" "/tmp/"
 
 #
