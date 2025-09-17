@@ -1,10 +1,6 @@
 #!/bin/bash
 
 set -o errexit
-set -o nounset
-set -o pipefail
-set -o xtrace
-set -x
 ls 
 
 function cerberus_cleanup() {
@@ -60,6 +56,9 @@ export CERBERUS_KUBECONFIG=$KUBECONFIG
 export CERBERUS_WATCH_NAMESPACES="[^.*$]"
 export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*,^loki*,^go*]"
 
+set -o nounset
+set -o pipefail
+set -x
 mkdir -p ${ARTIFACT_DIR}/cerberus
 
 cerberus_logs=${ARTIFACT_DIR}/cerberus/cerberus_prow_logs.out
