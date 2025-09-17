@@ -322,4 +322,9 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-reboot_cluster
+if ! reboot_cluster; then
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: reboot_cluster function failed"
+    exit 1
+fi
+
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All reboot operations completed successfully"
