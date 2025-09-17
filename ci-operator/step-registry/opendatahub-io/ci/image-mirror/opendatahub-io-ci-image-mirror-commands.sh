@@ -74,6 +74,10 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
             log "INFO Building weekly image tag for a $JOB_TYPE job"
             IMAGE_TAG="${RELEASE_VERSION}-weekly"
             ;;
+        batch)
+            log "INFO Skip Building image tag for a $JOB_TYPE job"
+            IMAGE_TAG="${RELEASE_VERSION}-batch-${current_date}"
+            ;;
         *)
             log "ERROR Cannot publish an image from a $JOB_TYPE job"
             exit 1
@@ -123,13 +127,19 @@ if [[ -n "${IMAGE_FLOATING_TAG-}" ]]; then
     DESTINATION_IMAGE_REF="$DESTINATION_IMAGE_REF $FLOATING_IMAGE_REF"
 fi
 
-log "INFO Mirroring Image"
-log "    From   : $SOURCE_IMAGE_REF"
-log "    To     : $DESTINATION_IMAGE_REF"
-log "    Dry Run: $dry"
-oc image mirror $SOURCE_IMAGE_REF $DESTINATION_IMAGE_REF --dry-run=$dry || {
-    log "ERROR Unable to mirror image"
-    exit 1
-}
-
-log "INFO Mirroring complete."
+if [[ "$JOB_TYPE" == "batch" ]]; then
+    log "INFO Skipping image mirroring for batch job type"
+    log "    From   : $SOURCE_IMAGE_REF"
+    log "    To     : $DESTINATION_IMAGE_REF"
+    log "    Reason : Batch jobs do not perform image mirroring"
+else
+    log "INFO Mirroring Image"
+    log "    From   : $SOURCE_IMAGE_REF"
+    log "    To     : $DESTINATION_IMAGE_REF"
+    log "    Dry Run: $dry"
+    oc image mirror $SOURCE_IMAGE_REF $DESTINATION_IMAGE_REF --dry-run=$dry || {
+        log "ERROR Unable to mirror image"
+        exit 1
+    }
+    log "INFO Mirroring complete."
+fi
