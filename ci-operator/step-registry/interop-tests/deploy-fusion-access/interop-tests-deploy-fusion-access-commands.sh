@@ -11,11 +11,13 @@ STORAGE_SCALE_CLIENT_CPU="${STORAGE_SCALE_CLIENT_CPU:-2}"
 STORAGE_SCALE_CLIENT_MEMORY="${STORAGE_SCALE_CLIENT_MEMORY:-4Gi}"
 STORAGE_SCALE_STORAGE_CPU="${STORAGE_SCALE_STORAGE_CPU:-2}"
 STORAGE_SCALE_STORAGE_MEMORY="${STORAGE_SCALE_STORAGE_MEMORY:-8Gi}"
+LOCALDISK_DEVICE_PATH="${LOCALDISK_DEVICE_PATH:-/dev/nvme1n1}"
 
 echo "Starting Fusion Access Operator deployment..."
 echo "Version: ${FUSION_ACCESS_STORAGE_SCALE_VERSION}"
 echo "Namespace: ${FUSION_ACCESS_NAMESPACE}"
 echo "Storage Scale Namespace: ${FUSION_ACCESS_NAMESPACE}"
+echo "LocalDisk Device Path: ${LOCALDISK_DEVICE_PATH}"
 
 IBM_ENTITLEMENT_KEY="$(cat "/var/run/secrets/ibm-entitlement-key")"
 FUSION_PULL_SECRET_EXTRA="$(cat "/var/run/secrets/fusion-pullsecret-extra")"
@@ -151,6 +153,55 @@ else
   echo "Checking for any clusters in the namespace..."
   oc get clusters -n ibm-spectrum-scale
   exit 1
+fi
+
+echo "Creating IBM Storage Scale LocalDisk for shared storage..."
+echo "Getting worker node information..."
+WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath="{range .items[*]}{.metadata.name}{'\n'}{end}")
+if [[ -z "$WORKER_NODES" ]]; then
+  echo "❌ No worker nodes found"
+  exit 1
+fi
+
+echo "Worker nodes found:"
+echo "$WORKER_NODES"
+
+# Get the first worker node for the LocalDisk
+FIRST_NODE=$(echo "$WORKER_NODES" | head -n1)
+echo "Using first worker node: $FIRST_NODE"
+
+# Create LocalDisk for shared storage
+echo "Creating LocalDisk resource..."
+if oc apply -f=- <<EOF
+apiVersion: scale.spectrum.ibm.com/v1beta1
+kind: LocalDisk
+metadata:
+  name: shareddisk1
+  namespace: ibm-spectrum-scale
+spec:
+  # Use configurable device path
+  device: ${LOCALDISK_DEVICE_PATH}
+  # The Kubernetes node where the specified device exists at creation time
+  node: ${FIRST_NODE}
+  # nodeConnectionSelector defines the nodes that have the shared lun directly attached to them
+  nodeConnectionSelector:
+    matchExpressions:
+    - key: node-role.kubernetes.io/worker
+      operator: Exists
+  # Set below only during testing, this will wipe existing stuff
+  existingDataSkipVerify: true
+EOF
+then
+  echo "✅ LocalDisk created successfully"
+else
+  echo "❌ Failed to create LocalDisk"
+  echo "This may be expected if the device ${LOCALDISK_DEVICE_PATH} doesn't exist on the node"
+  echo "You may need to adjust the LOCALDISK_DEVICE_PATH environment variable based on your environment"
+  echo "Common device paths to try:"
+  echo "  - /dev/nvme1n1 (NVMe SSD)"
+  echo "  - /dev/sdb (SATA/SCSI disk)"
+  echo "  - /dev/xvdb (Xen virtual disk)"
+  echo "  - /dev/vdb (KVM virtual disk)"
 fi
 
 echo "✅ Fusion Access deployment completed!"
