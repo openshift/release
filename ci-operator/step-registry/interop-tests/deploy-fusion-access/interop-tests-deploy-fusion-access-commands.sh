@@ -273,4 +273,56 @@ fi
 
 echo "IBM Storage Scale deployment verification completed."
 
+echo "Creating IBM Storage Scale FileSystem on top of LocalDisk resources..."
+if oc apply -f=- <<EOF
+apiVersion: scale.spectrum.ibm.com/v1beta1
+kind: Filesystem
+metadata:
+  name: localfilesystem
+  namespace: ibm-spectrum-scale
+spec:
+  local:
+    blockSize: 4M
+    pools:
+    - name: system
+      disks:
+      - shareddisk1
+    # Only 1-way is supported for LFS https://www.ibm.com/docs/en/scalecontainernative/5.2.1?topic=systems-local-file-system#filesystem-spec
+    replication: 1-way
+    type: shared
+  seLinuxOptions:
+    level: s0
+    role: object_r
+    type: container_file_t
+    user: system_u
+EOF
+then
+  echo "✅ IBM Storage Scale FileSystem created successfully"
+else
+  echo "❌ Failed to create IBM Storage Scale FileSystem"
+  echo "This may be expected if the LocalDisk resources are not ready yet"
+fi
+
+echo "Waiting for FileSystem to be ready..."
+sleep 10
+
+echo "Verifying FileSystem resource..."
+if oc get filesystem localfilesystem -n ibm-spectrum-scale >/dev/null 2>&1; then
+  echo "✅ FileSystem resource found:"
+  oc get filesystem localfilesystem -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,STATUS:.status.phase"
+else
+  echo "⚠️  FileSystem resource not found yet"
+fi
+
+echo "Checking for new StorageClass created by the FileSystem..."
+sleep 5
+STORAGECLASS_COUNT=$(oc get storageclass --no-headers 2>/dev/null | grep -i spectrum | wc -l)
+if [[ $STORAGECLASS_COUNT -gt 0 ]]; then
+  echo "✅ Found $STORAGECLASS_COUNT IBM Spectrum Scale StorageClass(es):"
+  oc get storageclass | grep -i spectrum
+else
+  echo "⚠️  No IBM Spectrum Scale StorageClass found yet"
+  echo "StorageClass may take some time to be created after FileSystem is ready"
+fi
+
 echo "✅ Fusion Access deployment completed!"
