@@ -231,12 +231,17 @@ function reboot_cluster() {
     max_consecutive_failures=10  # Allow up to 10 consecutive failures before giving up
     
     while [[ ${try} -lt ${max_try} ]]; do
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - === CLUSTER OPERATOR CHECK ITERATION ${try}/${max_try} ==="
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current try: ${try}, max_try: ${max_try}, consecutive_failures: ${consecutive_failures}"
+        
         # Check if all cluster operators are Available=True,Progressing=False,Degraded=False
         # Use a more robust approach to count unstable operators
         # Capture both output and error for debugging
         # Get cluster operators status
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting cluster operators status..."
         clusteroperators_output=$(oc get clusteroperators --no-headers 2>&1)
         oc_exit_code=$?
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - oc get clusteroperators exit code: ${oc_exit_code}"
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
             consecutive_failures=$(( consecutive_failures + 1 ))
@@ -248,10 +253,13 @@ function reboot_cluster() {
                 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Too many consecutive failures getting cluster operators status, giving up"
                 print_cluster_diagnostics "COMMAND FAILURE"
                 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test failed due to inability to check cluster operators"
+                echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - RETURNING 1 FROM reboot_cluster function"
                 return 1
             fi
             
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Sleeping 30 seconds before retry..."
             sleep 30
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - CONTINUING to next iteration after error"
             continue
         fi
         
@@ -259,10 +267,12 @@ function reboot_cluster() {
         consecutive_failures=0
         
         # Count unstable operators from successful output
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Counting unstable operators..."
         degraded_ops=$(echo "${clusteroperators_output}" | grep -v "True.*False.*False" | wc -l || echo "0")
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Found ${degraded_ops} unstable operators"
         
         if [[ ${degraded_ops} -eq 0 ]]; then
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All cluster operators are stable"
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All cluster operators are stable - BREAKING LOOP"
             break
         fi
         
@@ -280,8 +290,12 @@ function reboot_cluster() {
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Sleeping for 60 seconds before next check..."
         sleep 60
         try=$(( try + 1 ))
-        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting iteration ${try}/${max_try}"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Completed iteration, try is now ${try}/${max_try}"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - === END OF ITERATION ${try}/${max_try} ==="
     done
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - === CLUSTER OPERATOR CHECK LOOP COMPLETED ==="
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Final try value: ${try}, max_try: ${max_try}"
     
     if [[ ${try} -eq ${max_try} ]]; then
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Some cluster operators are still not stable after ${max_try} minutes (2 hours)"
