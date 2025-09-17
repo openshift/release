@@ -50,7 +50,7 @@ function assert_equal() {
 }
 
 echo "Getting and parsing the active key's URL"
-ACTIVE_KEY_URL=$(<"${SHARED_DIR}/azure_active_key_url")
+ACTIVE_KEY_URL=$(cat /etc/hypershift-aro-azurecreds/kms-encryption-key-id)
 read -r KEYVAULT_NAME ACTIVE_KEY_NAME ACTIVE_KEY_VERSION <<< "$(parse_key_url "$ACTIVE_KEY_URL")"
 
 echo "Making sure that the active key's info is correctly specified on the HostedCluster resource"
