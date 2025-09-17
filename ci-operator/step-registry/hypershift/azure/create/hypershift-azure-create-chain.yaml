@@ -123,6 +123,9 @@ chain:
     - name: HYPERSHIFT_INSTANCE_TYPE
       default: ""
       documentation: "Instance type for the nodepool vm size"
+    - name: ADDITIONAL_CA_BUNDLE_FILE
+      default: ""
+      documentation: "The additional ca bundle file name in the shared directory"
     commands: |-
       set -exuo pipefail
 
@@ -317,6 +320,10 @@ chain:
         COMMAND+=(--instance-type=${HYPERSHIFT_INSTANCE_TYPE})
       fi
       
+      if [[ -n "${ADDITIONAL_CA_BUNDLE_FILE}" ]]; then
+        COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
+      fi
+
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then

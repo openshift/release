@@ -39,10 +39,6 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: base
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   console-tests:
     name: "4.21"
     namespace: ocp
@@ -69,6 +65,10 @@ base_images:
     tag: libvirt-installer
   nested-environment-builder:
     name: nested-environment-builder
+    namespace: ci
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
     namespace: ci
     tag: latest
   rosa-aws-cli:
@@ -173,18 +173,6 @@ tests:
     cluster_profile: aws-2
     env:
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-single-node-realtime
-  timeout: 5h0m0s
-- as: e2e-metal-ovn-single-node-rt-upgrade-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-      TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
       - observers-resource-watch
@@ -457,7 +445,6 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
-        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter
 - as: e2e-agent-ovn-two-node-arbiter-ipv6
   cluster: build05
@@ -467,7 +454,6 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
-        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter
 - as: e2e-agent-ovn-two-node-arbiter-dualstack
   cluster: build05
@@ -477,7 +463,6 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
-        FEATURE_SET="TechPreviewNoUpgrade"
     workflow: baremetalds-two-node-arbiter
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
@@ -487,42 +472,25 @@ tests:
     workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
   cluster: build05
-  cron: 0 */6 * * *
+  cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-arbiter-ipv6-techpreview
+- as: e2e-metal-ovn-two-node-fencing-dualstack-techpreview
   cluster: build05
-  cron: 0 */6 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        NUM_MASTERS=2
-        MASTER_MEMORY=32768
-        NUM_ARBITERS=1
-        ARBITER_MEMORY=16384
-        NUM_WORKERS=0
-        ENABLE_ARBITER=true
-        FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-arbiter-dualstack-techpreview
-  cluster: build05
-  cron: 0 */6 * * *
+  cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
-        NUM_MASTERS=2
+        MASTER_DISK=100
         MASTER_MEMORY=32768
-        NUM_ARBITERS=1
-        ARBITER_MEMORY=16384
+        NUM_MASTERS=2
         NUM_WORKERS=0
-        ENABLE_ARBITER=true
         FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter-techpreview
+        BMC_DRIVER=redfish
+    workflow: baremetalds-two-node-fencing-techpreview
 - as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
   cluster: build05
   cron: '@daily'
@@ -780,9 +748,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
@@ -796,24 +762,20 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
-      NETWORK_TYPE: multi-tenant
       TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-upi-hybrid-env
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-disk-setup
+- as: e2e-vsphere-ovn-disk-setup-techpreview
   cron: 50 21 * * 2
   steps:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
       DISK_SETUP: "true"
-      FEATURE_GATES: '[MultiDiskSetup=true]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
@@ -929,6 +891,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: aws-3
     observers:
@@ -1003,7 +966,7 @@ tests:
         CNF_E2E_TESTS=false
         CNF_ORIGIN_TESTS=true
       T5CI_JOB_TYPE: origintests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1011,7 +974,7 @@ tests:
 - as: e2e-telco5g-cnftests
   capabilities:
   - intranet
-  cron: 00 10 */1 * 1-5
+  cron: 00 22 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -1019,7 +982,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1036,7 +999,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1044,13 +1007,28 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 0 7 * * 0-5
+  cron: 0 8 * * 0-5
   restrict_network_access: false
   steps:
     env:
       SKIP_OCP_INSTALL: "false"
       T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-ptp
+- as: e2e-telco5g-ptp-upstream
+  capabilities:
+  - intranet
+  cron: 30 12 * * 1-5
+  restrict_network_access: false
+  steps:
+    env:
+      SKIP_OCP_INSTALL: "true"
+      T5CI_DEPLOY_UPSTREAM: "true"
+      T5CI_JOB_TYPE: ptp
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1066,7 +1044,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1082,7 +1060,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: sno-ztp-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1090,7 +1068,7 @@ tests:
 - as: e2e-telco5g-mno-ztp-cnftests
   capabilities:
   - intranet
-  cron: 10 20 */1 * 1-5
+  cron: 10 08 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -1098,7 +1076,7 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: mno-ztp-cnftests
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1110,7 +1088,7 @@ tests:
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-bm
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1122,7 +1100,7 @@ tests:
   steps:
     env:
       T5CI_JOB_TYPE: network-flow-matrix-single-node-bm
-      T5CI_VERSION: "4.20"
+      T5CI_VERSION: "4.21"
     observers:
       enable:
       - observers-resource-watch
@@ -1135,6 +1113,7 @@ tests:
     - ref: network-flow-matrix-tests
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: aws-ovn-network-flow-matrix-single-node
   cron: 0 23 * * 2,5
   steps:
@@ -1252,6 +1231,24 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-gcp-custom-dns-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
+        \| egressfirewall
+      USER_PROVISIONED_DNS: "yes"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1951,13 +1948,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-sts-conformance
-  timeout: 6h0m0s
-- as: e2e-rosa-sts-hypershift-ovn
-  cluster: build10
-  cron: '@daily'
-  steps:
-    cluster_profile: aws-perfscale-qe
-    workflow: rosa-aws-sts-hcp-conformance
   timeout: 6h0m0s
 - as: e2e-osd-ccs-gcp
   cluster: build10

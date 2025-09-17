@@ -225,7 +225,7 @@ def get_secrets_from_index(
         response = client.access_secret_version(request={"name": index_secret})
     except PermissionDenied:
         raise click.ClickException(
-            f"Access denied: You do not have permission to list secrets in collection '{collection}'."
+            f"You don't have permission to access secrets in collection '{collection}'."
         )
     except Exception as e:
         raise click.ClickException(

@@ -22,7 +22,8 @@ images:
   to: kube-state-metrics
 promotion:
   to:
-  - name: "4.21"
+  - disabled: true
+    name: "4.21"
     namespace: ocp
 releases:
   initial:
@@ -63,6 +64,18 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      from: stable:cluster-monitoring-operator-src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: ginkgo-tests-cmo
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: make test-ginkgo
       from: stable:cluster-monitoring-operator-src
       resources:
         requests:

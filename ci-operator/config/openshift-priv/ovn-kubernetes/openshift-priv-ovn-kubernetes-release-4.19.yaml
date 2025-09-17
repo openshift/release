@@ -11,14 +11,14 @@ base_images:
     name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.23-openshift-4.19
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    tag: rhel-8-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -39,19 +39,19 @@ images:
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -287,22 +287,16 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+- as: e2e-metal-ipi-ovn-dualstack-bgp
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
   timeout: 5h0m0s
 - as: e2e-aws-ovn-hypershift

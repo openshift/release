@@ -67,7 +67,7 @@ function networkToSubnetsJson() {
 
   jq -r '.[.spec.primaryRouterHostname] = .[.spec.vlanId] |
   .[.spec.primaryRouterHostname][.spec.vlanId] = .spec |
-  .[.spec.primaryRouterHostname][.spec.vlanId].dnsServer = .spec.gateway |
+  .[.spec.primaryRouterHostname][.spec.vlanId].dnsServer = .spec.nameservers[0] |
   .[.spec.primaryRouterHostname][.spec.vlanId].mask = .spec.netmask |
   .[.spec.primaryRouterHostname][.spec.vlanId].StartIPv6Address= .spec.startIPv6Address |
   .[.spec.primaryRouterHostname][.spec.vlanId].CidrIPv6 = .spec.cidrIPv6' "${NETWORK_CACHE_PATH}" > "${TMPSUBNETSJSON}"

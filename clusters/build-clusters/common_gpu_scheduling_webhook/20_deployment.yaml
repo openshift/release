@@ -20,7 +20,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"gpu-scheduling-webhook:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"webhook\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 12h"
   labels:
     app: gpu-scheduling-webhook
   name: gpu-scheduling-webhook
@@ -40,7 +43,7 @@ spec:
       - key: node-role.kubernetes.io/infra
         operator: Exists
       containers:
-      - image: image-registry.openshift-image-registry.svc:5000/ci/gpu-scheduling-webhook:latest
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_gpu-scheduling-webhook_latest
         command:
         - /usr/bin/gpu-scheduling-webhook
         args:

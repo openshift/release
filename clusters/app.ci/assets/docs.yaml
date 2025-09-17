@@ -20,7 +20,10 @@ metadata:
   labels:
     app: ci-docs
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-docs:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-docs\")].image"},{"from":{"kind":"ImageStreamTag","name":"cluster-display:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"cluster-display\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 12h"
 spec:
   replicas: 2
   revisionHistoryLimit: 2
@@ -34,7 +37,8 @@ spec:
     spec:
       containers:
       - name: ci-docs
-        image: ci-docs
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-docs_latest
+        imagePullPolicy: Always
         resources:
           requests:
             memory: "250Mi"
@@ -43,7 +47,8 @@ spec:
         - --kubeconfig-dir=/etc/build-farm-credentials
         - --kubeconfig-suffix=config
         name: cluster-display
-        image: cluster-display
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_cluster-display_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /api/health
