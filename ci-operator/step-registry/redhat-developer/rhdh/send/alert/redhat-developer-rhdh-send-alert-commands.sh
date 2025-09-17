@@ -56,7 +56,7 @@ else
         *auth-providers*)
         part_2="redhat-developer-rhdh-ocp-helm-auth-providers-nightly"
         ;;
-        *ocp-v*)
+        *ocp-helm-nightly-v*)
         part_2="redhat-developer-rhdh-ocp-helm-nightly"
         ;;
       esac
