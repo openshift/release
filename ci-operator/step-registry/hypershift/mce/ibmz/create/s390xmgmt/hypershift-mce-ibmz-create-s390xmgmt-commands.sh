@@ -46,7 +46,7 @@ cd "ibmcloud-openshift-provisioning" || {
 
 
 
-export OCP_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.20.0-ec.5-s390x"
+#export OCP_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.20.0-ec.5-s390x"
 
 VARS_FILE="cluster-vars"
 
