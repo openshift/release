@@ -140,10 +140,14 @@ function reboot_cluster() {
     try=0
     max_try=30  # 30 attempts × 30 seconds = 15 minutes
     while [[ ${try} -lt ${max_try} ]]; do
+        # Temporarily disable errexit to handle oc command failures gracefully
+        set +o errexit
         if oc get nodes --request-timeout=10s >/dev/null 2>&1; then
+            set -o errexit
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - API server is accessible"
             break
         fi
+        set -o errexit
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - API server not accessible, waiting... (${try}/${max_try})"
         sleep 30
         try=$(( try + 1 ))
@@ -161,7 +165,13 @@ function reboot_cluster() {
     max_try=90  # 90 attempts × 60 seconds = 90 minutes
     while [[ ${try} -lt ${max_try} ]]; do
         # Get node status in JSON format to properly parse Ready status
-        if ! ready_count=$(oc get nodes -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status=="True")) | .metadata.name' 2>/dev/null | wc -l); then
+        # Temporarily disable errexit to handle oc command failures gracefully
+        set +o errexit
+        ready_count=$(oc get nodes -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status=="True")) | .metadata.name' 2>/dev/null | wc -l)
+        oc_exit_code=$?
+        set -o errexit
+        
+        if [[ ${oc_exit_code} -ne 0 ]]; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - WARNING: Failed to get node status, retrying..."
             sleep 10
             continue
@@ -196,8 +206,11 @@ function reboot_cluster() {
         # Check if all cluster operators are Available=True,Progressing=False,Degraded=False
         # Use a more robust approach to count unstable operators
         # Capture both output and error for debugging
+        # Temporarily disable errexit to handle oc command failures gracefully
+        set +o errexit
         clusteroperators_output=$(oc get clusteroperators --no-headers 2>&1)
         oc_exit_code=$?
+        set -o errexit
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
             consecutive_failures=$(( consecutive_failures + 1 ))
