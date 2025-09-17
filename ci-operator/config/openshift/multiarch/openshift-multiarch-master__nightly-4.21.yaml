@@ -60,24 +60,10 @@ base_images:
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
 releases:
-  arm64-initial:
-    candidate:
-      architecture: arm64
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.21"
   arm64-latest:
     candidate:
       architecture: arm64
       product: ocp
-      stream: nightly
-      version: "4.21"
-  initial:
-    candidate:
-      architecture: multi
-      product: ocp
-      relative: 1
       stream: nightly
       version: "4.21"
   latest:
@@ -153,11 +139,6 @@ tests:
         \| egressFirewall should have no impact outside its namespace
     workflow: openshift-e2e-powervs-heterogeneous-upi
   timeout: 6h0m0s
-- as: ocp-e2e-aws-ovn-upgrade-multi-x-ax
-  interval: 72h
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws-heterogeneous
 - as: ocp-e2e-aws-ovn-multi-x-ax
   cron: 08 11 * * 5
   steps:
@@ -207,25 +188,6 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-heterogeneous
   timeout: 6h0m0s
-- as: ocp-e2e-upgrade-aws-ovn-arm64
-  interval: 72h
-  steps:
-    cluster_profile: aws-3
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      OCP_ARCH: arm64
-      TEST_TYPE: upgrade-conformance
-    workflow: openshift-upgrade-aws
-- as: ocp-e2e-upgrade-aws-ovn-multi-a-a
-  interval: 72h
-  steps:
-    cluster_profile: aws
-    env:
-      OCP_ARCH: arm64
-      TEST_TYPE: upgrade-conformance
-    workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-multi-a-a
   interval: 24h
   steps:
@@ -400,16 +362,6 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     workflow: openshift-e2e-azure-ovn
-- as: ocp-e2e-upgrade-azure-ovn-multi-a-a
-  interval: 72h
-  steps:
-    cluster_profile: azure-arm64
-    env:
-      BASE_DOMAIN: ci.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-      TEST_TYPE: upgrade-conformance
-    workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   capabilities:
   - sshd-bastion
@@ -722,27 +674,11 @@ tests:
     - ref: ipi-install-heterogeneous
     - ref: openshift-e2e-test
     workflow: openshift-e2e-azure
-- as: ocp-e2e-upgrade-azure-ovn-multi-x-ax
-  interval: 72h
-  steps:
-    cluster_profile: azure-arm64
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      BASE_DOMAIN: ci.azure.devcluster.openshift.com
-      OCP_ARCH: amd64
-      TEST_SUITE: upgrade-conformance
-    workflow: openshift-upgrade-azure-heterogeneous
 - as: ocp-e2e-aws-ovn-multi-x-x
   interval: 72h
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
-- as: ocp-e2e-upgrade-aws-ovn-multi-x-x
-  interval: 72h
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws
 - as: ocp-e2e-gcp-ovn-multi-a-a
   cron: 0 11 * * 0
   steps:
@@ -802,15 +738,6 @@ tests:
     - ref: multiarch-migration-machine-type
     - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
-- as: ocp-e2e-upgrade-gcp-ovn-multi-a-a
-  interval: 72h
-  steps:
-    cluster_profile: gcp-arm64
-    env:
-      COMPUTE_NODE_TYPE: t2a-standard-4
-      OCP_ARCH: arm64
-      TEST_TYPE: upgrade-conformance
-    workflow: openshift-upgrade-gcp
 - as: ocp-e2e-gcp-ovn-multi-x-ax
   cron: 0 11 * * 0
   steps:
@@ -854,16 +781,6 @@ tests:
         pod should start\| pod sysctls\| build volumes should mount given secrets
         and configmaps into the build pod
     workflow: openshift-e2e-gcp-ovn
-- as: ocp-e2e-upgrade-gcp-ovn-multi-x-ax
-  interval: 72h
-  steps:
-    cluster_profile: gcp-arm64
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
-      OCP_ARCH: amd64
-      TEST_SUITE: upgrade-conformance
-    workflow: openshift-upgrade-gcp-heterogeneous
 zz_generated_metadata:
   branch: master
   org: openshift
