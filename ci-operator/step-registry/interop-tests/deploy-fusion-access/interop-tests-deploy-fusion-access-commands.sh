@@ -76,6 +76,9 @@ oc wait --for=jsonpath='{.metadata.name}'=fusionaccess-object fusionaccess/fusio
 echo "Waiting for IBM Storage Scale CRDs to be available..."
 oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeout=300s
 
+echo "Labeling worker nodes for IBM Storage Scale..."
+oc label nodes -l node-role.kubernetes.io/worker "scale.spectrum.ibm.com/role=storage"
+
 echo "Creating IBM Storage Scale Cluster..."
 MAX_ATTEMPTS=3
 ATTEMPT=1
@@ -141,15 +144,13 @@ done
 echo "Verifying IBM Storage Scale Cluster exists..."
 if oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale >/dev/null 2>&1; then
   echo "✅ IBM Storage Scale Cluster found, waiting for it to be ready..."
-  oc wait --for=jsonpath='{.metadata.name}'=ibm-spectrum-scale cluster/ibm-spectrum-scale -n ibm-spectrum-scale --timeout=1200s
+  echo "Waiting for Cluster to have successful condition..."
+  oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True cluster/ibm-spectrum-scale -n ibm-spectrum-scale --timeout=1200s
 else
   echo "❌ IBM Storage Scale Cluster not found after creation"
   echo "Checking for any clusters in the namespace..."
   oc get clusters -n ibm-spectrum-scale
   exit 1
 fi
-
-echo "Labeling worker nodes..."
-oc label nodes -l node-role.kubernetes.io/worker "scale.spectrum.ibm.com/role=storage"
 
 echo "✅ Fusion Access deployment completed!"
