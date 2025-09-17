@@ -1,15 +1,23 @@
 #!/bin/bash
 set -x
 
+oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+# Wait 30 minutes for FRR to be enabled
+sleep 1800
+
 SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion="$(cat /bm/address)"
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
 
 echo "LAB is $LAB_CLOUD"
+LOGIN=password
 
 SCRIPT_FILE="remote_script.sh"
 
+# This script is run on the bastion host. It sshs into the hypervisor creates a VM
+# and then spawns external BGP server on the VM.
 cat > $SCRIPT_FILE << 'EOF'
 #!/bin/bash
 set -x
@@ -18,7 +26,7 @@ export KUBECONFIG=/root/vmno/kubeconfig
 LOGIN=password
 INVENTORY_FILE="/root/jetlag/ansible/inventory/$LAB_CLOUD.local"
 CREATE_VM_SCRIPT="create_vm_script.sh"
-RUN_WORKLOAD_SCRIPT="run_workload.sh"
+PREPATE_SERVER_SCRIPT="prepare_server_script.sh"
 source /root/jetlag/.ansible/bin/activate
 
 # Get the list of hosts in the 'hv_vm' group
@@ -30,12 +38,12 @@ VM_NAME=$(echo "$HOSTS" | tail -n 1)
 # Get the value of hv_ip for the last host
 HV_IP=$(ansible-inventory -i "$INVENTORY_FILE" --host "$VM_NAME" | jq -r '.hv_ip')
 VM_IP=$(ansible-inventory -i "$INVENTORY_FILE" --host "$VM_NAME" | jq -r '.ip')
+GATEWAY_IP=$(ansible-inventory -i "$INVENTORY_FILE" --host "$VM_NAME" | jq -r '.gateway')
 
 # Print the extracted value 
 echo "The ip for the last entry is: $VM_NAME $HV_IP $VM_IP"
 deactivate
 
-#TODO
 SSH_ARGS='-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null'
 
 #!/bin/bash
@@ -49,10 +57,12 @@ cat > $CREATE_VM_SCRIPT << _EOF_
 
 set -x
 
-curl -o "$SOURCE_IMAGE" http://download.eng.bos.redhat.com/released/rhel-6-7-8/rhel-8/RHEL-8/8.10.0/BaseOS/x86_64/images/rhel-guest-image-8.10-1362.x86_64.qcow2
+curl -k -o "$SOURCE_IMAGE" http://mirror.scalelab.redhat.com/RHEL9/9.6.0/BaseOS/x86_64/images/rhel-guest-image-9.6-20250408.20.x86_64.qcow2
 qemu-img create -f qcow2 "$DEST_IMAGE" 120G
 
 virt-resize --expand "/dev/sda3" "$SOURCE_IMAGE" "$DEST_IMAGE"
+
+NAMESERVER=$(grep "nameserver" /etc/resolv.conf | awk '{print $2}')
 
 virt-customize -a "$DEST_IMAGE" --root-password password:"$LOGIN"
 virt-customize -a "$DEST_IMAGE" \
@@ -62,8 +72,8 @@ BOOTPROTO=none
 DEFROUTE=yes
 IPADDR='$VM_IP'
 PREFIX=24
-GATEWAY=198.18.0.1
-DNS1=8.8.8.8
+GATEWAY='$GATEWAY_IP'
+DNS1='$NAMESERVER'
 ONBOOT=yes
 NAME=eth0
 __EOF__'
@@ -84,23 +94,23 @@ ssh-keyscan $VM_IP >> ~/.ssh/known_hosts
 sshpass -p "$LOGIN" scp /root/vmno/kubeconfig root@$VM_IP:~/
 sshpass -p "$LOGIN" scp /etc/hosts /etc/resolv.conf root@$VM_IP:/etc/
 
-cat > $RUN_WORKLOAD_SCRIPT << _EOF_
+cat > $PREPATE_SERVER_SCRIPT << _EOF_
 #!/bin/bash
 
 set -x
-cat << __EOF__ > /etc/yum.repos.d/RHEL810-AppStream.repo
-[rhel810-appstream]
-name=RHEL810 AppStream
-baseurl=http://mirror.scalelab.redhat.com/RHEL8/8.10.0/AppStream/x86_64/os/
+cat << __EOF__ > /etc/yum.repos.d/RHEL96-AppStream.repo
+[rhel96-appstream]
+name=RHEL96 AppStream
+baseurl=http://mirror.scalelab.redhat.com/RHEL9/9.6.0/AppStream/x86_64/os/
 enabled=1
 gpgcheck=0
 __EOF__
 
-# Create the RHEL810-BaseOS.repo file
-cat << __EOF__ > /etc/yum.repos.d/RHEL810-BaseOS.repo
-[rhel810-baseos]
-name=RHEL810 BaseOS
-baseurl=http://mirror.scalelab.redhat.com/RHEL8/8.10.0/BaseOS/x86_64/os/
+# Create the RHEL96-BaseOS.repo file
+cat << __EOF__ > /etc/yum.repos.d/RHEL96-BaseOS.repo
+[rhel96-baseos]
+name=RHEL96 BaseOS
+baseurl=http://mirror.scalelab.redhat.com/RHEL9/9.6.0/BaseOS/x86_64/os/
 enabled=1
 gpgcheck=0
 __EOF__
@@ -109,12 +119,6 @@ dnf install curl git make binutils bison gcc glibc-devel golang podman jq -y
 curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux-amd64-rhel8.tar.gz | tar -xvzf -
 mv oc kubectl /usr/bin/
 export KUBECONFIG=/root/kubeconfig
-
-bash < <(curl -sSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-source ~/.gvm/scripts/gvm
-echo 'source ~/.gvm/scripts/gvm' >> ~/.bashrc
-gvm install go1.23
-gvm use go1.23 --default
 
 sysctl -w net.ipv4.ip_forward=1
 sysctl -p
@@ -153,14 +157,50 @@ write
 __EOF__
 )'
 
-git clone https://github.com/kube-burner/kube-burner-ocp
-cd kube-burner-ocp
-make clean; make build
-bin/amd64/kube-burner-ocp udn-bgp --iterations 1 --check-health=false --profile-type=regular --log-level=debug --local-indexing
-
 _EOF_
-chmod +x $RUN_WORKLOAD_SCRIPT
-sshpass -p "$LOGIN" ssh ${SSH_ARGS} root@${VM_IP} 'bash -s' < $RUN_WORKLOAD_SCRIPT
+chmod +x $PREPATE_SERVER_SCRIPT
+sshpass -p "$LOGIN" ssh ${SSH_ARGS} root@${VM_IP} 'bash -s' < $PREPATE_SERVER_SCRIPT
+echo $VM_IP
 EOF
 
-ssh ${SSH_ARGS} root@$bastion 'bash -s --' "$LAB_CLOUD" < $SCRIPT_FILE
+VM_IP=$(ssh ${SSH_ARGS} root@$bastion 'bash -s --' "$LAB_CLOUD" < $SCRIPT_FILE)
+
+VARS_FILE="vars.sh"
+
+cat > $VARS_FILE << EOF
+export ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
+export ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
+export ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
+export ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
+if [ -e "${ES_SECRETS_PATH}/host" ]; then
+    export ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
+fi
+
+export REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+export LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+export TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+EOF
+
+sshpass -p "$LOGIN" scp ./vars.sh root@${VM_IP}:~/
+rm -f ./vars.sh
+
+# Run the workload on the VM where external BGP server is running
+RUN_WORKLOAD_SCRIPT="run_workload_script.sh"
+cat > $RUN_WORKLOAD_SCRIPT << 'EOF'
+#!/bin/bash
+
+set -x
+source /root/vars.sh
+export KUBECONFIG=/root/kubeconfig
+
+git clone $REPO_URL $TAG_OPTION --depth 1
+pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+export WORKLOAD=udn-bgp
+export ITERATIONS=72
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+./run.sh
+rm -f /root/vars.sh
+EOF
+
+chmod +x $RUN_WORKLOAD_SCRIPT
+sshpass -p "$LOGIN" ssh ${SSH_ARGS} root@${VM_IP} 'bash -s' < $RUN_WORKLOAD_SCRIPT
