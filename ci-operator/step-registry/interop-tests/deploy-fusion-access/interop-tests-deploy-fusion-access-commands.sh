@@ -298,20 +298,49 @@ spec:
 EOF
 then
   echo "✅ IBM Storage Scale FileSystem created successfully"
+  
+  # Verify the FileSystem object was actually created
+  echo "Verifying FileSystem object creation..."
+  if oc get filesystem localfilesystem -n ibm-spectrum-scale >/dev/null 2>&1; then
+    echo "✅ FileSystem object 'localfilesystem' exists in namespace 'ibm-spectrum-scale'"
+  else
+    echo "❌ FileSystem object 'localfilesystem' not found after creation"
+    echo "Checking for any filesystem resources in the namespace..."
+    oc get filesystems -n ibm-spectrum-scale
+    exit 1
+  fi
 else
   echo "❌ Failed to create IBM Storage Scale FileSystem"
   echo "This may be expected if the LocalDisk resources are not ready yet"
+  exit 1
 fi
 
 echo "Waiting for FileSystem to be ready..."
 sleep 10
 
-echo "Verifying FileSystem resource..."
+# Wait for FileSystem to be in a ready state
+echo "Waiting for FileSystem to reach ready state..."
+if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/localfilesystem -n ibm-spectrum-scale --timeout=300s 2>/dev/null; then
+  echo "✅ FileSystem is ready"
+else
+  echo "⚠️  FileSystem may still be initializing, checking current status..."
+  oc get filesystem localfilesystem -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,STATUS:.status.phase"
+fi
+
+echo "Verifying FileSystem resource status and details..."
 if oc get filesystem localfilesystem -n ibm-spectrum-scale >/dev/null 2>&1; then
   echo "✅ FileSystem resource found:"
   oc get filesystem localfilesystem -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,STATUS:.status.phase"
+  
+  # Get detailed FileSystem information
+  echo ""
+  echo "FileSystem detailed information:"
+  oc get filesystem localfilesystem -n ibm-spectrum-scale -o yaml | grep -A 20 "status:"
 else
-  echo "⚠️  FileSystem resource not found yet"
+  echo "❌ FileSystem resource not found - this indicates a problem with the creation"
+  echo "Checking for any filesystem resources in the namespace..."
+  oc get filesystems -n ibm-spectrum-scale
+  exit 1
 fi
 
 echo "Checking for new StorageClass created by the FileSystem..."
