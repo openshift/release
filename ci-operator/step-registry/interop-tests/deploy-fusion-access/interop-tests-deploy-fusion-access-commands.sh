@@ -20,43 +20,24 @@ echo "Storage Scale Namespace: ${FUSION_ACCESS_NAMESPACE}"
 IBM_ENTITLEMENT_KEY="$(cat "/var/run/secrets/ibm-entitlement-key")"
 FUSION_PULL_SECRET_EXTRA="$(cat "/var/run/secrets/fusion-pullsecret-extra")"
 
-oc new-project "${FUSION_ACCESS_NAMESPACE}"
+if oc get namespace "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
+  echo "✅ Namespace ${FUSION_ACCESS_NAMESPACE} already exists"
+else
+  echo "Creating namespace ${FUSION_ACCESS_NAMESPACE}..."
+  oc create namespace "${FUSION_ACCESS_NAMESPACE}"
+fi
+
+echo "Waiting for namespace to be ready..."
+oc wait --for=jsonpath='{.status.phase}'=Active namespace/${FUSION_ACCESS_NAMESPACE} --timeout=60s
+
+echo "Creating fusion-pullsecret..."
 oc create secret -n "${FUSION_ACCESS_NAMESPACE}" generic fusion-pullsecret --from-literal=ibm-entitlement-key="${IBM_ENTITLEMENT_KEY}" --dry-run=client -o yaml | oc apply -f -
 
-sleep 7200 # debugging
+echo "Waiting for fusion-pullsecret to be ready..."
+oc wait --for=jsonpath='{.metadata.name}'=fusion-pullsecret secret/fusion-pullsecret -n ${FUSION_ACCESS_NAMESPACE} --timeout=60s
 
+echo "Creating fusion-pullsecret-extra..."
 oc apply -f=- <<EOF
----
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: storage-scale-operator-group
-  namespace: ${FUSION_ACCESS_NAMESPACE}
-spec:
-  upgradeStrategy: Default
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: test-fusion-access-operator
-  namespace: openshift-marketplace
-spec:
-  displayName: Test Storage Scale Operator
-  sourceType: grpc
-  image: "quay.io/openshift-storage-scale/openshift-fusion-access-catalog:stable"
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: openshift-fusion-access-operator
-  namespace: ${FUSION_ACCESS_NAMESPACE}
-spec:
-  channel: alpha
-  installPlanApproval: Automatic
-  name: openshift-fusion-access-operator
-  source: test-fusion-access-operator
-  sourceNamespace: openshift-marketplace
----
 apiVersion: v1
 kind: Secret
 metadata:
@@ -71,7 +52,13 @@ stringData:
       }
     }
 type: kubernetes.io/dockerconfigjson
----
+EOF
+
+echo "Waiting for fusion-pullsecret-extra to be ready..."
+oc wait --for=jsonpath='{.metadata.name}'=fusion-pullsecret-extra secret/fusion-pullsecret-extra -n ${FUSION_ACCESS_NAMESPACE} --timeout=60s
+
+echo "Creating FusionAccess resource..."
+oc apply -f=- <<EOF
 apiVersion: fusion.storage.openshift.io/v1alpha1
 kind: FusionAccess
 metadata:
@@ -81,7 +68,13 @@ spec:
   storageScaleVersion: ${FUSION_ACCESS_STORAGE_SCALE_VERSION}
   storageDeviceDiscovery:
     create: true
----
+EOF
+
+echo "Waiting for FusionAccess to be ready..."
+oc wait --for=jsonpath='{.metadata.name}'=fusionaccess-object fusionaccess/fusionaccess-object -n ${FUSION_ACCESS_NAMESPACE} --timeout=600s
+
+echo "Creating IBM Storage Scale Cluster..."
+oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Cluster
 metadata:
@@ -120,4 +113,10 @@ spec:
     license: data-management
 EOF
 
+echo "Waiting for IBM Storage Scale Cluster to be ready..."
+oc wait --for=jsonpath='{.metadata.name}'=ibm-spectrum-scale cluster/ibm-spectrum-scale -n ibm-spectrum-scale --timeout=1200s
+
+echo "Labeling worker nodes..."
 oc label nodes -l node-role.kubernetes.io/worker "scale.spectrum.ibm.com/role=storage"
+
+echo "✅ Fusion Access deployment completed!"
