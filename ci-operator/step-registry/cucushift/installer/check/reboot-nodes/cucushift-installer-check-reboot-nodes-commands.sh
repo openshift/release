@@ -129,7 +129,7 @@ function reboot_cluster() {
     declare -A node_ip_array
     
     # Get node lists with error handling
-    master_list=$(oc get node -o wide --no-headers | grep 'master' | awk '{print $1":"$6}' | sort)
+    master_list=$(run_command "oc get node -o wide --no-headers | grep 'master' | awk '{print \$1\":\"\$6}' | sort" 2>/dev/null || echo "")
     oc_exit_code=$?
     
     if [[ ${oc_exit_code} -ne 0 ]]; then
@@ -140,7 +140,7 @@ function reboot_cluster() {
     if [[ "${SIZE_VARIANT}" == "compact" ]]; then
         node_list="${master_list}"
     else
-        worker_list=$(oc get node -o wide --no-headers | grep 'worker' | awk '{print $1":"$6}' | sort)
+        worker_list=$(run_command "oc get node -o wide --no-headers | grep 'worker' | awk '{print \$1\":\"\$6}' | sort" 2>/dev/null || echo "")
         oc_exit_code=$?
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
@@ -165,7 +165,7 @@ function reboot_cluster() {
         fi
     done
 
-    total_nodes_count=$(echo ${node_list} | awk '{print NF}')
+    total_nodes_count=$(echo ${node_list} | awk '{print NF}' || echo "0")
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All ${total_nodes_count} nodes have been restarted, waiting for cluster to recover..."
     
     # Wait for API server to be accessible first
@@ -196,7 +196,7 @@ function reboot_cluster() {
     while [[ ${try} -lt ${max_try} ]]; do
         # Get node status in JSON format to properly parse Ready status
         # Get ready node count
-        ready_count=$(oc get nodes -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status=="True")) | .metadata.name' 2>/dev/null | wc -l)
+        ready_count=$(run_command "oc get nodes -o json | jq -r '.items[] | select(.status.conditions[] | select(.type==\"Ready\" and .status==\"True\")) | .metadata.name' | wc -l" 2>/dev/null || echo "0")
         oc_exit_code=$?
         
         if [[ ${oc_exit_code} -ne 0 ]]; then
@@ -259,7 +259,7 @@ function reboot_cluster() {
         consecutive_failures=0
         
         # Count unstable operators from successful output
-        degraded_ops=$(echo "${clusteroperators_output}" | grep -v "True.*False.*False" | wc -l)
+        degraded_ops=$(echo "${clusteroperators_output}" | grep -v "True.*False.*False" | wc -l || echo "0")
         
         if [[ ${degraded_ops} -eq 0 ]]; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All cluster operators are stable"
@@ -272,7 +272,8 @@ function reboot_cluster() {
         if [[ ${try} -eq 0 ]] || [[ $((try % 5)) -eq 0 ]]; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current cluster operator status:"
             echo "Running Command: oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true"
-            oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true
+            # Use run_command to ensure proper error handling
+            run_command "oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true" || true
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Debug command completed, continuing..."
         fi
         
@@ -287,7 +288,8 @@ function reboot_cluster() {
         print_cluster_diagnostics "CLUSTER OPERATOR FAILURE"
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Unstable cluster operators details:"
         echo "Running Command: oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true"
-        oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true
+        # Use run_command to ensure proper error handling
+        run_command "oc get clusteroperators --no-headers | grep -v 'True.*False.*False' || true" || true
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test failed due to unstable cluster operators"
         return 1
     fi
