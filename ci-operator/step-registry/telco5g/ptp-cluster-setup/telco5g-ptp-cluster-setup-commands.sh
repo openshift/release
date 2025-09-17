@@ -37,7 +37,7 @@ echo "exit" | curl telnet://${CLUSTER_HV_IP}:22 && echo "SSH port is opened"|| e
 #Create inventory file
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
+${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_retries=5
 EOF
 
 echo "#############################################################################..."
