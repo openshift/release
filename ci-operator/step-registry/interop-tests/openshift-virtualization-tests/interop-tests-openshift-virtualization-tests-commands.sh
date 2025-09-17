@@ -257,4 +257,7 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
 # Map tests if needed for related use cases
 mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
 
+# Send junit file to shared dir for Data Router Reporter step
+cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
+
 exit ${rc}
