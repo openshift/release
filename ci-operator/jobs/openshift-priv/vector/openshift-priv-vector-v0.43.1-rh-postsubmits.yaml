@@ -1,24 +1,27 @@
 postsubmits:
-  openshift/velero-plugin-for-csi:
+  openshift-priv/vector:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    cluster: build02
+    - ^v0\.43\.1-rh$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-velero-plugin-for-csi-main-images
+    name: branch-ci-openshift-priv-vector-v0.43.1-rh-images
+    path_alias: github.com/ViaQ/vector
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
@@ -34,6 +37,9 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -48,6 +54,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
