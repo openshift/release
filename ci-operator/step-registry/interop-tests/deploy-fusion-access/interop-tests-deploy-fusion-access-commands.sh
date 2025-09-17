@@ -191,6 +191,8 @@ spec:
 EOF
   then
     echo "✅ IBM Storage Scale Cluster created successfully on attempt $ATTEMPT"
+    echo "Immediately checking if Cluster resource exists..."
+    oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale 2>/dev/null && echo "✅ Cluster found immediately after creation" || echo "⚠️  Cluster not found immediately after creation"
     break
   else
     echo "❌ Failed to create IBM Storage Scale Cluster on attempt $ATTEMPT"
@@ -207,14 +209,33 @@ EOF
 done
 
 echo "Verifying IBM Storage Scale Cluster exists..."
+echo "Waiting a moment for the Cluster resource to be fully created..."
+sleep 5
+
+echo "Checking if ibm-spectrum-scale namespace exists..."
+if oc get namespace ibm-spectrum-scale >/dev/null 2>&1; then
+  echo "✅ ibm-spectrum-scale namespace exists"
+else
+  echo "❌ ibm-spectrum-scale namespace does not exist"
+  echo "Creating ibm-spectrum-scale namespace..."
+  oc create namespace ibm-spectrum-scale
+fi
+
+echo "Checking for Cluster resource in ibm-spectrum-scale namespace..."
 if oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale >/dev/null 2>&1; then
   echo "✅ IBM Storage Scale Cluster found, waiting for it to be ready..."
   echo "Waiting for Cluster to have successful condition..."
   oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True cluster/ibm-spectrum-scale -n ibm-spectrum-scale --timeout=1200s
 else
   echo "❌ IBM Storage Scale Cluster not found after creation"
-  echo "Checking for any clusters in the namespace..."
+  echo "Checking for any clusters in the ibm-spectrum-scale namespace..."
   oc get clusters -n ibm-spectrum-scale
+  echo ""
+  echo "Checking for any clusters in all namespaces..."
+  oc get clusters --all-namespaces
+  echo ""
+  echo "Checking if the Cluster resource exists but with a different name..."
+  oc get clusters -n ibm-spectrum-scale -o name 2>/dev/null || echo "No clusters found in ibm-spectrum-scale namespace"
   exit 1
 fi
 
