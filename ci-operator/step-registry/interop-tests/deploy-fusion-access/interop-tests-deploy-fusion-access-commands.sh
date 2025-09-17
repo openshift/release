@@ -81,6 +81,69 @@ oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeou
 echo "Labeling worker nodes for IBM Storage Scale..."
 oc label nodes -l node-role.kubernetes.io/worker "scale.spectrum.ibm.com/role=storage"
 
+echo "Creating IBM Storage Scale LocalDisk for shared storage..."
+echo "Getting worker node information..."
+WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath="{range .items[*]}{.metadata.name}{'\n'}{end}")
+if [[ -z "$WORKER_NODES" ]]; then
+  echo "❌ No worker nodes found"
+  exit 1
+fi
+
+echo "Worker nodes found:"
+echo "$WORKER_NODES"
+
+# Convert worker nodes to array for processing
+readarray -t NODE_ARRAY <<< "$WORKER_NODES"
+NODE_COUNT=${#NODE_ARRAY[@]}
+echo "Total worker nodes: $NODE_COUNT"
+
+# Create LocalDisk for each worker node to ensure shared access
+DISK_COUNT=1
+for NODE in "${NODE_ARRAY[@]}"; do
+  if [[ -n "$NODE" ]]; then
+    echo "Creating LocalDisk for node: $NODE"
+    
+    if oc apply -f=- <<EOF
+apiVersion: scale.spectrum.ibm.com/v1beta1
+kind: LocalDisk
+metadata:
+  name: shareddisk${DISK_COUNT}
+  namespace: ibm-spectrum-scale
+spec:
+  # Use configurable device path
+  device: ${LOCALDISK_DEVICE_PATH}
+  # The Kubernetes node where the specified device exists at creation time
+  node: ${NODE}
+  # nodeConnectionSelector defines the nodes that have the shared lun directly attached to them
+  nodeConnectionSelector:
+    matchExpressions:
+    - key: node-role.kubernetes.io/worker
+      operator: Exists
+  # Set below only during testing, this will wipe existing stuff
+  existingDataSkipVerify: true
+EOF
+    then
+      echo "✅ LocalDisk shareddisk${DISK_COUNT} created successfully for node $NODE"
+    else
+      echo "❌ Failed to create LocalDisk shareddisk${DISK_COUNT} for node $NODE"
+    fi
+    
+    ((DISK_COUNT++))
+  fi
+done
+
+echo "Created $((DISK_COUNT-1)) LocalDisk resources for shared storage across all worker nodes"
+
+echo "Verifying LocalDisk resources..."
+LOCALDISK_COUNT=$(oc get localdisks -n ibm-spectrum-scale --no-headers 2>/dev/null | wc -l)
+if [[ $LOCALDISK_COUNT -gt 0 ]]; then
+  echo "✅ Found $LOCALDISK_COUNT LocalDisk resources in ibm-spectrum-scale namespace:"
+  oc get localdisks -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
+else
+  echo "⚠️  No LocalDisk resources found in ibm-spectrum-scale namespace"
+  echo "This may be expected if the device ${LOCALDISK_DEVICE_PATH} doesn't exist on the nodes"
+fi
+
 echo "Creating IBM Storage Scale Cluster..."
 MAX_ATTEMPTS=3
 ATTEMPT=1
@@ -153,69 +216,6 @@ else
   echo "Checking for any clusters in the namespace..."
   oc get clusters -n ibm-spectrum-scale
   exit 1
-fi
-
-echo "Creating IBM Storage Scale LocalDisk for shared storage..."
-echo "Getting worker node information..."
-WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath="{range .items[*]}{.metadata.name}{'\n'}{end}")
-if [[ -z "$WORKER_NODES" ]]; then
-  echo "❌ No worker nodes found"
-  exit 1
-fi
-
-echo "Worker nodes found:"
-echo "$WORKER_NODES"
-
-# Convert worker nodes to array for processing
-readarray -t NODE_ARRAY <<< "$WORKER_NODES"
-NODE_COUNT=${#NODE_ARRAY[@]}
-echo "Total worker nodes: $NODE_COUNT"
-
-# Create LocalDisk for each worker node to ensure shared access
-DISK_COUNT=1
-for NODE in "${NODE_ARRAY[@]}"; do
-  if [[ -n "$NODE" ]]; then
-    echo "Creating LocalDisk for node: $NODE"
-    
-    if oc apply -f=- <<EOF
-apiVersion: scale.spectrum.ibm.com/v1beta1
-kind: LocalDisk
-metadata:
-  name: shareddisk${DISK_COUNT}
-  namespace: ibm-spectrum-scale
-spec:
-  # Use configurable device path
-  device: ${LOCALDISK_DEVICE_PATH}
-  # The Kubernetes node where the specified device exists at creation time
-  node: ${NODE}
-  # nodeConnectionSelector defines the nodes that have the shared lun directly attached to them
-  nodeConnectionSelector:
-    matchExpressions:
-    - key: node-role.kubernetes.io/worker
-      operator: Exists
-  # Set below only during testing, this will wipe existing stuff
-  existingDataSkipVerify: true
-EOF
-    then
-      echo "✅ LocalDisk shareddisk${DISK_COUNT} created successfully for node $NODE"
-    else
-      echo "❌ Failed to create LocalDisk shareddisk${DISK_COUNT} for node $NODE"
-    fi
-    
-    ((DISK_COUNT++))
-  fi
-done
-
-echo "Created $((DISK_COUNT-1)) LocalDisk resources for shared storage across all worker nodes"
-
-echo "Verifying LocalDisk resources..."
-LOCALDISK_COUNT=$(oc get localdisks -n ibm-spectrum-scale --no-headers 2>/dev/null | wc -l)
-if [[ $LOCALDISK_COUNT -gt 0 ]]; then
-  echo "✅ Found $LOCALDISK_COUNT LocalDisk resources in ibm-spectrum-scale namespace:"
-  oc get localdisks -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
-else
-  echo "⚠️  No LocalDisk resources found in ibm-spectrum-scale namespace"
-  echo "This may be expected if the device ${LOCALDISK_DEVICE_PATH} doesn't exist on the nodes"
 fi
 
 echo "✅ Fusion Access deployment completed!"
