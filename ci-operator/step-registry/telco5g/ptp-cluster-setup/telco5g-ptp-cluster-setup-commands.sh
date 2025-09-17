@@ -40,6 +40,8 @@ cat << EOF > $SHARED_DIR/inventory
 ${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_retries=5
 EOF
 
+# dummy changes to test PR
+
 echo "#############################################################################..."
 echo "========  Deploying plan $PLAN_NAME on cluster $CLUSTER_NAME  ========"
 echo "#############################################################################..."
