@@ -4,11 +4,68 @@ set -o nounset
 # set -o errexit  # Disabled to prevent script exit on command failures
 set -o pipefail
 
+# Enhanced error handling function
+error_handler() {
+    local exit_code=$?
+    local line_number=$1
+    local command="$2"
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ==========================================" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Script failed unexpectedly!" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ==========================================" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Exit code: ${exit_code}" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Line number: ${line_number}" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Failed command: ${command}" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current working directory: $(pwd)" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current user: $(whoami)" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Process ID: $$" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Parent process ID: $PPID" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Shell options: $-" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ==========================================" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stack trace:" >&2
+    local frame=0
+    while caller $frame; do
+        ((frame++))
+    done >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ==========================================" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Environment variables:" >&2
+    env | grep -E "(CLUSTER|AWS|KUBE|OPENSHIFT)" | sort >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ==========================================" >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Recent command history:" >&2
+    history | tail -10 >&2
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ==========================================" >&2
+    exit 1
+}
+
 # Add ERR trap to catch any unexpected exits
-trap 'echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Script exited unexpectedly at line $LINENO with exit code $?" >&2; echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stack trace:" >&2; caller >&2; exit 1' ERR
+trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
+
+# Enhanced exit handler
+exit_handler() {
+    local exit_code=$?
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Script execution completed"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Final exit code: ${exit_code}"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Execution time: $((SECONDS)) seconds"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current time: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+}
 
 # Add EXIT trap to log script completion
-trap 'echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Script completed with exit code $?"' EXIT
+trap 'exit_handler' EXIT
+
+# Record script start time for execution time calculation
+SECONDS=0
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Script execution started"
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Script: $0"
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Arguments: $*"
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Process ID: $$"
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Working directory: $(pwd)"
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - User: $(whoami)"
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
 
 # Set AWS credentials
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
