@@ -73,6 +73,9 @@ EOF
 echo "Waiting for FusionAccess to be ready..."
 oc wait --for=jsonpath='{.metadata.name}'=fusionaccess-object fusionaccess/fusionaccess-object -n ${FUSION_ACCESS_NAMESPACE} --timeout=600s
 
+echo "Waiting for IBM Storage Scale CRDs to be available..."
+oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeout=300s
+
 echo "Creating IBM Storage Scale Cluster..."
 oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
