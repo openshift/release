@@ -156,7 +156,12 @@ fi
 
 # Set RENDER_COMMAND based on MCE_VERSION
 # >2.6: "--render-sensitive --render", else: "--render"
-RENDER_COMMAND=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render" || echo "--render" )
+if [[ "$(printf '%s\n' "$MCE_VERSION" "2.6" | sort -V | head -n1)" == "2.6" ]]; then
+  RENDER_COMMAND="--render-sensitive --render"
+else
+  RENDER_COMMAND="--render"
+fi
+
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HC_NAME} \
