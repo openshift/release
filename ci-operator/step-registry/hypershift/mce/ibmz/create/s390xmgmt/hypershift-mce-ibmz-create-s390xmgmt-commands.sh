@@ -80,4 +80,4 @@ echo "Kubeconfig copied into SHARED_DIR"
 
 echo "Getting default_os_images.json from assisted-service"
 git clone https://github.com/openshift/assisted-service.git
-cp ${HOME}/assisted-service/data/default_os_images.json ${SHARED_DIR}/default_os_images.json
+cp assisted-service/data/default_os_images.json ${SHARED_DIR}/default_os_images.json
