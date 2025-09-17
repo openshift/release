@@ -78,6 +78,12 @@ oc wait --for=jsonpath='{.metadata.name}'=fusionaccess-object fusionaccess/fusio
 echo "Waiting for IBM Storage Scale CRDs to be available..."
 oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeout=300s
 
+echo "Verifying CRD details..."
+oc get crd clusters.scale.spectrum.ibm.com -o yaml | grep -A 5 -B 5 "validation\|schema" || echo "No validation schema found in CRD"
+
+echo "Checking for any CRD-related events..."
+oc get events --all-namespaces --sort-by='.lastTimestamp' | grep -i "clusters.scale.spectrum.ibm.com" | tail -5 || echo "No CRD-related events found"
+
 echo "Labeling worker nodes for IBM Storage Scale..."
 oc label nodes -l node-role.kubernetes.io/worker "scale.spectrum.ibm.com/role=storage"
 
@@ -139,9 +145,13 @@ LOCALDISK_COUNT=$(oc get localdisks -n ibm-spectrum-scale --no-headers 2>/dev/nu
 if [[ $LOCALDISK_COUNT -gt 0 ]]; then
   echo "✅ Found $LOCALDISK_COUNT LocalDisk resources in ibm-spectrum-scale namespace:"
   oc get localdisks -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
+  echo "Checking LocalDisk status and conditions..."
+  oc get localdisks -n ibm-spectrum-scale -o yaml | grep -A 10 -B 5 "conditions\|status" || echo "No status/conditions found in LocalDisk resources"
 else
   echo "⚠️  No LocalDisk resources found in ibm-spectrum-scale namespace"
   echo "This may be expected if the device ${LOCALDISK_DEVICE_PATH} doesn't exist on the nodes"
+  echo "Checking for any LocalDisk-related events..."
+  oc get events -n ibm-spectrum-scale --sort-by='.lastTimestamp' | grep -i localdisk || echo "No LocalDisk-related events found"
 fi
 
 echo "Creating IBM Storage Scale Cluster..."
@@ -192,7 +202,17 @@ EOF
   then
     echo "✅ IBM Storage Scale Cluster created successfully on attempt $ATTEMPT"
     echo "Immediately checking if Cluster resource exists..."
-    oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale 2>/dev/null && echo "✅ Cluster found immediately after creation" || echo "⚠️  Cluster not found immediately after creation"
+    if oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale 2>/dev/null; then
+      echo "✅ Cluster found immediately after creation"
+      echo "Getting Cluster details immediately after creation..."
+      oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale -o yaml | head -20
+    else
+      echo "⚠️  Cluster not found immediately after creation"
+      echo "Checking for any events related to the Cluster..."
+      oc get events -n ibm-spectrum-scale --sort-by='.lastTimestamp' | tail -10
+      echo "Checking for any validation errors..."
+      oc describe cluster ibm-spectrum-scale -n ibm-spectrum-scale 2>/dev/null || echo "Cannot describe cluster - resource may have been deleted"
+    fi
     break
   else
     echo "❌ Failed to create IBM Storage Scale Cluster on attempt $ATTEMPT"
