@@ -210,7 +210,10 @@ metadata:
   name: ci-chat-bot
   namespace: ci
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-chat-bot:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"bot\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
 spec:
   selector:
     matchLabels:
@@ -293,6 +296,7 @@ spec:
         - --depth=1
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -308,6 +312,7 @@ spec:
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -316,7 +321,8 @@ spec:
             memory: "1Gi"
             cpu: "0.5"
       - name: bot
-        image: ci-chat-bot:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-chat-bot_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
