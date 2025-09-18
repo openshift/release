@@ -73,6 +73,13 @@ if [[ "${ENABLE_CUSTOM_ENDPOINT_FOR_STORAGE}" == "yes" ]]; then
 EOF
 fi
 
+if [[ "${ENABLE_CUSTOM_ENDPOINT_FOR_TAGMANAGER}" == "yes" ]]; then
+  cat >> "${PATCH}" << EOF
+    - name: TagManager
+      url: https://tagmanager-${gcp_custom_endpoint}.p.googleapis.com
+EOF
+fi
+
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 yq-go r "${CONFIG}" platform
 rm "${PATCH}"
