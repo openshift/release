@@ -1,0 +1,62 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.24
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: compliance-sdk-integration-tests
+  skip_if_only_changed: ^.*md$|^OWNERS$|^LICENSE$
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make test-integration
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: compliance-sdk-unit-tests
+  steps:
+    cluster_profile: quay-aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-unit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: compliance-sdk-lint
+  steps:
+    cluster_profile: quay-aws
+    test:
+    - as: test
+      cli: latest
+      commands: make lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: ComplianceAsCode
+  repo: compliance-sdk
