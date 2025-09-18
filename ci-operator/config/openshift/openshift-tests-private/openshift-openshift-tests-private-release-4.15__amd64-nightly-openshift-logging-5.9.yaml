@@ -161,6 +161,28 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe-disruptive
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-fips-f999
+  cron: 8 8 29 2 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-sustaining-autorelease-412
+    env:
+      BASE_DOMAIN: sustaining-az-412.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      FORCE_SUCCESS_EXIT: "true"
+      OPERATORS: |
+        [
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+        ]
+      TEST_FILTERS: "53817"
+      TEST_IMPORTANCE: Critical
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - ref: install-operators
+    - ref: openshift-extended-logging-test
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
