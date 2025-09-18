@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
@@ -14,24 +14,11 @@ images:
   dockerfile_path: tests/Dockerfile
   to: tempo-tests-runner
 releases:
-  arm64-latest:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.14"
   latest:
     candidate:
-      architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
-  target:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.14"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -39,42 +26,36 @@ resources:
       memory: 200Mi
 tests:
 - as: tempo-stage-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
   cron: 0 0 30 2 *
   steps:
-    cluster_profile: gcp-observability
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      OCP_ARCH: arm64
       OPERATORS: |
         [
+            {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator", "target_namespaces": "", "operator_group":"coo-og"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      SKIP_TESTS: tests/e2e/generate tests/e2e-openshift/monolithic-multitenancy-static
-        tests/e2e-openshift-serverless/* tests/e2e-openshift-object-stores/*
+      SKIP_TESTS: tests/e2e-openshift-object-stores/*
     test:
-    - ref: idp-htpasswd
-    - as: install-tempo-operator
-      cli: latest
-      commands: |
-        oc create -f https://raw.githubusercontent.com/openshift/distributed-tracing-qe/refs/heads/main/resources/tempo-icsp.yaml
-        oc create namespace openshift-tempo-operator
-        oc label namespace openshift-tempo-operator openshift.io/cluster-monitoring="true"
-        operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE"
-        oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 400Mi
+    - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
+    - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: distributed-tracing-tests-tempo-downstream
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: tempo-product-ocp-4.14-arm-stage
+  variant: tempo-product-ocp-4.20-stage
