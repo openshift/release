@@ -16,8 +16,20 @@ platform:
   gcp:
     endpoint:
       name: ${gcp_custom_endpoint}
+EOF
+
+if [[ "${ENABLE_CUSTOM_ENDPOINT_FOR_COMPUTE}" == "yes" ]] ||\
+[[ "${ENABLE_CUSTOM_ENDPOINT_FOR_CONTAINER}" == "yes" ]] ||\
+[[ "${ENABLE_CUSTOM_ENDPOINT_FOR_DNS}" == "yes" ]] ||\
+[[ "${ENABLE_CUSTOM_ENDPOINT_FOR_FILE}" == "yes" ]] ||\
+[[ "${ENABLE_CUSTOM_ENDPOINT_FOR_IAM}" == "yes" ]] ||\
+[[ "${ENABLE_CUSTOM_ENDPOINT_FOR_SERVICEUSAGE}" == "yes" ]] ||\
+[[ "${ENABLE_CUSTOM_ENDPOINT_FOR_CLOUDRESOURCEMANAGER}" == "yes" ]] ||\
+[[ "${ENABLE_CUSTOM_ENDPOINT_FOR_STORAGE}" == "yes" ]]; then
+  cat >> "${PATCH}" << EOF
     serviceEndpoints:
 EOF
+fi
 
 if [[ "${ENABLE_CUSTOM_ENDPOINT_FOR_COMPUTE}" == "yes" ]]; then
   cat >> "${PATCH}" << EOF
