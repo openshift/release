@@ -65,6 +65,7 @@ proxy_host_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
 
 # Registry URLs
 cat <<EOF >> ${SHARED_DIR}/proxy_whitelist.txt
+registry.access.redhat.com
 access.redhat.com
 cdn.quay.io
 cdn01.quay.io
