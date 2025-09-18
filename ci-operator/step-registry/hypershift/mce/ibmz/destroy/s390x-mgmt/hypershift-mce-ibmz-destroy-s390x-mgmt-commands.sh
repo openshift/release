@@ -57,6 +57,7 @@ sed -i "s|^OCP_RELEASE_IMAGE=.*|OCP_RELEASE_IMAGE=\"$OCP_RELEASE_IMAGE\"|" "$VAR
 sed -i "s/^CONTROL_NODE_PROFILE=.*/CONTROL_NODE_PROFILE=\"$CONTROL_NODE_PROFILE\"/" "$VARS_FILE"
 sed -i "s/^COMPUTE_NODE_PROFILE=.*/COMPUTE_NODE_PROFILE=\"$COMPUTE_NODE_PROFILE\"/" "$VARS_FILE"
 
+mkdir -p "$HOME/$CLUSTER_NAME/"
 # Run the install-prerequisites.sh script to delete the OCP cluster in IBM cloud VPC
 if [[ -x ./scripts/0-install-prerequisites.sh ]]; then
     ./scripts/0-install-prerequisites.sh
