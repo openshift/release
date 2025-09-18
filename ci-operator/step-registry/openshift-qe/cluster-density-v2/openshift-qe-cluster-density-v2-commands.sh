@@ -11,7 +11,7 @@ python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
-sleep 600
+sleep 300
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
@@ -97,5 +97,5 @@ if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
 echo "----------------------------------------------------------------------"
-for ns_name  in `oc get ns |grep v2| awk '{print $1}'`;do echo $ns_name;oc -n $ns_name get pods;done
-sleep 7200
+for ns_name  in `oc get ns |grep v2| awk '{print $1}'`;do echo $ns_name;oc -n $ns_name get pods|grep build ;done
+sleep 3600
