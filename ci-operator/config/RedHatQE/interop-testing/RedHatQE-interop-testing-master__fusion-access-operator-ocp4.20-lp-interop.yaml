@@ -63,7 +63,12 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
+      CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
+      CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
+      CUSTOM_SECURITY_GROUP_SOURCES: ""
       FIPS_ENABLED: "false"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp", "self-managed-lp", "fusion-access-lp"]'
@@ -88,6 +93,7 @@ tests:
     - chain: ipi-aws-pre
     test:
     - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-configure-aws-security-groups
     - ref: interop-tests-install-fusion-access-operator
     - ref: interop-tests-deploy-fusion-access
     - ref: interop-tests-fusion-access-tests

@@ -11,13 +11,12 @@ STORAGE_SCALE_CLIENT_CPU="${STORAGE_SCALE_CLIENT_CPU:-2}"
 STORAGE_SCALE_CLIENT_MEMORY="${STORAGE_SCALE_CLIENT_MEMORY:-4Gi}"
 STORAGE_SCALE_STORAGE_CPU="${STORAGE_SCALE_STORAGE_CPU:-2}"
 STORAGE_SCALE_STORAGE_MEMORY="${STORAGE_SCALE_STORAGE_MEMORY:-8Gi}"
-LOCALDISK_DEVICE_PATH="${LOCALDISK_DEVICE_PATH:-/dev/nvme1n1}"
 
 echo "Starting Fusion Access Operator deployment..."
 echo "Version: ${FUSION_ACCESS_STORAGE_SCALE_VERSION}"
 echo "Namespace: ${FUSION_ACCESS_NAMESPACE}"
 echo "Storage Scale Namespace: ${FUSION_ACCESS_NAMESPACE}"
-echo "LocalDisk Device Path: ${LOCALDISK_DEVICE_PATH}"
+echo "Using IBM Storage Scale native shared storage for multi-node access"
 
 IBM_ENTITLEMENT_KEY="$(cat "/var/run/secrets/ibm-entitlement-key")"
 FUSION_PULL_SECRET_EXTRA="$(cat "/var/run/secrets/fusion-pullsecret-extra")"
@@ -110,71 +109,65 @@ oc get events --all-namespaces --sort-by='.lastTimestamp' | grep -i "clusters.sc
 echo "Labeling worker nodes for IBM Storage Scale..."
 oc label nodes -l node-role.kubernetes.io/worker "scale.spectrum.ibm.com/role=storage"
 
-echo "Creating IBM Storage Scale LocalDisk for shared storage..."
+echo "Creating IBM Storage Scale shared storage using LocalDisk and Filesystem..."
+echo "Note: Using IBM Storage Scale native shared storage for multi-node access"
+
+# Get worker node information for LocalDisk creation
 echo "Getting worker node information..."
 WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath="{range .items[*]}{.metadata.name}{'\n'}{end}")
-if [[ -z "$WORKER_NODES" ]]; then
-  echo "❌ No worker nodes found"
-  exit 1
-fi
-
-echo "Worker nodes found:"
-echo "$WORKER_NODES"
-
-# Convert worker nodes to array for processing
 readarray -t NODE_ARRAY <<< "$WORKER_NODES"
 NODE_COUNT=${#NODE_ARRAY[@]}
-echo "Total worker nodes: $NODE_COUNT"
 
-# Create LocalDisk for each worker node to ensure shared access
+echo "Found ${NODE_COUNT} worker nodes:"
+for NODE in "${NODE_ARRAY[@]}"; do
+  if [[ -n "$NODE" ]]; then
+    echo "  - $NODE"
+  fi
+done
+
+# Create LocalDisk for each worker node to enable shared storage
+echo "Creating LocalDisk resources for shared storage..."
 DISK_COUNT=1
 for NODE in "${NODE_ARRAY[@]}"; do
   if [[ -n "$NODE" ]]; then
     echo "Creating LocalDisk for node: $NODE"
-    
     if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: LocalDisk
 metadata:
   name: shareddisk${DISK_COUNT}
-  namespace: ibm-spectrum-scale
+  namespace: ${FUSION_ACCESS_NAMESPACE}
 spec:
-  # Use configurable device path
-  device: ${LOCALDISK_DEVICE_PATH}
-  # The Kubernetes node where the specified device exists at creation time
+  device: /dev/nvme1n1
   node: ${NODE}
-  # nodeConnectionSelector defines the nodes that have the shared lun directly attached to them
   nodeConnectionSelector:
     matchExpressions:
     - key: node-role.kubernetes.io/worker
       operator: Exists
-  # Set below only during testing, this will wipe existing stuff
   existingDataSkipVerify: true
 EOF
     then
-      echo "✅ LocalDisk shareddisk${DISK_COUNT} created successfully for node $NODE"
+      echo "✅ LocalDisk shareddisk${DISK_COUNT} created for node $NODE"
     else
       echo "❌ Failed to create LocalDisk shareddisk${DISK_COUNT} for node $NODE"
+      exit 1
     fi
-    
     ((DISK_COUNT++))
   fi
 done
 
-echo "Created $((DISK_COUNT-1)) LocalDisk resources for shared storage across all worker nodes"
+echo "Waiting for LocalDisk resources to be ready..."
+sleep 30
 
 echo "Verifying LocalDisk resources..."
-LOCALDISK_COUNT=$(oc get localdisks -n ibm-spectrum-scale --no-headers 2>/dev/null | wc -l)
-if [[ $LOCALDISK_COUNT -gt 0 ]]; then
-  echo "✅ Found $LOCALDISK_COUNT LocalDisk resources in ibm-spectrum-scale namespace:"
-  oc get localdisks -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
-  echo "Checking LocalDisk status and conditions..."
-  oc get localdisks -n ibm-spectrum-scale -o yaml | grep -A 10 -B 5 "conditions\|status" || echo "No status/conditions found in LocalDisk resources"
+if oc get localdisks -n ${FUSION_ACCESS_NAMESPACE} >/dev/null 2>&1; then
+  echo "✅ LocalDisk resources found:"
+  oc get localdisks -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
 else
-  echo "⚠️  No LocalDisk resources found in ibm-spectrum-scale namespace"
-  echo "This may be expected if the device ${LOCALDISK_DEVICE_PATH} doesn't exist on the nodes"
+  echo "❌ No LocalDisk resources found"
   echo "Checking for any LocalDisk-related events..."
-  oc get events -n ibm-spectrum-scale --sort-by='.lastTimestamp' | grep -i localdisk || echo "No LocalDisk-related events found"
+  oc get events -n ${FUSION_ACCESS_NAMESPACE} --sort-by='.lastTimestamp' | grep -i localdisk || echo "No LocalDisk-related events found"
+  exit 1
 fi
 
 echo "Creating IBM Storage Scale Cluster..."
@@ -327,13 +320,17 @@ fi
 
 echo "IBM Storage Scale deployment verification completed."
 
-echo "Creating IBM Storage Scale FileSystem on top of LocalDisk resources..."
+echo "Creating IBM Storage Scale Filesystem for shared storage..."
+echo "Note: Creating Filesystem on top of LocalDisk resources for multi-node access"
+
+# Create Filesystem on top of LocalDisk resources
+echo "Creating Filesystem resource..."
 if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Filesystem
 metadata:
-  name: localfilesystem
-  namespace: ibm-spectrum-scale
+  name: shared-filesystem
+  namespace: ${FUSION_ACCESS_NAMESPACE}
 spec:
   local:
     blockSize: 4M
@@ -341,7 +338,6 @@ spec:
     - name: system
       disks:
       - shareddisk1
-    # Only 1-way is supported for LFS https://www.ibm.com/docs/en/scalecontainernative/5.2.1?topic=systems-local-file-system#filesystem-spec
     replication: 1-way
     type: shared
   seLinuxOptions:
@@ -351,85 +347,74 @@ spec:
     user: system_u
 EOF
 then
-  echo "✅ IBM Storage Scale FileSystem created successfully"
-  
-  # Verify the FileSystem object was actually created
-  echo "Verifying FileSystem object creation..."
-  if oc get filesystem localfilesystem -n ibm-spectrum-scale >/dev/null 2>&1; then
-    echo "✅ FileSystem object 'localfilesystem' exists in namespace 'ibm-spectrum-scale'"
-  else
-    echo "❌ FileSystem object 'localfilesystem' not found after creation"
-    echo "Checking for any filesystem resources in the namespace..."
-    oc get filesystems -n ibm-spectrum-scale
-    exit 1
-  fi
+  echo "✅ IBM Storage Scale Filesystem created successfully"
 else
-  echo "❌ Failed to create IBM Storage Scale FileSystem"
-  echo "This may be expected if the LocalDisk resources are not ready yet"
+  echo "❌ Failed to create IBM Storage Scale Filesystem"
   exit 1
 fi
 
-echo "Waiting for FileSystem to be ready..."
-sleep 10
-
-# Show initial FileSystem status
-echo "Initial FileSystem status:"
-if oc get filesystem localfilesystem -n ibm-spectrum-scale >/dev/null 2>&1; then
-  oc get filesystem localfilesystem -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,STATUS:.status.phase"
+echo "Waiting for IBM Storage Scale Filesystem to be ready..."
+echo "Note: Filesystem creation can take up to 1 hour for large configurations"
+if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} --timeout=3600s; then
+  echo "✅ IBM Storage Scale Filesystem is ready"
 else
-  echo "FileSystem resource not found yet"
+  echo "⚠️  IBM Storage Scale Filesystem not ready within 1 hour, checking status..."
+  oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} -o yaml | grep -A 10 -B 5 "status:" || echo "No status information available"
 fi
 
-# Wait for FileSystem to be in a ready state
-echo "Waiting for FileSystem to reach ready state..."
-echo "Note: IBM Spectrum Scale FileSystem creation can take up to 1 hour in CI environments"
-if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/localfilesystem -n ibm-spectrum-scale --timeout=3600s 2>/dev/null; then
-  echo "✅ FileSystem is ready"
+echo "Verifying IBM Storage Scale Filesystem..."
+if oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} >/dev/null 2>&1; then
+  echo "✅ IBM Storage Scale Filesystem found:"
+  oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass"
 else
-  echo "⚠️  FileSystem may still be initializing (timeout after 1 hour), checking current status..."
-  oc get filesystem localfilesystem -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,STATUS:.status.phase"
-fi
-
-echo "Verifying FileSystem resource status and details..."
-if oc get filesystem localfilesystem -n ibm-spectrum-scale >/dev/null 2>&1; then
-  echo "✅ FileSystem resource found:"
-  oc get filesystem localfilesystem -n ibm-spectrum-scale -o custom-columns="NAME:.metadata.name,STATUS:.status.phase"
-  
-  # Get detailed FileSystem information
-  echo ""
-  echo "FileSystem detailed information:"
-  oc get filesystem localfilesystem -n ibm-spectrum-scale -o yaml | grep -A 20 "status:"
-else
-  echo "❌ FileSystem resource not found - this indicates a problem with the creation"
-  echo "Checking for any filesystem resources in the namespace..."
-  oc get filesystems -n ibm-spectrum-scale
+  echo "❌ IBM Storage Scale Filesystem not found"
+  echo "Checking for any Filesystem-related events..."
+  oc get events -n ${FUSION_ACCESS_NAMESPACE} --sort-by='.lastTimestamp' | grep -i filesystem || echo "No Filesystem-related events found"
   exit 1
 fi
 
-echo "Checking for new StorageClass created by the FileSystem..."
-sleep 5
-
-# Check for StorageClass with retry logic since it may take time to appear
-echo "Waiting for StorageClass to be created by the FileSystem..."
-STORAGECLASS_FOUND=false
-for i in {1..24}; do  # Check every 30 seconds for up to 12 minutes
-  STORAGECLASS_COUNT=$(oc get storageclass --no-headers 2>/dev/null | grep -i spectrum | wc -l)
-  if [[ $STORAGECLASS_COUNT -gt 0 ]]; then
-    echo "✅ Found $STORAGECLASS_COUNT IBM Spectrum Scale StorageClass(es):"
+echo "Checking for StorageClass created by IBM Storage Scale Filesystem..."
+echo "Waiting for StorageClass to be available (up to 12 minutes)..."
+STORAGECLASS_ATTEMPTS=0
+MAX_STORAGECLASS_ATTEMPTS=24
+while [[ $STORAGECLASS_ATTEMPTS -lt $MAX_STORAGECLASS_ATTEMPTS ]]; do
+  if oc get storageclass | grep -i spectrum >/dev/null 2>&1; then
+    echo "✅ IBM Storage Scale StorageClass found:"
     oc get storageclass | grep -i spectrum
-    STORAGECLASS_FOUND=true
     break
   else
-    echo "⏳ StorageClass not found yet (attempt $i/24), waiting 30 seconds..."
+    echo "⏳ Waiting for IBM Storage Scale StorageClass... (attempt $((STORAGECLASS_ATTEMPTS + 1))/$MAX_STORAGECLASS_ATTEMPTS)"
     sleep 30
+    ((STORAGECLASS_ATTEMPTS++))
   fi
 done
 
-if [[ "$STORAGECLASS_FOUND" == "false" ]]; then
-  echo "⚠️  No IBM Spectrum Scale StorageClass found after 12 minutes"
-  echo "StorageClass creation may take longer or there may be an issue"
-  echo "Current StorageClasses:"
+if [[ $STORAGECLASS_ATTEMPTS -eq $MAX_STORAGECLASS_ATTEMPTS ]]; then
+  echo "⚠️  IBM Storage Scale StorageClass not found after 12 minutes"
+  echo "Available StorageClasses:"
   oc get storageclass
 fi
+
+echo "Storage deployment summary:"
+echo "✅ IBM Storage Scale Cluster: Deployed with local storage"
+echo "✅ IBM Storage Scale LocalDisk: Created for shared storage"
+echo "✅ IBM Storage Scale Filesystem: Created for multi-node access"
+echo ""
+echo "Available storage options:"
+echo "1. IBM Storage Scale local storage (for IBM Storage Scale operations)"
+echo "2. IBM Storage Scale shared Filesystem (for application data sharing across pods)"
+echo ""
+
+echo "IBM Storage Scale Shared Storage Information:"
+echo "LocalDisk resources:"
+oc get localdisks -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device" 2>/dev/null || echo "No LocalDisk resources found"
+
+echo ""
+echo "Filesystem status:"
+oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass" 2>/dev/null || echo "Filesystem not found"
+
+echo ""
+echo "Available StorageClasses for shared storage:"
+oc get storageclass | grep -E "(spectrum|gp2)" || echo "No IBM Storage Scale or GP2 StorageClasses found"
 
 echo "✅ Fusion Access deployment completed!"
