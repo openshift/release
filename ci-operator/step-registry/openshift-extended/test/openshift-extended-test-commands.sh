@@ -301,6 +301,7 @@ function remove_kubeadmin_user() {
     fi
 }
 
+sleep 36000
 # execute the cases
 function run {
     test_scenarios=""
