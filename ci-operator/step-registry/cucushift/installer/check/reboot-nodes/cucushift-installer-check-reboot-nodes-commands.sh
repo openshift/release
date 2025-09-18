@@ -110,6 +110,7 @@ function wait_for_condition() {
     local max_attempts="$3"
     local sleep_interval="$4"
     local failure_message="$5"
+    local show_status_command="$6"  # Optional command to show current status
     
     local attempt=0
     
@@ -122,6 +123,13 @@ function wait_for_condition() {
         fi
         
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ${condition_name} not ready, waiting... (${attempt}/${max_attempts})"
+        
+        # Show current status if command provided and at specific intervals
+        if [[ -n "${show_status_command}" ]] && [[ ${attempt} -eq 0 ]] || [[ $((attempt % 5)) -eq 0 ]]; then
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Current ${condition_name} status:"
+            eval "${show_status_command}" || true
+        fi
+        
         sleep "${sleep_interval}"
         attempt=$(( attempt + 1 ))
     done
@@ -297,11 +305,13 @@ function reboot_cluster() {
     
     # Wait for cluster operators to stabilize
     local cluster_operator_check="[[ \$(oc get clusteroperators --no-headers 2>/dev/null | grep -v '${CLUSTER_OPERATOR_STABLE_PATTERN}' | wc -l | tr -d '\n') -eq 0 ]]"
+    local cluster_operator_status_cmd="oc get clusteroperators --no-headers | grep -v '${CLUSTER_OPERATOR_STABLE_PATTERN}' || echo 'All cluster operators are stable'"
     
     if ! wait_for_condition "cluster operators to stabilize" \
         "${cluster_operator_check}" \
         "${CLUSTER_OPERATOR_TIMEOUT}" 60 \
-        "Some cluster operators are still not stable after ${CLUSTER_OPERATOR_TIMEOUT} minutes"; then
+        "Some cluster operators are still not stable after ${CLUSTER_OPERATOR_TIMEOUT} minutes" \
+        "${cluster_operator_status_cmd}"; then
         print_cluster_diagnostics "CLUSTER OPERATOR FAILURE"
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Unstable cluster operators details:"
         run_command "oc get clusteroperators --no-headers | grep -v '${CLUSTER_OPERATOR_STABLE_PATTERN}' || true" || true
