@@ -80,7 +80,7 @@ set +x
  mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
  # Send junit file to shared dir for Data Router Reporter step
-cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
+cp "${ARTIFACT_DIR}/junit.functest.xml" "${SHARED_DIR}"
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
