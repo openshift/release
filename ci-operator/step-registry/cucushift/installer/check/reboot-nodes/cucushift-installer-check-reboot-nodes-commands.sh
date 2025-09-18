@@ -309,6 +309,25 @@ function reboot_cluster() {
     fi
     
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster reboot test completed successfully"
+    
+    # Output final cluster status for verification
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - FINAL CLUSTER STATUS VERIFICATION"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Node Status:"
+    run_command "oc get nodes -o wide" || true
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Cluster Operators Status:"
+    run_command "oc get clusteroperators" || true
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Machine Config Pools Status:"
+    run_command "oc get machineconfigpools" || true
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - END FINAL STATUS VERIFICATION"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
+    
     return 0
 }
 
