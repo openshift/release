@@ -88,16 +88,79 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-ilvft1t/release:latest
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-dns
-- as: installer-rehearse-gcp-private
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-provision
+- as: installer-rehearse-gcp2
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-dns-private
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-provision
+- as: installer-rehearse-gcp-proxy
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-ilvft1t/release:latest
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-provision
+- as: installer-rehearse-gcp-proxy-wif
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-ilvft1t/release:latest
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity-provision
+- as: installer-rehearse-gcp-proxy-users-static
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-ilvft1t/release:latest
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-users-static-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-users-static-provision
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
