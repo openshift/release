@@ -70,7 +70,9 @@ if [[ "${CLUSTER_TYPE}" == "equinix-ocp-metal-qe" ]]; then
     echo "IPv6 is enabled"
     IP_STACK="${IP_STACK}v6"
   fi
+  IP_STACK=v6
 fi
+IP_STACK=v6
 case "${IP_STACK}" in
   "v4v6")
     # --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112
