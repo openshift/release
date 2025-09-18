@@ -1,32 +1,27 @@
 presubmits:
-  openshift-priv/bpfman:
+  openshift/openshift-docs:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    - ^main-
-    cluster: build02
-    context: ci/prow/images
+    - ^power-monitoring-1\.0$
+    - ^power-monitoring-1\.0-
+    cluster: build05
+    context: ci/prow/validate-asciidoc
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-bpfman-main-images
-    path_alias: github.com/openshift/bpfman
-    rerun_command: /test images
+    name: pull-ci-openshift-openshift-docs-power-monitoring-1.0-validate-asciidoc
+    rerun_command: /test validate-asciidoc
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=validate-asciidoc
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -38,9 +33,6 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -62,36 +54,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate-asciidoc,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    - ^main-
-    cluster: build02
-    context: ci/prow/security
+    - ^power-monitoring-1\.0$
+    - ^power-monitoring-1\.0-
+    cluster: build05
+    context: ci/prow/validate-portal
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-bpfman-main-security
-    optional: true
-    path_alias: github.com/openshift/bpfman
-    rerun_command: /test security
+    name: pull-ci-openshift-openshift-docs-power-monitoring-1.0-validate-portal
+    rerun_command: /test validate-portal
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security
+        - --target=validate-portal
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -101,14 +86,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -121,9 +100,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -133,4 +109,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate-portal,?($|\s.*)
