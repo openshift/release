@@ -576,6 +576,9 @@ CONFIG = {
     'aws-lp-chaos-quota-slice': {
         'us-west-2': 10,
     },
+    'metal-redhat-gs-quota-slice': {
+        'default': 1,
+    },
 }
 
 for i in range(2,7):
