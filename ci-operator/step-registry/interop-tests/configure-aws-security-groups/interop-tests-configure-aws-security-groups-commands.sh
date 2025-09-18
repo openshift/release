@@ -24,17 +24,52 @@ echo "VPC ID: ${VPC_ID}"
 SG_NAME="${CLUSTER_NAME}-ibm-storage-scale-sg"
 echo "Creating custom security group: ${SG_NAME}"
 
+# Create tag specifications file
+TAG_JSON=$(mktemp)
+cat > "${TAG_JSON}" <<EOF
+[
+  {
+    "ResourceType": "security-group",
+    "Tags": [
+      {
+        "Key": "Name",
+        "Value": "${SG_NAME}"
+      },
+      {
+        "Key": "Purpose",
+        "Value": "IBM-Storage-Scale"
+      }
+    ]
+  }
+]
+EOF
+
+# Debug: Show the values being used
+echo "Debug information:"
+echo "  SG_NAME: '${SG_NAME}'"
+echo "  VPC_ID: '${VPC_ID}'"
+echo "  REGION: '${REGION}'"
+echo "  TAG_JSON: '${TAG_JSON}'"
+
 # Create the security group
-SG_ID=$(aws ec2 create-security-group \
-  --region "${REGION}" \
-  --group-name "${SG_NAME}" \
-  --vpc-id "${VPC_ID}" \
-  --description "IBM Storage Scale security group for Fusion Access Operator testing" \
-  --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=${SG_NAME}},{Key=Purpose,Value=IBM-Storage-Scale}]" \
-  --query 'GroupId' --output text)
+echo "Creating security group with command:"
+echo "aws ec2 create-security-group --region \"${REGION}\" --group-name \"${SG_NAME}\" --vpc-id \"${VPC_ID}\" --description \"IBM Storage Scale security group for Fusion Access Operator testing\" --tag-specifications \"file://${TAG_JSON}\" --query 'GroupId' --output text"
+
+SG_ID=$(aws ec2 create-security-group --region "${REGION}" --group-name "${SG_NAME}" --vpc-id "${VPC_ID}" --description "IBM Storage Scale security group for Fusion Access Operator testing" --tag-specifications "file://${TAG_JSON}" --query 'GroupId' --output text 2>&1)
+SG_CREATE_EXIT_CODE=$?
+
+# Clean up temporary file
+rm -f "${TAG_JSON}"
+
+if [[ $SG_CREATE_EXIT_CODE -ne 0 ]]; then
+  echo "ERROR: Failed to create security group"
+  echo "Exit code: $SG_CREATE_EXIT_CODE"
+  echo "Output: $SG_ID"
+  exit 1
+fi
 
 if [[ -z "${SG_ID}" ]]; then
-  echo "ERROR: Failed to create security group"
+  echo "ERROR: Security group creation succeeded but no group ID returned"
   exit 1
 fi
 
