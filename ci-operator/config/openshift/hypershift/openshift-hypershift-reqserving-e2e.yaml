@@ -1,0 +1,140 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator-init:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  manila-csi-driver-operator-test:
+    name: "4.20"
+    namespace: ocp
+    tag: manila-csi-driver-operator-test
+  ocp_4.20_base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+  openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+  openstack-cinder-csi-driver-operator-test:
+    name: "4.20"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator-test
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- inputs:
+    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
+  to: hypershift-operator
+- dockerfile_path: Dockerfile.control-plane
+  inputs:
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: hypershift
+- dockerfile_path: Dockerfile.e2e
+  inputs:
+    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
+  to: hypershift-tests
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y python3-pip
+  from: src
+  to: custom-verify-src
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
+  initial-419:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.19"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+  latest-417:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
+  latest-418:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.18"
+  latest-419:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+  n1minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+  n2minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.18"
+  nightly-419:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 4000m
+      memory: 2.5Gi
+tests:
+- as: reqserving-e2e-aws
+  capabilities:
+  - build-tmpfs
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-419
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
+      ZONES_COUNT: "3"
+    workflow: hypershift-aws-reqserving-e2e
+zz_generated_metadata:
+  branch: reqserving-e2e
+  org: openshift
+  repo: hypershift
