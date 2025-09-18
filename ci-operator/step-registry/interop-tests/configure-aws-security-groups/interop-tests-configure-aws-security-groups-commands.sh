@@ -14,11 +14,47 @@ echo "AWS credentials file: ${AWS_SHARED_CREDENTIALS_FILE}"
 echo "AWS region: ${REGION}"
 
 # Get cluster information
-CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
-VPC_ID="$(<"${SHARED_DIR}/vpc_id")"
+echo "Checking for cluster information files..."
+echo "SHARED_DIR: ${SHARED_DIR}"
+echo "Files in SHARED_DIR:"
+ls -la "${SHARED_DIR}/" || echo "Could not list SHARED_DIR"
 
-echo "Cluster name: ${CLUSTER_NAME}"
-echo "VPC ID: ${VPC_ID}"
+# Try different possible locations for cluster name
+CLUSTER_NAME=""
+if [[ -f "${SHARED_DIR}/CLUSTER_NAME" ]]; then
+  CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
+  echo "Found CLUSTER_NAME in ${SHARED_DIR}/CLUSTER_NAME: ${CLUSTER_NAME}"
+elif [[ -f "${SHARED_DIR}/cluster_name" ]]; then
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+  echo "Found cluster_name in ${SHARED_DIR}/cluster_name: ${CLUSTER_NAME}"
+else
+  echo "WARNING: Could not find cluster name file, using default"
+  CLUSTER_NAME="fusion-access-test"
+fi
+
+# Try different possible locations for VPC ID
+VPC_ID=""
+if [[ -f "${SHARED_DIR}/vpc_id" ]]; then
+  VPC_ID="$(<"${SHARED_DIR}/vpc_id")"
+  echo "Found vpc_id in ${SHARED_DIR}/vpc_id: ${VPC_ID}"
+elif [[ -f "${SHARED_DIR}/VPC_ID" ]]; then
+  VPC_ID="$(<"${SHARED_DIR}/VPC_ID")"
+  echo "Found VPC_ID in ${SHARED_DIR}/VPC_ID: ${VPC_ID}"
+else
+  echo "WARNING: Could not find VPC ID file, will try to discover it"
+  # Try to discover VPC ID from existing resources
+  VPC_ID=$(aws ec2 describe-vpcs --region "${REGION}" --filters "Name=is-default,Values=true" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "")
+  if [[ -n "${VPC_ID}" && "${VPC_ID}" != "None" ]]; then
+    echo "Discovered default VPC ID: ${VPC_ID}"
+  else
+    echo "ERROR: Could not find or discover VPC ID"
+    exit 1
+  fi
+fi
+
+echo "Final values:"
+echo "  CLUSTER_NAME: ${CLUSTER_NAME}"
+echo "  VPC_ID: ${VPC_ID}"
 
 # Create a custom security group for IBM Storage Scale
 SG_NAME="${CLUSTER_NAME}-ibm-storage-scale-sg"
