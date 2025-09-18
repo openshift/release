@@ -59,7 +59,6 @@ trap 'exit_handler' EXIT
 readonly API_SERVER_TIMEOUT=30      # 30 attempts × 30 seconds = 15 minutes
 readonly NODE_READY_TIMEOUT=90      # 90 attempts × 60 seconds = 90 minutes
 readonly CLUSTER_OPERATOR_TIMEOUT=120  # 120 attempts × 60 seconds = 120 minutes
-readonly MAX_CONSECUTIVE_FAILURES=10
 readonly CLUSTER_OPERATOR_STABLE_PATTERN="True.*False.*False"
 
 # Record script start time for execution time calculation
@@ -113,7 +112,6 @@ function wait_for_condition() {
     local failure_message="$5"
     
     local attempt=0
-    local consecutive_failures=0
     
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for ${condition_name}..."
     
@@ -124,7 +122,7 @@ function wait_for_condition() {
         fi
         
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ${condition_name} not ready, waiting... (${attempt}/${max_attempts})"
-        sleep ${sleep_interval}
+        sleep "${sleep_interval}"
         attempt=$(( attempt + 1 ))
     done
     
@@ -227,7 +225,7 @@ function reboot_node() {
 }
 
 function reboot_cluster() {
-    local try max_try total_nodes_count=0 master_list node_list="" worker_list
+    local total_nodes_count=0 master_list node_list="" worker_list
     declare -A node_ip_array
     
     # Get node lists with error handling
@@ -271,7 +269,7 @@ function reboot_cluster() {
         fi
     done
 
-           total_nodes_count=$(echo ${node_list} | awk '{print NF}' 2>/dev/null | tr -d '\n' || echo "0")
+           total_nodes_count=$(echo "${node_list}" | awk '{print NF}' 2>/dev/null | tr -d '\n' || echo "0")
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Total nodes to reboot: ${total_nodes_count}"
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - All ${total_nodes_count} nodes have been restarted, waiting for cluster to recover..."
     
@@ -337,6 +335,7 @@ if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
 fi
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    # shellcheck source=/dev/null
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
