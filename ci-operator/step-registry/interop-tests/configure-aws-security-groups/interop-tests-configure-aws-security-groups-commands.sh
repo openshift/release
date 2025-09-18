@@ -110,7 +110,58 @@ if [[ -z "${SG_ID}" ]]; then
 fi
 
 echo "Created security group: ${SG_ID}"
-echo "${SG_ID}" > "${SHARED_DIR}/security_groups_ids"
+
+# Try to write to SHARED_DIR, but fallback to /tmp if it's read-only
+if echo "${SG_ID}" > "${SHARED_DIR}/security_groups_ids" 2>/dev/null; then
+  echo "Security group ID saved to: ${SHARED_DIR}/security_groups_ids"
+else
+  echo "WARNING: Could not write to ${SHARED_DIR}/security_groups_ids (read-only filesystem)"
+  echo "Writing to /tmp/security_groups_ids instead"
+  echo "${SG_ID}" > "/tmp/security_groups_ids"
+  echo "Security group ID saved to: /tmp/security_groups_ids"
+  
+  # Also try to export it as an environment variable for other steps
+  echo "export SECURITY_GROUP_ID=${SG_ID}" >> /tmp/security_group_env
+  echo "Security group ID also exported to: /tmp/security_group_env"
+fi
+
+# Configure install-config.yaml directly if we can't use the standard step
+if [[ ! -f "${SHARED_DIR}/security_groups_ids" ]]; then
+  echo "Configuring install-config.yaml directly with security group ID..."
+  CONFIG="${SHARED_DIR}/install-config.yaml"
+  
+  if [[ -f "${CONFIG}" ]]; then
+    echo "Adding security group to install-config.yaml..."
+    
+    # Create a patch for the install-config
+    PATCH=$(mktemp)
+    cat > "${PATCH}" <<EOF
+compute:
+- platform:
+    aws:
+      additionalSecurityGroupIDs: ["${SG_ID}"]
+controlPlane:
+  platform:
+    aws:
+      additionalSecurityGroupIDs: ["${SG_ID}"]
+EOF
+    
+    echo "Install-config patch:"
+    cat "${PATCH}"
+    
+    # Apply the patch using yq
+    if command -v yq >/dev/null 2>&1; then
+      yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${CONFIG}" "${PATCH}" > "${CONFIG}.tmp" && mv "${CONFIG}.tmp" "${CONFIG}"
+      echo "✅ Install-config updated with security group ID"
+    else
+      echo "WARNING: yq not available, install-config not updated"
+    fi
+    
+    rm -f "${PATCH}"
+  else
+    echo "WARNING: install-config.yaml not found at ${CONFIG}"
+  fi
+fi
 
 # Get the VPC CIDR for allowing traffic within the VPC
 VPC_CIDR=$(aws ec2 describe-vpcs --region "${REGION}" --vpc-ids "${VPC_ID}" --query 'Vpcs[0].CidrBlock' --output text)
