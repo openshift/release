@@ -76,10 +76,33 @@ echo "Waiting for FusionAccess to be ready..."
 oc wait --for=jsonpath='{.metadata.name}'=fusionaccess-object fusionaccess/fusionaccess-object -n ${FUSION_ACCESS_NAMESPACE} --timeout=600s
 
 echo "Waiting for IBM Storage Scale CRDs to be available..."
-oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeout=300s
+echo "Note: FusionAccess operator should install IBM Storage Scale operator and its CRDs"
+
+# Check if FusionAccess operator is actually installing the IBM Storage Scale operator
+echo "Checking for IBM Storage Scale operator installation..."
+sleep 30  # Give the operator time to start installing
+
+# Wait for CRDs with longer timeout and better error handling
+if oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeout=600s 2>/dev/null; then
+  echo "✅ IBM Storage Scale CRDs are available"
+else
+  echo "⚠️  IBM Storage Scale CRDs not found after 10 minutes"
+  echo "This may indicate that the FusionAccess operator is not installing the IBM Storage Scale operator"
+  echo "Checking for any IBM Storage Scale related operators..."
+  oc get csv -A | grep -i spectrum || echo "No IBM Spectrum Scale operators found"
+  echo "Checking for any IBM Storage Scale related CRDs..."
+  oc get crd | grep -i spectrum || echo "No IBM Spectrum Scale CRDs found"
+  echo "Checking FusionAccess operator logs for errors..."
+  oc logs -n ${FUSION_ACCESS_NAMESPACE} -l app.kubernetes.io/name=openshift-fusion-access-operator --tail=50 || echo "Cannot get FusionAccess operator logs"
+  echo "Proceeding anyway - the Cluster creation may still work if CRDs are installed later"
+fi
 
 echo "Verifying CRD details..."
-oc get crd clusters.scale.spectrum.ibm.com -o yaml | grep -A 5 -B 5 "validation\|schema" || echo "No validation schema found in CRD"
+if oc get crd clusters.scale.spectrum.ibm.com >/dev/null 2>&1; then
+  oc get crd clusters.scale.spectrum.ibm.com -o yaml | grep -A 5 -B 5 "validation\|schema" || echo "No validation schema found in CRD"
+else
+  echo "⚠️  CRD clusters.scale.spectrum.ibm.com not found"
+fi
 
 echo "Checking for any CRD-related events..."
 oc get events --all-namespaces --sort-by='.lastTimestamp' | grep -i "clusters.scale.spectrum.ibm.com" | tail -5 || echo "No CRD-related events found"
@@ -155,11 +178,19 @@ else
 fi
 
 echo "Creating IBM Storage Scale Cluster..."
+echo "Note: If CRDs are not available yet, the Cluster creation will be retried"
+
 MAX_ATTEMPTS=3
 ATTEMPT=1
 
 while [[ $ATTEMPT -le $MAX_ATTEMPTS ]]; do
   echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+  
+  # Check if CRD exists before attempting to create Cluster
+  if ! oc get crd clusters.scale.spectrum.ibm.com >/dev/null 2>&1; then
+    echo "⚠️  CRD clusters.scale.spectrum.ibm.com not found, waiting 30 seconds before attempt $ATTEMPT..."
+    sleep 30
+  fi
   
   if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
@@ -216,11 +247,34 @@ EOF
     break
   else
     echo "❌ Failed to create IBM Storage Scale Cluster on attempt $ATTEMPT"
+    echo "Checking for specific error details..."
+    
+    # Check if the error is related to missing CRD
+    if ! oc get crd clusters.scale.spectrum.ibm.com >/dev/null 2>&1; then
+      echo "❌ CRD clusters.scale.spectrum.ibm.com is still not available"
+      echo "This indicates the FusionAccess operator is not installing the IBM Storage Scale operator"
+      echo "Checking FusionAccess operator status..."
+      oc get csv -n ${FUSION_ACCESS_NAMESPACE} | grep fusion-access || echo "No FusionAccess CSV found"
+      echo "Checking for any operator installation events..."
+      oc get events -n ${FUSION_ACCESS_NAMESPACE} --sort-by='.lastTimestamp' | tail -10
+    else
+      echo "✅ CRD is available, checking for other issues..."
+      echo "Current CRD status:"
+      oc get crd clusters.scale.spectrum.ibm.com -o yaml | grep -A 10 "status:" || echo "No status found in CRD"
+    fi
+    
     if [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; then
       echo "⏳ Waiting 1 minute before retry..."
       sleep 60
     else
       echo "❌ All $MAX_ATTEMPTS attempts failed"
+      echo "Final debugging information:"
+      echo "FusionAccess operator status:"
+      oc get csv -n ${FUSION_ACCESS_NAMESPACE} | grep fusion-access || echo "No FusionAccess CSV found"
+      echo "IBM Storage Scale operator status:"
+      oc get csv -A | grep -i spectrum || echo "No IBM Spectrum Scale operators found"
+      echo "Available CRDs:"
+      oc get crd | grep -i spectrum || echo "No IBM Spectrum Scale CRDs found"
       exit 1
     fi
   fi
