@@ -28,8 +28,8 @@ then
 elif [ "${OSSM_VERSION}" == "3" ]
 then
   # remove v from ISTIO version if there is any
-  [[ $ISTIO_VERSION == v* ]] && ISTIO_VERSION="${ISTIO_VERSION#v}" || ISTIO_VERSION="$ISTIO_VERSION"
-  hack/istio/download-istio.sh -iv ${ISTIO_VERSION}
+  [[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"
+  hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
   # install testing apps
   hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
   # enable monitoring in demo apps
@@ -40,7 +40,7 @@ then
   hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n bookinfo -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
   hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n sleep -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
   # install custom grafana
-  oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_VERSION}/samples/addons/grafana.yaml
+  oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_SAMPLE_APP_VERSION}/samples/addons/grafana.yaml
   oc wait -n ${ISTIO_NAMESPACE} --for=condition=available deployment/grafana --timeout=150s
   # Expose grafana route (for Kiali) (delete route first if exists from previous run)
   oc delete -n ${ISTIO_NAMESPACE} route grafana || true
