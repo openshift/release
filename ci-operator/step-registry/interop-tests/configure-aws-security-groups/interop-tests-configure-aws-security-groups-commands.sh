@@ -149,12 +149,71 @@ EOF
     echo "Install-config patch:"
     cat "${PATCH}"
     
-    # Apply the patch using yq
-    if command -v yq >/dev/null 2>&1; then
-      yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${CONFIG}" "${PATCH}" > "${CONFIG}.tmp" && mv "${CONFIG}.tmp" "${CONFIG}"
-      echo "✅ Install-config updated with security group ID"
+    # Apply the patch using Python (usually available in CI containers)
+    echo "Merging security group configuration into install-config.yaml..."
+    
+    # Create a backup
+    cp "${CONFIG}" "${CONFIG}.backup"
+    
+    # Use Python to safely merge the YAML
+    python3 <<EOF
+import yaml
+import sys
+
+# Read the existing config
+with open('${CONFIG}', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Add security group to compute section
+if 'compute' not in config:
+    config['compute'] = []
+if len(config['compute']) == 0:
+    config['compute'] = [{}]
+
+# Ensure the first compute entry has platform.aws structure
+if 'platform' not in config['compute'][0]:
+    config['compute'][0]['platform'] = {}
+if 'aws' not in config['compute'][0]['platform']:
+    config['compute'][0]['platform']['aws'] = {}
+
+config['compute'][0]['platform']['aws']['additionalSecurityGroupIDs'] = ['${SG_ID}']
+
+# Add security group to controlPlane section
+if 'controlPlane' not in config:
+    config['controlPlane'] = {}
+if 'platform' not in config['controlPlane']:
+    config['controlPlane']['platform'] = {}
+if 'aws' not in config['controlPlane']['platform']:
+    config['controlPlane']['platform']['aws'] = {}
+
+config['controlPlane']['platform']['aws']['additionalSecurityGroupIDs'] = ['${SG_ID}']
+
+# Write the updated config
+with open('${CONFIG}', 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+print("✅ Install-config updated with security group ID")
+EOF
+    
+    if [[ $? -eq 0 ]]; then
+      echo "✅ Install-config updated successfully"
+      echo "Updated install-config.yaml:"
+      cat "${CONFIG}"
     else
-      echo "WARNING: yq not available, install-config not updated"
+      echo "WARNING: Python YAML update failed, trying simple append approach..."
+      # Fallback: simple append approach
+      cat >> "${CONFIG}" <<EOF
+
+compute:
+- platform:
+    aws:
+      additionalSecurityGroupIDs: ["${SG_ID}"]
+controlPlane:
+  platform:
+    aws:
+      additionalSecurityGroupIDs: ["${SG_ID}"]
+EOF
+      echo "✅ Install-config updated with fallback approach"
     fi
     
     rm -f "${PATCH}"
