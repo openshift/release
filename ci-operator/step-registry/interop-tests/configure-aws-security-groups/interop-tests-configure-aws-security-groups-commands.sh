@@ -13,24 +13,60 @@ export REGION="${LEASED_RESOURCE}"
 echo "AWS credentials file: ${AWS_SHARED_CREDENTIALS_FILE}"
 echo "AWS region: ${REGION}"
 
-# Get the AWS ROSA worker security group ID
-export AWS_ROSA_WORKER_SECURITY_GROUP=$(aws ec2 describe-security-groups \
-  --region "${REGION}" \
-  --filters "Name=group-name,Values=*worker*" \
-  --query 'SecurityGroups[0].GroupId' --output text)
+# Get cluster information
+CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
+VPC_ID="$(<"${SHARED_DIR}/vpc_id")"
 
-if [[ -z "${AWS_ROSA_WORKER_SECURITY_GROUP}" ]]; then
-  echo "ERROR: Could not find worker security group"
+echo "Cluster name: ${CLUSTER_NAME}"
+echo "VPC ID: ${VPC_ID}"
+
+# Create a custom security group for IBM Storage Scale
+SG_NAME="${CLUSTER_NAME}-ibm-storage-scale-sg"
+echo "Creating custom security group: ${SG_NAME}"
+
+# Create the security group
+SG_ID=$(aws ec2 create-security-group \
+  --region "${REGION}" \
+  --group-name "${SG_NAME}" \
+  --vpc-id "${VPC_ID}" \
+  --description "IBM Storage Scale security group for Fusion Access Operator testing" \
+  --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=${SG_NAME}},{Key=Purpose,Value=IBM-Storage-Scale}]" \
+  --query 'GroupId' --output text)
+
+if [[ -z "${SG_ID}" ]]; then
+  echo "ERROR: Failed to create security group"
   exit 1
 fi
 
-echo "Configuring security group: ${AWS_ROSA_WORKER_SECURITY_GROUP}"
+echo "Created security group: ${SG_ID}"
+echo "${SG_ID}" > "${SHARED_DIR}/security_groups_ids"
+
+# Get the VPC CIDR for allowing traffic within the VPC
+VPC_CIDR=$(aws ec2 describe-vpcs --region "${REGION}" --vpc-ids "${VPC_ID}" --query 'Vpcs[0].CidrBlock' --output text)
+echo "VPC CIDR: ${VPC_CIDR}"
+
+# Allow traffic from within the VPC
+aws ec2 authorize-security-group-ingress \
+  --region "${REGION}" \
+  --group-id "${SG_ID}" \
+  --protocol tcp \
+  --port 0-65535 \
+  --cidr "${VPC_CIDR}" || echo "WARNING: TCP rule may already exist"
+
+aws ec2 authorize-security-group-ingress \
+  --region "${REGION}" \
+  --group-id "${SG_ID}" \
+  --protocol udp \
+  --port 0-65535 \
+  --cidr "${VPC_CIDR}" || echo "WARNING: UDP rule may already exist"
+
+echo "Configured security group: ${SG_ID}"
 
 # Parse custom security group configuration from environment variables
 # Default IBM Storage Scale ports if not specified
 CUSTOM_PORTS="${CUSTOM_SECURITY_GROUP_PORTS:-12345,1191,60000-61000}"
 CUSTOM_PROTOCOLS="${CUSTOM_SECURITY_GROUP_PROTOCOLS:-tcp,udp}"
-CUSTOM_SOURCES="${CUSTOM_SECURITY_GROUP_SOURCES:-${AWS_ROSA_WORKER_SECURITY_GROUP}}"
+CUSTOM_SOURCES="${CUSTOM_SECURITY_GROUP_SOURCES:-${VPC_CIDR}}"
 
 echo "Security group configuration:"
 echo "  Ports: ${CUSTOM_PORTS}"
@@ -58,7 +94,7 @@ for port in "${PORT_ARRAY[@]}"; do
           # Source is a CIDR block
           aws ec2 authorize-security-group-ingress \
             --region "${REGION}" \
-            --group-id "${AWS_ROSA_WORKER_SECURITY_GROUP}" \
+            --group-id "${SG_ID}" \
             --protocol "${protocol}" \
             --port "${start_port}-${end_port}" \
             --cidr "${source}" || {
@@ -68,7 +104,7 @@ for port in "${PORT_ARRAY[@]}"; do
           # Source is a security group
           aws ec2 authorize-security-group-ingress \
             --region "${REGION}" \
-            --group-id "${AWS_ROSA_WORKER_SECURITY_GROUP}" \
+            --group-id "${SG_ID}" \
             --protocol "${protocol}" \
             --port "${start_port}-${end_port}" \
             --source-group "${source}" || {
@@ -81,7 +117,7 @@ for port in "${PORT_ARRAY[@]}"; do
           # Source is a CIDR block
           aws ec2 authorize-security-group-ingress \
             --region "${REGION}" \
-            --group-id "${AWS_ROSA_WORKER_SECURITY_GROUP}" \
+            --group-id "${SG_ID}" \
             --protocol "${protocol}" \
             --port "${port}" \
             --cidr "${source}" || {
@@ -91,7 +127,7 @@ for port in "${PORT_ARRAY[@]}"; do
           # Source is a security group
           aws ec2 authorize-security-group-ingress \
             --region "${REGION}" \
-            --group-id "${AWS_ROSA_WORKER_SECURITY_GROUP}" \
+            --group-id "${SG_ID}" \
             --protocol "${protocol}" \
             --port "${port}" \
             --source-group "${source}" || {
@@ -125,8 +161,10 @@ done
 echo "Custom security group configuration completed successfully"
 echo ""
 echo "📋 Security Group Configuration Summary:"
-echo "  Security Group ID: ${AWS_ROSA_WORKER_SECURITY_GROUP}"
+echo "  Security Group ID: ${SG_ID}"
+echo "  Security Group Name: ${SG_NAME}"
 echo "  Region: ${REGION}"
+echo "  VPC ID: ${VPC_ID}"
 echo ""
 echo "🔧 Configured Ports and Protocols:"
 for port in "${PORT_ARRAY[@]}"; do
