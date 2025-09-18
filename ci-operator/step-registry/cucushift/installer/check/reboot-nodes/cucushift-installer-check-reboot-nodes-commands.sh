@@ -110,7 +110,7 @@ function wait_for_condition() {
     local max_attempts="$3"
     local sleep_interval="$4"
     local failure_message="$5"
-    local show_status_command="$6"  # Optional command to show current status
+    local show_status_command="$6"  # Optional command to show status (both during waiting and on success)
     
     local attempt=0
     
@@ -119,6 +119,13 @@ function wait_for_condition() {
     while [[ ${attempt} -lt ${max_attempts} ]]; do
         if eval "${check_command}"; then
             echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ${condition_name} condition met"
+            
+            # Show success details if command provided
+            if [[ -n "${show_status_command}" ]]; then
+                echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ${condition_name} success details:"
+                eval "${show_status_command}" || true
+            fi
+            
             return 0
         fi
         
@@ -170,24 +177,14 @@ function ssh_command() {
 }
 
 function reboot_node() {
-    local node_ip=$1 node_name=$2 ret=0
+    local node_ip=$1 node_name=$2
     local instance_id
 
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting instance ID for node ${node_name} (${node_ip})"
     
-    # Get instance ID from AWS
-    # Get instance ID from AWS
-    instance_id=$(aws ec2 describe-instances \
-        --region "${AWS_REGION:-us-east-1}" \
-        --filters "Name=private-ip-address,Values=${node_ip}" \
-        --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' \
-        --output text | grep -E '\s+running$' | awk '{print $1}' | head -1)
-    aws_exit_code=$?
-    
-    if [[ ${aws_exit_code} -ne 0 ]]; then
-        echo "ERROR: AWS CLI failed to describe instances for IP ${node_ip} (exit code: ${aws_exit_code})"
-        return 1
-    fi
+    # Get instance ID from AWS using run_command for consistent error handling
+    local describe_cmd="aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --filters 'Name=private-ip-address,Values=${node_ip}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text | grep -E '\\s+running$' | awk '{print \$1}' | head -1"
+    instance_id=$(run_command_silent "${describe_cmd}")
     
     if [[ -z "${instance_id}" ]]; then
         echo "ERROR: Could not find running instance for IP ${node_ip}"
@@ -198,33 +195,33 @@ function reboot_node() {
     
     # Stop the instance
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stopping instance ${instance_id}"
-    aws ec2 stop-instances --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
-    if [[ ${ret} == 1 ]]; then
-        echo "ERROR: fail to stop instance ${instance_id}"
+    if ! run_command "aws ec2 stop-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}'"; then
+        echo "ERROR: Failed to stop instance ${instance_id}"
         return 1
     fi
     
-    # Wait for instance to stop
-    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for instance ${instance_id} to stop"
-    aws ec2 wait instance-stopped --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
-    if [[ ${ret} == 1 ]]; then
-        echo "ERROR: instance ${instance_id} did not stop within timeout"
+    # Wait for instance to stop using wait_for_condition
+    if ! wait_for_condition "instance ${instance_id} to stop" \
+        "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -q 'stopped'" \
+        30 10 \
+        "Instance ${instance_id} did not stop within 5 minutes" \
+        "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         return 1
     fi
     
     # Start the instance
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting instance ${instance_id}"
-    aws ec2 start-instances --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
-    if [[ ${ret} == 1 ]]; then
-        echo "ERROR: fail to start instance ${instance_id}"
+    if ! run_command "aws ec2 start-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}'"; then
+        echo "ERROR: Failed to start instance ${instance_id}"
         return 1
     fi
     
-    # Wait for instance to start
-    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting for instance ${instance_id} to start"
-    aws ec2 wait instance-running --region "${AWS_REGION:-us-east-1}" --instance-ids "${instance_id}" || ret=1
-    if [[ ${ret} == 1 ]]; then
-        echo "ERROR: instance ${instance_id} did not start within timeout"
+    # Wait for instance to start using wait_for_condition
+    if ! wait_for_condition "instance ${instance_id} to start" \
+        "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -q 'running'" \
+        30 10 \
+        "Instance ${instance_id} did not start within 5 minutes" \
+        "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         return 1
     fi
     
@@ -285,7 +282,8 @@ function reboot_cluster() {
     if ! wait_for_condition "API server accessibility" \
         "oc get nodes --request-timeout=10s >/dev/null 2>&1" \
         "${API_SERVER_TIMEOUT}" 30 \
-        "API server not accessible after ${API_SERVER_TIMEOUT} attempts"; then
+        "API server not accessible after ${API_SERVER_TIMEOUT} attempts" \
+        "oc get nodes --request-timeout=10s | head -5"; then
         print_cluster_diagnostics "API SERVER FAILURE"
         return 1
     fi
@@ -296,7 +294,8 @@ function reboot_cluster() {
     if ! wait_for_condition "all nodes to be Ready" \
         "${node_ready_check}" \
         "${NODE_READY_TIMEOUT}" 60 \
-        "Not all nodes are Ready after ${NODE_READY_TIMEOUT} minutes"; then
+        "Not all nodes are Ready after ${NODE_READY_TIMEOUT} minutes" \
+        "oc get nodes -o wide | head -10"; then
         print_cluster_diagnostics "NODE READY FAILURE"
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Detailed node conditions:"
         run_command "oc get nodes -o json | jq '.items[] | {name: .metadata.name, conditions: .status.conditions[] | select(.type==\"Ready\")}'" || true
@@ -305,13 +304,12 @@ function reboot_cluster() {
     
     # Wait for cluster operators to stabilize
     local cluster_operator_check="[[ \$(oc get clusteroperators --no-headers 2>/dev/null | grep -v '${CLUSTER_OPERATOR_STABLE_PATTERN}' | wc -l | tr -d '\n') -eq 0 ]]"
-    local cluster_operator_status_cmd="oc get clusteroperators --no-headers | grep -v '${CLUSTER_OPERATOR_STABLE_PATTERN}' || echo 'All cluster operators are stable'"
     
     if ! wait_for_condition "cluster operators to stabilize" \
         "${cluster_operator_check}" \
         "${CLUSTER_OPERATOR_TIMEOUT}" 60 \
         "Some cluster operators are still not stable after ${CLUSTER_OPERATOR_TIMEOUT} minutes" \
-        "${cluster_operator_status_cmd}"; then
+        "oc get clusteroperators | head -10"; then
         print_cluster_diagnostics "CLUSTER OPERATOR FAILURE"
         echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Unstable cluster operators details:"
         run_command "oc get clusteroperators --no-headers | grep -v '${CLUSTER_OPERATOR_STABLE_PATTERN}' || true" || true
