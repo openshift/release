@@ -58,7 +58,7 @@ export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^cert
 
 set -o nounset
 set -o pipefail
-set -x
+
 mkdir -p ${ARTIFACT_DIR}/cerberus
 
 cerberus_logs=${ARTIFACT_DIR}/cerberus/cerberus_prow_logs.out

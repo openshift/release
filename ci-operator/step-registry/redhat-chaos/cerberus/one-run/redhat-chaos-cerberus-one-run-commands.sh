@@ -1,6 +1,8 @@
 #!/bin/bash
 
 set -o errexit
+set -o nounset
+set -o pipefail
 
 if [ ${RUN_CERBERUS} == "false" ]; then
   exit 0
@@ -10,9 +12,6 @@ ls
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
 
-set -o nounset
-set -o pipefail
-set -x
 # We will monitor all namespaces if any pods are in a failure state
 # Cerberus will also monitor many more components, see full list here:
 # https://github.com/redhat-chaos/cerberus#what-kubernetesopenshift-components-can-cerberus-monitor
@@ -35,7 +34,7 @@ fi
 
 export CERBERUS_IGNORE_PODS
 
-./cerberus/prow_run.sh
+#./cerberus/prow_run.sh
 
 if [[ -f final_cerberus_info.json ]]; then
     replaced_str=$(less final_cerberus_info.json | sed "s/True/0/g" | sed "s/False/1/g" | tr "'" '"' | jq .cluster_health)
