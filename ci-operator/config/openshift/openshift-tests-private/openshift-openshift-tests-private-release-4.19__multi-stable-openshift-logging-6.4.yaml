@@ -37,32 +37,25 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: gcp-ipi-arm-fips-f999-logging
+- as: gcp-ipi-arm-fips-f999-logging-debug
   cron: 0 9 29 2 *
   steps:
     cluster_profile: gcp-observability
     env:
       COMPUTE_NODE_TYPE: t2a-standard-8
-      FILTERS_ADDITIONAL: ""
       FIPS_ENABLED: "true"
-      FORCE_SUCCESS_EXIT: "true"
-      LOGGING_TEST_VERSION: "6.4"
       OCP_ARCH: arm64
-      OPERATORS: |
-        [
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": "", "config": "{\"env\": [{\"name\": \"FIPS_MODE\", \"value\": \"disabled\"}]}"}
-        ]
-      TEST_ADDITIONAL: ""
-      TEST_FILTERS: ~Disruptive&;~Longduration&;~AWSSTS&;~AZWIF&;~AZMonitor&;~Splunk&;~Cloudwatch&
-      TEST_IMPORTANCE: Critical|High|Medium|Low
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: sig-openshift-logging
-      TEST_TIMEOUT: "30"
     test:
-    - chain: openshift-logging-deploy-operators
-    - ref: install-operators
-    - chain: openshift-e2e-test-logging-qe
+    - as: sleep-xhours
+      commands: sleep 4h
+      from: cli
+      resources:
+        limits:
+          memory: 200Mi
+        requests:
+          cpu: 50m
+          memory: 200Mi
+      timeout: 4h5m0s
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: azure-ipi-oidc-f999-logging
   cron: 8 8 29 2 *

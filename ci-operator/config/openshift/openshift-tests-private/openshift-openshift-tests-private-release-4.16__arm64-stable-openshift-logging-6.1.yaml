@@ -57,7 +57,7 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-proxy-sts-arm-f14-logging
+- as: aws-ipi-proxy-sts-arm-f14-logging-debug
   cron: 58 16 29 2 *
   steps:
     cluster_profile: aws-qe
@@ -66,25 +66,18 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FILTERS_ADDITIONAL: ""
-      LOGGING_TEST_VERSION: "6.1"
       OCP_ARCH: arm64
-      OPERATORS: |
-        [
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
-        ]
-      TEST_ADDITIONAL: ""
-      TEST_FILTERS: ~Disruptive&;~Longduration&;~Splunk&;~GCL&;~AZWIF&;~AZMonitor&;~PodDisruptionBudget&
-      TEST_IMPORTANCE: ""
-      TEST_PARALLEL: "3"
-      TEST_ROSA_LOGIN_ENV: ""
-      TEST_SCENARIOS: sig-openshift-logging
-      TEST_TIMEOUT: "15"
     test:
-    - chain: openshift-logging-deploy-operators
-    - ref: install-operators
-    - chain: openshift-e2e-test-logging-qe
+    - as: sleep-xhours
+      commands: sleep 4h
+      from: cli
+      resources:
+        limits:
+          memory: 200Mi
+        requests:
+          cpu: 50m
+          memory: 200Mi
+      timeout: 4h5m0s
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 zz_generated_metadata:
   branch: release-4.16
