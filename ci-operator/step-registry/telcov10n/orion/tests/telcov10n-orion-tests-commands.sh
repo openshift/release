@@ -26,7 +26,7 @@ OPENSEARCH_HOST=$(<"/secret/telco5g/hostname")
 ES_SERVER="https://${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD}@${OPENSEARCH_HOST}"
 
 pip install .
-export EXTRA_FLAGS=" --anomaly-detection"
+export EXTRA_FLAGS=" --hunter-analyze"
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     export EXTRA_FLAGS+=" --output-format junit"
