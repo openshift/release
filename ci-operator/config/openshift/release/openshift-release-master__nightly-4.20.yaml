@@ -505,6 +505,97 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
+- as: e2e-metal-ovn-two-node-fencing-degraded-techpreview
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEGRADED_NODE: "true"
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      SKIP_READINESS_CHECKS: "true"
+      TEST_ARGS: --disable-monitor=etcd-log-analyzer,node-lifecycle
+      TEST_SKIPS: \[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\] local
+        kubeconfig \\"check-endpoints\.kubeconfig\\" should be present in all kube-apiserver
+        containers \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
+        local kubeconfig \\"control-plane-node\.kubeconfig\\" should be present in
+        all kube-apiserver containers \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
+        local kubeconfig \\"lb-ext\.kubeconfig\\" should be present on all masters
+        and work \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
+        local kubeconfig \\"lb-int\.kubeconfig\\" should be present on all masters
+        and work \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
+        local kubeconfig \\"localhost-recovery\.kubeconfig\\" should be present on
+        all masters and work \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
+        local kubeconfig \\"localhost\.kubeconfig\\" should be present on all masters
+        and work \[Suite:openshift/conformance/parallel/minimal\]\|\[sig-api-machinery\]\[Feature:APIServer\]\[Late\]
+        kubelet terminates kube-apiserver gracefully extended \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Early\]
+        Managed cluster should \[apigroup:config\.openshift\.io\] start all core operators
+        \[Skipped:Disconnected\] \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\]
+        all registered tls artifacts must have no metadata violation regressions \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\]
+        all tls artifacts must be registered \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\]
+        collect certificate data \[Suite:openshift/conformance/parallel\]\|\[sig-architecture\]
+        Conformance Tests should have at least two untainted nodes \[Conformance\]
+        \[Suite:openshift/conformance/parallel/minimal\] \[Suite:k8s\]\|\[sig-cli\]
+        oc adm must-gather runs successfully \[apigroup:config\.openshift\.io\] \[Suite:openshift/conformance/parallel\]\|\[sig-cli\]
+        oc adm must-gather runs successfully for audit logs \[apigroup:config\.openshift\.io\]\[apigroup:oauth\.openshift\.io\]
+        \[Suite:openshift/conformance/parallel\]\|\[sig-cli\] oc adm node-logs \[Suite:openshift/conformance/parallel\]\|\[sig-etcd\]
+        etcd cluster has the same number of master nodes and voting members from the
+        endpoints configmap \[Early\]\[apigroup:config\.openshift\.io\] \[Suite:openshift/conformance/parallel\]\|\[sig-instrumentation\]
+        Prometheus \[apigroup:image\.openshift\.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+        \[Early\]\[apigroup:config\.openshift\.io\] \[Skipped:Disconnected\] \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        Network Policies when using openshift ovn-kubernetes allow ingress traffic
+        to one pod from a particular namespace in L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        Network Policies when using openshift ovn-kubernetes allow ingress traffic
+        to one pod from a particular namespace in L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        Network Policies when using openshift ovn-kubernetes pods within namespace
+        should be isolated when deny policy is present in L2 dualstack primary UDN
+        \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        Network Policies when using openshift ovn-kubernetes pods within namespace
+        should be isolated when deny policy is present in L3 dualstack primary UDN
+        \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
+        can perform east/west traffic between nodes for two pods connected over a
+        L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
+        can perform east/west traffic between nodes two pods connected over a L3 primary
+        UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
+        isolates overlapping CIDRs with L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
+        isolates overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
+        can perform east/west traffic between nodes for two pods connected over a
+        L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
+        can perform east/west traffic between nodes two pods connected over a L3 primary
+        UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
+        isolates overlapping CIDRs with L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
+        isolates overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using UserDefinedNetwork can perform
+        east/west traffic between nodes for two pods connected over a L2 primary UDN
+        \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using UserDefinedNetwork can perform
+        east/west traffic between nodes two pods connected over a L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using UserDefinedNetwork isolates
+        overlapping CIDRs with L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        when using openshift ovn-kubernetes created using UserDefinedNetwork isolates
+        overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-node\]
+        Managed cluster should verify that nodes have no unexpected reboots \[Late\]
+        \[Suite:openshift/conformance/parallel\]\|\[sig-node\]\[apigroup:config\.openshift\.io\]
+        CPU Partitioning node validation should have correct cpuset and cpushare set
+        in crio containers \[Suite:openshift/conformance/parallel\]
+    workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-upgrade
   cluster: build05
   cron: '@daily'
