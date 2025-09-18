@@ -12,10 +12,15 @@ images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: odh-dashboard-image
+- context_dir: .
+  dockerfile_path: ./packages/model-registry/Dockerfile.workspace
+  to: odh-mod-arch-model-registry-image
 promotion:
   to:
   - namespace: opendatahub-io
     tag: latest
+  - namespace: opendatahub-io
+    tag: main
 releases:
   latest:
     release:
@@ -44,13 +49,22 @@ tests:
     env:
       IMAGE_REPO: odh-dashboard
     workflow: opendatahub-io-ci-image-mirror
-- as: odh-dashboard-s390x-build
-  cron: 0 2 * * *
+- as: odh-mod-arch-model-registry-pr-image-mirror
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-model-registry-image
     env:
-      IMAGE_REPO: odh-dashboard
-      IMAGE_TAG: multiarch-nightly
-    workflow: opendatahub-io-ci-s390x-build-build-publish
+      IMAGE_REPO: odh-mod-arch-modular-architecture
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-model-registry-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-model-registry-image
+    env:
+      IMAGE_REPO: odh-mod-arch-modular-architecture
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
