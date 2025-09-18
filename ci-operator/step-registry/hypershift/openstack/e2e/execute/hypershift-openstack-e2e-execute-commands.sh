@@ -34,18 +34,18 @@ fi
 # run the test
 hack/ci-test-e2e.sh ${E2E_EXTRA_ARGS} \
         --test.v \
-	--test.timeout=2h30m \
+        --test.timeout=2h30m \
         --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
         --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
         --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
         --e2e.node-pool-replicas=2 \
-	--e2e.aws-credentials-file=${CLUSTER_PROFILE_DIR}/.awscred \
-	--e2e.base-domain=origin-ci-int-aws.dev.rhcloud.com \
+        --e2e.aws-credentials-file=${CLUSTER_PROFILE_DIR}/.awscred \
+        --e2e.base-domain=shiftstack.devcluster.openshift.com \
         --test.run="${E2E_TESTS_REGEX}" \
-	--test.parallel=20 \
+        --test.parallel=20 \
         --e2e.platform="OpenStack" \
-	--e2e.ssh-key-file="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
+        --e2e.ssh-key-file="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
         --e2e.openstack-credentials-file="${SHARED_DIR}/clouds.yaml" \
         --e2e.openstack-external-network-id="${OPENSTACK_EXTERNAL_NETWORK_ID}" \
         --e2e.openstack-node-flavor="${OPENSTACK_COMPUTE_FLAVOR}" \
-	--e2e.openstack-node-image-name="${RHCOS_IMAGE_NAME}"
+        --e2e.openstack-node-image-name="${RHCOS_IMAGE_NAME}"
