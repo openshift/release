@@ -136,7 +136,7 @@ apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: LocalDisk
 metadata:
   name: shareddisk${DISK_COUNT}
-  namespace: ${FUSION_ACCESS_NAMESPACE}
+  namespace: ${STORAGE_SCALE_NAMESPACE}
 spec:
   device: /dev/nvme1n1
   node: ${NODE}
@@ -160,13 +160,13 @@ echo "Waiting for LocalDisk resources to be ready..."
 sleep 30
 
 echo "Verifying LocalDisk resources..."
-if oc get localdisks -n ${FUSION_ACCESS_NAMESPACE} >/dev/null 2>&1; then
+if oc get localdisks -n ${STORAGE_SCALE_NAMESPACE} >/dev/null 2>&1; then
   echo "✅ LocalDisk resources found:"
-  oc get localdisks -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
+  oc get localdisks -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device"
 else
   echo "❌ No LocalDisk resources found"
   echo "Checking for any LocalDisk-related events..."
-  oc get events -n ${FUSION_ACCESS_NAMESPACE} --sort-by='.lastTimestamp' | grep -i localdisk || echo "No LocalDisk-related events found"
+  oc get events -n ${STORAGE_SCALE_NAMESPACE} --sort-by='.lastTimestamp' | grep -i localdisk || echo "No LocalDisk-related events found"
   exit 1
 fi
 
@@ -330,7 +330,7 @@ apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Filesystem
 metadata:
   name: shared-filesystem
-  namespace: ${FUSION_ACCESS_NAMESPACE}
+  namespace: ${STORAGE_SCALE_NAMESPACE}
 spec:
   local:
     blockSize: 4M
@@ -355,21 +355,21 @@ fi
 
 echo "Waiting for IBM Storage Scale Filesystem to be ready..."
 echo "Note: Filesystem creation can take up to 1 hour for large configurations"
-if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} --timeout=3600s; then
+if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} --timeout=3600s; then
   echo "✅ IBM Storage Scale Filesystem is ready"
 else
   echo "⚠️  IBM Storage Scale Filesystem not ready within 1 hour, checking status..."
-  oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} -o yaml | grep -A 10 -B 5 "status:" || echo "No status information available"
+  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o yaml | grep -A 10 -B 5 "status:" || echo "No status information available"
 fi
 
 echo "Verifying IBM Storage Scale Filesystem..."
-if oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} >/dev/null 2>&1; then
+if oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} >/dev/null 2>&1; then
   echo "✅ IBM Storage Scale Filesystem found:"
-  oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass"
+  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass"
 else
   echo "❌ IBM Storage Scale Filesystem not found"
   echo "Checking for any Filesystem-related events..."
-  oc get events -n ${FUSION_ACCESS_NAMESPACE} --sort-by='.lastTimestamp' | grep -i filesystem || echo "No Filesystem-related events found"
+  oc get events -n ${STORAGE_SCALE_NAMESPACE} --sort-by='.lastTimestamp' | grep -i filesystem || echo "No Filesystem-related events found"
   exit 1
 fi
 
@@ -407,11 +407,11 @@ echo ""
 
 echo "IBM Storage Scale Shared Storage Information:"
 echo "LocalDisk resources:"
-oc get localdisks -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device" 2>/dev/null || echo "No LocalDisk resources found"
+oc get localdisks -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,NODE:.spec.node,DEVICE:.spec.device" 2>/dev/null || echo "No LocalDisk resources found"
 
 echo ""
 echo "Filesystem status:"
-oc get filesystem shared-filesystem -n ${FUSION_ACCESS_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass" 2>/dev/null || echo "Filesystem not found"
+oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass" 2>/dev/null || echo "Filesystem not found"
 
 echo ""
 echo "Available StorageClasses for shared storage:"
