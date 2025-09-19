@@ -154,6 +154,9 @@ oc adm node-image create --dir="${dir}" --insecure=true
 echo "node_${folder_name}.iso" >"${SHARED_DIR}"/node-iso.txt
 node_iso=$(<"${SHARED_DIR}"/node-iso.txt)
 
+echo "Download node iso for debugging....."
+sleep 20m
+
 echo "uploading ${node_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
