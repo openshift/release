@@ -68,7 +68,7 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       USER_PROVISIONED_DNS: "no"
     workflow: cucushift-installer-rehearse-azure-ipi-private-customer-dns
-- as: installer-rehearse-ibmcloud
+- as: installer-rehearse-ibmcloud-subnets
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
@@ -77,9 +77,14 @@ tests:
       APPLY_ALL_SUBNETS: "yes"
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.20.0-rc.2-x86_64
       NUMBER_SUBNETS_PAIR_PER_ZONE: "3"
-      PICKUP_SUBNETS_ORDER: 2Paging
+      PICKUP_SUBNETS_ORDER: "ascending"
+      SLEEP_DURATION: 5h
+      NO_REPORTPORTAL: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc-deprovision
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 - as: installer-rehearse-gcp
   cron: '@yearly'
