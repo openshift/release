@@ -124,3 +124,4 @@ fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
 check_private
+
