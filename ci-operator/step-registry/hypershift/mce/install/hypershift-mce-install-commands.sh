@@ -15,12 +15,14 @@ fi
 
 echo "$MCE_VERSION"
 
-_REPO="quay.io/acm-d/mce-custom-registry"
+MCE_CATALOG_PATH="acm-d/mce-custom-registry"
+_REPO="quay.io/$MCE_CATALOG_PATH"
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
-  _REPO="quay.io:443/acm-d/mce-dev-catalog"
+  MCE_CATALOG_PATH="acm-d/mce-dev-catalog"
+  _REPO="quay.io:443/$MCE_CATALOG_PATH"
 fi
 if [[ "$DISCONNECTED" == "true" ]]; then
-  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
+  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/$MCE_CATALOG_PATH
   # Setup disconnected quay mirror container repo
   oc apply -f - <<EOF
 apiVersion: operator.openshift.io/v1alpha1
@@ -291,7 +293,9 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-#if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.3)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+
+/tmp/${HYPERSHIFT_NAME} version
+
 
 # display HyperShift Operator Version and MCE version
 oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
