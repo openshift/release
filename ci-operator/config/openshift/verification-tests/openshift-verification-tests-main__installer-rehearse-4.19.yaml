@@ -48,7 +48,14 @@ tests:
     cluster_profile: aws-qe
     env:
       CUSTOM_REGION_LIST: us-east-1
-    workflow: cucushift-installer-rehearse-aws-cases-all-regions
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SLEEP_DURATION: 2h
+    pre:
+      - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-provision
+      - ref: cucushift-installer-reportportal-marker
+    post:
+      - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-deprovision
+      - ref: send-results-to-reportportal
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
