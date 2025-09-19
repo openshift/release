@@ -6,7 +6,7 @@ set -o pipefail
 export DATAROUTER_RESULTS="${SHARED_DIR}/*.xml"
 export OCP_VERSION
 
-export REPORTPORTAL_APPLY_TFA="${AAPLY_TFA}"
+export REPORTPORTAL_APPLY_TFA="${APPLY_TFA}"
 export REPORTPORTAL_CMP
 export REPORTPORTAL_HOSTNAME
 export REPORTPORTAL_PROJECT="lp-interop-dr_personal"
