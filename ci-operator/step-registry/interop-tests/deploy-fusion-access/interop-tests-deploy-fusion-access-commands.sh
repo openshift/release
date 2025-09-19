@@ -6,6 +6,7 @@ set -o pipefail
 
 FUSION_ACCESS_STORAGE_SCALE_VERSION="${FUSION_ACCESS_STORAGE_SCALE_VERSION:-v5.2.3.1}"
 FUSION_ACCESS_NAMESPACE="${FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
+STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
 STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
 STORAGE_SCALE_CLIENT_CPU="${STORAGE_SCALE_CLIENT_CPU:-2}"
 STORAGE_SCALE_CLIENT_MEMORY="${STORAGE_SCALE_CLIENT_MEMORY:-4Gi}"
@@ -15,7 +16,7 @@ STORAGE_SCALE_STORAGE_MEMORY="${STORAGE_SCALE_STORAGE_MEMORY:-8Gi}"
 echo "Starting Fusion Access Operator deployment..."
 echo "Version: ${FUSION_ACCESS_STORAGE_SCALE_VERSION}"
 echo "Namespace: ${FUSION_ACCESS_NAMESPACE}"
-echo "Storage Scale Namespace: ${FUSION_ACCESS_NAMESPACE}"
+echo "Storage Scale Namespace: ${STORAGE_SCALE_NAMESPACE}"
 echo "Using IBM Storage Scale native shared storage for multi-node access"
 
 IBM_ENTITLEMENT_KEY="$(cat "/var/run/secrets/ibm-entitlement-key")"
@@ -125,6 +126,16 @@ for NODE in "${NODE_ARRAY[@]}"; do
   fi
 done
 
+# Ensure the IBM Storage Scale namespace exists before creating LocalDisk resources
+echo "Checking if ${STORAGE_SCALE_NAMESPACE} namespace exists..."
+if oc get namespace "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+  echo "✅ ${STORAGE_SCALE_NAMESPACE} namespace exists"
+else
+  echo "❌ ${STORAGE_SCALE_NAMESPACE} namespace does not exist"
+  echo "Creating ${STORAGE_SCALE_NAMESPACE} namespace..."
+  oc create namespace "${STORAGE_SCALE_NAMESPACE}"
+fi
+
 # Create LocalDisk for each worker node to enable shared storage
 echo "Creating LocalDisk resources for shared storage..."
 DISK_COUNT=1
@@ -189,8 +200,8 @@ while [[ $ATTEMPT -le $MAX_ATTEMPTS ]]; do
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Cluster
 metadata:
-  name: ibm-spectrum-scale
-  namespace: ibm-spectrum-scale
+  name: ${STORAGE_SCALE_CLUSTER_NAME}
+  namespace: ${STORAGE_SCALE_NAMESPACE}
 spec:
   pmcollector:
     nodeSelector:
@@ -226,16 +237,16 @@ EOF
   then
     echo "✅ IBM Storage Scale Cluster created successfully on attempt $ATTEMPT"
     echo "Immediately checking if Cluster resource exists..."
-    if oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale 2>/dev/null; then
+    if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" 2>/dev/null; then
       echo "✅ Cluster found immediately after creation"
       echo "Getting Cluster details immediately after creation..."
-      oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale -o yaml | head -20
+      oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" -o yaml | head -20
     else
       echo "⚠️  Cluster not found immediately after creation"
       echo "Checking for any events related to the Cluster..."
-      oc get events -n ibm-spectrum-scale --sort-by='.lastTimestamp' | tail -10
+      oc get events -n "${STORAGE_SCALE_NAMESPACE}" --sort-by='.lastTimestamp' | tail -10
       echo "Checking for any validation errors..."
-      oc describe cluster ibm-spectrum-scale -n ibm-spectrum-scale 2>/dev/null || echo "Cannot describe cluster - resource may have been deleted"
+      oc describe cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" 2>/dev/null || echo "Cannot describe cluster - resource may have been deleted"
     fi
     break
   else
@@ -279,41 +290,41 @@ echo "Verifying IBM Storage Scale deployment..."
 echo "Waiting a moment for the Cluster resource to be fully created..."
 sleep 10
 
-echo "Checking if ibm-spectrum-scale namespace exists..."
-if oc get namespace ibm-spectrum-scale >/dev/null 2>&1; then
-  echo "✅ ibm-spectrum-scale namespace exists"
+echo "Checking if ${STORAGE_SCALE_NAMESPACE} namespace exists..."
+if oc get namespace "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+  echo "✅ ${STORAGE_SCALE_NAMESPACE} namespace exists"
 else
-  echo "❌ ibm-spectrum-scale namespace does not exist"
-  echo "Creating ibm-spectrum-scale namespace..."
-  oc create namespace ibm-spectrum-scale
+  echo "❌ ${STORAGE_SCALE_NAMESPACE} namespace does not exist"
+  echo "Creating ${STORAGE_SCALE_NAMESPACE} namespace..."
+  oc create namespace "${STORAGE_SCALE_NAMESPACE}"
 fi
 
 echo "Checking for IBM Storage Scale Cluster resource..."
-if oc get cluster ibm-spectrum-scale -n ibm-spectrum-scale >/dev/null 2>&1; then
+if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
   echo "✅ IBM Storage Scale Cluster found, waiting for it to be ready..."
   echo "Waiting for Cluster to have successful condition..."
-  oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True cluster/ibm-spectrum-scale -n ibm-spectrum-scale --timeout=1200s
+  oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True cluster/"${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" --timeout=1200s
 else
   echo "⚠️  IBM Storage Scale Cluster resource not found, but this may be normal if managed by operator"
 fi
 
 echo "Checking for IBM Storage Scale pods to verify deployment..."
-POD_COUNT=$(oc get pods -n ibm-spectrum-scale --no-headers 2>/dev/null | wc -l)
+POD_COUNT=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers 2>/dev/null | wc -l)
 if [[ $POD_COUNT -gt 0 ]]; then
   echo "✅ Found $POD_COUNT IBM Storage Scale pods:"
-  oc get pods -n ibm-spectrum-scale
+  oc get pods -n "${STORAGE_SCALE_NAMESPACE}"
   echo ""
   echo "Waiting for pods to be ready..."
-  oc wait --for=condition=Ready pod -l app.kubernetes.io/name=ibm-spectrum-scale -n ibm-spectrum-scale --timeout=300s || echo "Some pods may still be starting up"
+  oc wait --for=condition=Ready pod -l app.kubernetes.io/name=ibm-spectrum-scale -n "${STORAGE_SCALE_NAMESPACE}" --timeout=300s || echo "Some pods may still be starting up"
 else
   echo "⚠️  No IBM Storage Scale pods found yet"
 fi
 
 echo "Checking for IBM Storage Scale daemon resources..."
-DAEMON_COUNT=$(oc get daemon -n ibm-spectrum-scale --no-headers 2>/dev/null | wc -l)
+DAEMON_COUNT=$(oc get daemon -n "${STORAGE_SCALE_NAMESPACE}" --no-headers 2>/dev/null | wc -l)
 if [[ $DAEMON_COUNT -gt 0 ]]; then
   echo "✅ Found $DAEMON_COUNT IBM Storage Scale daemon resources:"
-  oc get daemon -n ibm-spectrum-scale
+  oc get daemon -n "${STORAGE_SCALE_NAMESPACE}"
 else
   echo "⚠️  No IBM Storage Scale daemon resources found yet"
 fi
