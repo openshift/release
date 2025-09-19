@@ -27,8 +27,12 @@ echo "Copying artifacts from test pod..."
 # Copy artifacts from the test pod
 oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
 
-# Validate that a JUnit report was produced; fail if missing to avoid false positives
-if ! find "${ARTIFACT_DIR}" -maxdepth 1 -type f -name 'junit*.xml' -print -quit | grep -q .; then
+# Print out the copied artifact structure for debugging
+echo "Artifact directory contents under ${ARTIFACT_DIR}:"
+ls -laR "${ARTIFACT_DIR}"
+
+# Validate that a JUnit report was produced (search recursively in case oc cp nested paths)
+if ! find "${ARTIFACT_DIR}" -type f -name 'junit*.xml' -print -quit | grep -q .; then
   echo "ERROR: No JUnit report found in ${ARTIFACT_DIR}. Marking job as failed." >&2
   if [ "${TEST_RC}" -eq 0 ]; then
     TEST_RC=1
