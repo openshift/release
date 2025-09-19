@@ -31,6 +31,13 @@ make run-k8s
 make query-k8s-curl
 make test-eval-k8s
 
+# Clean up port-forward
+if [ -f /tmp/pf-assisted-chat.pid ]; then
+  kill "$(cat /tmp/pf-assisted-chat.pid)" 2>/dev/null || true
+  rm -f /tmp/pf-assisted-chat.pid
+fi
+pkill -f 'oc port-forward.*svc/assisted-chat.*8090:8090' 2>/dev/null || true
+
 # Verify at least one eval case passed (PASS count > 0)
 if ! grep -q "PASS" test/evals/eval_output/summary.txt; then
   echo "[CI] No passing eval cases found in eval_output/summary.txt"
