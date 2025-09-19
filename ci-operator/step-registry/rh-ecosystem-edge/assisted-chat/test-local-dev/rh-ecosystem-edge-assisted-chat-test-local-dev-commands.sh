@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if ! command -v oc >/dev/null 2>&1 && [ -x /cli/oc ]; then
+  export PATH="/cli:${PATH}"
+fi
+
 GEMINI_API_KEY=$(cat /var/run/secrets/gemini/api_key)
 export GEMINI_API_KEY
 
