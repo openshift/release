@@ -576,12 +576,15 @@ CONFIG = {
     'aws-lp-chaos-quota-slice': {
         'us-west-2': 10,
     },
+    'metal-redhat-gs-quota-slice': {
+        'default': 1,
+    },
 }
 
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-for i in range(0, 2):
+for i in range(0, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
