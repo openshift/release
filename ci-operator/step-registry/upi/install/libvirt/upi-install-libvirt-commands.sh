@@ -73,6 +73,11 @@ VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   echo "Storage pool ${POOL_NAME} already exists. Skipping..."
 else
+  if [[ $(${VIRSH} pool-list --all | grep ${POOL_NAME}) ]]; then
+    echo "Storage pool ${POOL_NAME} already exists in inactive state. Deleting it.."
+    ${VIRSH} pool-undefine  ${POOL_NAME}
+    ${VIRSH} pool-destroy  ${POOL_NAME}
+  fi
   echo "Creating storage pool..."
   ${VIRSH} pool-define-as \
     --name ${POOL_NAME} \
@@ -435,6 +440,7 @@ for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+sleep 30m 
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   restart_nodes &
