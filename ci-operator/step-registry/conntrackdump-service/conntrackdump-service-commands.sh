@@ -53,8 +53,29 @@ spec:
       units:
       - contents: |
           [Unit]
-          After=network.target
+          Description=install conntrack
+          After=network-online.target
+          After=install-tcpdump.service
+          Wants=network-online.target
+          Before=machine-config-daemon-firstboot.service
+          Before=kubelet.service
 
+          [Service]
+          Type=oneshot
+          ExecStart=rpm -ihv https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libnetfilter_cthelper-1.0.0-22.el9.x86_64.rpm
+          ExecStart=rpm -ihv https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libnetfilter_cttimeout-1.0.0-19.el9.x86_64.rpm
+          ExecStart=rpm -ihv https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libnetfilter_queue-1.0.5-1.el9.x86_64.rpm
+          ExecStart=rpm -ihv https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/conntrack-tools-1.4.7-4.el9.x86_64.rpm
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+        enabled: true
+        name: install-conntrack.service
+      - contents: |
+          [Unit]
+          After=network.target
+          After=install-conntrack.service
           [Service]
           Restart=always
           RestartSec=30
