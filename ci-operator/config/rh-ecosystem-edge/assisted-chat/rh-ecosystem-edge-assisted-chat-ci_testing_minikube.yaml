@@ -1,0 +1,71 @@
+base_images:
+  assisted-service-mcp:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: assisted-service-mcp
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.17
+images:
+- context_dir: inspector
+  dockerfile_path: Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-inspector
+- build_args:
+  - name: AIUI_APP_GIT_SHA
+    value: $(git rev-parse HEAD)
+  - name: AIUI_APP_VERSION
+    value: latest
+  context_dir: .
+  dockerfile_path: test/prow/Dockerfile.ui
+  to: rh-ecosystem-edge-assisted-chat-ui
+- context_dir: .
+  dockerfile_path: Containerfile.assisted-chat
+  to: rh-ecosystem-edge-assisted-chat-lightspeed-stack
+- context_dir: .
+  dockerfile_path: test/prow/Dockerfile.plus-llama
+  from: rh-ecosystem-edge-assisted-chat-lightspeed-stack
+  to: rh-ecosystem-edge-assisted-chat-lightspeed-stack-plus-llama
+- context_dir: assisted-service-mcp
+  dockerfile_path: Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-mcp-server
+- dockerfile_path: test/prow/Dockerfile.local_dev
+  to: rh-ecosystem-edge-assisted-chat-test-local-dev
+promotion: {}
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: true
+  as: local-dev-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    dependencies:
+      ASSISTED_CHAT_IMG: rh-ecosystem-edge-assisted-chat-lightspeed-stack-plus-llama
+      ASSISTED_MCP_IMAGE: rh-ecosystem-edge-assisted-chat-mcp-server
+      INSPECTOR_IMAGE: rh-ecosystem-edge-assisted-chat-inspector
+      UI_IMAGE: rh-ecosystem-edge-assisted-chat-ui
+    workflow: rh-ecosystem-edge-assisted-chat-local-dev
+zz_generated_metadata:
+  branch: ci_testing_minikube
+  org: rh-ecosystem-edge
+  repo: assisted-chat
