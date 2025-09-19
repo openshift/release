@@ -1,0 +1,71 @@
+observer:
+  name: openshift-qe-udn-density-pods-observer
+  # Only one of the following two should be specified
+  from: perfscale-observer
+  env:
+  - name: E2E_VERSION
+    default: "v2.4.0"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: OVERRIDE_ITERATIONS
+    default: ""
+    documentation:
+      Allow job to override the iteration count
+  - name: ITERATION_MULTIPLIER_ENV
+    default: "9"
+    documentation: |-
+      The number of iterations per worker nodes to create
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is false for udn-density-pods workload
+  - name: POD_READY_THRESHOLD
+    default: "1400s"
+    documentation: |-
+      Defines the maximum threshold for Pod Ready
+  - name: EXTRA_FLAGS
+    default: "--churn-duration=20m --timeout=5h"
+    documentation: |-
+      Default is Churn Duration for 20 minutes
+  - name: PROFILE_TYPE
+    default: "reporting"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: ENABLE_LAYER_3
+    default: "true"
+    documentation: |-
+      Defaults to true switches to --layer3, when false switches to layer2
+  - name: ADDITIONAL_PARAMS
+    default: ""
+    documentation: |-
+      JSON value to upload additonal metadata to ES index
+  - name: WAIT_FOR_NS
+    default: "true"
+    documentation: |-
+      Waits to start the workload until a 'start-kraken' namespace gets created
+  # Literal image stream tag that will be used to run the observer
+  commands: openshift-qe-udn-density-pods-observer-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 10Mi
+  timeout: 9h
+  grace_period: 200s
+  documentation: |-
+        Be able to run udn-density-pods workload throughout the time of other tests by leveraging the observer functionality
