@@ -8,7 +8,7 @@ fi
 
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HCP_CLI=""
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
+if (( $(awk 'BEGIN {prxint ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4, use HyperShift command"
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then

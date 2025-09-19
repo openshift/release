@@ -73,6 +73,8 @@ else
 fi
 
 
+# Saving the cluster name and kubeconfig to SHARED_DIR
+echo "$CLUSTER_NAME" >> "$SHARED_DIR/cluster-name"
 
 echo "Copying kubeconfig into SHARED_DIR"
 cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"
