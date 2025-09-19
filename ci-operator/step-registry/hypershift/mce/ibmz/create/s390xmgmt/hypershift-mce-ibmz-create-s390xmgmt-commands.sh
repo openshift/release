@@ -73,8 +73,12 @@ else
 fi
 
 
+export mgmt_cluster_key=$CLUSTER_NAME
 # Saving the cluster name and kubeconfig to SHARED_DIR
-echo "$CLUSTER_NAME" >> "$SHARED_DIR/cluster-name"
+echo "$mgmt_cluster_key" >> "$SHARED_DIR/mgmt_cluster_name"
+
+echo "Printing the management cluster name"
+cat "$SHARED_DIR/mgmt_cluster_name"
 
 echo "Copying kubeconfig into SHARED_DIR"
 cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"

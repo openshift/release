@@ -37,7 +37,7 @@ else
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
     export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
     set +e
-fi 
+fi
 
 # Login to the IBM Cloud
 echo "Logging into IBM Cloud in the $IC_REGION region and $infra_name-rg resource group."

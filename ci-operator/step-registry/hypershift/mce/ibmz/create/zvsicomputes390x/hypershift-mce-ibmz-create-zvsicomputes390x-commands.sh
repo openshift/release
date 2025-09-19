@@ -17,10 +17,10 @@ export hcp_domain
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 
-CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
-export CLUSTER_NAME
+MGMT_CLUSTER_NAME=$(cat "$SHARED_DIR/mgmt_cluster_name")
+export MGMT_CLUSTER_NAME
 
-VPC_NAME="$CLUSTER_NAME-vpc"
+VPC_NAME="$MGMT_CLUSTER_NAME-vpc"
 
 # Getting ssh info
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
@@ -276,18 +276,18 @@ create_sg_rule() {
 }
 
 # Create security group rules to open the port range 30000-33000 for TCP traffic
-sg_name="$CLUSTER_NAME-sg"
+sg_name="$MGMT_CLUSTER_NAME-sg"
 create_sg_rule $sg_name inbound tcp 30000 33000
 create_sg_rule $sg_name inbound tcp 3128 3128
 
 # Create Bastion Node
-create_vsi "$infra_name-bastion" "$IC_REGION-2" "bx2-2x8" "$CLUSTER_NAME-sn-2" "ibm-redhat-9-6-minimal-amd64-3" "hcp-prow-ci-dnd-key" "$sg_name"
+create_vsi "$infra_name-bastion" "$IC_REGION-2" "bx2-2x8" "$MGMT_CLUSTER_NAME-sn-2" "ibm-redhat-9-6-minimal-amd64-3" "hcp-prow-ci-dnd-key" "$sg_name"
 
 # Create Compute Nodes
 
 for i in $(seq 1 $HYPERSHIFT_NODE_COUNT); do
     ZONE="$IC_REGION-2"
-    SUBNET_NAME="$CLUSTER_NAME-sn-2"
+    SUBNET_NAME="$MGMT_CLUSTER_NAME-sn-2"
     create_vsi "$infra_name-compute-$i" "$ZONE" "$ZVSI_PROFILE" "$SUBNET_NAME" "$ZVSI_IMAGE" "hcp-prow-ci-dnd-key" "$sg_name"
 done
 
@@ -364,7 +364,7 @@ HAPROXY_CFG
 # Append backend servers
 for i in $(seq 1 ${HUB_COMPUTE_COUNT}); do
   index=$((i - 1))
-  echo "   server ${CLUSTER_NAME}-compute-${i} ${HUB_COMPUTE_RIPS[$index]}" >> haproxy.cfg
+  echo "   server ${MGMT_CLUSTER_NAME}-compute-${i} ${HUB_COMPUTE_RIPS[$index]}" >> haproxy.cfg
 done
 
 cat <<HAPROXY_CFG >> haproxy.cfg
@@ -397,11 +397,11 @@ fi
 # Configuring DNS
 
 # Getting the IBM Cloud DNS instance ID
-DNS_ID=$(ibmcloud dns instance $CLUSTER_NAME-dns --output JSON | jq -r '.guid')
+DNS_ID=$(ibmcloud dns instance $MGMT_CLUSTER_NAME-dns --output JSON | jq -r '.guid')
 
 # Create DNS zone if not exists
 if ! ibmcloud dns zones -i $DNS_ID | grep "$hcp_domain" >/dev/null 2>&1; then
-    echo -e "\nCreating DNS Zone $hcp_domain in the $CLUSTER_NAME-dns instance..."
+    echo -e "\nCreating DNS Zone $hcp_domain in the $MGMT_CLUSTER_NAME-dns instance..."
     DNS_ZONE_ID=$(ibmcloud dns zone-create $hcp_domain -i $DNS_ID --output JSON | jq -r '.id')
 else
     echo -e "\nDNS zone $hcp_domain already exists, skipping creation."
@@ -416,14 +416,14 @@ create_dns_records "*.apps" $DNS_ID $DNS_ZONE_ID $BASTION_RIP
 
 # Adding VPC network to the DNS zone
 
-vpc_crn=$(ibmcloud is vpc $CLUSTER_NAME-vpc | awk '/CRN/{print $2}')
-echo "Adding VPC network $CLUSTER_NAME-vpc to the DNS zone $hcp_domain"
-dns_network_state=$(ibmcloud dns permitted-network-add $DNS_ZONE_ID --type vpc --vpc-crn $vpc_crn -i $CLUSTER_NAME-dns --output JSON | jq -r '.state')
+vpc_crn=$(ibmcloud is vpc $MGMT_CLUSTER_NAME-vpc | awk '/CRN/{print $2}')
+echo "Adding VPC network $MGMT_CLUSTER_NAME-vpc to the DNS zone $hcp_domain"
+dns_network_state=$(ibmcloud dns permitted-network-add $DNS_ZONE_ID --type vpc --vpc-crn $vpc_crn -i $MGMT_CLUSTER_NAME-dns --output JSON | jq -r '.state')
 if [ "$dns_network_state" != "ACTIVE" ]; then
-  echo "VPC network $CLUSTER_NAME-vpc which is added to the DNS zone $HC_NAME.$hcp_domain is not in ACTIVE state."
+  echo "VPC network $MGMT_CLUSTER_NAME-vpc which is added to the DNS zone $HC_NAME.$hcp_domain is not in ACTIVE state."
   exit 1
 else 
-  echo "VPC network $CLUSTER_NAME-vpc is successfully added to the DNS zone $hcp_domain."
+  echo "VPC network $MGMT_CLUSTER_NAME-vpc is successfully added to the DNS zone $hcp_domain."
   echo "DNS zone $hcp_domain is in the ACTIVE state."
 fi
 
