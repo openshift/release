@@ -15,7 +15,7 @@ echo "$MCE_VERSION"
 
 MCE_CATALOG_PATH="acm-d/mce-custom-registry"
 _REPO="quay.io/$MCE_CATALOG_PATH"
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
+if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
   MCE_CATALOG_PATH="acm-d/mce-dev-catalog"
   _REPO="quay.io:443/$MCE_CATALOG_PATH"
 fi
@@ -88,7 +88,7 @@ oc wait mcp master worker --for condition=updated --timeout=20m
 
 echo "Install MCE custom catalog source"
 IMG="${_REPO}:${MCE_VERSION}-latest"
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
+if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
   IMG="${_REPO}:latest-${MCE_VERSION}"
 fi
 oc apply -f - <<EOF
