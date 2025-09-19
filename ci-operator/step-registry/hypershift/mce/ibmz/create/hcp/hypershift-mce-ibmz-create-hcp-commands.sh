@@ -89,6 +89,17 @@ data:
       [[registry.mirror]]
         location = "brew.registry.redhat.io"
         insecure = false
+    
+    [[registry]]
+      location = "registry.redhat.io/multicluster-engine"
+      insecure = false
+      blocked = false
+      mirror-by-digest-only = true
+      prefix = ""
+
+      [[registry.mirror]]
+        location = "quay.io:443/acm-d"
+        insecure = false
 
     [[registry]]
       location = "registry.redhat.io/multicluster-engine"
@@ -174,14 +185,22 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
     --release-image=${OCP_IMAGE_MULTI} ${RENDER_COMMAND} > /tmp/hc-manifests/cluster-agent.yaml
+    
+MGMT_CLUSTER_ARCH=$(oc get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.io/arch}')
 
-# Split the manifest to replace routing strategy of various services
-csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"
+if [[ "$MGMT_CLUSTER_ARCH" == "s390x" ]]; then
+    oc apply -f /tmp/hc-manifests/cluster-agent.yaml
+else
+    echo "$(date) Management cluster arch is $MGMT_CLUSTER_ARCH → patching service strategies before apply"
 
-# Service strategy to replace
-printf "  - service: APIServer
+    # Split the manifest to replace routing strategy of various services
+    csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"
+
+    # Service strategy to replace
+    cat <<EOF > /tmp/hc-manifests/replacement.yaml
+  - service: APIServer
     servicePublishingStrategy:
-      type: LoadBalancer
+      type: LoadBalancervi
   - service: OAuthServer
     servicePublishingStrategy:
       type: Route
@@ -197,19 +216,19 @@ printf "  - service: APIServer
   - service: OVNSbDb
     servicePublishingStrategy:
       type: Route
-" > /tmp/hc-manifests/replacement.yaml
+EOF
 
-for file in /tmp/hc-manifests/manifest_*
-do
-    if grep -q 'kind: HostedCluster' "$file"
-    then
-        yq eval-all -i 'select(fileIndex==0).spec.services = select(fileIndex==1) | select(fileIndex==0)' "$file" "/tmp/hc-manifests/replacement.yaml"
-    fi
-done
+    for file in /tmp/hc-manifests/manifest_*; do
+        if grep -q 'kind: HostedCluster' "$file"; then
+            yq eval-all -i 'select(fileIndex==0).spec.services = select(fileIndex==1) | select(fileIndex==0)' \
+                "$file" "/tmp/hc-manifests/replacement.yaml"
+        fi
+    done
 
-# Applying agent cluster manifests
-echo "$(date) Applying agent cluster manifests"
-ls /tmp/hc-manifests/manifest_* | awk ' { print " -f " $1 } ' | xargs oc apply
+    # Applying agent cluster manifests
+    echo "$(date) Applying agent cluster manifests"
+    ls /tmp/hc-manifests/manifest_* | awk '{ print " -f " $1 }' | xargs oc apply
+fi
 
 oc wait --timeout=15m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Agent cluster is available"
@@ -227,6 +246,7 @@ spec:
   pullSecretRef:
     name: pull-secret
   sshAuthorizedKey: ${ssh_key}
+  ignitionConfigOverride: '{"ignition":{"version":"3.2.0"},"storage":{"files":[{"path":"/etc/containers/policy.json","mode":420,"overwrite":true,"contents":{"source":"data:text/plain;charset=utf-8;base64,ewogICAgImRlZmF1bHQiOiBbCiAgICAgICAgewogICAgICAgICAgICAidHlwZSI6ICJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIgogICAgICAgIH0KICAgIF0sCiAgICAidHJhbnNwb3J0cyI6CiAgICAgICAgewogICAgICAgICAgICAiZG9ja2VyLWRhZW1vbiI6CiAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgIiI6IFt7InR5cGUiOiJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIn1dCiAgICAgICAgICAgICAgICB9CiAgICAgICAgfQp9"}}]}}'
 EOF
 
 # Waiting for discovery iso file to ready
@@ -238,3 +258,4 @@ echo "$(date) Create hosted cluster kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/nested_kubeconfig
 echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
 
+echo "$(date) Completed the creation of the HCP."
