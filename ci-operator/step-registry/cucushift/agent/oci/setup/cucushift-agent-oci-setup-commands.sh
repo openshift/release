@@ -4,7 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi;
+echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file for further installation steps...";
+cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
+export OCI_CLI_USER=${OCI_CLI_USER}
+export OCI_CLI_TENANCY=${OCI_CLI_TENANCY}
+export OCI_CLI_FINGERPRINT=${OCI_CLI_FINGERPRINT}
+export OCI_CLI_REGION=${OCI_CLI_REGION}
+export COMPARTMENT_ID=${COMPARTMENT_ID}
+export TEMPLATE_ID=${TEMPLATE_ID}
+export STACK_ID=${STACK_ID}
+export JOB_ID=${JOB_ID:-0000}
+EOF' EXIT TERM
 
 REGION=$(<"${CLUSTER_PROFILE_DIR}"/region)
 USER=$(<"${CLUSTER_PROFILE_DIR}"/user)
@@ -51,15 +62,3 @@ JOB_ID=$(oci resource-manager job create-apply-job \
 --query 'data.id' --raw-output)
 
 echo "${JOB_ID}" >"${SHARED_DIR}"/job-id.txt
-
-echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file for further installation steps..."
-cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
-export OCI_CLI_USER=${OCI_CLI_USER}
-export OCI_CLI_TENANCY=${OCI_CLI_TENANCY}
-export OCI_CLI_FINGERPRINT=${OCI_CLI_FINGERPRINT}
-export OCI_CLI_REGION=${OCI_CLI_REGION}
-export COMPARTMENT_ID=${COMPARTMENT_ID}
-export TEMPLATE_ID=${TEMPLATE_ID}
-export STACK_ID=${STACK_ID}
-export JOB_ID=${JOB_ID}
-EOF
