@@ -42,3 +42,9 @@ sleep 2.5h
 
 echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+
+oc patch crd featuregates.config.openshift.io --type=json -p='[{"op":"remove","path":"/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/featureSet/x-kubernetes-validations"}]'
+oc patch featuregate cluster --type=json -p='[{"op": "remove", "path": "/spec/customNoUpgrade"}]'
+oc patch featuregate cluster --type=merge -p '{"spec":{"featureSet":""}}'
+oc patch clusterversion version --type=json -p '[{"op": "remove", "path": "/spec/overrides"}]' || true
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
