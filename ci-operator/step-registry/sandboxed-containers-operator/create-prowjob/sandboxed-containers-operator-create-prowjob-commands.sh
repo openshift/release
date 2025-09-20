@@ -90,18 +90,14 @@ get_latest_trustee_catalog_tag() {
 
 
 get_expected_version() {
-    # Extract expected version from catalog tag
-    # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
-    # If input is "latest", returns "0.0.0"
-    # Otherwise returns empty string
+    # Extract expected version from catalog tag if it matches X.Y.Z-[0-9]+ format
+    # Otherwise returns input
     local catalog_tag="$1"
 
     if [[ "${catalog_tag}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[0-9]+$ ]]; then
         echo "${BASH_REMATCH[1]}"
-    elif [[ "${catalog_tag}" == "latest" ]]; then
-        echo "0.0.0"
     else
-        echo ""
+        echo "${catalog_tag}"
     fi
 }
 
@@ -127,7 +123,7 @@ AWS_REGION_OVERRIDE="${AWS_REGION_OVERRIDE:-us-east-2}"
 CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
 
 # OSC Version Configuration
-EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
+EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.2}"
 
 # Kata RPM Configuration
 INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
@@ -136,11 +132,17 @@ if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; th
     exit 1
 fi
 
-# Kata RPM version (includes OCP version)
+# Kata RPM version configuration
 if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
+    # Require KATA_RPM_VERSION when INSTALL_KATA_RPM is true
+    if [[ -z "${KATA_RPM_VERSION:-}" ]]; then
+        echo "ERROR: KATA_RPM_VERSION must be provided when INSTALL_KATA_RPM=true"
+        exit 1
+    fi
+    echo "Using provided KATA_RPM_VERSION: ${KATA_RPM_VERSION}"
 else
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
+    # Set default when INSTALL_KATA_RPM is false (for compatibility)
+    KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
 fi
 
 # test is Pre-GA for brew builds or GA for operators/rpms already on OCP
@@ -150,15 +152,6 @@ TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
 if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
     echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
     exit 1
-fi
-
-# Prow Run Type depends on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    PROW_RUN_TYPE="candidate"
-else
-    PROW_RUN_TYPE="release"
-    CATALOG_SOURCE_NAME="redhat-operators"
-    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
 fi
 
 # After the tests finish, wait before killing the cluster
@@ -181,6 +174,25 @@ if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+# Must-gather Configuration
+ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
+# Validate ENABLE_MUST_GATHER
+if [[ "${ENABLE_MUST_GATHER}" != "true" && "${ENABLE_MUST_GATHER}" != "false" ]]; then
+    echo "ERROR: ENABLE_MUST_GATHER should be 'true' or 'false', got: ${ENABLE_MUST_GATHER}"
+    exit 1
+fi
+
+# Must-gather image to use for collecting debug information
+MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-quay.io/openshift/origin-must-gather:latest}"
+
+# Only collect must-gather on test failure
+MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
+# Validate MUST_GATHER_ON_FAILURE_ONLY
+if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
+    echo "ERROR: MUST_GATHER_ON_FAILURE_ONLY should be 'true' or 'false', got: ${MUST_GATHER_ON_FAILURE_ONLY}"
+    exit 1
+fi
+
 
 
 # Catalog Source Configuration
@@ -188,19 +200,23 @@ echo "Configuring catalog sources..."
 
 # Set catalog source variables based on TEST_RELEASE_TYPE
 if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+    PROW_RUN_TYPE="candidate" # filename suffix
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
-
     else
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
     fi
 
-    # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
-    extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
-    if [[ -n "${extracted_version}" ]]; then
-        EXPECTED_OSC_VERSION="${extracted_version}"
-        echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+    # Only extract if EXPECTED_OSC_VERSION is not already provided by user
+    if [[ -z "${EXPECTED_OSC_VERSION:-}" ]]; then
+        extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
+        if [[ -n "${extracted_version}" ]]; then
+            EXPECTED_OSC_VERSION="${extracted_version}"
+            echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+        fi
+    else
+        echo "Using user-provided EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}"
     fi
 
     CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
@@ -220,23 +236,27 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
     TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
 
-    # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
-    extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
-    if [[ -n "${extracted_trustee_version}" ]]; then
-        EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
-        echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
+    # Only extract if EXPECTED_TRUSTEE_VERSION is not already provided by user
+    if [[ -z "${EXPECTED_TRUSTEE_VERSION:-}" ]]; then
+        extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
+        if [[ -n "${extracted_trustee_version}" ]]; then
+            EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
+            echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
+        fi
     else
-        EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
-        echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
+        echo "Using user-provided EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
     fi
 
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
 else # GA
+    PROW_RUN_TYPE="release" # filename suffix
     CATALOG_SOURCE_NAME="redhat-operators"
     TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-    CATALOG_SOURCE_IMAGE="none"
-    TRUSTEE_CATALOG_SOURCE_IMAGE="none"
+    CATALOG_SOURCE_IMAGE="GA"
+    TRUSTEE_CATALOG_SOURCE_IMAGE="GA"
+    EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.2}"
+    EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.4.1}"
 fi
 
 # Generate output file path
@@ -282,13 +302,17 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
       CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
+      EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
@@ -306,10 +330,14 @@ tests:
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
       CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
       CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
       ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
@@ -329,10 +357,14 @@ tests:
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
       CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
       CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
       ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
@@ -351,10 +383,14 @@ tests:
       AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
       CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
       ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
@@ -373,10 +409,14 @@ tests:
       AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
       CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
       ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}
+      EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: ${SLEEP_DURATION}
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
@@ -424,23 +464,26 @@ fi
 # Show configuration summary
 echo "=========================================="
 echo "Configuration details:"
-echo "  • OCP Version: ${OCP_VERSION}"
-echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
-echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
-echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
-echo "  • Expected Trustee Version: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
-echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
-echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
-echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
-echo "  • Sleep Duration: ${SLEEP_DURATION}"
-echo "  • Test Timeout: ${TEST_TIMEOUT}"
+echo "  • OCP_VERSION: ${OCP_VERSION}"
+echo "  • PROW_RUN_TYPE: ${PROW_RUN_TYPE}"
+echo "  • TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}"
+echo "  • EXPECTED_OSC_VERSION: ${EXPECTED_OSC_VERSION}"
+echo "  • EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
+echo "  • AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}"
+echo "  • CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}"
+echo "  • INSTALL_KATA_RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
+echo "  • ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}"
+echo "  • MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
+echo "  • MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}"
+echo "  • SLEEP_DURATION: ${SLEEP_DURATION}"
+echo "  • TEST_TIMEOUT: ${TEST_TIMEOUT}"
 
 if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
-    echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
+    echo "  • CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
+    echo "  • TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
 else
-    echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
-    echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME}"
+    echo "  • CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}"
+    echo "  • TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}"
 fi
 
 echo "=========================================="
