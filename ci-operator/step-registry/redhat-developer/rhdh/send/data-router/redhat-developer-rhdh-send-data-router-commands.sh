@@ -23,6 +23,30 @@ CONTAINER_PLATFORM=$(cat $SHARED_DIR/CONTAINER_PLATFORM.txt)
 CONTAINER_PLATFORM_VERSION=$(cat $SHARED_DIR/CONTAINER_PLATFORM_VERSION.txt)
 export IS_OPENSHIFT CONTAINER_PLATFORM CONTAINER_PLATFORM_VERSION
 
+save_status_data_router_failed() {
+  local result=$1
+  STATUS_DATA_ROUTER_FAILED=${result}
+  echo "Saving STATUS_DATA_ROUTER_FAILED=${STATUS_DATA_ROUTER_FAILED}"
+  printf "%s" "${STATUS_DATA_ROUTER_FAILED}" > "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt"
+  cp "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" "$ARTIFACT_DIR/STATUS_DATA_ROUTER_FAILED.txt"
+}
+
+# Download and source the reporting.sh file from RHDH repository
+REPORTING_SCRIPT_URL="https://raw.githubusercontent.com/redhat-developer/rhdh/${RELEASE_BRANCH_NAME}/.ibm/pipelines/reporting.sh"
+REPORTING_SCRIPT_TMP="/tmp/reporting.sh"
+
+echo "💾 Downloading reporting.sh from ${REPORTING_SCRIPT_URL}"
+if curl -f -s -o "${REPORTING_SCRIPT_TMP}" "${REPORTING_SCRIPT_URL}"; then
+  echo "🟢 Successfully downloaded reporting.sh, sourcing it..."
+  # shellcheck source=/dev/null
+  source "${REPORTING_SCRIPT_TMP}"
+  rm -f "${REPORTING_SCRIPT_TMP}"
+  echo "✅ Successfully sourced reporting.sh from redhat-developer/rhdh/${RELEASE_BRANCH_NAME}"
+else
+  echo "🔴 Error: Failed to download reporting.sh from ${REPORTING_SCRIPT_URL}"
+  save_status_data_router_failed true
+fi
+
 # Validate required variables
 validate_required_vars() {
   local required_vars=(
@@ -40,14 +64,6 @@ validate_required_vars() {
   done
 }
 
-save_status_data_router_failed() {
-  local result=$1
-  STATUS_DATA_ROUTER_FAILED=${result}
-  echo "Saving STATUS_DATA_ROUTER_FAILED=${STATUS_DATA_ROUTER_FAILED}"
-  printf "%s" "${STATUS_DATA_ROUTER_FAILED}" > "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt"
-  cp "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" "$ARTIFACT_DIR/STATUS_DATA_ROUTER_FAILED.txt"
-}
-
 save_status_url_reportportal() {
   local url=$1
   STATUS_URL_REPORTPORTAL=${url}
@@ -59,17 +75,6 @@ save_status_url_reportportal() {
 get_metadata_output_path() {
   local metadata_output="data_router_metadata_output.json"
   echo "${ARTIFACT_DIR}/${metadata_output}"
-}
-
-get_job_url() {
-  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
-  local job_complete_url
-  if [ -n "${PULL_NUMBER:-}" ]; then
-    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-  else
-    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
-  fi
-  echo "${job_complete_url}"
 }
 
 save_data_router_metadata() {
@@ -175,7 +180,7 @@ main() {
         return
       fi
 
-      if output=$(/droute send --metadata "$(get_metadata_output_path)" \
+      if output=$(droute send --metadata "$(get_metadata_output_path)" \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
@@ -213,7 +218,7 @@ main() {
         echo "Attempt ${i} of ${max_attempts}: Checking Data Router request completion..."
 
         # Get DataRouter request information.
-        DATA_ROUTER_REQUEST_OUTPUT=$(/droute request get \
+        DATA_ROUTER_REQUEST_OUTPUT=$(`droute` request get \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
