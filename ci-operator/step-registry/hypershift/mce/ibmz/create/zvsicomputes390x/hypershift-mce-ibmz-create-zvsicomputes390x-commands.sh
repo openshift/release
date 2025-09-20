@@ -530,9 +530,7 @@ scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$BASTION_FIP:/root/setup_proxy
 echo "Triggering the proxy server setup on Bastion"
 ssh "${ssh_options[@]}" root@$BASTION_FIP "/root/setup_proxy.sh"
 
-
-sleep 5000 # Sleep added for debug purposes, to be removed later
-cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${BASTION_FIP}:3128/
 export HTTPS_PROXY=http://${BASTION_FIP}:3128/
 export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
@@ -541,6 +539,19 @@ export http_proxy=http://${BASTION_FIP}:3128/
 export https_proxy=http://${BASTION_FIP}:3128/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
+
+sleep 300
+
+# Sourcing the proxy settings for the next steps
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+sleep 120
+
+# Verifying the compute nodes status
+echo "$(date) Checking the compute nodes in the hosted control plane"
+oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
+
 echo "$(date) Successfully completed the e2e creation chain"
-
-
