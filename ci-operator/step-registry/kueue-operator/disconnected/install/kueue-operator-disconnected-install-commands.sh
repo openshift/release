@@ -137,34 +137,6 @@ spec:
         - ${MIRROR_REGISTRY_HOST}/operator-framework/opm
       source: quay.io/operator-framework/opm
 
-EOF
-
-oc apply -f - <<EOF
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: kueue-mirrorset
-spec:
-  imageTagMirrors:
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
-      source: registry.redhat.io/kueue/kueue-rhel9-operator
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
-      source: registry.redhat.io/kueue/kueue-rhel9
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather-1-0
-      source: registry.redhat.io/kueue/kueue-must-gather-rhel9
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/library/busybox
-      source: docker.io/library/busybox
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/ubi9/ubi
-      source: registry.access.redhat.com/ubi9/ubi
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/operator-framework/opm
-      source: quay.io/operator-framework/opm
-
 EOF"
 
     echo "[$(timestamp)] Waiting for the MachineConfigPool to finish rollout..."
