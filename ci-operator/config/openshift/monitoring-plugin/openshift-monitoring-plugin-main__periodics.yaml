@@ -44,10 +44,6 @@ images:
   dockerfile_path: web/cypress/Dockerfile
   to: monitoring-ui-tests-runner
 releases:
-  initial:
-    integration:
-      name: "4.20"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
@@ -62,12 +58,20 @@ resources:
       memory: 4Gi
 tests:
 - as: e2e-monitoring
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
     test:
     - ref: monitoring-plugin-tests-monitoring-ui
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
