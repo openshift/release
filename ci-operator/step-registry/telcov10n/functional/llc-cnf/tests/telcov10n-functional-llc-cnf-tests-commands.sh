@@ -13,10 +13,12 @@ export ROLE_WORKER_CNF=worker-cnf
 
 # local variables
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
-NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
-NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
-GINKGO_LABEL="uncore-cache"
-GINKGO_SUITES="test/e2e/performanceprofile/functests/13_llc"
+NTO_REPO="https://github.com/mrniranjan/cluster-node-tuning-operator.git"
+#NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
+NTO_BRANCH="all_420_fixes"
+#NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
+GINKGO_LABELS=("tier-0" "tier-1" "tier-2")
+GINKGO_SUITES="test/e2e/performanceprofile/functests"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
 
@@ -132,6 +134,7 @@ export GOPATH="${HOME}"/go
 export GOBIN="${GOPATH}"/bin
 export IMAGE_REGISTRY=quay.io/openshift-kni/
 export CNF_TESTS_IMAGE=cnf-tests:latest
+export BUSY_CPUS_IMAGE=cnf-tests:latest
 
 ## Print the nodes in the cluster
 oc get nodes
@@ -147,13 +150,17 @@ make vet
 run_tests_status=0
 
 run_tests() {
-    echo "************ Running ${GINKGO_LABEL} tests ************"
-    GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${GINKGO_LABEL}" \
+    local label=$1
+    echo "************ Running ${label} tests ************"
+    GOFLAGS=-mod=vendor ginkgo --no-color -v --label-filter="${label}" \
     --timeout=24h --keep-separate-reports --keep-going --flake-attempts=2 \
-    --junit-report=junit.xml --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
+    --junit-report="junit_${label}.xml" --output-dir="${ARTIFACT_DIR}" -r ${GINKGO_SUITES}
 }
 
-run_tests || run_tests_status=$?
+# Run tests for each label
+for label in "${GINKGO_LABELS[@]}"; do
+    run_tests "${label}" || run_tests_status=$?
+done
 popd
 
 echo "Ginkgo command failed with exit code: ${run_tests_status}"
@@ -163,33 +170,90 @@ source "${SHARED_DIR}"/myenv/bin/activate
 git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
 pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
-for junit_file in "${ARTIFACT_DIR}"/*.xml; do
-    if [ ! -e "${junit_file}" ]; then
-        echo "No XML files found in ${ARTIFACTS_DIR}."
+# Group XML files by directory and merge them
+echo "************ Grouping and merging XML files by directory ************"
+declare -A directory_files
+
+# Find all XML files and group them by directory prefix
+for xml_file in "${ARTIFACT_DIR}"/*.xml; do
+    if [ ! -e "${xml_file}" ]; then
+        echo "No XML files found in ${ARTIFACT_DIR}."
         exit 0
     fi
-    output_file="${junit_file%.xml}.html"
-    # Run j2html.py on the XML file
-    echo "Processing ${junit_file} -> ${output_file}"
-    python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"
-    if [[ $? -ne 0 ]]; then
-         echo "Error: Failed to process ${junit_file}."
-         exit 1;
+
+    # Extract filename without path
+    filename=$(basename "${xml_file}")
+
+    # Extract directory name from filename
+    # Handle different possible naming patterns from ginkgo:
+    # Pattern 1: junit_<label>_<directory>.xml
+    # Pattern 2: <directory>_junit_<label>.xml
+    # Pattern 3: junit_<label>.xml (with separate files for each dir)
+
+    if [[ "${filename}" =~ ^junit_[^_]+_(.+)\.xml$ ]]; then
+        # Pattern 1: junit_tier-0_1_performance.xml -> 1_performance
+        directory_name="${BASH_REMATCH[1]}"
+    elif [[ "${filename}" =~ ^(.+)_junit_[^_]+\.xml$ ]]; then
+        # Pattern 2: 1_performance_junit_tier-0.xml -> 1_performance
+        directory_name="${BASH_REMATCH[1]}"
+    else
+        # Fallback: try to extract directory from file content or use a default
+        # For now, use the full filename without extension as directory name
+        directory_name="${filename%.xml}"
+        # Remove junit_ prefix and label suffix if present
+        directory_name=$(echo "${directory_name}" | sed 's/^junit_//' | sed 's/_tier-[0-9]$//' | sed 's/_uncore-cache$//')
     fi
 
-    # create json reports
-    json_output_file="${junit_file%.xml}.json"
-    python "${SHARED_DIR}"/telco5gci/junit2json.py "${junit_file}" -o "${json_output_file}"
+    # Add file to the appropriate directory group
+    if [[ -n "${directory_files[${directory_name}]:-}" ]]; then
+        directory_files["${directory_name}"]="${directory_files[${directory_name}]} ${xml_file}"
+    else
+        directory_files["${directory_name}"]="${xml_file}"
+    fi
 done
 
-# Run junitparser merge
+# Process each directory group
+for directory in "${!directory_files[@]}"; do
+    echo "Processing directory: ${directory}"
+    read -r -a files_array <<< "${directory_files[${directory}]}"
 
-xml_files=("$ARTIFACT_DIR"/*.xml)
-output_file="${ARTIFACT_DIR}"/junit.xml
+    if [ ${#files_array[@]} -eq 1 ]; then
+        # Only one file for this directory, just copy it
+        merged_file="${ARTIFACT_DIR}/${directory}_merged.xml"
+        cp "${files_array[0]}" "${merged_file}"
+    else
+        # Multiple files for this directory, merge them
+        merged_file="${ARTIFACT_DIR}/${directory}_merged.xml"
+        echo "Merging XML files for ${directory}: ${files_array[*]}"
+        junitparser merge "${files_array[@]}" "${merged_file}"
+    fi
 
-# Merge XML files using junitparser
-echo "Merging XML files into ${output_file}"
-junitparser merge "${xml_files[@]}" "${output_file}"
+    # Create HTML report for the merged file
+    html_output_file="${ARTIFACT_DIR}/${directory}.html"
+    echo "Creating HTML report: ${merged_file} -> ${html_output_file}"
+    if ! python "${SHARED_DIR}"/telco5gci/j2html.py "${merged_file}" -o "${html_output_file}"; then
+        echo "Error: Failed to process ${merged_file}."
+        exit 1
+    fi
+
+    # Create JSON report for the merged file
+    json_output_file="${ARTIFACT_DIR}/${directory}.json"
+    echo "Creating JSON report: ${merged_file} -> ${json_output_file}"
+    if ! python "${SHARED_DIR}"/telco5gci/junit2json.py "${merged_file}" -o "${json_output_file}"; then
+        echo "Error: Failed to create JSON for ${merged_file}."
+        exit 1
+    fi
+done
+
+# Create overall merged junit.xml from all directory merged files
+merged_xml_files=("${ARTIFACT_DIR}"/*_merged.xml)
+if [ ${#merged_xml_files[@]} -gt 0 ] && [ -e "${merged_xml_files[0]}" ]; then
+    output_file="${ARTIFACT_DIR}/junit.xml"
+    echo "Creating overall merged XML file: ${output_file}"
+    junitparser merge "${merged_xml_files[@]}" "${output_file}"
+else
+    echo "No merged XML files found to create overall junit.xml"
+fi
 
 rm -rf "${SHARED_DIR}"/myenv "${SHARED_DIR}"/telco5gci
 set +x
