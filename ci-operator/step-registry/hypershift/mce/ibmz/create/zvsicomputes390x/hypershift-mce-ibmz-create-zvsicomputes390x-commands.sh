@@ -540,14 +540,14 @@ export https_proxy=http://${BASTION_FIP}:3128/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 
-sleep 300
+
 
 # Sourcing the proxy settings for the next steps
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-sleep 120
+
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
