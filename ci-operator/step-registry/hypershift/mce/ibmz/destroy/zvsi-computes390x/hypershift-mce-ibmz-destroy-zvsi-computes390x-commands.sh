@@ -18,10 +18,10 @@ httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
 
-CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
-export CLUSTER_NAME
+MGMT_CLUSTER_NAME=$(cat "$SHARED_DIR/mgmt_cluster_name")
+export MGMT_CLUSTER_NAME
 
-VPC_NAME="$CLUSTER_NAME-vpc"
+VPC_NAME="$MGMT_CLUSTER_NAME-vpc"
 
 
 # Installing CLI tools
@@ -64,6 +64,18 @@ done
 
 # Targeting the resource group
 ibmcloud target -g $infra_name-rg
+
+
+# Deleting the Permitted Network from the DNS instance 
+
+echo -e "\nInitiating the deletion of DNS Service $MGMT_CLUSTER_NAME-dns having zone $hcp_domain"
+if ibmcloud dns instances | grep "$MGMT_CLUSTER_NAME-dns" >/dev/null 2>&1; then
+   dns_zone_id=$(ibmcloud dns zones -i $MGMT_CLUSTER_NAME-dns | grep $hcp_domain | awk '{print $1}')
+   vpc_id=$(ibmcloud is vpc $VPC_NAME --output JSON | jq -r '.id')
+   ibmcloud dns permitted-network-remove $dns_zone_id $vpc_id -i $MGMT_CLUSTER_NAME-dns -f # Remove the attached VPC from the DNS instance before deleting
+else 
+   echo "ℹ️ No action needed: DNS Service $CLUSTER_NAME-dns does not exist or has already been deleted."
+fi
 
 
 # Deleting the zVSIs and Floating IPs

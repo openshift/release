@@ -35,7 +35,7 @@ export IC_API_KEY
 GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
 git clone -b image-name-fix git@github.ibm.com:OpenShift-on-Z/ibmcloud-openshift-provisioning.git
 
-#Navigate to clone directory
+# Navigate to clone directory
 cd "ibmcloud-openshift-provisioning" || {
     echo "Failed to cd into ibmcloud-openshift-provisioning"
     exit 1

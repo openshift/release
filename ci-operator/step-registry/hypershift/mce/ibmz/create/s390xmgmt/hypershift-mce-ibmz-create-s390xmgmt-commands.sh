@@ -17,9 +17,6 @@ export CONTROL_NODE_PROFILE
 COMPUTE_NODE_PROFILE=cz2-16x32
 export COMPUTE_NODE_PROFILE
 
-echo "Printing OCP release image"
-echo $OCP_RELEASE_IMAGE
-
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
 tmp_ssh_key="/tmp/ssh-private-key"
