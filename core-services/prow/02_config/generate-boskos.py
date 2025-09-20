@@ -266,6 +266,9 @@ CONFIG = {
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 7,
     },
+    'gcp-confidential-qe-quota-slice': {
+        'us-central1': 6,
+    },
     'gcp-sustaining-autorelease-412-quota-slice': {
         'us-east1': 25,
     },
