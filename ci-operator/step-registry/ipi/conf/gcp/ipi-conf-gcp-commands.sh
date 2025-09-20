@@ -61,6 +61,10 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
   fi
 fi
 
+if [[ -n "${CONTROL_PLANE_NODE_TYPE:-}" ]]; then
+  echo "CONTROL_PLANE_NODE_TYPE is set. Overriding control plane node type to '${CONTROL_PLANE_NODE_TYPE}'."
+  master_type="${CONTROL_PLANE_NODE_TYPE}"
+fi
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
