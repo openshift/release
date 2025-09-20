@@ -84,7 +84,7 @@ EOF
 fi
 
 sleep 60
-oc wait mcp master worker --for condition=updated --timeout=20m
+oc wait mcp master worker --for condition=updated --timeout=30m
 
 echo "Install MCE custom catalog source"
 IMG="${_REPO}:${MCE_VERSION}-latest"
