@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 6h
+
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
 OCP_VERSION="${OCP_MAJOR_MINOR}"
@@ -103,6 +105,7 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
   || /bin/true
 
+sleep 4h
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
