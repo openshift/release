@@ -79,7 +79,7 @@ fi
 
 
 # Deleting the zVSIs and Floating IPs
-for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
+for ((i = 1; i <= $HYPERSHIFT_NODE_COUNT ; i++)); do
     echo "Triggering the $infra_name-compute-$i instance deletion in the $VPC_NAME VPC."
     vsi_status=$(ibmcloud is instance-delete $infra_name-compute-$i --output JSON -f | jq -r '.[]|.result')
     vsi_delete_status+=("$vsi_status")
