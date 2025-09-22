@@ -6,16 +6,18 @@ set -x
 
 # Test remove after determining which is the correct directory
 # <----
-echo "LS DIR ARTIFACT_DIR: ${ARTIFACT_DIR}"
-ls -l $ARTIFACT_DIR
-
-echo "LS DIR: PWD"
-ls -l $PWD
-
 export prow_artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs"
-task_id=$BUILD_ID
+export prow_artifacts_pr_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release"
+
 job_id=$JOB_NAME
-prowjobjson_url="${prow_artifacts_base_url}/${job_id}/${task_id}/prowjob.json"
+task_id=$BUILD_ID
+
+if [[ "${JOB_TYPE}" == "presubmit" ]]; then
+    prowjobjson_url="${prow_artifacts_pr_base_url}/${PULL_NUMBER}/${job_id}/${task_id}/prowjob.json"
+else
+    prowjobjson_url="${prow_artifacts_base_url}/${job_id}/${task_id}//prowjob.json"
+fi
+
 pull_number=$(curl -s "$prowjobjson_url" | jq -r '.metadata.labels."prow.k8s.io/refs.pull"')
 echo $pull_number
 # ---->
