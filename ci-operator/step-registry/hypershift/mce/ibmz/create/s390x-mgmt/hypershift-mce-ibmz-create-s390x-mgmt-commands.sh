@@ -17,9 +17,6 @@ export CONTROL_NODE_PROFILE
 COMPUTE_NODE_PROFILE=cz2-16x32
 export COMPUTE_NODE_PROFILE
 
-echo "Printing OCP release image"
-echo $OCP_RELEASE_IMAGE
-
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
 tmp_ssh_key="/tmp/ssh-private-key"
@@ -43,10 +40,6 @@ cd "ibmcloud-openshift-provisioning" || {
     echo "Failed to cd into ibmcloud-openshift-provisioning"
     exit 1
 }
-
-
-
-export OCP_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.20.0-ec.5-s390x"
 
 VARS_FILE="cluster-vars"
 
@@ -72,5 +65,14 @@ else
     exit 1
 fi
 
+export mgmt_cluster_key=$CLUSTER_NAME
+# Saving the cluster name and kubeconfig to SHARED_DIR
+echo "$mgmt_cluster_key" >> "$SHARED_DIR/mgmt_cluster_name"
+
 echo "Copying kubeconfig into SHARED_DIR"
 cp $HOME/$CLUSTER_NAME/auth/kubeconfig $SHARED_DIR/kubeconfig
+echo "Kubeconfig copied into SHARED_DIR"
+
+echo "Getting default_os_images.json from assisted-service"
+git clone https://github.com/openshift/assisted-service.git
+cp assisted-service/data/default_os_images.json ${SHARED_DIR}/default_os_images.json
