@@ -302,8 +302,8 @@ done
 
 HUB_COMPUTE_RIPS=()
 # Fetching the number of compute nodes in the hub cluster
-HUB_COMPUTE_COUNT=($(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' | wc -l
-))
+HUB_COMPUTE_COUNT=$(oc get nodes -l node-role.kubernetes.io/worker= \
+  -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' | wc -l)
 
 # Fetching the Reserved IPs of the hub cluster compute nodes
 for i in $(seq 1 $HUB_COMPUTE_COUNT); do
