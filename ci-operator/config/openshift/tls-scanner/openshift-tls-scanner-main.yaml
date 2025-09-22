@@ -1,0 +1,37 @@
+binary_build_commands: go build .
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.6"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tls-scanner
+  steps:
+    cluster_profile: aws
+    test:
+    - as: tls-scanner
+      cli: latest
+      commands: ./deploy.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: tls-scanner
