@@ -80,12 +80,6 @@ set -x # log the MG commands
 echo "Running sandboxed containers operator must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather-osc
 
-# Check if volume percentage flag is supported
-VOLUME_PERCENTAGE_FLAG=""
-if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
-   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
-fi
-
 # Run must-gather with the sandboxed containers operator image
 oc --insecure-skip-tls-verify adm must-gather \
     $VOLUME_PERCENTAGE_FLAG \
