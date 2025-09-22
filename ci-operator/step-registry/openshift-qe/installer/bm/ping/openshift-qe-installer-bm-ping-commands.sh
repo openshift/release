@@ -9,6 +9,6 @@ set -x
 echo "LS DIR ARTIFACT_DIR: ${ARTIFACT_DIR}"
 ls -l $ARTIFACT_DIR
 
-echo "LS DIR ARTIFACTS: ${ARTIFACTS}"
-ls -l $ARTIFACTS
+echo "LS DIR: PWD"
+ls -l $PWD
 # ---->
