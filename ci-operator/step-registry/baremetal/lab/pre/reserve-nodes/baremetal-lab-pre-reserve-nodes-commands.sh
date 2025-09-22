@@ -18,6 +18,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 [ "${ADDITIONAL_WORKERS}" -gt 0 ] && [ -z "${ADDITIONAL_WORKER_ARCHITECTURE}" ] && { echo "\$ADDITIONAL_WORKER_ARCHITECTURE is not filled. Failing."; exit 1; }
 
 gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
+gnu_additional_arch=$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 
 # The hostname of nodes and the cluster names have limited length for BM.
 # Other profiles add to the cluster_name the suffix "-${UNIQUE_HASH}".
@@ -46,7 +47,7 @@ scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.en
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
-  "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
+  "${ADDITIONAL_WORKERS}" "${gnu_additional_arch}" "${VENDOR}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
