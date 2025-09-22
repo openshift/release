@@ -44,10 +44,6 @@ fi
 # Installing hypershift cli
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_CLI_NAME=hcp
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
- echo "MCE version is less than 2.4, using the hypershift cli name."
- HYPERSHIFT_CLI_NAME=hypershift
-fi
 
 echo "$(date) Installing hypershift cli"
 mkdir /tmp/${HYPERSHIFT_CLI_NAME}_cli

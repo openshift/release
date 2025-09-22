@@ -219,6 +219,7 @@ function gather_network() {
   local namespace=$1
   local selector=$2
   local container=$3
+  local netfilter=$4
 
   if ! oc --insecure-skip-tls-verify --request-timeout=20s get ns ${namespace}; then
     echo "Namespace ${namespace} does not exist, skipping ${namespace} network pods"
@@ -227,10 +228,13 @@ function gather_network() {
 
   local podlist="/tmp/${namespace}-pods"
 
-  # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+  # Snapshot iptables/nftables rules on each node
   oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
   while IFS= read -r i; do
     queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
+    if [[ ${netfilter} == "nftables" ]]; then
+      queue ${ARTIFACT_DIR}/network/nft-list-ruleset-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i nft list ruleset
+    fi
   done < ${podlist}
   # Snapshot all used ports on each node.
   while IFS= read -r i; do
@@ -239,17 +243,19 @@ function gather_network() {
 }
 
 # Gather network details both from SDN and OVN. One of them should succeed.
-gather_network openshift-sdn app=sdn sdn
+gather_network openshift-sdn app=sdn sdn iptables
 sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
 sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')
 if [ "${sample_node}" = "${sample_node_zone}" ]; then
   echo "INFO: INTERCONNECT MODE"
   ovnkube_container=ovnkube-controller
+  ovnkube_netfilter=nftables
 else
   echo "INFO: LEGACY MODE"
   ovnkube_container=ovnkube-node
+  ovnkube_netfilter=iptables
 fi
-gather_network openshift-ovn-kubernetes app=ovnkube-node $ovnkube_container
+gather_network openshift-ovn-kubernetes app=ovnkube-node ${ovnkube_container} ${ovnkube_netfilter}
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"

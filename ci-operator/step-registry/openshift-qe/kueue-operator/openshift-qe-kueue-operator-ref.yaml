@@ -1,0 +1,36 @@
+ref:
+  as: openshift-qe-kueue-operator
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-kueue-operator-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Add args for e2e-benchmarking kube-burner-ocp cmd.
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: WORKLOAD
+    default: "kueue-operator-jobs"
+    documentation: |-
+      Define one of the following workload types: kueue-operator-jobs, keue-operator-jobs-shared or kueue-operator-pods.
+  documentation: >-
+    This step runs the perfscale kueue-operator workload in the deployed cluster
+  timeout: 2h30m

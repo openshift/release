@@ -74,40 +74,6 @@ subjects:
     name: keel
     namespace: keel
 ---
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: quay-webhook
-  namespace: keel
-spec:
-  to:
-    kind: Service
-    name: keel
-    weight: 100
-  port:
-    targetPort: 9300
-  path: /v1/webhooks/quay
-  tls:
-    termination: edge
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: keel
-  namespace: keel
-  labels:
-    app: keel
-spec:
-  type: LoadBalancer
-  ports:
-    - port: 9300
-      targetPort: 9300
-      protocol: TCP
-      name: keel
-  selector:
-    app: keel
-  sessionAffinity: None
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -116,7 +82,7 @@ metadata:
   labels:
     app: keel
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: keel
@@ -126,6 +92,22 @@ spec:
         app: keel
     spec:
       serviceAccountName: keel
+      initContainers:
+      - name: restart-keel-deployments
+        image: quay.io/openshift/ci:ocp_cli-yq_latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Find all deployments with keel annotations and restart them
+          DEPLOYMENTS=$(oc get deployments --all-namespaces -o yaml | yq -r '.items[] | select(.metadata.annotations["keel.sh/policy"]) | "\(.metadata.namespace) \(.metadata.name)"')
+          echo "$DEPLOYMENTS" | while IFS=' ' read -r namespace name; do
+            if [ -n "$namespace" ] && [ -n "$name" ]; then
+              echo "Restarting deployment $namespace/$name..."
+              oc rollout restart deployment/"$name" -n "$namespace"
+            fi
+          done
+          echo "Deployment restart process completed"
       containers:
         - name: keel
           image: "keelhq/keel:latest"
@@ -157,11 +139,9 @@ spec:
             requests:
               cpu: 100m
               memory: 256Mi
-              ephemeral-storage: 200Mi
             limits:
-              cpu: 4
+              cpu: 200m
               memory: 512Mi
-              ephemeral-storage: 400Mi
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget

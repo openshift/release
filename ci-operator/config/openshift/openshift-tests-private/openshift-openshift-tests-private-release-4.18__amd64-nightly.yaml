@@ -569,6 +569,23 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: metal3-agent-hypershift-arm-nodepool-guest-f28
+  capabilities:
+  - intranet
+  cron: 56 23 14 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:multi-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: arm64
+      AGENTSERVICECONFIG_CPU_ARCHITECTURE: arm64
+      EXTRA_ARGS: --arch=arm64
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    workflow: hypershift-mce-agent-metal3-conformance-baremetal-lab
 - as: aws-ipi-ovn-hypershift-fips-guest-openldap-f14
   cron: 6 4 15,29 * *
   steps:
@@ -4441,6 +4458,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-ipv6-static
+- as: baremetal-upi-ovn-dual-stack-disk-etcd-encryption-f28
+  capabilities:
+  - intranet
+  cron: 20 19 17 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      ENABLE_ETCD_ENCRYPTION: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-dual-stack
 zz_generated_metadata:
   branch: release-4.18
   org: openshift
