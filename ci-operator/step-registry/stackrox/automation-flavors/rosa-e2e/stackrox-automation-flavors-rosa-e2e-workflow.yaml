@@ -5,11 +5,15 @@ workflow:
     - ref: stackrox-stackrox-begin
     - as: rosa-create
       commands: |
+        export FIPS_ENABLED="${FIPS_ENABLED:-}"
         /usr/bin/openshift-ci.sh create rosa
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
         name: stackrox-automation-flavors
         namespace: test-credentials
+      env:
+      - name: FIPS_ENABLED
+        default: false
       from: rosa
       resources:
         requests:
