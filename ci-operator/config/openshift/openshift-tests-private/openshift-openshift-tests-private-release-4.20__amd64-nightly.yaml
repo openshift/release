@@ -919,6 +919,19 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-ipsec-libreswan
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      IPSEC_RHCOS_LAYERED_IMAGE: quay.io/huirwang/ipsec-rhcos-layered-image-4.20:5.2
+      NMSTATE_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_TYPE: ipsec-suite
+    test:
+    - ref: operatorhub-subscribe-nmstate-operator
+    - ref: openshift-e2e-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-ovn-winc-f7
   cron: 33 1 7,14,23,30 * *
   steps:
@@ -4679,6 +4692,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-ipv6-static
+- as: baremetal-upi-ovn-dual-stack-disk-etcd-encryption-f7
+  capabilities:
+  - intranet
+  cron: 27 17 5,12,21,28 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      ENABLE_ETCD_ENCRYPTION: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-dual-stack
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

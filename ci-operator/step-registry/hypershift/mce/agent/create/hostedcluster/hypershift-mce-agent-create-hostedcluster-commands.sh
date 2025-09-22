@@ -27,10 +27,6 @@ fi
 
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_NAME=hcp
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-  echo "MCE version is less than 2.4"
-  HYPERSHIFT_NAME=hypershift
-fi
 
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
@@ -108,29 +104,6 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} $(support_np_skew)"
-
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-  echo "MCE version is less than 2.4"
-  oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-  oc apply -f - <<EOF
-apiVersion: cluster.open-cluster-management.io/v1
-kind: ManagedCluster
-metadata:
-  annotations:
-    import.open-cluster-management.io/hosting-cluster-name: local-cluster
-    import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
-    open-cluster-management/created-via: other
-  labels:
-    cloud: auto-detect
-    cluster.open-cluster-management.io/clusterset: default
-    name: ${CLUSTER_NAME}
-    vendor: OpenShift
-  name: ${CLUSTER_NAME}
-spec:
-  hubAcceptsClient: true
-  leaseDurationSeconds: 60
-EOF
-fi
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}

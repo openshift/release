@@ -33,6 +33,46 @@ EOF
 # adapt to newer ipsec config for ocp versions >= 4.15
 if (( ocp_minor_version >= 15 && ocp_major_version == 4 )); then
     /tmp/yq e '.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode = "Full"' -i ${SHARED_DIR}/manifest_cluster-network-03-config.yml
+
+  # If the IPSEC_RHCOS_LAYERED_IMAGE environment variable is not empty, then apply the custom layered image which is used for pre-merge testing libreswan
+  # If the IPSEC_RHCOS_LAYERED_IMAGE environment variable is empty, then do thing.
+  if [[ -n "${IPSEC_RHCOS_LAYERED_IMAGE}" ]]; then
+     echo "IPSEC_RHCOS_LAYERED_IMAGE is ${IPSEC_RHCOS_LAYERED_IMAGE}" 
+     for role in master worker; do
+  cat >> "${SHARED_DIR}/manifest_${role}-ipsec-extension.yml" <<-EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: ${role}
+  annotations:
+    user-ipsec-machine-config: "true"
+  name: 80-ipsec-${role}-extensions
+spec:
+  osImageURL: ${IPSEC_RHCOS_LAYERED_IMAGE}
+  config:
+    ignition:
+      version: 3.2.0
+    systemd:
+      units:
+      - name: ipsecenabler.service
+        enabled: true
+        contents: |
+         [Unit]
+         Description=Enable ipsec service after os extension installation
+         Before=kubelet.service
+
+         [Service]
+         Type=oneshot
+         ExecStartPre=systemd-tmpfiles --create /usr/lib/rpm-ostree/tmpfiles.d/libreswan.conf
+         ExecStart=systemctl enable --now ipsec.service
+
+         [Install]
+         WantedBy=multi-user.target
+EOF
+    cat ${SHARED_DIR}/manifest_${role}-ipsec-extension.yml
+    done
+  fi 
 fi
 
 cat ${SHARED_DIR}/manifest_cluster-network-03-config.yml
