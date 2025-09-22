@@ -94,14 +94,12 @@ if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publi
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-echo "HYPERSHIFT_NAME" ${HYPERSHIFT_NAME}
-echo "EXTRA_ARGS" ${EXTRA_ARGS}
-echo "CLUSTER_NAME" ${CLUSTER_NAME}
-echo "AGENT_NAMESPACE" ${AGENT_NAMESPACE}
-echo "BASEDOMAIN" ${BASEDOMAIN}
-echo "RELEASE_IMAGE" ${RELEASE_IMAGE}
-
-sleep 1h
+echo "HYPERSHIFT_NAME" ${HYPERSHIFT_NAME} >> $SHARED_DIR/debug-info.log
+echo "EXTRA_ARGS" ${EXTRA_ARGS} >> $SHARED_DIR/debug-info.log
+echo "CLUSTER_NAME" ${CLUSTER_NAME} >> $SHARED_DIR/debug-info.log
+echo "AGENT_NAMESPACE" ${AGENT_NAMESPACE} >> $SHARED_DIR/debug-info.log
+echo "BASEDOMAIN" ${BASEDOMAIN} >> $SHARED_DIR/debug-info.log
+echo "RELEASE_IMAGE" ${RELEASE_IMAGE} >> $SHARED_DIR/debug-info.log
 
 eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
@@ -112,8 +110,9 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
-  --release-image ${RELEASE_IMAGE} $(support_np_skew)"
+  --release-image ${RELEASE_IMAGE} $(support_np_skew)" --render --render-sensitive > $SHARED_DIR/hostedcluster-debug.yaml
 
+exit 0
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
 
