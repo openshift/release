@@ -198,7 +198,8 @@ function generate_attribute_install() {
                  'openshift-extended-test-supplementary' \
                  'openshift-extended-web-tests' \
                  'openshift-e2e-test-clusterinfra-qe' \
-                 'openshift-e2e-test-qe-report'
+                 'openshift-e2e-test-qe-report' \
+                 'cucushift-installer-check-cluster-health'
   do
     if [[ -d "$LOCAL_DIR_ORI/$keyword" ]]
     then

@@ -72,12 +72,13 @@ function mirror_catalog_and_operator() {
     # Extract the digest from the CSV operator image and construct the Quay equivalent.
     OPERATOR_DIGEST=$(echo "${OPERATOR_IMAGE_FROM_CSV}" | sed 's/.*@/@/')
     OPERAND_DIGEST=$(echo "${OPERAND_IMAGE_FROM_CSV}" | sed 's/.*@/@/')
-    QUAY_OPERATOR_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0${OPERATOR_DIGEST}"
-    QUAY_OPERAND_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-0-11${OPERAND_DIGEST}"
+    QUAY_OPERATOR_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERATOR_COMPONENT:-kueue-operator-1-1}${OPERATOR_DIGEST}"
+    QUAY_OPERAND_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERAND_COMPONENT:-kueue-0-12}${OPERAND_DIGEST}"
+    QUAY_MUST_GATHER_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/${MUST_GATHER_COMPONENT:-kueue-must-gather-1-0}${MUST_GATHER_DIGEST}"
 
 
-    MIRRORED_BUNDLE_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-1-0:${BUNDLE_TAG}"
-    MIRRORED_MUST_GATHER_IMAGE="${MIRROR_REGISTRY_HOST}/kueue/kueue-must-gather-rhel9${MUST_GATHER_DIGEST}"
+    MIRRORED_BUNDLE_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/${BUNDLE_COMPONENT:-kueue-bundle-1-1}:${BUNDLE_TAG}"
+    MIRRORED_MUST_GATHER_IMAGE="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/${MUST_GATHER_COMPONENT:-kueue-must-gather-1-0}${MUST_GATHER_DIGEST}"
     
     echo "Mirrored BUNDLE_IMAGE for disconnected environment: ${MIRRORED_BUNDLE_IMAGE}"
     echo "Mirrored MUST_GATHER_IMAGE for disconnected environment: ${MIRRORED_MUST_GATHER_IMAGE}"
@@ -98,7 +99,7 @@ mirror:
   - name: registry.access.redhat.com/ubi9/ubi:9.4
   - name: quay.io/operator-framework/opm:latest
   - name: docker.io/library/busybox:1.36.0
-  - name: ${MUST_GATHER_IMAGE_FROM_CSV}
+  - name: ${QUAY_MUST_GATHER_IMAGE}
   # Mirror Quay operator andoperand images since registry.redhat.io version may not be available during release.
   - name: ${QUAY_OPERATOR_IMAGE}
   - name: ${QUAY_OPERAND_IMAGE}
@@ -119,23 +120,14 @@ metadata:
 spec:
   imageDigestMirrors:
     - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
+        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/${OPERATOR_COMPONENT}
       source: registry.redhat.io/kueue/kueue-rhel9-operator
     - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
+        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/${OPERAND_COMPONENT}
       source: registry.redhat.io/kueue/kueue-rhel9
     - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather-1-0
+        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/${MUST_GATHER_COMPONENT}
       source: registry.redhat.io/kueue/kueue-must-gather-rhel9
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/library/busybox
-      source: docker.io/library/busybox
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/ubi9/ubi
-      source: registry.access.redhat.com/ubi9/ubi
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/operator-framework/opm
-      source: quay.io/operator-framework/opm
 
 EOF
 
@@ -146,15 +138,6 @@ metadata:
   name: kueue-mirrorset
 spec:
   imageTagMirrors:
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0
-      source: registry.redhat.io/kueue/kueue-rhel9-operator
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-0-11
-      source: registry.redhat.io/kueue/kueue-rhel9
-    - mirrors:
-        - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/kueue-must-gather-1-0
-      source: registry.redhat.io/kueue/kueue-must-gather-rhel9
     - mirrors:
         - ${MIRROR_REGISTRY_HOST}/library/busybox
       source: docker.io/library/busybox
