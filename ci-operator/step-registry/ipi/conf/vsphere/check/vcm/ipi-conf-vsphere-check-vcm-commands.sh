@@ -442,8 +442,11 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   vsphere_password="${vcenter_passwords[$account_loc]}"
   pool_usernames[$VCENTER]=${vsphere_user}
   pool_passwords[$VCENTER]=${vsphere_password}
-
-  shortName=$(jq -r '.spec.shortName' < /tmp/pool.json)
+  if [ -n "${DEFAULT_ZONE:-}" ] || [ -n "${COMPUTE_ZONE:-}" ] ||[ -n "${CONTROL_PLANE_ZONE:-}" ]; then
+    shortName=$(jq -r '.spec.zone' < /tmp/pool.json)
+  else
+    shortName=$(jq -r '.spec.shortName' < /tmp/pool.json)
+  fi
   server=$(jq -r '.spec.server' < /tmp/pool.json)
   region=$(jq -r '.spec.region' < /tmp/pool.json)
   zone=$(jq -r '.spec.zone' < /tmp/pool.json)
