@@ -122,5 +122,5 @@ if [ -z "${CLUSTER_NAME}" ]; then
     CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-
+sleep 3600
 check_private
