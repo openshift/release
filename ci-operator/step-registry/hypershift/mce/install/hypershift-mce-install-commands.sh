@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 set -ex
 env
 
@@ -86,10 +84,13 @@ EOF
 fi
 
 sleep 60
-oc wait mcp master worker --for condition=updated --timeout=20m
+oc wait mcp master worker --for condition=updated --timeout=30m
 
 echo "Install MCE custom catalog source"
-IMG="quay.io:443/acm-d/mce-dev-catalog:2.10.0-DOWNSTREAM-2025-09-17-07-19-34"
+IMG="${_REPO}:${MCE_VERSION}-latest"
+if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
+  IMG="${_REPO}:latest-${MCE_VERSION}"
+fi
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -285,7 +286,7 @@ EOF
 fi
 
 # display HyperShift cli version
-HYPERSHIFT_NAME="hcp"
+HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
   downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
@@ -293,9 +294,7 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-
 /tmp/${HYPERSHIFT_NAME} version
-
 
 # display HyperShift Operator Version and MCE version
 oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
