@@ -1,8 +1,21 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.19
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-419
 releases:
   latest:
     candidate:
@@ -25,9 +38,13 @@ tests:
       BASE_DOMAIN: test.lp.devcluster.openshift.com
       USER_TAGS: |
         TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     test:
     - ref: redhat-chaos-start-krkn
     - ref: redhat-chaos-pod-scenarios-kube-apiserver-disruption
+    - ref: redhat-chaos-pod-scenarios-etcd-disruption
     workflow: redhat-chaos-installer-aws
   timeout: 5h0m0s
 zz_generated_metadata:
