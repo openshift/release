@@ -69,11 +69,12 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: LPINTEROP-5704
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      ODF_VERSION_MAJOR_MINOR: "4.18"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.14", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      TEST_IMPORTANCE: LEVEL0
+      TEST_SCENARIOS: Cluster_Observability
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -96,7 +97,14 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
-    - ref: interop-tests-ocs-tests
+    - ref: acm-tests-clc-create
+    - ref: acm-fetch-managed-clusters
+    - ref: acm-tests-observability
+    - ref: acm-tests-grc
+    - ref: acm-tests-alc
+    - ref: quay-tests-quay-interop-test
+    - ref: acm-opp-app
+    - ref: openshift-extended-test
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
