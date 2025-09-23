@@ -193,7 +193,7 @@ data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
   operatorVer: "${EXPECTED_OPERATOR_VERSION}"
   channel: "${OPERATOR_UPDATE_CHANNEL}"
-  redirectNeeded: "true"
+  redirectNeeded: "false"
   exists: "true"
   labelSingleNode: "false"
   eligibility: "false"
