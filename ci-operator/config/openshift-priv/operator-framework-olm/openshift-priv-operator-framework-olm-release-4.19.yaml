@@ -50,8 +50,7 @@ images:
   to: ci-image
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - ci-image
     name: 4.19-priv
     namespace: ocp-private
@@ -161,8 +160,14 @@ tests:
 - as: e2e-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

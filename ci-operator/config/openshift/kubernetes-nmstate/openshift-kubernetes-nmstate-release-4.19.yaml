@@ -49,8 +49,7 @@ images:
   to: src-with-oc-and-kubectl
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-with-oc-and-kubectl
     name: "4.19"
     namespace: ocp
@@ -82,6 +81,7 @@ resources:
       memory: 200Mi
 tests:
 - as: security
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
@@ -123,6 +123,25 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: kubernetes-nmstate-e2e-azure
+- as: e2e-handler-ovn-ipv4-nightly-periodic
+  cluster: build05
+  cron: 14 19 * * 0
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OVNKubernetes"
+        MIRROR_IMAGES=false
+    workflow: kubernetes-nmstate-e2e-handler
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

@@ -1,0 +1,25 @@
+chain:
+  as: kueue-operator-post
+  steps:
+    - as: kueue-must-gather
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - ref: gather-must-gather
+    - as: kueue-cleanup
+      cli: latest
+      commands: |
+        make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+  documentation: |-
+    This chain runs the post steps for the Kueue operator

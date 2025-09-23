@@ -15,10 +15,6 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -30,6 +26,10 @@ base_images:
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
     tag: latest
   openstack-installer:
     name: "4.15"
@@ -78,12 +78,12 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: azure-ipi-proxy-workers-rhcos-rhel8-f14-logging
-  cron: 43 20 20 * *
+- as: azure-ipi-proxy-workers-rhcos-rhel8-f999-logging
+  cron: 8 8 29 2 *
   steps:
-    cluster_profile: azure-qe
+    cluster_profile: azure-observability
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4s_v3
       FILTERS_ADDITIONAL: ""
       FORCE_SUCCESS_EXIT: "true"
@@ -93,7 +93,7 @@ tests:
             {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
@@ -107,8 +107,37 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
-- as: aws-ipi-f14-disruptive-logging
-  cron: 10 8 16 * *
+- as: aws-ipi-private-shared-vpc-phz-sts-f999-logging
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.9
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
+      TEST_IMPORTANCE: Critical|High
+      TEST_PARALLEL: "3"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
+- as: aws-ipi-f999-disruptive-logging
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -121,7 +150,7 @@ tests:
             {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_FILTERS: Disruptive;Longduration
       TEST_PARALLEL: "3"

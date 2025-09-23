@@ -87,6 +87,10 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+if [ -f "${SHARED_DIR}/runtime_env" ]; then
+    source "${SHARED_DIR}/runtime_env"
+fi
+
 # restore external oidc cache dir for oc
 if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
     echo "Restoring external OIDC cache dir for oc"
@@ -226,7 +230,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
+equinix-edge-enablement|equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -344,7 +348,9 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
-    extended-platform-tests run all --dry-run | \
+    echo "SHARD_ARGS=\"${SHARD_ARGS}\""
+
+    extended-platform-tests run all --dry-run ${SHARD_ARGS:-} | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
@@ -486,7 +492,7 @@ function handle_filters {
     done
 
     echo "handle AND logical"
-    for filter in ${filters_and[*]}
+    for filter in "${filters_and[@]}"
     do
         echo "handle filter_and ${filter}"
         handle_and_filter "${filter}"
@@ -494,7 +500,7 @@ function handle_filters {
 
     echo "handle OR logical"
     rm -fr ./case_selected_or
-    for filter in ${filters_or[*]}
+    for filter in "${filters_or[@]}"
     do
         echo "handle filter_or ${filter}"
         handle_or_filter "${filter}"

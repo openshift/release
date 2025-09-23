@@ -1,12 +1,12 @@
 base_images:
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
+  ocp_4.20_base-rhel9:
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make amazon-eks-pod-identity-webhook
 build_root:
   from_repository: true
@@ -14,26 +14,26 @@ canonical_go_repository: github.com/aws/amazon-eks-pod-identity-webhook
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: aws-pod-identity-webhook
 promotion:
   to:
-  - name: 4.19-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -54,6 +54,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift-priv

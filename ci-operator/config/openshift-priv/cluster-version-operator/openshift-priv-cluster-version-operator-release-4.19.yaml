@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-version-operator
@@ -34,8 +38,7 @@ images:
   to: cluster-version-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -67,6 +70,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  run_if_changed: \.go$
 - as: unit
   commands: go test ./...
   container:
@@ -90,6 +94,18 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-extended-tests
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&
+      TEST_SCENARIOS: OTA cvo
+    test:
+    - chain: openshift-e2e-test-ota-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi
+  timeout: 8h0m0s
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -167,6 +183,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

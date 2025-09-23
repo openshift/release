@@ -21,17 +21,37 @@ function update_openshift_config_pull_secret {
 
   echo "Adding PreGA pull secret to pull the container image index from the Hub cluster..."
 
-  optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
-  optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
-  qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+  # optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+  # optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+  # qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
 
-  openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
-  openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
-  openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+  # openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+  # openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+  # openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
 
-  reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
-  reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
-  brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+  # reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+  # reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+  # brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+
+#   cat <<EOF >| /tmp/pre-ga.json
+# {
+#   "auths": {
+#     "quay.io/prega": {
+#       "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
+#       "email": "prega@redhat.com"
+#     },
+#     "brew.registry.redhat.io": {
+#       "auth": "${brew_registry_auth}"
+#     },
+#     "quay.io/openshift-qe-optional-operators": {
+#       "auth": "${qe_registry_auth}"
+#     },
+#     "quay.io/openshifttest": {
+#       "auth": "${openshifttest_registry_auth}"
+#     }
+#   }
+# }
+# EOF
 
   cat <<EOF >| /tmp/pre-ga.json
 {
@@ -39,17 +59,6 @@ function update_openshift_config_pull_secret {
     "quay.io/prega": {
       "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
       "email": "prega@redhat.com"
-    },
-    "brew.registry.redhat.io": {
-      "auth": "${brew_registry_auth}",
-      "email": "jiazha@redhat.com"
-    },
-    "quay.io/openshift-qe-optional-operators": {
-      "auth": "${qe_registry_auth}",
-      "email": "jiazha@redhat.com"
-    },
-    "quay.io/openshifttest": {
-      "auth": "${openshifttest_registry_auth}"
     }
   }
 }
@@ -67,8 +76,6 @@ EOF
 
 function apply_catalog_source_and_image_content_source_policy {
 
-  image_index_tag="v${IMAGE_INDEX_OCP_VERSION}.0"
-
   SSHOPTS=(-o 'ConnectTimeout=5'
     -o 'StrictHostKeyChecking=no'
     -o 'UserKnownHostsFile=/dev/null'
@@ -80,7 +87,7 @@ function apply_catalog_source_and_image_content_source_policy {
 
   timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
     "${PREGA_CATSRC_AND_ICSP_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
-    "${catalog_info_dir}" "${image_index_tag}" << 'EOF'
+    "${catalog_info_dir}" "${IMAGE_INDEX_OCP_VERSION}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -88,14 +95,26 @@ set -o pipefail
 set -x
 catalog_soruces_url="${1}"
 prega_operator_index_tags_url="${2}"
-tag_version="${4}"
+image_index_ocp_version="${4}"
+tag_version="v${4}.0"
 
 function findout_manifest_digest {
-  curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
+  res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
     [ .tags[] ]
     | sort_by(.start_ts)
-    | last.manifest_digest'
+    | last.manifest_digest')
+
+  if [ "${res}" == "null" ]; then
+    res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" | jq -r '
+      [ .tags[]
+      | select(has("end_ts") | not)]
+      | sort_by(.start_ts)
+      | .[-2].manifest_digest')
+  fi
+
+  echo "${res}"
 }
+
 function get_related_catalogs_and_icsp_manifests {
 
   query_tag="${tag_version%.*}-"
@@ -115,13 +134,51 @@ function get_related_catalogs_and_icsp_manifests {
     [ "${has_additional}" == "false" ] && break
   done
 
-  echo ${tag/-/.0-}
+  if [ "${image_index_ocp_version/./}" -gt 419 ]; then
+    echo ${tag}
+  else
+    echo ${tag/-/.0-}
+  fi
 }
 
 selected_manifest_digest=$(findout_manifest_digest)
 version_tag=$(get_related_catalogs_and_icsp_manifests)
-info_dir=${3}/${version_tag}
 
+echo "Checking if the selected tag exists..."
+status_code=$(curl -sSL -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}")
+if [ "$status_code" -ne 200 ]; then
+  echo "Resource not found (HTTP status: $status_code). Getting previous version..."
+
+  # Get all tags from the base URL, filter for tag version, sort, and get the previous one
+  next_version=$(curl -sSL "${catalog_soruces_url}" \
+    | grep -oP '(?<=href=")[^"]+' \
+    | sort -t '-' -k2,2 -k3,3 \
+    | grep "${tag_version/.0/}" \
+    | awk -F '[-/]' -v tag_ver="$version_tag" '
+BEGIN {
+    split(tag_ver, a, "[-/]");
+    reference_ts = a[2];
+    gsub(/T|ci/, "", reference_ts);
+}
+{
+    current_ts = $2
+    gsub(/T|ci/, "", current_ts)
+    if (current_ts >= reference_ts) {
+        # printf("%s > %s = ", current_ts, reference_ts)
+        print $0
+        exit
+    }
+}')
+
+  if [ -n "$next_version" ]; then
+    echo "Next available version is: $next_version"
+    version_tag=${next_version}
+  else
+    echo "Could not find a previous version."
+  fi
+fi
+
+info_dir=${3}/${version_tag}
 mkdir -pv ${info_dir}
 pushd .
 cd ${info_dir}
@@ -131,6 +188,13 @@ for f in $(curl -sSL ${catalog_soruces_url}/${version_tag}|grep -oP '(?<=href=")
   curl -sSLO ${catalog_soruces_url}/${version_tag}/${f}
   set +x
 done
+
+set -x
+if [ -n "${next_version:-}" ]; then
+  stable_img_index="quay.io/prega/prega-operator-index:${tag_version}"
+  sed -i "s#^  image:.*#  image: ${stable_img_index}#" catalogSource.yaml
+fi
+set +x
 
 popd
 EOF
@@ -153,6 +217,7 @@ EOF
   echo
   echo "----------------------------------------------------------------------------------------------"
   set -x
+  rm -frv "${ARTIFACT_DIR}/pre-ga-info"
   mv -v ${catalog_info_dir} "${ARTIFACT_DIR}/pre-ga-info"
   prega_info_dir="$(ls -1d ${ARTIFACT_DIR}/pre-ga-info/*)"
   ls -lhrtR ${prega_info_dir}

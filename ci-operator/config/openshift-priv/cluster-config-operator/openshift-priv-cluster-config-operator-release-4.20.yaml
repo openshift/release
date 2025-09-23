@@ -1,12 +1,12 @@
 base_images:
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -14,12 +14,12 @@ canonical_go_repository: github.com/openshift/cluster-config-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-config-operator
 promotion:
   to:
@@ -69,10 +69,12 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
+  shard_count: 2
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-serial-techpreview
+  shard_count: 2
   steps:
     cluster_profile: aws-3
     env:
@@ -92,6 +94,20 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- as: e2e-tests-extension
+  optional: true
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary cluster-config-operator-tests-ext"
+        make tests-ext-build
+        echo "Running ./cluster-config-operator-tests-ext with sanity test"
+        ./cluster-config-operator-tests-ext run-suite openshift/cluster-config-operator/conformance/parallel -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

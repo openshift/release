@@ -73,20 +73,18 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
-  e2e-aws:
-    requests:
-      cpu: "4"
-      memory: 4Gi
 test_binary_build_commands: make test
 tests:
 - as: title-check
   commands: make name-check
   container:
     from: src
+  skip_if_only_changed: OWNERS$
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata)/)
+  skip_if_only_changed: ^frontend/|^test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|testdata|winc)/|OWNERS$
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-3
     test:
     - as: critical-test

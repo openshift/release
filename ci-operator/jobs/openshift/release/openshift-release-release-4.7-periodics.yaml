@@ -2,7 +2,7 @@ periodics:
 - agent: kubernetes
   cluster: build06
   decorate: true
-  interval: 24h
+  interval: 7200h
   labels:
     job-release: "4.7"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.7-s390x
@@ -50,7 +50,7 @@ periodics:
         value: s390x
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -67,7 +67,7 @@ periodics:
 - agent: kubernetes
   cluster: build06
   decorate: true
-  interval: 24h
+  interval: 7200h
   labels:
     job-release: "4.7"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.7-ppc64le
@@ -115,7 +115,7 @@ periodics:
         value: ppc64le
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -126,144 +126,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build06
-  cron: 42 10 8,22 * *
-  decorate: true
-  decoration_config:
-    timeout: 8h0m0s
-  labels:
-    job-env: aws
-    job-release: "4.7"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    release.openshift.io/verify: "true"
-  name: release-openshift-origin-installer-e2e-aws-upgrade-4.4-to-4.5-to-4.6-to-4.7-ci
-  spec:
-    containers:
-    - args:
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -exuo pipefail
-
-        data=$(ARTIFACTS)/release.json
-
-        if ! curl --fail -X GET -G --location https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0 <4.5.0-0' > ${data}; then
-          echo "error: Could not find an initial version"
-          exit 1
-        fi
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
-
-        if ! curl --fail -X GET -G --location https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0 <4.6.0-0' > ${data}; then
-          echo "error: Could not find a middle version"
-          exit 1
-        fi
-        next_0=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
-
-        if ! curl --fail -X GET -G --location https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4.6.0-0.nightly/latest > ${data}; then
-          echo "error: Could not find a middle version"
-          exit 1
-        fi
-        next_1=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
-
-        if ! curl --fail -X GET -G --location https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4.7.0-0.ci/latest > ${data}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-        next_2=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
-
-        export RELEASE_IMAGE_LATEST=${next_2}
-        export CONFIG_SPEC="${CONFIG_SPEC/RELEASE_IMAGES/$next_0,$next_1,$next_2}"
-
-        ci-operator $@
-      - ""
-      env:
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: |
-              TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
-              TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials

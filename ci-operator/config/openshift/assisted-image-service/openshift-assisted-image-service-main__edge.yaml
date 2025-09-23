@@ -1,18 +1,18 @@
 base_images:
   assisted-installer:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,25 +20,21 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.14
+    name: ocm-2.15
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tests:
-    name: "4.19"
-    namespace: ocp
-    tag: tests
 build_root:
   from_repository: true
 images:
@@ -48,20 +44,20 @@ images:
   to: assisted-image-service-build
 promotion:
   to:
-  - name: ocm-2.14
+  - name: ocm-2.15
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -118,17 +114,18 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
-- as: e2e-metal-assisted-4-19
+- always_run: false
+  as: e2e-metal-assisted-4-20
   cluster: build05
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-deploy-nodes-4-19
+  as: e2e-metal-assisted-deploy-nodes-4-20
   cluster: build05
   optional: true
   steps:
@@ -136,26 +133,26 @@ tests:
     env:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="deploy_nodes"
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-day2-arm-workers-4-19
+  as: e2e-metal-assisted-day2-arm-workers-4-20
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
-      ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
         AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
         DAY2_CPU_ARCHITECTURE=arm64
-        OPENSHIFT_VERSION=4.19-multi
-    workflow: assisted-equinix
-- as: e2e-ai-operator-ztp
+        OPENSHIFT_VERSION=4.20-multi
+    workflow: assisted-ofcir-baremetal-heterogeneous
+- always_run: false
+  as: e2e-ai-operator-ztp
   cluster: build05
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -166,16 +163,16 @@ tests:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
-  as: e2e-oci-assisted-4-19
+  as: e2e-oci-assisted-4-20
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-oci
 - always_run: false
-  as: e2e-metal-assisted-external-4-19
+  as: e2e-metal-assisted-external-4-20
   cluster: build05
   optional: true
   steps:
@@ -183,7 +180,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: main

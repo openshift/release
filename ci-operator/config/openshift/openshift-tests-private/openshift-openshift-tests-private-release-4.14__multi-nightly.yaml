@@ -73,6 +73,20 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-byo-iam-role-efs-arm-f28
+  cron: 10 13 5 * *
+  steps:
+    cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role-efs
 - as: aws-ipi-byo-iam-role-efs-fips-amd-f28-destructive
   cron: 9 12 4 * *
   steps:
@@ -256,27 +270,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
-- as: aws-ipi-mini-perm-arm-f28
-  cron: 54 19 15 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
-- as: aws-ipi-mini-perm-amd-f28-destructive
-  cron: 29 23 10 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
 - as: aws-ipi-ovn-ipsec-amd-mixarch-f28-destructive
   cron: 4 23 12 * *
   steps:
@@ -344,6 +337,37 @@ tests:
     test:
     - chain: cucushift-ovn-migration-sdn
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-priv-sts-basecap-none-mini-perm-amd-f28-destructive
+  cron: 1 23 13 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      PERSISTENT_MONITORING: "false"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-private-cco-manual-security-token-service
+- as: aws-ipi-priv-sts-basecap-none-mini-perm-arm-f28
+  cron: 52 14 1 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-private-cco-manual-security-token-service
 - as: aws-ipi-proxy-sts-arm-f28
   cron: 16 12 2 * *
   steps:
@@ -686,7 +710,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
 - as: azure-ipi-oidc-mini-perm-amd-f28-destructive
-  cron: 2 2 14 * *
+  cron: 49 22 7 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -698,7 +722,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
 - as: azure-ipi-oidc-mini-perm-arm-f28
-  cron: 11 1 11 * *
+  cron: 36 17 26 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -1363,7 +1387,8 @@ tests:
       YQ_VERSION: 4.30.5
     workflow: openshift-e2e-ibmcloud-heterogeneous-test-qe
 - as: baremetal-ipi-ovn-ipv4-fips-vmedia-amd-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 31 14 13 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -1378,7 +1403,8 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
 - as: baremetal-ipi-ovn-dualstack-amd-vmedia-f28
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 33 20 27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe

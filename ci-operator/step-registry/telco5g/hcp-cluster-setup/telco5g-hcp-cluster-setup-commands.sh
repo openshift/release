@@ -57,7 +57,7 @@ if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
     INTERNAL=true
     INTERNAL_ONLY=true
 # Using internalbos temporarily 
-    CL_SEARCH="internalbos"
+    CL_SEARCH="computeqe"
     HOSTS_NUMBER=" --number 2"
 fi
 
@@ -76,7 +76,7 @@ ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno ${HOSTS_NUMBER-}"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
-- name: Grab and run kcli to install openshift cluster
+- name: Find a cluster to run job
   hosts: bastion
   gather_facts: false
   tasks:
@@ -146,18 +146,18 @@ if $BASTION_ENV; then
 [hypervisor]
 ${HYPERV_HOST} ansible_host=${CLUSTER_HV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
-    dnsmasq_params="vsno_dnsmasq_dir: /etc/dnsmasq.d"
-    dnsmasq_params2="dnsmasq_restart: true"
-    dnsmasq_params3="netmanager_restart: false"
 else
     cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
 ${HYPERV_HOST} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
-    dnsmasq_params=""
-    dnsmasq_params2=""
-    dnsmasq_params3=""
 fi
+
+data=$(ansible -i $SHARED_DIR/inventory hypervisor -m shell -a "host $SNO_NAME" | grep address)
+
+SNO_IP=$(echo $data | sed "s/.*address //g")
+SNO_FQDN=$(echo $data | cut -d" " -f1)
+SNO_DOMAIN=$(echo $SNO_FQDN | cut -d"." -f2-)
 
 # Create a playbook to remove existing SNO
 cat << EOF > $SHARED_DIR/delete-sno.yml
@@ -173,11 +173,32 @@ cat << EOF > $SHARED_DIR/delete-sno.yml
         tasks_from: deletion.yml
       vars:
         vsno_name: $SNO_NAME
-        $dnsmasq_params
-        $dnsmasq_params2
-        $dnsmasq_params3
+        vsno_domain_name: $SNO_DOMAIN
 
 EOF
+
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
+---
+- name: Delete cluster if exists
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Remove last run for ${CLUSTER_NAME}_ci
+    shell: |
+        kcli delete plan --yes ${CLUSTER_NAME}_ci
+        kcli delete plan --yes ${CLUSTER_NAME}
+    ignore_errors: yes
+
+  - name: Remove last run for ${ADD_BM_HOST:-empty}_ci
+    shell: |
+        kcli delete plan --yes ${ADD_BM_HOST:-empty}_ci
+        kcli delete plan --yes ${ADD_BM_HOST:-empty}
+    ignore_errors: yes
+
+EOF
+
+
 
 cat << EOF > ~/fetch-information.yml
 ---
@@ -224,20 +245,21 @@ echo "Run the playbook to remove SNO management cluster"
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     $SHARED_DIR/delete-sno.yml
 
-# shellcheck disable=SC1083
-SNO_IP=$(ansible-playbook -vv ~/freeip.yml 2>/dev/null | grep '"free_ip": ' | tail -1  | awk {'print $2'} | tr -d '"')
+echo "Run the playbook to remove possible kcli clusters"
+ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+    $SHARED_DIR/destroy-cluster.yml
 
 if $BASTION_ENV; then
-    PLAYBOOK_ARGS=" -e vsno_dnsmasq_dir=/etc/dnsmasq.d -e dnsmasq_configure_interface=false -e netmanager_restart=false -e dnsmasq_restart=true "
+    PLAYBOOK_ARGS=" -e hostedbm_inject_dns=true "
     SNO_CLUSTER_API_PORT="64${SNO_IP##*.}"  # "64" and last octet of SNO_IP address
 else
-    PLAYBOOK_ARGS=""
+    PLAYBOOK_ARGS=" -e hostedbm_inject_dns=false "
     SNO_CLUSTER_API_PORT="6443"
 fi
 
-if [[ "$T5CI_VERSION" == "4.19" ]]; then
-    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
-    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.18"
+if [[ "$T5CI_VERSION" == "4.20" ]] || [[ "$T5CI_VERSION" == "4.21" ]]; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.19"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.19"
 fi
 
 cat << EOF > ~/fetch-kubeconfig.yml
@@ -308,7 +330,9 @@ EOF
 if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf-nrop"* ]]; then
     PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST"
 fi
-
+if [[ "$JOB_NAME" != *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
+    PLAYBOOK_ARGS+=" -e image_override=quay.io/hypershift/hypershift-operator:latest "
+fi
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
@@ -318,11 +342,10 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e hcphost=$CLUSTER_NAME \
     -e vsno_name=$SNO_NAME \
     -e vsno_ip=$SNO_IP \
-    -e hostedbm_inject_dns=true \
+    -e vsno_add_nm_hosts=false \
     -e sno_tag=$MGMT_VERSION \
     -e vsno_wait_minutes=150 \
     -e vsno_release=$T5CI_JOB_MGMT_RELEASE_TYPE \
-    -e image_override=quay.io/hypershift/hypershift-operator:latest \
     -e hcp_tag=$T5CI_VERSION \
     -e hcp_release=$T5CI_JOB_HCP_RELEASE_TYPE $PLAYBOOK_ARGS || status=$?
 

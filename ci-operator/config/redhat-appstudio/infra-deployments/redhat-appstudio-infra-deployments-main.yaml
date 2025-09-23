@@ -8,7 +8,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -27,7 +27,7 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   optional: true
   steps:
     test:
@@ -39,12 +39,12 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-2
+      region: us-west-2
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+    version: "4.16"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
   steps:
     test:
     - ref: redhat-appstudio-e2e
@@ -54,11 +54,11 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-2
+      region: us-west-2
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   cron: 0 1 * * *
   steps:
     workflow: redhat-appstudio-openshift-upgrade
@@ -72,9 +72,9 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   optional: true
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
   steps:
     test:
     - ref: redhat-appstudio-upgrade
@@ -94,12 +94,29 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-2
+      region: us-west-2
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.15"
+    version: "4.16"
   cron: 0 */4 * * *
+  steps:
+    test:
+    - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
+- always_run: false
+  as: konflux-e2e-v416-optional
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
   steps:
     test:
     - ref: redhat-appstudio-e2e

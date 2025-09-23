@@ -1,0 +1,37 @@
+base_images:
+  assisted-test-infra-internal:
+    name: ocm-2.15
+    namespace: edge-infrastructure
+    tag: assisted-test-infra-internal
+releases:
+  latest:
+    integration:
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cleanup-aws-us-east-1
+  cron: '*/30 * * * *'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      AWS_REGION: us-east-1
+    test:
+    - ref: assisted-aws-cleanup
+- as: cleanup-aws-us-east-2
+  cron: '*/30 * * * *'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      AWS_REGION: us-east-2
+    test:
+    - ref: assisted-aws-cleanup
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: assisted-test-infra
+  variant: aws-cleanup

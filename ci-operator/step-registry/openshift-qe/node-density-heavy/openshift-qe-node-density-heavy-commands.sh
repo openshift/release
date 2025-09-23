@@ -39,11 +39,7 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-heavy
 
-# A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50  --pod-ready-threshold=2m" ./run.sh
-
-# The measurable run
-EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS} --pprof=${PPROF}"
 
 export CLEANUP_WHEN_FINISH=true
 
@@ -58,16 +54,8 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
 fi
 
 if [[ -n "${USER_METADATA}" ]]; then
-    USER_METADATA=$(echo "$USER_METADATA" | xargs)
-    IFS=',' read -r -a env_array <<< "$USER_METADATA"
-    true > user-metadata.yaml
-    for env_pair in "${env_array[@]}"; do
-      env_pair=$(echo "$env_pair" | xargs)
-      env_key=$(echo "$env_pair" | cut -d'=' -f1)
-      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
-      echo "$env_key: \"$env_value\"" >> user-metadata.yaml
-    done
-    EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+  echo "${USER_METADATA}" > user-metadata.yaml
+  EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
 fi
 export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
@@ -92,3 +80,6 @@ if [ ${BAREMETAL} == "true" ]; then
   pkill ssh
 fi
 #node-density-heavy test
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
+fi

@@ -25,8 +25,11 @@ images:
   to: cloud-event-consumer
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
+    - cloud-event-consumer
+    name: ptp-4.19
+    namespace: origin
+  - excluded_images:
     - cloud-event-consumer
     name: "4.19"
     namespace: ocp
@@ -49,7 +52,6 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws
-  optional: true
   steps:
     cluster_profile: aws-telco
     env:
@@ -85,12 +87,19 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
-- as: security
+- always_run: false
+  as: security
   optional: true
   steps:
     env:
       PROJECT_NAME: cloud-event-proxy
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: redhat-cne

@@ -23,6 +23,16 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+# Starting in 4.21, we will aggressively retry test failures only in
+# presubmits to determine if a failure is a flake or legitimate. This is
+# to reduce the number of retests on PR's.
+# TODO: Remove "origin" and run everywhere
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) && "$REPO_NAME" == "origin" ]]; then
+    if openshift-tests run --help | grep -q 'retry-strategy'; then
+        TEST_ARGS+=" --retry-strategy=aggressive"
+    fi
+fi
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -126,6 +136,8 @@ if [[ -f "${SHARED_DIR}/mirror-tests-image" ]]; then
     TEST_ARGS+=" --from-repository=$(<"${SHARED_DIR}/mirror-tests-image")"
 fi
 
+TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
+
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
 gcp|gcp-arm64)
@@ -198,18 +210,7 @@ powervs*)
     export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
-external)
-    # FIXME(mtulio): https://issues.redhat.com/browse/OCPBUGS-53249
-    # Forcing openshift/origin presubmits to set the flag provider to "external" to validate the PR
-    # https://github.com/openshift/origin/pull/29623
-    # Presubmits on origin repo is currently permanent failing, skips is addressed on OCPBUGS-53249, required by
-    # https://github.com/openshift/kubernetes/pull/2247
-    if [[ $JOB_NAME == *"pull-ci-openshift-origin"* ]] || [[ $JOB_NAME == *"pull-ci-openshift-kubernetes"* ]]; then
-        export TEST_PROVIDER='{"type":"external"}'
-    else
-        export TEST_PROVIDER=''
-    fi
-    ;;
+external) export TEST_PROVIDER='{"type":"external"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -338,6 +339,38 @@ function suite() {
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!" &&
     set +x
+}
+
+function wait_for_ipsec_full_mode() {
+  until
+    timeout 30s oc rollout status daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes && \
+    oc wait --for=delete daemonset/ovn-ipsec-containerized -n openshift-ovn-kubernetes --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not available yet (or) ovn-ipsec-containerized daemonset is still deployed"
+    sleep 30s
+  done
+  wait_for_cluster_operators_ready
+}
+
+function wait_for_ipsec_external_mode() {
+  until
+    oc wait --for=delete daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not removed yet"
+    sleep 30s
+  done
+  wait_for_cluster_operators_ready
+}
+
+function wait_for_cluster_operators_ready() {
+  until
+    oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+  do
+    echo "Cluster Operators Degraded=True,Progressing=True,or Available=False"
+    sleep 30s
+  done
 }
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
@@ -524,6 +557,27 @@ suite-conformance)
     ;;
 suite)
     suite
+    ;;
+ipsec-suite)
+     # Rollout IPsec Full mode and run the suite.
+     echo "Rolling out IPsec Full mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full"}}}}}'
+     wait_for_ipsec_full_mode
+     echo "IPsec Full mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec External mode and run the suite.
+     echo "Rolling out IPsec External mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"External"}}}}}'
+     wait_for_ipsec_external_mode
+     echo "IPsec External mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec Full mode with NAT-T encapsulation and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full", "full":{"encapsulation": "Always"}}}}}}'
+     wait_for_ipsec_full_mode
+     echo "IPsec Full mode with NAT-T encapsulation rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"

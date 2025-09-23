@@ -37,7 +37,7 @@ echo "exit" | curl telnet://${CLUSTER_HV_IP}:22 && echo "SSH port is opened"|| e
 #Create inventory file
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
+${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_retries=5
 EOF
 
 echo "#############################################################################..."
@@ -155,7 +155,7 @@ cat << EOF > ~/fetch-kubeconfig.yml
       regexp: '    server: https://api.*'
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
-    
+
   - name: Add docker auth to enable pulling containers from CI registry
     shell: >-
       kcli ssh root@${CLUSTER_NAME}-installer
@@ -299,13 +299,19 @@ log_chronyd_status() {
 
 #Set status and run playbooks
 status=0
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+
+if [[ "$SKIP_OCP_INSTALL" != "true" ]]; then
+  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+fi
+
+# Fetch kubeconfig and cluster information
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
-if [[ "$status" == 0 ]]; then
+
+if [[ "$SKIP_OCP_INSTALL" != "true" && "$status" -eq 0 ]]; then
   #installer has issues applying machine-configs with OCP 4.10, using manual way
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
+  KUBECONFIG="$SHARED_DIR/kubeconfig" oc apply -f "$SHARED_DIR/disable_ntp.yml" || true
   wait_for_mcp "2700s" || true
   log_chronyd_status || true
 fi
-exit ${status}
+exit $status

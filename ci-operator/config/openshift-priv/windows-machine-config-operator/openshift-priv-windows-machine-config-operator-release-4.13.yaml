@@ -73,11 +73,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
-- as: build
-  commands: make build
-  container:
-    from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make unit
   container:
@@ -94,6 +89,9 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -113,6 +111,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
       WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
     test:
     - ref: windows-e2e-operator-test

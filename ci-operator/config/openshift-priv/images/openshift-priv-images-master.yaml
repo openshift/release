@@ -3,8 +3,12 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
+  ocp_4.20_base-rhel9:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.21_base-rhel9:
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-8-base-openshift-4.18:
@@ -25,49 +29,52 @@ images:
 - context_dir: base
   dockerfile_path: Dockerfile.rhel9
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
   to: base-rhel9
 - context_dir: egress/router
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: egress-router
 - context_dir: egress/http-proxy
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: egress-http-proxy
 - context_dir: egress/dns-proxy
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: egress-dns-proxy
 - context_dir: ipfailover/keepalived
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: keepalived-ipfailover
 promotion:
   to:
   - excluded_images:
     - base-rhel9
-    name: 4.19-priv
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -92,6 +99,12 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift-priv

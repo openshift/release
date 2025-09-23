@@ -1,4 +1,8 @@
 base_images:
+  cluster-control-plane-machine-set-tests:
+    name: "4.19"
+    namespace: ocp
+    tag: cluster-control-plane-machine-set-tests
   ocp_4.19_base-rhel9:
     name: "4.19"
     namespace: ocp
@@ -48,7 +52,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws
-  interval: 24h
+  cron: 5 17 * * 0
   steps:
     cluster_profile: aws-2
     observers:
@@ -58,7 +62,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -66,7 +70,7 @@ tests:
     workflow: ipi-aws
   timeout: 6h0m0s
 - as: e2e-aws-arm
-  interval: 24h
+  cron: 53 22 * * 6
   steps:
     cluster_profile: aws-2
     dependencies:
@@ -77,7 +81,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -85,7 +89,7 @@ tests:
     workflow: ipi-aws
   timeout: 6h0m0s
 - as: e2e-azure
-  interval: 24h
+  cron: 34 1 * * 6
   steps:
     cluster_profile: azure4
     observers:
@@ -95,7 +99,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -103,7 +107,7 @@ tests:
     workflow: ipi-azure
   timeout: 6h0m0s
 - as: e2e-gcp
-  interval: 24h
+  cron: 8 21 * * 6
   steps:
     cluster_profile: gcp
     observers:
@@ -113,7 +117,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -121,7 +125,7 @@ tests:
     workflow: ipi-gcp
   timeout: 6h0m0s
 - as: e2e-openstack
-  interval: 24h
+  cron: 2 1 * * 0
   steps:
     cluster_profile: openstack-vexxhost
     test:
@@ -129,7 +133,7 @@ tests:
       commands: |
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -137,7 +141,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-aws-techpreview
-  interval: 24h
+  cron: 39 20 * * 0
   steps:
     cluster_profile: aws
     env:
@@ -146,7 +150,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -154,7 +158,7 @@ tests:
     workflow: ipi-aws
   timeout: 6h0m0s
 - as: e2e-aws-arm-techpreview
-  interval: 24h
+  cron: 41 8 * * 6
   steps:
     cluster_profile: aws
     dependencies:
@@ -166,7 +170,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -174,7 +178,7 @@ tests:
     workflow: ipi-aws
   timeout: 6h0m0s
 - as: e2e-azure-techpreview
-  interval: 24h
+  cron: 32 9 * * 0
   steps:
     cluster_profile: azure4
     env:
@@ -183,7 +187,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -191,7 +195,7 @@ tests:
     workflow: ipi-azure
   timeout: 6h0m0s
 - as: e2e-gcp-techpreview
-  interval: 24h
+  cron: 11 3 * * 6
   steps:
     cluster_profile: gcp
     env:
@@ -200,7 +204,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -208,7 +212,7 @@ tests:
     workflow: ipi-gcp
   timeout: 6h0m0s
 - as: e2e-openstack-techpreview
-  interval: 24h
+  cron: 44 19 * * 6
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -218,7 +222,7 @@ tests:
       commands: |
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -226,14 +230,14 @@ tests:
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-vsphere-periodic
-  interval: 24h
+  cron: 10 16 * * 0
   steps:
     cluster_profile: vsphere-elastic
     test:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m
@@ -241,7 +245,7 @@ tests:
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-periodic-techpreview
-  interval: 24h
+  cron: 28 3 * * 6
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -250,7 +254,7 @@ tests:
     - as: test
       commands: |
         make e2e-periodic
-      from: src
+      from: cluster-control-plane-machine-set-tests
       resources:
         requests:
           cpu: 100m

@@ -1,16 +1,16 @@
 base_images:
   base-rhel9:
-    name: "4.18"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
-    tag: v1.30.0
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    tag: v1.39.2
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -18,16 +18,16 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cert-manager
 operator:
   bundles:
@@ -35,24 +35,21 @@ operator:
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: openshift.io/cert-manager-operator:latest
+  - pullspec: openshift.io/cert-manager-operator:.*
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller
+  - pullspec: quay.io/jetstack/cert-manager-controller:.*
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-webhook
+  - pullspec: quay.io/jetstack/cert-manager-webhook:.*
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-cainjector
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:.*
     with: pipeline:cert-manager
 releases:
-  initial:
-    integration:
-      name: "4.17"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.17"
-      namespace: ocp
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -87,12 +84,18 @@ tests:
     test:
     - ref: fips-check-image-scan
 - as: e2e-operator
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
-      FIPS_ENABLED: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
@@ -101,11 +104,13 @@ tests:
       cli: latest
       commands: |
         oc -n cert-manager-operator rollout status deployment cert-manager-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
       from: src
       resources:
         requests:
           cpu: 100m
-    - ref: fips-check-fips-or-die
     - as: test
       cli: latest
       commands: |
@@ -114,29 +119,28 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 - as: e2e-operator-tech-preview
   optional: true
-  run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
+  skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
-      FIPS_ENABLED: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
     test:
-    - ref: fips-check-fips-or-die
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
   branch: master
   org: openshift

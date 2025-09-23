@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.18
+    tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
 - dockerfile_path: images/Dockerfile.ci
   from: src
@@ -14,12 +14,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -47,7 +47,8 @@ tests:
         BOND_PRIMARY_INTERFACE=true
         NETWORK_CONFIG_FOLDER=./network-configs/bond
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-upgrade
+- always_run: false
+  as: e2e-metal-ipi-upgrade
   cluster: build05
   optional: true
   steps:
@@ -65,6 +66,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
@@ -72,7 +74,8 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-ovn-dualstack-v6
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-v6
   cluster: build05
   optional: true
   steps:
@@ -81,7 +84,8 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6v4
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-upgrade-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-upgrade-ovn-ipv6
   cluster: build05
   optional: true
   steps:
@@ -91,6 +95,7 @@ tests:
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
 - as: e2e-metal-ipi-serial-ipv4
   cluster: build05
+  shard_count: 2
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
@@ -103,7 +108,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   optional: true
@@ -125,6 +130,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
+- as: e2e-metal-ovn-arbiter
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter
 - as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
@@ -159,6 +171,30 @@ tests:
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
     workflow: agent-e2e-generic
   timeout: 6h0m0s
+- as: e2e-agent-iso-no-registry-compact-ipv4
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
+        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-bad-dns
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        AGENT_TEST_CASES=bad_dns
+    workflow: agent-e2e-generic
 zz_generated_metadata:
   branch: master
   org: openshift-metal3

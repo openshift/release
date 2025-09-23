@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-operator
     decorate: true
     labels:
@@ -27,7 +27,7 @@ presubmits:
         - --target=e2e-gcp-operator
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -78,7 +78,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -100,7 +100,7 @@ presubmits:
         - --target=e2e-gcp-ovn
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -151,7 +151,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build09
+    cluster: build03
     context: ci/prow/goimports
     decorate: true
     labels:
@@ -168,7 +168,7 @@ presubmits:
         - --target=goimports
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -204,7 +204,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build09
+    cluster: build03
     context: ci/prow/govet
     decorate: true
     labels:
@@ -221,7 +221,7 @@ presubmits:
         - --target=govet
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -257,7 +257,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build09
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -275,7 +275,7 @@ presubmits:
         - --target=[release:latest]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -311,7 +311,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build01
+    cluster: build11
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -338,7 +338,7 @@ presubmits:
         - --variant=okd-scos
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -389,7 +389,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build09
+    cluster: build03
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -411,7 +411,7 @@ presubmits:
         - --variant=okd-scos
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -443,21 +443,24 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
-    context: ci/prow/regression-clusterinfra-cucushift-rehearse-gcp-ipi
+    cluster: build04
+    context: ci/prow/regression-clusterinfra-gcp-ipi-mapi
     decorate: true
+    decoration_config:
+      timeout: 7h0m0s
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-machine-api-provider-gcp-release-4.18-regression-clusterinfra-cucushift-rehearse-gcp-ipi
+    name: pull-ci-openshift-machine-api-provider-gcp-release-4.18-regression-clusterinfra-gcp-ipi-mapi
     optional: true
-    rerun_command: /test regression-clusterinfra-cucushift-rehearse-gcp-ipi
+    rerun_command: /test regression-clusterinfra-gcp-ipi-mapi
+    run_if_changed: ^(go\.mod|go\.sum)$
     spec:
       containers:
       - args:
@@ -466,10 +469,10 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=regression-clusterinfra-cucushift-rehearse-gcp-ipi
+        - --target=regression-clusterinfra-gcp-ipi-mapi
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -514,13 +517,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )regression-clusterinfra-cucushift-rehearse-gcp-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )regression-clusterinfra-gcp-ipi-mapi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build09
+    cluster: build03
     context: ci/prow/security
     decorate: true
     labels:
@@ -538,7 +541,7 @@ presubmits:
         - --target=security
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -580,7 +583,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build09
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -597,7 +600,7 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

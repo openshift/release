@@ -103,7 +103,7 @@ EOF
 if [ -z "${OUTBOUND_TYPE}" ]; then
   echo "Outbound Type is not defined"
 else
-  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
+  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NATGatewaySingleZone" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
     echo "Writing 'outboundType: ${OUTBOUND_TYPE}' to install-config"
     PATCH="${SHARED_DIR}/install-config-outboundType.yaml.patch"
     cat > "${PATCH}" << EOF
@@ -152,8 +152,18 @@ else
   echo "Omit baseDomainResourceGroupName for private cluster"
 fi
 
-# starting from 4.19, cluster sp only needs Contributor role
-if (( minor_version > 18 && major_version == 4 )) && [[ -f "${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json" ]]; then
-    echo "Copy Azure credential azure-sp-contributor.json to SHARED_DIR"
-    cp ${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json ${SHARED_DIR}/azure-sp-contributor.json
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  patch_user_provisioned_dns="${SHARED_DIR}/install-config-user-provisioned-dns.yaml.patch"
+  cat > "${patch_user_provisioned_dns}" << EOF
+platform:
+  azure:
+    userProvisionedDNS: Enabled
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
 fi
+
+# starting from 4.19, cluster sp only needs Contributor role
+#if (( minor_version > 18 && major_version == 4 )) && [[ -f "${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json" ]]; then
+#    echo "Copy Azure credential azure-sp-contributor.json to SHARED_DIR"
+#    cp ${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json ${SHARED_DIR}/azure-sp-contributor.json
+#fi

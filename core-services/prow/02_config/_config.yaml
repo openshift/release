@@ -17,6 +17,7 @@ deck:
       - org: openshift
         slug: test-platform
       github_users:
+      - deads2k
       - vikaslaad
       - dobbymoodge
       - bparees
@@ -48,15 +49,6 @@ deck:
       - org: openshift
         slug: test-platform
   - repo: openshift/grafana-tempo-operator
-    rerun_auth_configs:
-      github_team_slugs:
-      - org: openshift
-        slug: team-qe
-      - org: openshift
-        slug: team-red-hat
-      - org: openshift
-        slug: test-platform
-  - repo: openshift/jaegertracing-jaeger-operator
     rerun_auth_configs:
       github_team_slugs:
       - org: openshift
@@ -178,11 +170,11 @@ deck:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-kni/eco-ci-cd-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-online/access-transparency-service: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/cucushift: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/distributed-tracing-qe: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/grafana-tempo-operator: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
-      openshift/jaegertracing-jaeger-operator: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/open-telemetry-opentelemetry-operator: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/openshift-tests-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/verification-tests: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -230,7 +222,7 @@ deck:
       optional_files:
       - .*/monitor.*\.xml
       required_files:
-      - .*/junit.*\.xml
+      - .*junit.*\.xml
     - lens:
         name: podinfo
       required_files:
@@ -295,6 +287,8 @@ plank:
   default_decoration_config_entries:
   - config:
       censor_secrets: true
+      censoring_options:
+        minimum_secret_length: 6
       gcs_configuration:
         bucket: test-platform-results
         compress_file_types:
@@ -338,10 +332,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250412-53ab931a4
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20250412-53ab931a4
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20250412-53ab931a4
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20250412-53ab931a4
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20250914-6845c9a4c
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20250914-6845c9a4c
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20250914-6845c9a4c
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20250914-6845c9a4c
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -362,8 +356,8 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
-      grace_period: 2h0m0s
-      timeout: 22h0m0s
+      grace_period: 3h0m0s
+      timeout: 45h0m0s
     repo: openshift/openshift-tests-private
   - config:
       gcs_configuration:
@@ -381,14 +375,6 @@ plank:
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
       timeout: 23h0m0s
     repo: openshift/grafana-tempo-operator
-  - config:
-      gcs_configuration:
-        bucket: qe-private-deck
-        mediaTypes:
-          log: text/plain
-      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
-      timeout: 23h0m0s
-    repo: openshift/jaegertracing-jaeger-operator
   - config:
       gcs_configuration:
         bucket: qe-private-deck
@@ -414,10 +400,17 @@ plank:
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
     repo: openshift-kni/eco-ci-cd-private
   - config:
-      timeout: 23h55m0s
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-online/access-transparency-service
+  - config:
+      timeout: 36h0m0s
     repo: openshift-kni/eco-ci-cd
   - config:
-      timeout: 12h0m0s
+      timeout: 23h55m0s
     repo: openshift-eng/ocp-qe-perfscale-ci
   - config:
       timeout: 12h0m0s
@@ -440,12 +433,12 @@ plank:
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-online/access-transparency-service: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/distributed-tracing-qe: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/grafana-tempo-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
-    openshift/jaegertracing-jaeger-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/verification-tests: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -454,10 +447,11 @@ plank:
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
-  max_concurrency: 1500
+  max_concurrency: 1750
   max_goroutines: 20
+  max_revivals: 3
   pod_pending_timeout: 30m0s
-  pod_running_timeout: 48h0m0s
+  pod_running_timeout: 72h0m0s
   pod_unscheduled_timeout: 30m0s
   report_templates:
     '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -467,6 +461,9 @@ plank:
       ### Report flaky E2E tests and PROW issues in [INTLY-7197](https://issues.redhat.com/browse/INTLY-7197) epic. Detailed instructions can be found in the description of said epic.
       [Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
     openshift-kni/eco-ci-cd-private: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-online/access-transparency-service: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -479,9 +476,6 @@ plank:
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift/grafana-tempo-operator: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift/jaegertracing-jaeger-operator: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift/open-telemetry-opentelemetry-operator: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -507,10 +501,6 @@ prowjob_default_entries:
   config:
     tenant_id: qe-private
   repo: openshift/grafana-tempo-operator
-- cluster: '*'
-  config:
-    tenant_id: qe-private
-  repo: openshift/jaegertracing-jaeger-operator
 - cluster: '*'
   config:
     tenant_id: qe-private
@@ -614,43 +604,32 @@ tide:
             skip-unknown-contexts: true
           assisted-test-infra:
             skip-unknown-contexts: true
+          cert-manager-operator-release:
+            skip-unknown-contexts: true
           ci-docs:
             skip-unknown-contexts: true
+          jenkins:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
           lightspeed-service:
-            skip-unknown-contexts: true
-          lvm-operator:
             skip-unknown-contexts: true
           release:
             skip-unknown-contexts: true
       openshift-kni:
         repos:
-          cluster-group-upgrades-operator:
-            optional-regex-contexts:
-            - Red\ Hat\ Konflux.*
-          cnf-features-deploy:
-            optional-regex-contexts:
-            - Red\ Hat\ Konflux.*
-          lifecycle-agent:
-            optional-regex-contexts:
-            - Red\ Hat\ Konflux.*
           numaresources-operator:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
-          oran-hwmgr-plugin:
-            optional-regex-contexts:
-            - Red\ Hat\ Konflux.*
-          oran-o2ims:
-            optional-regex-contexts:
-            - Red\ Hat\ Konflux.*
-          telco-reference:
+          scheduler-plugins:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
       openshift-priv:
         repos:
           assisted-installer:
             skip-unknown-contexts: true
-          lvm-operator:
-            skip-unknown-contexts: true
+          jenkins:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
       operator-framework:
         repos:
           api:
@@ -699,7 +678,6 @@ tide:
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/distributed-tracing-qe: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/grafana-tempo-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
-    openshift/jaegertracing-jaeger-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
   priority:

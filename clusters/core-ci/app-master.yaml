@@ -1,0 +1,46 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: clusters
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: cluster-core-ci
+  namespace: openshift-gitops
+spec:
+  destinations:
+  - name: in-cluster
+    namespace: '*'
+  sourceRepos:
+  - 'https://github.com/openshift/release'
+  sourceNamespaces:
+  - clusters
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-core-ci
+  namespace: clusters
+spec:
+  destination:
+    name: in-cluster
+    namespace: clusters
+  source:
+    path: clusters/core-ci/manifests
+    repoURL: 'https://github.com/openshift/release'
+    targetRevision: core-ci
+  sources: []
+  project: cluster-core-ci
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+      - PruneLast=true

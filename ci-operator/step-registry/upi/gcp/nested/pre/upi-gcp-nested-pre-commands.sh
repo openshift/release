@@ -42,7 +42,7 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
 gcloud compute instances create "${INSTANCE_PREFIX}" \
   --image-family openshift4-libvirt-rhel9 \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --machine-type n2-standard-16 \
+  --machine-type "${MACHINE_TYPE}" \
   --boot-disk-type pd-ssd \
   --boot-disk-size 256GB \
   --subnet "${INSTANCE_PREFIX}" \

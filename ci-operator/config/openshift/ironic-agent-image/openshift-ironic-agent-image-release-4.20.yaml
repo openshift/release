@@ -3,7 +3,7 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
@@ -21,8 +21,8 @@ raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-19-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.art/ci/base-4-19-rhel-9-server-ironic.repo
-    from: ocp_4.19_base-rhel9
+      curl http://base-4-20-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.art/ci/base-4-20-rhel-9-server-ironic.repo
+    from: ocp_4.20_base-rhel9
     to: ironic-agent-base
 releases:
   initial:
@@ -54,7 +54,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
@@ -79,7 +79,7 @@ tests:
     #!/bin/bash
     set -euxo pipefail
     # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="main"
+    export CHECK_RELEASE="release-4.20"
     make check-reqs
   container:
     from: src

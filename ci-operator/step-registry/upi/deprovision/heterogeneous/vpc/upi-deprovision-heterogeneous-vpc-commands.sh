@@ -22,7 +22,6 @@ echo "BUILD ID - ${BUILD_ID}"
 TRIM_BID=$(echo "${BUILD_ID}" | cut -c 1-6)
 echo "TRIMMED BUILD ID - ${TRIM_BID}"
 OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
-OCP_CLEAN_VERSION=$(echo "${OCP_VERSION}" | awk -F. '{print $1"."$2}')
 
 if [ ! -f "${SHARED_DIR}"/WORKSPACE_NAME ]
 then
@@ -91,14 +90,27 @@ function cleanup_ibmcloud_vpc() {
         done
     fi
     echo "Done cleaning up prior runs"
+    echo "Cleanup security group"
+    SEC_GROUP_NAME="${VPC_NAME}-workers-sg"
+
+    SEC_GROUP_ID=$(ibmcloud is security-groups --output json | jq -r \
+      --arg NAME "$SEC_GROUP_NAME" '.[] | select(.name == $NAME) | .id')
+
+    if [[ -n "$SEC_GROUP_ID" ]]; then
+      echo "Deleting security group: $SEC_GROUP_NAME ($SEC_GROUP_ID)"
+      ibmcloud is security-group-delete "$SEC_GROUP_ID" -f
+    else
+      echo "Security group '$SEC_GROUP_NAME' not found."
+    fi
+    echo "Cleanup security group"
 }
 
 function setup_multi_arch_vpc_workspace(){
   # Before the vpc is created, download the automation code
   cd "${IBMCLOUD_HOME_FOLDER}" || true
-  curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/release-${OCP_CLEAN_VERSION}.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
+  curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/main.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
   tar -xf "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc.tar.gz
-  mv ocp4-upi-compute-powervs-ibmcloud-release-"${OCP_CLEAN_VERSION}" ocp4-multi-arch-vpc || true
+  mv ocp4-upi-compute-powervs-ibmcloud-main ocp4-multi-arch-vpc || true
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-multi-arch-vpc || true
   ${IBMCLOUD_HOME_FOLDER}/terraform init
 }

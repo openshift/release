@@ -1,0 +1,27 @@
+ref:
+  as: sandboxed-containers-operator-get-kata-rpm
+  from: upi-installer
+  commands: sandboxed-containers-operator-get-kata-rpm-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - mount_path: /usr/local/sandboxed-containers-operator-ci-secrets/secrets
+      name: sandboxed-containers-operator-ci-secrets
+      namespace: test-credentials
+  env:
+  - name: INSTALL_KATA_RPM
+    default: 'false'
+  - name: KATA_RPM_BUILD_TASK
+    default: ''
+  - name: KATA_RPM_VERSION
+    default: '3.13.0-3.rhaos4.18.el9'
+    documentation: |-
+      kata-containers version to be downloaded from brew/koji
+      and pushed to all worker nodes; eg: 3.13.0-1.rhaos4.18.el9
+  documentation: |-
+    When INSTALL_KATA_RPM is true it fetches kata-containers.rpm
+    specified by KATA_RPM_BUILD_TASK or KATA_RPM_VERSION to all
+    worker nodes into "/var/local/kata-containers.rpm" so it can
+    be installed by openshift-tests-private "[sig-kata]" tests

@@ -31,8 +31,7 @@ images:
   to: cloud-network-config-controller
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -66,6 +65,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-azure-serial
+  shard_count: 2
   steps:
     cluster_profile: azure-2
     env:
@@ -106,7 +106,14 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

@@ -4,6 +4,15 @@ metadata:
   name: dptp-controller-manager-app-ci
 rules:
 - apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
   - prow.k8s.io
   resources:
   - prowjobs
@@ -77,7 +86,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-controller-manager\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: dptp-controller-manager
   name: dptp-controller-manager
@@ -109,6 +121,7 @@ spec:
         - --depth=1
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -124,6 +137,7 @@ spec:
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -131,8 +145,9 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "0.5"
-      - image: dptp-controller-manager
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-controller-manager_latest
         name: dptp-controller-manager
+        imagePullPolicy: Always
         args:
         - --leader-election-namespace=ci
         - --release-repo-git-sync-path=/var/repo/release

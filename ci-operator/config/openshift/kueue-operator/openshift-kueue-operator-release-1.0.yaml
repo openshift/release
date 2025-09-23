@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
   ocp_builder_rhel-9-base-openshift-4.19:
     name: builder
     namespace: ocp
@@ -7,6 +11,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -22,8 +38,27 @@ images:
 - dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
   from: src
   to: kueue-operator-src
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -67,64 +102,12 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
+  optional: true
   steps:
+    post:
+    - chain: kueue-operator-post
     test:
-    - as: e2e-kueue
-      cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
-        make e2e-ci-test
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
-- as: test-e2e-upstream-4-17
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
-  steps:
-    test:
-    - as: e2e-kueue
-      cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
-        make e2e-upstream-test
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
+    - chain: kueue-operator-test-e2e
 - as: test-e2e-4-18
   cluster_claim:
     architecture: amd64
@@ -133,66 +116,84 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
-  optional: true
+  minimum_interval: 96h
+  presubmit: true
   steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-0
+      OPERAND_COMPONENT: kueue-0-11
+      OPERATOR_COMPONENT: kueue-operator-1-0
+    post:
+    - chain: kueue-operator-post
     test:
-    - as: e2e-kueue
-      cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
-        make e2e-ci-test
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
-- as: test-e2e-upstream-4-18
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-4-19
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
-  optional: true
+    version: "4.19"
+  minimum_interval: 96h
+  presubmit: true
   steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-0
+      OPERAND_COMPONENT: kueue-0-11
+      OPERATOR_COMPONENT: kueue-operator-1-0
+    post:
+    - chain: kueue-operator-post
     test:
-    - as: e2e-kueue
+    - chain: kueue-operator-test-e2e
+- as: test-e2e-disconnected
+  minimum_interval: 96h
+  steps:
+    cluster_profile: gcp
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-0
+      CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.19
+      CATSRC_NAME: redhat-operators
+      MIRROR_OPERATORS: "true"
+      MUST_GATHER_COMPONENT: kueue-must-gather-1-0
+      OPERAND_COMPONENT: kueue-0-11
+      OPERATOR_COMPONENT: kueue-operator-1-0
+    post:
+    - as: kueue-must-gather-disconnected
       cli: latest
-      commands: |-
-        echo "Current PWD: $(pwd)"
-        echo "Listing directory contents:"
-        ls -lah
-        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
-        echo "Current Git branch:"
-        git branch --show-current
-
-        echo "Latest Git commits:"
-        git log --oneline -5
-
-        echo "Git status:"
-        git status
-        export OPERATOR_IMAGE=quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-operator-1-0:on-pr-${REVISION}
-        echo "Using Operator Image: ${OPERATOR_IMAGE}"
-        make e2e-upstream-test
+      commands: |
+        source "${SHARED_DIR}/env"
+        export MUST_GATHER_IMAGE
+        echo "Running must-gather to gather diagnostics..."
+        mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
+        oc adm must-gather --image=${MUST_GATHER_IMAGE} --dest-dir=${ARTIFACT_DIR:-must-gather}/must-gather
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
+    - as: kueue-cleanup-disconnected
+      cli: latest
+      commands: make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    test:
+    - chain: cert-manager-install
+    - chain: kueue-operator-disconnected
+    - as: e2e-kueue
+      cli: latest
+      commands: |
+        export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        make test-e2e
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 zz_generated_metadata:
   branch: release-1.0
   org: openshift

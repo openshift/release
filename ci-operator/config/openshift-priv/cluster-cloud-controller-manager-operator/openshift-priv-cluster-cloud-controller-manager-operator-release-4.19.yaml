@@ -10,7 +10,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.19"
 binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
 build_root:
   from_repository: true
@@ -27,8 +27,7 @@ images:
   to: cluster-cloud-controller-manager-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -109,7 +108,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      TEST_FILTERS: LEVEL0
+      TEST_FILTERS: ~ChkUpgrade&;LEVEL0
       TEST_SCENARIOS: Cluster_Infrastructure
     test:
     - ref: openshift-extended-test
@@ -169,11 +168,12 @@ tests:
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix
-- as: security
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: cluster-cloud-controller-manager-operator
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

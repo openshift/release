@@ -7,7 +7,6 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export STORAGECLASS_LOCATION=${SHARED_DIR}/efs-sc.yaml
 
 REGION=${REGION:-$LEASED_RESOURCE}
-FILESYSTEM_ID=$(yq-go r "${STORAGECLASS_LOCATION}" 'parameters.fileSystemId')
 
 # Special setting for C2S/SC2S
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
@@ -58,6 +57,21 @@ function wait_for_mount_targets_deleted() {
         fi
     done
 }
+
+if [[ ${ENABLE_CROSS_ACCOUNT} == "yes" ]]; then
+  # Cross account clusters switch to the shared account
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  logger "INFO" "Using shared AWS account ..."
+  FILESYSTEM_ID=$(cat "$SHARED_DIR/cross_account_fs_id")
+  # clean vpc peering if exists, it only created for cross account clusters
+  if test -s "${SHARED_DIR}/vpc_peering_id" ; then
+    vpc_peering_id=$(cat "$SHARED_DIR/vpc_peering_id")
+    aws ec2 delete-vpc-peering-connection --region "${REGION}" --vpc-peering-connection-id "${vpc_peering_id}"
+    logger "INFO" "Aws vpc-peering-connection ${vpc_peering_id} deleted ..."
+  fi
+else
+  FILESYSTEM_ID=$(yq-go r "${STORAGECLASS_LOCATION}" 'parameters.fileSystemId')
+fi
 
 # Delete each Access Point
 for ap in $(aws efs describe-access-points --region "${REGION}" --file-system-id "${FILESYSTEM_ID}" --query 'AccessPoints[*].AccessPointId' --output text); do

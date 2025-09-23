@@ -6,6 +6,63 @@ presubmits:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
+    context: ci/prow/aks-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-release-4.7-aks-qa-e2e-tests
+    optional: true
+    rerun_command: /test aks-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=aks-qa-e2e-tests
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )aks-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build10
     context: ci/prow/aro-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -26,7 +83,7 @@ presubmits:
         - --target=aro-qa-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -67,7 +124,7 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
+      timeout: 6h0m0s
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -83,7 +140,7 @@ presubmits:
         - --target=eks-ebpf-qa-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -124,7 +181,7 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
+      timeout: 6h0m0s
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -140,7 +197,7 @@ presubmits:
         - --target=eks-qa-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -197,7 +254,7 @@ presubmits:
         - --target=gke-nongroovy-compatibility-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -254,7 +311,7 @@ presubmits:
         - --target=gke-nongroovy-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -312,7 +369,7 @@ presubmits:
         - --target=gke-operator-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -370,7 +427,7 @@ presubmits:
         - --target=gke-qa-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -427,7 +484,7 @@ presubmits:
         - --target=gke-race-condition-qa-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -483,7 +540,7 @@ presubmits:
         - --target=gke-scale-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -540,7 +597,7 @@ presubmits:
         - --target=gke-scanner-v4-install-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -597,7 +654,7 @@ presubmits:
         - --target=gke-sensor-integration-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -655,7 +712,7 @@ presubmits:
         - --target=gke-ui-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -712,7 +769,7 @@ presubmits:
         - --target=gke-upgrade-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -769,7 +826,7 @@ presubmits:
         - --target=gke-version-compatibility-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -829,7 +886,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -888,7 +945,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -948,7 +1005,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1008,7 +1065,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1068,7 +1125,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1128,7 +1185,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1187,7 +1244,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1247,7 +1304,7 @@ presubmits:
         - --variant=ocp-4-12
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1284,18 +1341,18 @@ presubmits:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-compliance-e2e-tests
+    context: ci/prow/ocp-4-19-compliance-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-compliance-e2e-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-compliance-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-18-compliance-e2e-tests
+    rerun_command: /test ocp-4-19-compliance-e2e-tests
     run_if_changed: ^(compliance|central\/compliance.*)
     spec:
       containers:
@@ -1304,10 +1361,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=compliance-e2e-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1337,25 +1394,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-compliance-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-compliance-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-ebpf-qa-e2e-tests
+    context: ci/prow/ocp-4-19-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-ebpf-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-ebpf-qa-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-18-ebpf-qa-e2e-tests
+    rerun_command: /test ocp-4-19-ebpf-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -1363,10 +1420,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=ebpf-qa-e2e-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1396,25 +1453,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-ebpf-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-ebpf-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-fips-qa-e2e-tests
+    context: ci/prow/ocp-4-19-fips-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-fips-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-fips-qa-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-18-fips-qa-e2e-tests
+    rerun_command: /test ocp-4-19-fips-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -1422,10 +1479,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=fips-qa-e2e-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1455,25 +1512,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-fips-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-fips-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-nongroovy-e2e-tests
+    context: ci/prow/ocp-4-19-nongroovy-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-nongroovy-e2e-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-nongroovy-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-18-nongroovy-e2e-tests
+    rerun_command: /test ocp-4-19-nongroovy-e2e-tests
     skip_if_only_changed: ^ui/
     spec:
       containers:
@@ -1482,10 +1539,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=nongroovy-e2e-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1515,25 +1572,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-nongroovy-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-nongroovy-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-operator-e2e-tests
+    context: ci/prow/ocp-4-19-operator-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-operator-e2e-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-operator-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-18-operator-e2e-tests
+    rerun_command: /test ocp-4-19-operator-e2e-tests
     run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
     spec:
       containers:
@@ -1542,10 +1599,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=operator-e2e-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1575,25 +1632,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-operator-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-operator-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-qa-e2e-tests
+    context: ci/prow/ocp-4-19-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-qa-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-18-qa-e2e-tests
+    rerun_command: /test ocp-4-19-qa-e2e-tests
     run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
     spec:
       containers:
@@ -1602,10 +1659,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=qa-e2e-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1635,25 +1692,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-scanner-v4-install-tests
+    context: ci/prow/ocp-4-19-scanner-v4-install-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-scanner-v4-install-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-scanner-v4-install-tests
     optional: true
-    rerun_command: /test ocp-4-18-scanner-v4-install-tests
+    rerun_command: /test ocp-4-19-scanner-v4-install-tests
     run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
     spec:
       containers:
@@ -1662,10 +1719,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=scanner-v4-install-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1695,25 +1752,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-scanner-v4-install-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-scanner-v4-install-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-sensor-integration-tests
+    context: ci/prow/ocp-4-19-sensor-integration-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-sensor-integration-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-sensor-integration-tests
     optional: true
-    rerun_command: /test ocp-4-18-sensor-integration-tests
+    rerun_command: /test ocp-4-19-sensor-integration-tests
     spec:
       containers:
       - args:
@@ -1721,10 +1778,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=sensor-integration-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1754,25 +1811,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-sensor-integration-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-sensor-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
-    context: ci/prow/ocp-4-18-ui-e2e-tests
+    context: ci/prow/ocp-4-19-ui-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-18
+      ci-operator.openshift.io/variant: ocp-4-19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-18-ui-e2e-tests
+    name: pull-ci-stackrox-stackrox-release-4.7-ocp-4-19-ui-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-18-ui-e2e-tests
+    rerun_command: /test ocp-4-19-ui-e2e-tests
     run_if_changed: ^ui/
     spec:
       containers:
@@ -1781,10 +1838,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=ui-e2e-tests
-        - --variant=ocp-4-18
+        - --variant=ocp-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1814,7 +1871,64 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4-18-ui-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4-19-ui-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build10
+    context: ci/prow/osd-aws-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 6h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-release-4.7-osd-aws-qa-e2e-tests
+    optional: true
+    rerun_command: /test osd-aws-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=osd-aws-qa-e2e-tests
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )osd-aws-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1841,7 +1955,7 @@ presubmits:
         - --target=osd-gcp-qa-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1898,7 +2012,7 @@ presubmits:
         - --target=powervs-qa-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1935,6 +2049,120 @@ presubmits:
     - ^release-4\.7$
     - ^release-4\.7-
     cluster: build10
+    context: ci/prow/rosa-hcp-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-release-4.7-rosa-hcp-qa-e2e-tests
+    optional: true
+    rerun_command: /test rosa-hcp-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=rosa-hcp-qa-e2e-tests
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rosa-hcp-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build10
+    context: ci/prow/rosa-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-release-4.7-rosa-qa-e2e-tests
+    optional: true
+    rerun_command: /test rosa-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=rosa-qa-e2e-tests
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rosa-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build10
     context: ci/prow/shell-unit-tests
     decorate: true
     decoration_config:
@@ -1954,7 +2182,7 @@ presubmits:
         - --target=shell-unit-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

@@ -1,0 +1,58 @@
+workflow:
+  as: hypershift-mce-agent-metal3-conformance-cilium
+  documentation: |-
+    The HyperShift mce agent conformance (connected) workflow executes
+    tests against a new ephemeral cluster with Cilium CNI installed.
+    The installation method for nodepool is metal3.
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - ref: hypershift-mce-dump
+    - chain: cilium-dump
+    - chain: hypershift-mce-agent-destroy
+    - chain: baremetalds-ipi-post
+    test:
+    - ref: hypershift-mce-agent-info
+    - chain: hypershift-conformance
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: cilium-conf
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-proxy
+    - ref: ipi-install-hosted-loki
+    - ref: baremetalds-devscripts-setup
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-agent-metal3-create-cilium
+    env:
+      HYPERSHIFT_NETWORK_TYPE: "Other"
+      CILIUM_VERSION: "1.15.1"
+      TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
+        access to server in CIDR block\| Netpol NetworkPolicy between server and client
+        should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed\|
+        Services should serve endpoints on same port and different protocols\|
+        Netpol NetworkPolicy between server and client should enforce
+        except clause while egress access to server in CIDR block\| Unidling
+        \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling
+        \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\] should work with
+        TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\| DNS should answer queries using the local DNS
+        endpoint\| etcd leader changes are not excessive\| check registry.redhat.io is available
+        and samples operator can import sample imagestreams
+      AGENT_NAMESPACE: hypershift-agents
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      IP_STACK: v4
+      PACKET_OS: rocky_9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=Cilium
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        ENABLE_LOCAL_REGISTRY=

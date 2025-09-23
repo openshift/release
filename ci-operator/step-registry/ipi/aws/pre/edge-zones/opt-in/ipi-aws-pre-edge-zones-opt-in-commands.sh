@@ -89,7 +89,28 @@ function select_option() {
 }
 
 
-for ZTYPE in $(echo ${EDGE_ZONE_TYPES-}  | tr ',' '\n');
-do
-    select_option "$ZTYPE";
-done
+if [[ "${EDGE_ZONES_LIST}" != "" ]]; then
+    for z_name in $(echo ${EDGE_ZONES_LIST} | sed 's/,/\n/g');
+    do
+        echo "EDGE_ZONES_LIST is set: ${EDGE_ZONES_LIST}"
+        echo "$z_name" >> "${SHARED_DIR}/edge-zone-names.txt"
+        aws --region "$REGION" ec2 describe-availability-zones --all-availability-zones --filters Name=zone-name,Values="$z_name" | tee /tmp/az.stat
+        z_group_name=$(jq -r '.AvailabilityZones[].GroupName' /tmp/az.stat)
+        z_opted_in_status=$(jq -r '.AvailabilityZones[].OptInStatus' /tmp/az.stat)
+        if [[ "${z_group_name}" == "" ]]; then
+            echo "Error: ${z_name} is not valid, exit now."
+            return 1
+        fi
+
+        if [[ "${z_opted_in_status}" != "opted-in" ]]; then
+            echo "Error: ${z_name} is not in \"opted-in\" status, exit now."
+            return 1
+        fi
+        echo "edge_zone_groups[$z_name]=\"$z_group_name\"" >> "${SHARED_DIR}/edge-zone-groups.env"
+    done
+else
+    for ZTYPE in $(echo ${EDGE_ZONE_TYPES-}  | tr ',' '\n');
+    do
+        select_option "$ZTYPE";
+    done
+fi

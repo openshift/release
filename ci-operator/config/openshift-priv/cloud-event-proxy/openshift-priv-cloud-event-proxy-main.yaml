@@ -1,12 +1,12 @@
 base_images:
   base:
-    name: 4.19-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 canonical_go_repository: github.com/redhat-cne/cloud-event-proxy
@@ -14,31 +14,32 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cloud-event-proxy
 - dockerfile_path: examples/consumer.Dockerfile
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cloud-event-consumer
 promotion:
   to:
+  - disabled: true
+    excluded_images:
+    - cloud-event-consumer
+    name: ptp-4.21
+    namespace: origin
   - excluded_images:
     - cloud-event-consumer
-    name: 4.19-priv
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.19-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -49,7 +50,6 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws
-  optional: true
   steps:
     cluster_profile: aws-telco
     env:
@@ -85,12 +85,19 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
-- as: security
+- always_run: false
+  as: security
   optional: true
   steps:
     env:
       PROJECT_NAME: cloud-event-proxy
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv

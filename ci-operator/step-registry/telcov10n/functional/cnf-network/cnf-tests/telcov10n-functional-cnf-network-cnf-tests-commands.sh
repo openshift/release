@@ -5,6 +5,12 @@ set -o pipefail
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 PROJECT_DIR="/tmp"
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Create group_vars directory"
 mkdir ${ECO_CI_CD_INVENTORY_PATH}/group_vars
 
@@ -46,6 +52,8 @@ ansible-playbook ./playbooks/cnf/deploy-run-cnf-tests-script.yaml \
         features='$FEATURES_TO_TEST' \
         oo_install_ns=metallb-system \
         cnf_test_dir=$PROJECT_DIR/ \
+        cnf_test_perf_test_profile=$CNF_TESTS_PERF_PROFILE \
+        cnf_tests_skip='$CNF_TESTS_SKIP' \
         cnftests_git_dest=cnf-features-deploy"
 
 echo "Set bastion ssh configuration"
@@ -55,8 +63,19 @@ BASTION_IP=$(cat /eco-ci-cd/inventories/cnf/host_vars/bastion | grep -oP '(?<=an
 BASTION_USER=$(cat /eco-ci-cd/inventories/cnf/group_vars/all | grep -oP '(?<=ansible_user: ).*'| sed "s/'//g")
 
 echo "Run cnf-tests via ssh tunnel"
-ssh -o StrictHostKeyChecking=no $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "cd /tmp/cnf-features-deploy;./cnf-tests-run.sh || true"
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "cd /tmp/cnf-features-deploy;./cnf-tests-run.sh || true"
 
 echo "Gather artifacts from bastion"
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/junit/cnftests-junit.xml ${ARTIFACT_DIR}/junit_test-result.xml
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/junit/cnftests-junit.xml ${ARTIFACT_DIR}/junit_test-result.xml || true
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/junit/junit_cnftests.xml ${ARTIFACT_DIR}/junit_test-result.xml || true
+
+# Fail if the report file doesn't exist
+if [ ! -f "${ARTIFACT_DIR}/junit_test-result.xml" ]; then
+  echo "junit_test-result.xml not found, failing."
+  exit 1
+fi
+
+echo "Store report for reporter step"
+cp "${ARTIFACT_DIR}/junit_test-result.xml" "${SHARED_DIR}/junit_test-result.xml"
+
 rm -rf $PROJECT_DIR/temp_ssh_key

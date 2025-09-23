@@ -309,7 +309,34 @@ test -f /usr/config && rm -f /usr/config || true
 # also the repo doesn't exist on equinix
 dnf config-manager --set-enabled extras-common || true
 
-dnf install -y git sysstat sos make podman python39 jq net-tools gcc
+# Packages to install
+PKGS="git sysstat sos make podman python39 jq net-tools gcc"
+
+# Number of attempts
+MAX_RETRIES=5
+# Delay between attempts (in seconds)
+DELAY=15
+
+attempt=1
+
+while (( attempt <= MAX_RETRIES )); do
+    if dnf install --nobest -y \$PKGS; then
+        echo "Packages installed successfully."
+        break
+    else
+        echo "Install failed (attempt \$attempt). Cleaning cache and retrying..."
+        dnf clean all
+        rm -rf /var/cache/dnf/*
+        sleep \$DELAY
+    fi
+
+    (( attempt++ ))
+done
+
+if (( attempt > MAX_RETRIES )); then
+    echo "ERROR: Failed to install packages after \$MAX_RETRIES attempts."
+    exit 1
+fi
 
 systemctl start sysstat
 

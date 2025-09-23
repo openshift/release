@@ -163,6 +163,10 @@ function collect_diagnostic_data {
       for vm in "${vms[@]}"; do
           datacenter=$(echo "$vm" | cut -d'/' -f 2)
           vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
+          vm_ip="$(govc vm.info -dc="${datacenter}" ${vm} | grep "IP address:" | awk -F "IP address:   " '{print $2}')"
+          if [ ! -z "${vm_ip}" ]; then
+            curl -o "${ARTIFACT_DIR}/${vm_ip}.txt" http://log-gather.vmc.ci.openshift.org:8080/retrieve?node-ip=${vm-ip}
+          fi
 
           if [ ! -z "${vm_host}" ]; then
               hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)

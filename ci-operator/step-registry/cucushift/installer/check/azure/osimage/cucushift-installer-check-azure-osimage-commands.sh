@@ -98,11 +98,34 @@ worker_generation=$(az vm image show --urn ${worker_image_urn} --query hyperVGen
 critical_check_result=0
 
 echo "---------- Check worker nodes urn and hyperV generation ----------"
-worker_nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/worker -o json | jq -r '.items[].metadata.name')
+echo "Expected worker_image_urn: ${worker_image_urn}, expected worker_generation: ${worker_generation}"
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+node_filter=""
+if (( ${ocp_minor_version} < 19 )); then
+    # No rhel worker is provisioned on 4.19+
+    node_filter="node.openshift.io/os_id=rhcos,"
+fi
+worker_nodes_list=$(oc get nodes --selector ${node_filter}node-role.kubernetes.io/worker -o json | jq -r '.items[].metadata.name')
 for node in ${worker_nodes_list}; do
     echo "check worker node: ${node}"
     vm_urn_check "${node}" "${worker_image_urn,,}" "${RESOURCE_GROUP}" || critical_check_result=1
     vm_hyperv_generation_check "${node}" "${worker_generation}" "${RESOURCE_GROUP}" || critical_check_result=1
+done
+
+echo "---------- Check image setting in machineset ----------"
+machineset_list=$(oc get machinesets.machine.openshift.io -n openshift-machine-api -ojson | jq -r '.items[].metadata.name')
+for machineset_name in ${machineset_list}; do
+    machineset_json_file=$(mktemp)
+    echo "image setting in machineset ${machineset_name}:"
+    oc get machinesets.machine.openshift.io -n openshift-machine-api ${machineset_name} -ojson | jq -r '.spec.template.spec.providerSpec.value.image' | tee -a "${machineset_json_file}"
+    machineset_image_urn=$(jq -r '. | "\(.publisher):\(.offer):\(.sku):\(.version)"' ${machineset_json_file})
+    machineset_image_resourceID=$(jq -r ".resourceID" ${machineset_json_file})
+    if [[ "${machineset_image_urn}" == "${worker_image_urn,,}" ]] && [[ -z "${machineset_image_resourceID}" ]]; then
+        echo "INFO: machineset check passed!"
+    else
+        echo "ERROR: machineset check failed!"
+        critical_check_result=1
+    fi
 done
 
 if [[ -f "${SHARED_DIR}/azure_marketplace_image_urn_master" ]]; then
@@ -110,12 +133,27 @@ if [[ -f "${SHARED_DIR}/azure_marketplace_image_urn_master" ]]; then
     master_generation=$(az vm image show --urn ${master_image_urn} --query hyperVGeneration -otsv)
 
     echo "---------- Check master nodes urn and hyperV generation ---------"
-    master_nodes_list=$(oc get nodes --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/master -o json | jq -r '.items[].metadata.name')
+    echo "Expected master_image_urn: ${master_image_urn}, expected master_generation: ${master_generation}"
+    master_nodes_list=$(oc get nodes --selector node-role.kubernetes.io/master -o json | jq -r '.items[].metadata.name')
     for node in ${master_nodes_list}; do
         echo "check master node: ${node}"
         vm_urn_check "${node}" "${master_image_urn,,}" "${RESOURCE_GROUP}" || critical_check_result=1
         vm_hyperv_generation_check "${node}" "${master_generation}" "${RESOURCE_GROUP}" || critical_check_result=1
     done
+
+    # CPMS check
+    echo "---------- Check image setting in controlplanemachineset ---------"
+    echo "image setting in controlplanemachineset: "
+    cmps_json_file=$(mktemp)
+    oc get controlplanemachineset.machine.openshift.io cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io".spec.providerSpec.value.image' | tee -a "${cmps_json_file}"
+    cpms_image_urn=$(jq -r '. | "\(.publisher):\(.offer):\(.sku):\(.version)"' ${cmps_json_file})
+    cpms_image_resourceID=$(jq -r ".resourceID" ${cmps_json_file})
+    if [[ "${cpms_image_urn}" == "${master_image_urn,,}" ]] && [[ -z "${cpms_image_resourceID}" ]]; then
+        echo "INFO: cpms check passed!"
+    else
+        echo "ERROR: cpms check failed!"
+        critical_check_result=1
+    fi
 fi
 
 exit ${critical_check_result}

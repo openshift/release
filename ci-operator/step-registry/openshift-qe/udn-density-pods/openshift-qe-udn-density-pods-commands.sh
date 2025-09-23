@@ -59,7 +59,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
@@ -77,4 +77,7 @@ fi
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
+fi
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
 fi

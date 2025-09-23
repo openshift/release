@@ -1,8 +1,12 @@
 base_images:
-  ocp_4.19_base-rhel9:
-    name: "4.19"
+  ocp_4.20_base-rhel9:
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
+  openstack-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: openstack-installer
   upi-installer:
     name: "4.14"
     namespace: ocp
@@ -12,10 +16,10 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
+    tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
 - dockerfile_path: Dockerfile
-  from: ocp_4.19_base-rhel9
+  from: ocp_4.20_base-rhel9
   to: hive
 promotion:
   to:
@@ -26,12 +30,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.19"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -89,7 +93,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.19"
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -107,10 +111,12 @@ tests:
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
+      - collection: ""
+        mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
         namespace: test-credentials
-      - mount_path: /tmp/secret/pull-secret
+      - collection: ""
+        mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
@@ -134,7 +140,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.17"
+    version: "4.19"
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -154,10 +160,12 @@ tests:
         export USE_MANAGED_DNS=false
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e-pool
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
+      - collection: ""
+        mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
         namespace: test-credentials
-      - mount_path: /tmp/secret/pull-secret
+      - collection: ""
+        mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
@@ -207,6 +215,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+  timeout: 5h0m0s
 - as: e2e-vsphere
   run_if_changed: vsphere
   steps:
@@ -220,9 +229,18 @@ tests:
         source $SHARED_DIR/vsphere_context.sh
         source $SHARED_DIR/govc.sh
         source $SHARED_DIR/additional_cluster.sh
+
+        export CLUSTER_NAME=$ADDITIONAL_CLUSTER_NAME
+        export VSPHERE_API_VIP=$ADDITIONAL_CLUSTER_API_VIP
+        export VSPHERE_INGRESS_VIP=$ADDITIONAL_CLUSTER_INGRESS_VIP
+        export VSPHERE_MACHINE_NETWORK=$(<"${SHARED_DIR}"/machinecidr.txt)
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        export VSPHERE_INSTALLER_PLATFORM_SPEC_JSON=$(<"${SHARED_DIR}"/platform.json)
+
         GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
       credentials:
-      - mount_path: /var/run/vault/vsphere-ibmcloud-ci
+      - collection: ""
+        mount_path: /var/run/vault/vsphere-ibmcloud-ci
         name: vsphere-ibmcloud-ci
         namespace: test-credentials
       dependencies:
@@ -235,6 +253,36 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-vsphere
+- as: e2e-openstack
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      HIVE_OSP_RESOURCE: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
+        export API_FLOATING_IP=$(<"${SHARED_DIR}/HIVE_FIP_API")
+        export INGRESS_FLOATING_IP=$(<"${SHARED_DIR}/HIVE_FIP_INGRESS")
+        export EXTERNAL_NETWORK=$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")
+        export COMPUTE_FLAVOR=$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
+        export CONTROLPLANE_FLAVOR=$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")
+
+        GO_COMPLIANCE_INFO=0 CLOUD=openstack make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-openstack
 zz_generated_metadata:
   branch: master
   org: openshift

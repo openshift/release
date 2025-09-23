@@ -11,9 +11,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 IBMCLOUD_HOME=/tmp/ibmcloud
 export IBMCLOUD_HOME
 
-IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
-export IBMCLOUD_HOME_FOLDER
-
 REGION="${LEASED_RESOURCE}"
 export REGION
 
@@ -50,18 +47,18 @@ function login_ibmcloud() {
 
 # Download automation code
 function download_automation_code() {
-    mkdir -p ${IBMCLOUD_HOME_FOLDER}
+    mkdir -p ${IBMCLOUD_HOME}
     echo "Downloading the head for ocp4-upi-compute-powervs"
-    cd "${IBMCLOUD_HOME_FOLDER}" \
-        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}"-per.tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
-        && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
-        && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
+    cd "${IBMCLOUD_HOME}" \
+        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/main.tar.gz -o "${IBMCLOUD_HOME}"/ocp-main.tar.gz \
+        && tar -xzf "${IBMCLOUD_HOME}"/ocp-main.tar.gz \
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs
     echo "Down ... Downloading the head for ocp4-upi-compute-powervs"
 }
 
 # Downloads the terraform binary and puts into the path
 function download_terraform_binary() {
-    mkdir -p "${IBMCLOUD_HOME_FOLDER}/ocp-install-dir"
+    mkdir -p "${IBMCLOUD_HOME}/ocp-install-dir"
     echo "Attempting to install terraform using gzip"
     curl -L -o "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
         && gunzip "${IBMCLOUD_HOME}"/ocp-install-dir/terraform.gz \
@@ -72,31 +69,30 @@ function download_terraform_binary() {
 
 # Cleans up the failed prior jobs
 function cleanup_prior() {
+
+    # Delete the current TGW VPC Connection from the static transit gateway
     echo "Clean up transit gateway - VPC connection"
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
-    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP}" --arg workspace_name "${WORKSPACE_NAME}-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+    POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    echo ":started searching for gateway... output expected:"
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg name "multi-arch-x-px-${POWERVS_REGION}-1-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $name) | .id')
     do
-        VPC_CONN="${WORKSPACE_NAME}-vpc"
-        VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_CONN}" | awk '{print $3}')"
-        if [ -n "${VPC_CONN_ID}" ]
-        then
-            echo "deleting VPC connection"
-            ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
-            sleep 120
-            echo "Done Cleaning up GW VPC Connection"
-        else
-            echo "GW VPC Connection not found. VPC Cleanup not needed."
-        fi
-        break
-    done
-
-    # Delete any vpc older than 24 hrs
-    echo "Cleaning up VPCs"
-    for VPC in $(ibmcloud is vpcs --resource-group-name "${RESOURCE_GROUP}" 2>&1 | grep "${RESOURCE_GROUP}" | grep -v Listing | grep -i ci-op | awk '{print $1}')
-    do
-        echo "VPC=${VPC}"
-        ibmcloud is vpc-delete "${VPC}" -f
-        sleep 10s
+        echo ":gateway: ${GW}"
+        VPC_NAME_PREFIX=$(yq-v4 -r '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+        for VPC_NAME in $(ibmcloud is vpcs --output json | jq -r --arg mn "${VPC_NAME_PREFIX}" '.[] | select(.name | contains($mn)).name')
+        do
+            echo ":VPC: ${VPC_NAME}"
+            VPC_CONN_ID="$(ibmcloud tg connections "${GW}" 2>&1 | grep "${VPC_NAME}-vpc" | awk '{print $3}')"
+            if [ -n "${VPC_CONN_ID}" ]
+            then
+                echo "deleting VPC connection"
+                ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+                sleep 120
+                echo "Done Cleaning up GW VPC Connection"
+            else
+                echo "GW VPC Connection not found. VPC Cleanup not needed."
+            fi
+        done
     done
 
     echo "Cleaning up workspaces for ${WORKSPACE_NAME}"
@@ -143,7 +139,9 @@ function configure_automation() {
 
     # create workspace for powervs from cli
     echo "Display all the variable values:"
-    POWERVS_REGION=$(bash "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
+
     echo "VPC Region is ${REGION}"
     echo "PowerVS region is ${POWERVS_REGION}"
     echo "Resource Group is ${RESOURCE_GROUP}"
@@ -178,20 +176,24 @@ function configure_automation() {
 
     # Invoke create-var-file.sh to generate var.tfvars file
     echo "Creating the var file"
-    cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
+    cd ${IBMCLOUD_HOME}/ocp4-upi-compute-powervs \
         && bash scripts/create-var-file.sh /tmp/ibmcloud/ocp4-upi-compute-powervs "${ADDITIONAL_WORKERS}" "p-px"
-    cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
+    cp "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
 
     #Create the VPC to fixed transit gateway Connection for the TG
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
-    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg workspace_name "${WORKSPACE_NAME}" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $workspace_name) | "(.id)"')
+    echo ":started searching for gateway... output expected:"
+    for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg name "multi-arch-x-px-${POWERVS_REGION}-1-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $name) | .id')
     do
-        for CS in $(ibmcloud is vpcs --output json | jq -r '.[] | select(.name | contains("${WORKSPACE_NAME}-vpc")) | .id')
+        echo ":gateway: ${GW}" 
+        VPC_NAME_PREFIX=$(yq-v4 -r '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+        for VPC_NAME in $(ibmcloud is vpcs --output json | jq -r --arg mn "${VPC_NAME_PREFIX}" '.[] | select(.name | contains($mn)).name')
         do
-            VPC_CONN_NAME=$(ibmcloud is vpc "${CS}" --output json | jq -r .name)
-            VPC_NW_ID=$(ibmcloud is vpc "${CS}" --output json | jq -r .crn)
+            echo ":VPC: ${VPC_NAME}"
+            VPC_CONN_NAME=$(ibmcloud is vpc "${VPC_NAME}" --output json | jq -r .name)
+            VPC_NW_ID=$(ibmcloud is vpc "${VPC_NAME}" --output json | jq -r .crn)
             echo "Creating new VPC connection for gateway now."
-            ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}" --network-id "${VPC_NW_ID}" --network-type vpc || true
+            ibmcloud tg cc "${GW}" --name "${VPC_CONN_NAME}-vpc" --network-id "${VPC_NW_ID}" --network-type vpc || true
         done
     done
 }
@@ -199,11 +201,11 @@ function configure_automation() {
 # run_automation executes the terraform based on automation
 function run_automation() {
     echo "Running init"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ init -upgrade -no-color
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/ init -upgrade -no-color
     echo "Running plan"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ plan -var-file=data/var.tfvars -no-color
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/ plan -var-file=data/var.tfvars -no-color
     echo "Running apply"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ apply -var-file=data/var.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
+    "${IBMCLOUD_HOME}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/ apply -var-file=data/var.tfvars -auto-approve -no-color -state="${SHARED_DIR}"/terraform.tfstate
     echo "Finished Running"
 }
 

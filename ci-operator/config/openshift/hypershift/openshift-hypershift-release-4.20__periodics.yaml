@@ -76,11 +76,23 @@ tests:
       AWS_MULTI_ARCH: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aks
-  cron: 0 4 * * *
+  cron: 0 3 * * *
   steps:
     cluster_profile: hypershift
     env:
       AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-multi-x-ax
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      AZURE_MULTI_ARCH: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
@@ -98,12 +110,15 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
+      PUBLIC_ONLY: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
   cron: 0 2 * * *
   steps:
     cluster_profile: hypershift
+    env:
+      PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
@@ -143,6 +158,15 @@ tests:
         UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
         the local DNS endpoint \[Suite:openshift/conformance/parallel\]
     workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-external-oidc
+  minimum_interval: 8h
+  steps:
+    cluster_profile: hypershift
+    env:
+      CI_TESTS_RUN: TestExternalOIDCTechPreview
+      OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-external-oidc
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:
@@ -176,7 +200,7 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.20
       ODF_OPERATOR_SUB_CHANNEL: stable-4.18
-      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-17
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
       REDHAT_OPERATORS_INDEX_TAG: v4.18
     workflow: hypershift-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-metal-ovn-disconnected
@@ -197,7 +221,7 @@ tests:
     cluster_profile: aws
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
-  cron: 0 2 * * *
+  cron: 0 */2 * * *
   steps:
     cluster_profile: hypershift
     workflow: hypershift-azure-aks-conformance
@@ -208,7 +232,7 @@ tests:
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       HYPERSHIFT_NODE_COUNT: "2"
-      ODF_OPERATOR_CHANNEL: stable-4.18
+      ODF_OPERATOR_CHANNEL: stable-4.19
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance
@@ -263,7 +287,6 @@ tests:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_SUITE: experimental/reliability/minimal
     leases:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vexxhost-quota-slice
@@ -300,7 +323,6 @@ tests:
     cluster_profile: openstack-vexxhost
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_SUITE: experimental/reliability/minimal
     workflow: hypershift-openstack-nested-conformance
 zz_generated_metadata:
   branch: release-4.20

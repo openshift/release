@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build07
-  cron: 30 18 9,26 * *
+  cluster: build05
+  cron: 25 2 24 9 *
   decorate: true
   extra_refs:
   - base_ref: release-4.18
@@ -13,6 +13,17 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-cluster-node-tuning-operator-release-4.18-e2e-nightly
+  reporter_config:
+    slack:
+      channel: '#psap-ci-alerts'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -24,7 +35,7 @@ periodics:
       - --target=e2e-nightly
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:

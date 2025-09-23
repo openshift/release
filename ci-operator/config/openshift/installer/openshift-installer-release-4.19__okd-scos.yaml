@@ -1,0 +1,158 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  origin_scos-4.19_base-stream9:
+    name: scos-4.19
+    namespace: origin
+    tag: base-stream9
+  origin_scos-4.19_cli:
+    name: scos-4.19
+    namespace: origin
+    tag: cli
+  origin_scos-4.19_etcd:
+    name: scos-4.19
+    namespace: origin
+    tag: etcd
+  origin_scos-4.19_hyperkube:
+    name: scos-4.19
+    namespace: origin
+    tag: hyperkube
+  origin_scos-4.19_installer-etcd-artifacts:
+    name: scos-4.19
+    namespace: origin
+    tag: installer-etcd-artifacts
+  origin_scos-4.19_installer-kube-apiserver-artifacts:
+    name: scos-4.19
+    namespace: origin
+    tag: installer-kube-apiserver-artifacts
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: origin_scos-4.19_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    origin_scos-4.19_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:cli
+    origin_scos-4.19_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
+    origin_scos-4.19_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
+  to: upi-installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/baremetal/Dockerfile.ci
+  from: origin_scos-4.19_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    origin_scos-4.19_etcd:
+      as:
+      - etcd
+      - registry.ci.openshift.org/ocp/4.19:etcd
+    origin_scos-4.19_hyperkube:
+      as:
+      - kas
+      - registry.ci.openshift.org/ocp/4.19:hyperkube
+  to: baremetal-installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: origin_scos-4.19_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    origin_scos-4.19_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.19:installer-etcd-artifacts
+    origin_scos-4.19_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.19:installer-kube-apiserver-artifacts
+  to: installer-artifacts
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.ci
+  from: origin_scos-4.19_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    origin_scos-4.19_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.19:installer-etcd-artifacts
+    origin_scos-4.19_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.19:installer-kube-apiserver-artifacts
+  to: installer
+promotion:
+  to:
+  - name: scos-4.19
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.19
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  src:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: installer
+  variant: okd-scos

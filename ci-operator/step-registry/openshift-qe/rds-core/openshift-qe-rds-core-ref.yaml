@@ -1,0 +1,48 @@
+ref:
+  as: openshift-qe-rds-core
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+    - name: CHURN
+      default: "false"
+      documentation: |-
+        Default is false, which means the workload will not delete and recreate a set number of namespaces
+    - name: E2E_VERSION
+      default: "default"
+      documentation: |-
+        Override the e2e version
+    - name: EXTRA_FLAGS
+      default: ""
+      documentation: |-
+        Extra flags to pass to kube-burner-ocp
+    - name: GC
+      default: "true"
+      documentation: |-
+        GC will clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resouce
+    - name: KUBE_BURNER_VERSION
+      default: "default"
+      documentation: |-
+        Override the kube burner version
+    - name: ITERATIONS
+      default: "1"
+      documentation: |-
+        Number of iterations/namespaces
+    - name: PROFILE_TYPE
+      default: "reporting"
+      documentation: |-
+        Kube-burner indexing profile type
+  commands: openshift-qe-rds-core-commands.sh
+  timeout: 30m
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale rds-core workload in the deployed cluster

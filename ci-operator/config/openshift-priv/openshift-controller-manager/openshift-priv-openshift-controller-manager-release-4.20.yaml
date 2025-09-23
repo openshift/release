@@ -3,14 +3,14 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -18,12 +18,12 @@ canonical_go_repository: github.com/openshift/openshift-controller-manager
 images:
 - dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: openshift-controller-manager
 promotion:
   to:
@@ -107,6 +107,27 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- as: e2e-tests-extension
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary openshift-controller-manager-tests-ext"
+        make tests-ext-build
+        echo "Running ./openshift-controller-manager-tests-ext with suite"
+        ./openshift-controller-manager-tests-ext run-suite openshift/openshift-controller-manager/all -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-serial
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

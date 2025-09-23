@@ -1,14 +1,22 @@
 base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
   lightspeed-service-api:
     name: lightspeed-service-api
     namespace: ols
     tag: latest
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
-      RUN dnf install -y podman
+      RUN dnf install -y podman make
 releases:
   latest:
     candidate:
@@ -29,7 +37,8 @@ tests:
     cloud: aws
     labels:
       region: us-east-1
-    owner: ols
+      variant: fips
+    owner: obs
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
@@ -62,34 +71,44 @@ tests:
 
         tests/scripts/test-e2e-cluster-periodics.sh
       credentials:
-      - mount_path: /var/run/azure_openai
+      - collection: ""
+        mount_path: /var/run/azure_openai
         name: azureopenai-apitoken
         namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
+      - collection: ""
+        mount_path: /var/run/azureopenai-entra-id
         name: azureopenai-entra-id
         namespace: test-credentials
-      - mount_path: /var/run/bam
+      - collection: ""
+        mount_path: /var/run/bam
         name: bam-apitoken
         namespace: test-credentials
-      - mount_path: /var/run/openai
+      - collection: ""
+        mount_path: /var/run/openai
         name: openai-apitoken
         namespace: test-credentials
-      - mount_path: /var/run/watsonx
+      - collection: ""
+        mount_path: /var/run/watsonx
         name: watsonx-apitoken
         namespace: test-credentials
-      - mount_path: /var/run/insights-stage-upload-offline-token
+      - collection: ""
+        mount_path: /var/run/insights-stage-upload-offline-token
         name: insights-stage-upload-offline-token
         namespace: test-credentials
-      - mount_path: /var/run/aws-bucket
+      - collection: ""
+        mount_path: /var/run/aws-bucket
         name: aws-bucket
         namespace: test-credentials
-      - mount_path: /var/run/aws-access-key-id
+      - collection: ""
+        mount_path: /var/run/aws-access-key-id
         name: aws-access-key-id
         namespace: test-credentials
-      - mount_path: /var/run/aws-region
+      - collection: ""
+        mount_path: /var/run/aws-region
         name: aws-region
         namespace: test-credentials
-      - mount_path: /var/run/aws-secret-access-key
+      - collection: ""
+        mount_path: /var/run/aws-secret-access-key
         name: aws-secret-access-key
         namespace: test-credentials
       dependencies:
@@ -100,6 +119,81 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: ols-disconnected-periodics
+  cron: 10 8 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-observability
+    env:
+      OPERATORS: |
+        [
+            {"name": "lightspeed-operator", "source": "cs-redhat-operator-index-v4-17", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"}
+        ]
+      SELF_MANAGED_ADDITIONAL_CA: "true"
+      SELF_MANAGED_REGISTRY_CERT: "true"
+    post:
+    - ref: gather-must-gather
+    test:
+    - ref: openshift-lightspeed-service-install-disconnected
+    - ref: install-operators
+    - as: e2e
+      cli: latest
+      commands: |
+        export SUITE_ID=ollama
+        export PROVIDER=ollama
+        export MODEL=gemma3:1b
+        export DISCONNECTED=true
+
+        make install-deps && make install-deps-test
+        export ARTIFACT_DIR="/tmp"
+        pdm run pytest tests/e2e -s -k 'test_readiness' --durations=0 -o junit_suite_name="${SUITE_ID}" --junit-prefix="${SUITE_ID}" --junit-xml="${ARTIFACT_DIR}/junit_e2e_${SUITE_ID}.xml" \
+        --eval_out_dir ${ARTIFACT_DIR}
+      credentials:
+      - collection: ""
+        mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/azureopenai-entra-id
+        name: azureopenai-entra-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/bam
+        name: bam-apitoken
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/watsonx
+        name: watsonx-apitoken
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/insights-stage-upload-offline-token
+        name: insights-stage-upload-offline-token
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -2,7 +2,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.19"
     namespace: ocp
@@ -27,8 +27,7 @@ images:
   to: ibm-cloud-controller-manager
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -77,12 +76,12 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
-  optional: true
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: cloud-provider-ibm
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

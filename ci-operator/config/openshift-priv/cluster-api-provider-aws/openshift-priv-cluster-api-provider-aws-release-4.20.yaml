@@ -6,7 +6,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -15,18 +15,18 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
-    tag: latest
+    tag: "4.20"
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -34,12 +34,12 @@ canonical_go_repository: sigs.k8s.io/cluster-api-provider-aws
 images:
 - dockerfile_path: openshift/Dockerfile.openshift
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: aws-cluster-api-controllers
 promotion:
   to:
@@ -72,7 +72,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -86,35 +86,35 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
+  shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
-- as: regression-clusterinfra-aws-ipi-proxy-techpreview
+- as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     env:
       E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_FILTERS: CAPI
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
       TEST_SCENARIOS: Cluster_Infrastructure CAPI
-      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -122,15 +122,16 @@ tests:
     workflow: hypershift-aws-e2e-external
 - as: verify-commits
   commands: |
-    commitchecker --start ${PULL_BASE_SHA:-master}
+    commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
   optional: true
-- as: security
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: cluster-api-provider-aws
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

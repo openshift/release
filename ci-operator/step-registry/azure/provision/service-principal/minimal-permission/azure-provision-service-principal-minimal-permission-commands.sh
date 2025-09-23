@@ -43,14 +43,14 @@ function run_cmd_with_retries_save_output()
 
 function run_cmd_with_retries()
 {
-    local cmd="$1" retries="${2:-}"
-    local try=0 ret=0
+	local cmd="$1" try=0 ret=0
+    local retries="${2}" print_cmd="${3:-${cmd}}"
     [[ -z ${retries} ]] && max="20" || max=${retries}
-    echo "Trying ${max} times max to run '${cmd}'"
+    echo "Trying ${max} times max to run '${print_cmd}'"
 
     res=$(eval "${cmd}") || ret=$?
     while [[ ${ret} -ne 0 || -z "${res}" ]] && [ ${try} -lt ${max} ]; do
-        echo "'${cmd}' did not return success or return empty, waiting 60 sec....."
+        echo "'${print_cmd}' did not return success or return empty, waiting 60 sec....."
         sleep 60
         try=$(( try + 1 ))
         ret=0
@@ -96,8 +96,6 @@ if [[ "${CLUSTER_TYPE}" == "azuremag" ]] || [[ "${CLUSTER_TYPE}" == "azurestack"
 else
     az cloud set --name AzureCloud
 fi
-az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
@@ -111,6 +109,9 @@ if [[ -z "${sp_list}" ]]; then
 fi
 
 for sp_type in ${sp_list}; do
+    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+    az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
+
     sp_name="${CLUSTER_NAME}-sp-${sp_type}"
     sp_output="$(mktemp)"
     if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]] && [[ "${sp_type}" == "cluster" ]]; then
@@ -122,33 +123,39 @@ for sp_type in ${sp_list}; do
 
     echo "Creating ${sp_type} sp with role ${role_name} granted..."
     create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTION_ID}" "${sp_output}"    
-    sp_id=$(jq -r .appId "${sp_output}")
+    sp_app_id=$(jq -r .appId "${sp_output}")
+    sp_id=$(az ad sp show --id ${sp_app_id} --query id -otsv)
     sp_password=$(jq -r .password "${sp_output}")
     sp_tenant=$(jq -r .tenant "${sp_output}")
-    if [[ "${sp_id}" == "" ]] || [[ "${sp_password}" == "" ]]; then
+    if [[ "${sp_app_id}" == "" ]] || [[ "${sp_password}" == "" ]]; then
         echo "Unable to get service principal id or password, exit..."
         exit 1
     fi
 
-    echo "New service principal id: ${sp_id}"
+    echo "New service principal app id: ${sp_app_id}, id: ${sp_id}"
     os_sp_file_name="azure_minimal_permission"
     if [[ "${sp_type}" != "cluster" ]]; then
         os_sp_file_name="azure_minimal_permission_${sp_type}"
     fi
     cat <<EOF > "${SHARED_DIR}/${os_sp_file_name}"
-{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTION_ID}","clientId":"${sp_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
+{"subscriptionId":"${AZURE_AUTH_SUBSCRIPTION_ID}","clientId":"${sp_app_id}","tenantId":"${sp_tenant}","clientSecret":"${sp_password}"}
 EOF
 
     # for destroy
-    echo "${sp_id}" >> "${SHARED_DIR}/azure_sp_id"
+    echo "${sp_app_id}" >> "${SHARED_DIR}/azure_sp_id"
     rm -f ${sp_output}
 
     # ensure that role assignment creation is successful
     echo "Ensure that role ${role_name} assigned successfully"
     cmd="az role assignment list --role '${role_name}'"
-    run_cmd_with_retries "${cmd}"
+    run_cmd_with_retries "${cmd}" 20
 
     if [[ "${role_name}" == "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
-        az role assignment list --assignee ${sp_id} --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
+        az role assignment list --assignee ${sp_app_id} --query '[].id' -otsv >> "${SHARED_DIR}/azure_role_assignment_ids"
     fi
+
+    # ensure that new service principal can be login successfully
+    echo "Login with new service principal to ensure that new SP works well"
+    cmd="az login --service-principal -u '${sp_app_id}' -p '${sp_password}' --tenant '${sp_tenant}'"
+    run_cmd_with_retries "${cmd}" 10 "az login --service-principal"
 done

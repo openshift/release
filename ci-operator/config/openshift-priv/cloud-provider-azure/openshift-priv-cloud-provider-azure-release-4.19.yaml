@@ -6,7 +6,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -67,7 +67,6 @@ promotion:
   to:
   - additional_images:
       cloud-provider-azure-rpms: rpms
-    disabled: true
     excluded_images:
     - rhel-coreos
     name: 4.19-priv
@@ -127,11 +126,12 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: cloud-provider-azure
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

@@ -7,9 +7,17 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
+
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from  \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
+  else
+    _curl="curl"
+  fi
 }
 
 function generate_cluster_image_set {
@@ -22,7 +30,7 @@ kind: ClusterImageSet
 metadata:
   name: "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)"
 spec:
-  releaseImage: "${RELEASE_IMAGE_LATEST}"
+  releaseImage: "$(cat ${SHARED_DIR}/release-image-tag.txt)"
 EOF
 
   set -x
@@ -34,7 +42,6 @@ function generate_assisted_deployment_pull_secret {
 
   echo "************ telcov10n Generate Assited Deployment Pull Secret object ************"
 
-  SPOKE_CLUSTER_NAME=${NAMESPACE}
   ai_dp_secret_name="${SPOKE_CLUSTER_NAME}-pull-secret"
 
   if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
@@ -57,6 +64,46 @@ EOF
   set -x
   oc -n ${SPOKE_CLUSTER_NAME} get secret ${ai_dp_secret_name}
   set +x
+}
+
+function get_hfs_helper {
+  oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings ${hostname_with_base_domain} && \
+  [ "$(oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings ${hostname_with_base_domain} -ojson \
+    | jq -r -c '.status.settings')" != "null" ]
+}
+
+function generate_host_firmware_settings_manifest {
+
+  if [ "${BIOS_SETTINGS}" != "{}" ] ; then
+
+    local hostname_with_base_domain
+    hostname_with_base_domain="$(cat ${SHARED_DIR}/hostname_with_base_domain)"
+
+    echo "************ telcov10n Setup BIOS settings ************"
+
+    wait_until_command_is_ok "get_hfs_helper" 10s 100
+
+    echo
+    echo "${hostname_with_base_domain} HostFirmwareSettings before patch:"
+    echo "-----------------------------------------------------------------"
+    set -x
+    oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
+    set +x
+    echo
+
+    oc -n ${SPOKE_CLUSTER_NAME} patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
+spec:
+  settings: $(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
+EO-hfs-patch
+
+    echo
+    echo "${hostname_with_base_domain} HostFirmwareSettings after patch:"
+    echo "-----------------------------------------------------------------"
+    set -x
+    oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
+    set +x
+    echo
+  fi
 }
 
 function generate_baremetal_secret {
@@ -89,6 +136,18 @@ EOF
     set +x
 
   done
+}
+
+function create_spoke_namespace {
+
+  SPOKE_CLUSTER_NAME=${NAMESPACE}
+
+  if [ "${SITE_CONFIG_VERSION}" == "v2" ]; then
+    echo "************ telcov10n Create Spoke Namespace ************"
+    set -x
+    oc create ns ${SPOKE_CLUSTER_NAME} || echo "${SPOKE_CLUSTER_NAME} namespace Already exist..."
+    set +x
+  fi
 }
 
 function checking_installation_progress {
@@ -126,8 +185,8 @@ function checking_installation_progress {
       oc get clusterimagesets.hive.openshift.io $cis ;
       echo ;
       echo "######## Installation Progress ##########" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "message" ;
-      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs curl -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "message" ;
+      oc -n ${SPOKE_CLUSTER_NAME} get agentclusterinstalls ${SPOKE_CLUSTER_NAME}  -ojsonpath='{.status.debugInfo.eventsURL}' | xargs ${_curl} -k % 2> /dev/null | jq . | grep "Successfully completed installing cluster" >/dev/null && break ;
 
       now=$(date +%s)
       if [ ${timeout} -lt ${now} ] ; then
@@ -150,6 +209,17 @@ function checking_installation_progress {
   echo
 }
 
+function add_proxy_to_kubeconfig_if_needed {
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    kc_s5_proxy_format="${SOCKS5_PROXY/socks5h:/socks5:}"
+    if [ "$(grep "${kc_s5_proxy_format}" "${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml")" == "" ]; then
+      echo "Adding '${kc_s5_proxy_format}' in the ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml file"
+      sed -i "/    server: / a\    proxy-url: ${kc_s5_proxy_format}" ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml
+    fi
+  fi
+}
+
 function get_and_save_kubeconfig_and_creds {
 
   echo "************ telcov10n Get and Save Spoke kubeconfig and kubeadmin password ************"
@@ -162,14 +232,18 @@ function get_and_save_kubeconfig_and_creds {
   oc -n ${SPOKE_CLUSTER_NAME} get secrets $secret_adm_pass -o json \
     | jq -r '.data.password' | base64 --decode >| ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml
 
+  add_proxy_to_kubeconfig_if_needed
+
   cp -v ${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml ${SHARED_DIR}/spoke-${secret_adm_pass}.yaml ${ARTIFACT_DIR}/
 }
 
 function main {
   set_hub_cluster_kubeconfig
   generate_cluster_image_set
+  create_spoke_namespace
   generate_assisted_deployment_pull_secret
   generate_baremetal_secret
+  generate_host_firmware_settings_manifest
   checking_installation_progress "${REFRESH_TIME}"
   get_and_save_kubeconfig_and_creds
 

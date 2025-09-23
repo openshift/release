@@ -65,8 +65,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-multi
-  cron: 0 2 * * *
+- as: e2e-aws-multi-x-ax
+  cron: 11 4 * * 0
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -76,17 +76,29 @@ tests:
       AWS_MULTI_ARCH: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aks
-  cron: 0 4 * * *
+  cron: 0 */6 * * *
   steps:
     cluster_profile: hypershift
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-multi-x-ax
+  cron: 22 14 * * 0
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      AZURE_MULTI_ARCH: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   capabilities:
   - build-tmpfs
-  cron: 0 0 1 1 *
+  cron: 25 11 * * 6
   steps:
     cluster_profile: hypershift
     env:
@@ -94,24 +106,27 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
-  cron: 0 1 * * *
+  cron: 44 16 * * 6
   steps:
     cluster_profile: hypershift
     env:
+      PUBLIC_ONLY: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
-  cron: 0 2 * * *
+  cron: 6 14 * * 6
   steps:
     cluster_profile: hypershift
+    env:
+      PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
-  cron: 0 3 * * *
+  cron: 10 18 * * 0
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-aws-upgrade
-  cron: 0 */12 * * *
+  cron: 21 12 * * 6
   steps:
     cluster_profile: hypershift
     dependencies:
@@ -125,7 +140,14 @@ tests:
   minimum_interval: 168h
   steps:
     cluster_profile: hypershift
+    workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-conformance-cilium-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
       TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
         access to server in CIDR block \[Feature:NetworkPolicy\] \[Suite:openshift/conformance/parallel\]
         \[Suite:k8s\]\| Netpol NetworkPolicy between server and client should ensure
@@ -142,14 +164,67 @@ tests:
         Unidling with Deployments \[apigroup:route.openshift.io\] should work with
         UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
         the local DNS endpoint \[Suite:openshift/conformance/parallel\]
-    workflow: hypershift-aws-conformance-cilium
+    test:
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest-cilium
+- as: e2e-aws-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: hypershift
+    env:
+      TEST_SKIPS: The default cluster RBAC policy should have correct RBAC rules\|
+        Cluster scoped load balancer healthcheck port and path should be 10256/healthz\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should
+        provide named network metrics\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\| pod should not start for sysctls not on whitelist \[apigroup:k8s.cni.cncf.io\]
+        net.ipv4.conf.IFNAME.arp_filter\| pod should not start for sysctls not on
+        whitelist \[apigroup:k8s.cni.cncf.io\] net.ipv4.conf.all.send_redirects\|
+        sysctl allowlist update should start a pod with custom sysctl only when the
+        sysctl is added to whitelist
+    workflow: hypershift-aws-conformance-calico
+- as: e2e-aws-conformance-calico-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
+      TEST_SKIPS: The default cluster RBAC policy should have correct RBAC rules\|
+        Cluster scoped load balancer healthcheck port and path should be 10256/healthz\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should
+        provide named network metrics\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\|pod should not start for sysctls not on whitelist \[apigroup:k8s.cni.cncf.io\]
+        net.ipv4.conf.IFNAME.arp_filter\| pod should not start for sysctls not on
+        whitelist \[apigroup:k8s.cni.cncf.io\] net.ipv4.conf.all.send_redirects\|
+        sysctl allowlist update should start a pod with custom sysctl only when the
+        sysctl is added to whitelist
+    test:
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest-calico
+- as: e2e-kubevirt-metal-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
+    workflow: hypershift-kubevirt-baremetalds-conformance-calico
 - as: e2e-powervs-ovn
-  cron: 0 8 * * *
+  cron: 46 5 * * 6
   steps:
     cluster_profile: hypershift-powervs
     workflow: hypershift-powervs-e2e
 - as: e2e-ibmcloud-ovn-iks
-  cron: 0 4 * * *
+  cron: 2 20 * * 6
   steps:
     env:
       BOM_VERSION: 4.10.26_openshift
@@ -159,7 +234,7 @@ tests:
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
     workflow: hypershift-ibmcloud-e2e
 - as: e2e-ibmcloud-ovn-roks
-  cron: 0 4 * * *
+  cron: 21 2 * * 6
   steps:
     env:
       BOM_VERSION: 4.11.0_openshift
@@ -169,7 +244,7 @@ tests:
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
     workflow: hypershift-ibmcloud-e2e
 - as: e2e-kubevirt-metal-ovn
-  cron: 0 4 * * *
+  cron: 31 0 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -179,8 +254,18 @@ tests:
       ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-17
       REDHAT_OPERATORS_INDEX_TAG: v4.17
     workflow: hypershift-kubevirt-baremetalds-conformance
+- as: e2e-kubevirt-metal-conformance-cilium
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
+    workflow: hypershift-kubevirt-baremetalds-conformance-cilium
 - as: e2e-kubevirt-metal-ovn-disconnected
-  cron: 0 8 * * *
+  cron: 23 0 * * 6
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -192,23 +277,23 @@ tests:
       ODF_OPERATOR_SUB_CHANNEL: stable-4.15
     workflow: hypershift-kubevirt-baremetalds-disconnected-conformance
 - as: e2e-kubevirt-aws-ovn-csi
-  cron: 0 4 * * *
+  cron: 7 6 * * 0
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
-  cron: 0 2 * * *
+  cron: 45 15 * * 6
   steps:
     cluster_profile: hypershift
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-kubevirt-ovn
-  cron: 0 4 * * *
+  cron: 47 6 * * 0
   steps:
     cluster_profile: azure4
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       HYPERSHIFT_NODE_COUNT: "2"
-      ODF_OPERATOR_CHANNEL: stable-4.18
+      ODF_OPERATOR_CHANNEL: stable-4.19
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance
@@ -225,14 +310,14 @@ tests:
       KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e-aws
 - as: e2e-kubevirt-azure
-  cron: 0 0 1 1 *
+  cron: 42 14 * * 6
   steps:
     cluster_profile: azure4
     env:
       HYPERSHIFT_NODE_COUNT: "2"
     workflow: hypershift-kubevirt-azure-conformance
 - as: e2e-openstack-aws
-  cron: 0 10 * * *
+  cron: 42 12 * * 0
   steps:
     cluster_profile: hypershift
     env:

@@ -104,8 +104,8 @@ function prepare_next_steps() {
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
 
-  # clean up the ${REMOTE_DIR} as it may contains credential files
-  run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "rm -rf ${REMOTE_DIR}/*"
+  # Delete the ${REMOTE_SECRETS_DIR} as it may contain credential files
+  run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "rm -rf ${REMOTE_SECRETS_DIR}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -126,6 +126,7 @@ fi
 
 REMOTE_DIR="/home/${BASTION_SSH_USER}"
 REMOTE_INSTALL_DIR="${REMOTE_DIR}/installer/"
+REMOTE_SECRETS_DIR="${REMOTE_DIR}/secrets/"
 REMOTE_ENV_FILE="/tmp/remote_env_file"
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -143,9 +144,21 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "mkdir ${REMOTE_INSTALL_DIR}; mkdir ${REMOTE_SECRETS_DIR}"
+
 # Prepare credentials
 # Update here to support intallation in bastion on different platforms
 case "${CLUSTER_TYPE}" in
+aws|aws-arm64|aws-usgov)
+    if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
+        echo "Setting AWS credential with minimal permision for installer"
+        export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+    else
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+    fi
+    run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AWS_SHARED_CREDENTIALS_FILE}" "${REMOTE_SECRETS_DIR}/.awscred"
+    echo "export AWS_SHARED_CREDENTIALS_FILE='${REMOTE_SECRETS_DIR}/.awscred'" >> "${REMOTE_ENV_FILE}"
+    ;;
 azure4|azuremag|azure-arm64)
     if [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
         echo "Setting AZURE credential using managed identity for installer"
@@ -153,14 +166,14 @@ azure4|azuremag|azure-arm64)
     else
         AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
     fi
-    run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_DIR}/osServicePrincipal.json"
-    echo "export AZURE_AUTH_LOCATION='${REMOTE_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
+    run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_SECRETS_DIR}/osServicePrincipal.json"
+    echo "export AZURE_AUTH_LOCATION='${REMOTE_SECRETS_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
     ;;
 gcp)
     if [[ -z "${ATTACH_BASTION_SA}" ]]; then
         GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json
-	run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${GOOGLE_CLOUD_KEYFILE_JSON}" "${REMOTE_DIR}/gce.json"
-	echo "export GOOGLE_CLOUD_KEYFILE_JSON='${REMOTE_DIR}/gce.json'" >> "${REMOTE_ENV_FILE}"
+	run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${GOOGLE_CLOUD_KEYFILE_JSON}" "${REMOTE_SECRETS_DIR}/gce.json"
+	echo "export GOOGLE_CLOUD_KEYFILE_JSON='${REMOTE_SECRETS_DIR}/gce.json'" >> "${REMOTE_ENV_FILE}"
     else
 	echo "The install on bastion will use the service-account attached to the bastion host, nothing to do"
     fi
@@ -172,7 +185,6 @@ echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
 
-run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "mkdir ${REMOTE_INSTALL_DIR}"
 run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${SHARED_DIR}/install-config.yaml" "${REMOTE_INSTALL_DIR}"
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
@@ -200,6 +212,7 @@ echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 # save ENV to REMOTE_ENV_FILE for installation on bastion
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> "${REMOTE_ENV_FILE}"
 [[ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]] && echo "export OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP=${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" >> "${REMOTE_ENV_FILE}"
+[[ -n "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" ]] && echo "export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" >> "${REMOTE_ENV_FILE}"
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then echo "export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true" >> "${REMOTE_ENV_FILE}"; fi
 echo "export TF_LOG=${TF_LOG}" >> "${REMOTE_ENV_FILE}"
 echo "export TF_LOG_CORE=${TF_LOG_CORE}" >> "${REMOTE_ENV_FILE}"

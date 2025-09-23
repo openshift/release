@@ -1,0 +1,34 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: prometheus
+  namespace: ci-grafana
+spec:
+  valuesFrom:
+  - targetPath: "secureJsonData.httpHeaderValue1"
+    valueFrom:
+      secretKeyRef:
+        name: "external-credentials"
+        key: "OPENSHIFT_MONITORING_CI_TOKEN"
+  - targetPath: "secureJsonData.tlsCACert"
+    valueFrom:
+      configMapKeyRef:
+        name: "openshift-service-ca.crt"
+        key: "service-ca.crt"
+  datasource:
+    name: prometheus
+    access: proxy
+    editable: false
+    isDefault: true
+    jsonData:
+      httpHeaderName1: 'Authorization'
+      timeInterval: 5s
+      tlsAuthWithCACert: true
+    secureJsonData:
+      httpHeaderValue1: 'Bearer ${OPENSHIFT_MONITORING_CI_TOKEN}'
+      tlsCACert: '${service-ca.crt}'
+    type: prometheus
+    url: https://thanos-querier.openshift-monitoring.svc:9091
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"

@@ -20,6 +20,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: aws-account-operator-codecov-token
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -34,14 +35,17 @@ tests:
   commands: make lint
   container:
     from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: test
   commands: make test
   container:
     from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: validate
   commands: make validate
   container:
     from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: integration-test
   cluster_claim:
     architecture: amd64
@@ -51,6 +55,7 @@ tests:
     timeout: 15m0s
     version: "4.12"
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     test:
     - as: test
@@ -67,7 +72,8 @@ tests:
                 echo -e "\nSkipped Integration Test\n"
         fi
       credentials:
-      - mount_path: /tmp/secret/aao-aws-creds
+      - collection: ""
+        mount_path: /tmp/secret/aao-aws-creds
         name: aao-aws-creds
         namespace: test-credentials
       from: src

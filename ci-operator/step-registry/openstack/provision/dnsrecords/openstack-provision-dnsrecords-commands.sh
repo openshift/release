@@ -4,13 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+# https://docs.aws.amazon.com/cli/latest/topic/config-vars.html
+export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws/.awscred"
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
-
-if [ -z "${AWS_PROFILE:-}" ]; then
-  unset AWS_PROFILE
-fi 
 
 TMP_DIR=$(mktemp -d)
 
@@ -20,11 +17,15 @@ else
   CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
 fi
 
+if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ]; then
+  echo "Credentials file is not correctly mounted"
+fi
+
 echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"
 HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${BASE_DOMAIN}" \
-            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
-            --output text)"
+  --dns-name "${BASE_DOMAIN}" \
+  --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
+  --output text)"
 
 cat > "${SHARED_DIR}/dns_up.json" <<EOF
 {
@@ -83,6 +84,28 @@ if [ -f "${SHARED_DIR}/MIRROR_REGISTRY_IP" ]; then
   cp "${TMP_DIR}/dns_mirror_registry.json" "${SHARED_DIR}/dns_up.json"
 fi
 
+if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && -s "${SHARED_DIR}/HIVE_CLUSTER_NAME" ]]; then
+  HIVE_FIP_API=$(<"${SHARED_DIR}"/HIVE_FIP_API)
+  HIVE_CLUSTER_NAME=$(<"${SHARED_DIR}"/HIVE_CLUSTER_NAME)
+  if [[ "${HIVE_FIP_API}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    HIVE_FIP_API_RECORD_TYPE="A"
+  else
+    HIVE_FIP_API_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating Hive API DNS $HIVE_FIP_API_RECORD_TYPE record for ${HIVE_CLUSTER_NAME}.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "api.'${HIVE_CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${HIVE_FIP_API_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${HIVE_FIP_API}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_hive_api.json"
+  cp "${TMP_DIR}/dns_hive_api.json" "${SHARED_DIR}/dns_up.json"
+
+  HIVE_FIP_INGRESS=$(<"${SHARED_DIR}"/HIVE_FIP_INGRESS)
+  if [[ "${HIVE_FIP_INGRESS}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    HIVE_FIP_INGRESS_RECORD_TYPE="A"
+  else
+    HIVE_FIP_INGRESS_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating Hive Ingress DNS $HIVE_FIP_INGRESS_RECORD_TYPE record for ${HIVE_CLUSTER_NAME}.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${HIVE_CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${HIVE_FIP_INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${HIVE_FIP_INGRESS}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_hive_ingress.json"
+  cp "${TMP_DIR}/dns_hive_ingress.json" "${SHARED_DIR}/dns_up.json"
+fi
 
 cp "${SHARED_DIR}/dns_up.json" "${ARTIFACT_DIR}/"
 aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/dns_up.json"

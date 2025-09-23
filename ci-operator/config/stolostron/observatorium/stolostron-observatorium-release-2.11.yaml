@@ -49,6 +49,7 @@ tests:
     make test --always-make
   container:
     from: test-bin
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
@@ -92,7 +93,8 @@ tests:
         export OSCI_COMPONENT_NAME="observatorium"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

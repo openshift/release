@@ -3,25 +3,25 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: kubernetes-sigs-lws
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ci
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: lws-operator
 promotion:
   to:
@@ -37,7 +37,8 @@ tag_specification:
   namespace: ocp
 tests:
 - as: verify
-  commands: make verify-gofmt
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+    make verify-gofmt lint
   container:
     from: src
 - as: verify-codegen
@@ -65,9 +66,9 @@ tests:
   steps:
     workflow: openshift-ci-security
 - as: e2e-aws-operator
-  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -83,7 +84,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-operand
-  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: aws-2
     test:

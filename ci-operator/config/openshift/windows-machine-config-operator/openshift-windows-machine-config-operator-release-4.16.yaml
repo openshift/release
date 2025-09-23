@@ -72,11 +72,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
-- as: build
-  commands: make build
-  container:
-    from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: unit
   commands: make unit
   container:
@@ -93,6 +88,9 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: aws-2
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -128,6 +126,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
       WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
     test:
     - ref: windows-e2e-operator-test
@@ -143,7 +143,7 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
   timeout: 5h0m0s
 - as: vsphere-e2e-ccm-install
-  cron: 27 5 20 * *
+  cron: 11 9 22 3 *
   steps:
     cluster_profile: vsphere-elastic
     test:

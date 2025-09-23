@@ -7,7 +7,15 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 
 declare ICSP_NAME=${ICSP_NAME}
 declare CATALOG_SOURCE=${COO_CATALOG_SOURCE}
-declare COO_INDEX_IMAGE=${COO_INDEX_IMAGE}
+declare COO_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE}
+
+# Check if COO_INDEX_IMAGE is not empty
+if [[ -z "$COO_INDEX_IMAGE" ]]; then
+    echo "Error: COO_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "COO_INDEX_IMAGE is set to: $COO_INDEX_IMAGE"
+fi
 
 set_proxy() {
 	[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
@@ -71,7 +79,7 @@ update_global_auth() {
 	brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
 
 	# Create a new dockerconfig with the konflux registry credentials without the "email" field
-	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"https://registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
+	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"https://registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
 
 	# update global auth
 	local -i ret=0

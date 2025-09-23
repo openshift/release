@@ -53,6 +53,11 @@ elif $INTERNAL; then
     CL_SEARCH="any"
 fi
 
+# We run SRIOV jobs only on internal network
+if [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
+    CL_SEARCH="internalbos"
+fi
+
 echo $CL_SEARCH
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
@@ -68,7 +73,7 @@ ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
-- name: Grab and run kcli to install openshift cluster
+- name: Find a cluster to run job
   hosts: bastion
   gather_facts: false
   tasks:
@@ -133,18 +138,18 @@ if $BASTION_ENV; then
 [hypervisor]
 ${HYPERV_HOST} ansible_host=${CLUSTER_HV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
-    dnsmasq_params="vsno_dnsmasq_dir: /etc/dnsmasq.d"
-    dnsmasq_params2="dnsmasq_restart: true"
-    dnsmasq_params3="netmanager_restart: false"
 else
     cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
 ${HYPERV_HOST} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
-    dnsmasq_params=""
-    dnsmasq_params2=""
-    dnsmasq_params3=""
 fi
+
+data=$(ansible -i $SHARED_DIR/inventory hypervisor -m shell -a "host $SNO_NAME" | grep address)
+
+SNO_IP=$(echo $data | sed "s/.*address //g")
+SNO_FQDN=$(echo $data | cut -d" " -f1)
+SNO_DOMAIN=$(echo $SNO_FQDN | cut -d"." -f2-)
 
 # Create a playbook to remove existing SNO
 cat << EOF > $SHARED_DIR/delete-sno.yml
@@ -160,9 +165,20 @@ cat << EOF > $SHARED_DIR/delete-sno.yml
         tasks_from: deletion.yml
       vars:
         vsno_name: $SNO_NAME
-        $dnsmasq_params
-        $dnsmasq_params2
-        $dnsmasq_params3
+        vsno_domain_name: $SNO_DOMAIN
+
+EOF
+
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
+---
+- name: Delete cluster if exists
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Remove last run for ${CLUSTER_NAME}_ci
+    shell: kcli delete plan --yes ${CLUSTER_NAME}_ci
+    ignore_errors: yes
 
 EOF
 
@@ -211,11 +227,12 @@ echo "Run the playbook to remove SNO management cluster"
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     $SHARED_DIR/delete-sno.yml
 
-# shellcheck disable=SC1083
-SNO_IP=$(ansible-playbook -vv ~/freeip.yml 2>/dev/null | grep '"free_ip": ' | tail -1  | awk {'print $2'} | tr -d '"')
+echo "Run the playbook to remove possible kcli clusters"
+ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+    $SHARED_DIR/destroy-cluster.yml
 
 if $BASTION_ENV; then
-    PLAYBOOK_ARGS=" -e vsno_dnsmasq_dir=/etc/dnsmasq.d -e dnsmasq_configure_interface=false -e netmanager_restart=false -e dnsmasq_restart=true "
+    PLAYBOOK_ARGS=" -e gitops_params_inject_dns=true -e gitops_params_inject_dns_server=${CLUSTER_HV_IP} "
     SNO_CLUSTER_API_PORT="64${SNO_IP##*.}"  # "64" and last octet of SNO_IP address
 else
     PLAYBOOK_ARGS=""
@@ -292,7 +309,8 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e ztphost=$CLUSTER_NAME \
     -e vsno_name=$SNO_NAME \
     -e vsno_ip=$SNO_IP \
-    -e hostedbm_inject_dns=true \
+    -e vsno_add_nm_hosts=false \
+    -e hostedbm_inject_dns=false \
     -e sno_tag=$MGMT_VERSION \
     -e vsno_wait_minutes=150 \
     -e sno_release=$MGMT_RELEASE \
@@ -301,6 +319,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e ztphub_wait_install_timeout=90 \
     -e disconnected_env=true \
     -e disconnected_env_pull_secret=/home/kni/pull-secret.txt \
+    -e gitops_sno_single_ip=true \
     -e ztphub_wait_install_timeout=150 $PLAYBOOK_ARGS || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.

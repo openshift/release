@@ -91,7 +91,7 @@ while [ $v -gt 10 ]
 do
   v_xy="${ocp_major_version}${v}"
   echo "Checking ${v_xy} ..."
-  jq --arg r "^rhcos-(x86_64-){0,1}${v_xy}\..*" '.Images[] | select(.Name | test($r))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.Name | sub("^rhcos-x86_64-"; "") | sub("^rhcos-"; "")) | last' > $selected_image
+  jq --arg r "${v_xy}" '.Images[] | select(.Description | test($r))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.CreationDate) | last' > $selected_image
   image_id=$(jq -r '.ImageId' $selected_image)
 
   if ! is_empty "$image_id"; then
@@ -122,7 +122,19 @@ yq-go m -x -i "${CONFIG}" "${IMAGE_ID_PATCH}"
 # Instance type
 if [[ ${USE_MARKETPLACE_CONTRACT_NODE_TYPE_ONLY} == "yes" ]]; then
   NODE_TYPE_PATCH="${ARTIFACT_DIR}/install-config-marketplace-instance-type.yaml.patch"
-  node_type="m5.2xlarge"
+
+  case "${CLUSTER_TYPE:-}" in
+    aws)
+      node_type="m6i.xlarge"
+      ;;
+    aws-usgov)
+      node_type="m5.2xlarge"
+      ;;
+    *)
+      echo "Unsupported cluster type: ${CLUSTER_TYPE:-}"
+      exit 1
+  esac
+
   echo "Replace instance type with $node_type which presents in the contract."
   
 

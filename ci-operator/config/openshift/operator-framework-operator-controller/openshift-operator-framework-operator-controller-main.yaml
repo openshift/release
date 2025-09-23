@@ -2,60 +2,60 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
-  ocp_4.19_base-rhel9:
-    name: "4.19"
+    tag: latest
+  ocp_4.20_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: openshift/catalogd.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: olm-catalogd
 - dockerfile_path: openshift/operator-controller.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: olm-operator-controller
 - dockerfile_path: openshift/registry.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: e2e-test-registry
 promotion:
   to:
   - excluded_images:
     - e2e-test-registry
-    name: "4.19"
+    name: "4.21"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -127,7 +127,9 @@ tests:
     test:
     - as: upstream-e2e
       cli: latest
-      commands: make -C openshift test-e2e
+      commands: |
+        make -C openshift test-e2e
+        make -C openshift test-experimental-e2e
       dependencies:
       - env: E2E_REGISTRY_IMAGE
         name: e2e-test-registry
@@ -135,6 +137,57 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- as: default-catalog-consistency
+  run_if_changed: ^(openshift/default-catalog-consistency/|openshift/catalogd/kustomize/overlays/openshift/catalogs/)
+  steps:
+    test:
+    - as: default-catalog-tests
+      commands: |
+        echo "Running Default Catalog Tests"
+        cd openshift/default-catalog-consistency
+        REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
+      credentials:
+      - collection: ""
+        mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: default-catalog-tests-verify
+      commands: |
+        echo "Verifying Default Catalog Tests"
+        cd openshift/default-catalog-consistency
+        make verify
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: tests-extension
+  run_if_changed: ^(openshift/tests-extension/)
+  steps:
+    test:
+    - as: sanity
+      commands: |
+        cd openshift/tests-extension
+        make verify
+        make build
+        make verify-metadata
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-aws-techpreview-olmv1-ext
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/all
+    test:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 zz_generated_metadata:

@@ -1,0 +1,48 @@
+ref:
+  as: aro-hcp-tests-run-aro-hcp-tests
+  from: src-plus-az
+  commands: aro-hcp-tests-run-aro-hcp-tests-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: hcp-integration-credentials
+      mount_path: /var/run/hcp-integration-credentials
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CUSTOMER_SUBSCRIPTION
+    default: ""
+    documentation: Azure subscription to create resources in.  For example, "ARO SRE Team - INT (EA Subscription 3)"
+  - name: AZURE_TENANT_ID
+    default: ""
+    documentation: Read from Vault, listed here for convenience of knowing it exists.
+  - name: AZURE_CLIENT_ID
+    default: ""
+    documentation: Read from Vault, listed here for convenience of knowing it exists.
+  - name: AZURE_CLIENT_SECRET
+    default: ""
+    documentation: Read from Vault, listed here for convenience of knowing it exists.
+  - name: LOCATION
+    default: ""
+    documentation: |-
+      Azure region to create resources in.  For example, "uksouth".
+      This is intentionally not the standard AZURE_REGION_LOCATION so that Azure library doesn't automatically select it.
+      That way we can have tets that choose different locations.
+  - name: MULTISTAGE_PARAM_OVERRIDE_LOCATION
+    documentation: |-
+      The var has precedence over the LOCATION env var. It can be set when using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_LOCATION": "uksouth"
+        }
+      }
+    default: ""
+  - name: ARO_HCP_SUITE_NAME
+    default: ""
+    documentation: Suite to run.  For example, integration/parallel.
+  - name: ARO_E2E_SKIP_CLEANUP
+    default: ""
+    documentation: Set to true to skip cleanup.  This can leave lot of cruft, so be responsible.
+  documentation: |-
+    Run the Azure/ARO-HCP/aro-hcp-tests binary.

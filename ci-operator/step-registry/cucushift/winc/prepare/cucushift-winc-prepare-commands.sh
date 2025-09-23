@@ -6,7 +6,6 @@ set -x
 
 function create_winc_test_configmap()
 {
-
   oc create configmap winc-test-config -n winc-test --from-literal=primary_windows_image="${1}" --from-literal=primary_windows_container_image="${2}"
 
   # Display pods and configmap
@@ -20,7 +19,6 @@ function create_workloads()
   # turn off the automatic label synchronization required for PodSecurity admission
   # set pods security profile to privileged. See https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-levels
   oc label namespace winc-test security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged  --overwrite
-
 
   # Create Windows workload
   oc create -f - <<EOF
@@ -123,10 +121,82 @@ EOF
   oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m
 }
 
+# Function to get Windows machineset name based on platform
+getMachinesetName() {
+  local platform="$1"
+  local name
+
+  case "$platform" in
+    aws|gcp)
+      name=$(oc get machinesets -n openshift-machine-api -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep winworker | head -n1)
+      if [[ -z "$name" ]]; then
+        name=$(oc get machinesets -n openshift-machine-api -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep worker | head -n1)
+        name="${name/worker/winworker}"
+      fi
+      echo "$name"
+      ;;
+    azure)
+      echo "windows"
+      ;;
+    vsphere|nutanix)
+      echo "winworker"
+      ;;
+    *)
+      echo ""
+      return 1
+      ;;
+  esac
+}
+
+
+# Get platform type
 IAAS_PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}"| tr '[:upper:]' '[:lower:]')
 
+# Get the Windows machineset name
+winworker_machineset_name=$(getMachinesetName "$IAAS_PLATFORM")
 
-winworker_machineset_name=$(oc get machineset -n openshift-machine-api -o json | jq -r '.items[] | select(.metadata.name | test("winworker")).metadata.name')
+if [ -z "$winworker_machineset_name" ]; then
+  echo "Failed to determine Windows machineset name for platform: $IAAS_PLATFORM"
+  exit 1
+fi
+
+# Get Windows OS image ID based on platform
+case "$IAAS_PLATFORM" in
+  aws)
+    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.ami.id}" -n openshift-machine-api)
+    ;;
+  azure)
+    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.sku}" -n openshift-machine-api)
+    ;;
+  vsphere)
+    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template}" -n openshift-machine-api)
+    ;;
+  gcp)
+    # we need the value after family/
+    # in this example projects/windows-cloud/global/images/family/windows-2022-core
+    # windows_os_image_id needs to be windows-2022-core
+    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api | tr "/" "\n" | tail -n1)
+    ;;
+  nutanix)
+    # Extract the image name from Nutanix providerSpec
+    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.name}" -n openshift-machine-api)
+    ;;
+  *)
+    echo "Cloud provider \"$IAAS_PLATFORM\" is not supported by WMCO"
+    exit 1
+    ;;
+esac
+
+# Verify we got the Windows OS image ID
+if [ -z "$windows_os_image_id" ]; then
+  echo "Failed to retrieve Windows OS image ID for platform: $IAAS_PLATFORM"
+  exit 1
+fi
+
+echo "Windows machineset name: $winworker_machineset_name"
+echo "Windows OS image ID: $windows_os_image_id"
+
+# Get replica count
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
 
 echo "Waiting for Windows nodes to come up in Running state"
@@ -144,32 +214,6 @@ if [[ "$os_version" == *"2019"* ]]
 then
     windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-1809"
 fi
-
-case "$IAAS_PLATFORM" in
-  aws)
-	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.ami.id}" -n openshift-machine-api)
-    ;;
-  azure)
-	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.sku}" -n openshift-machine-api)
-	;;
-  vsphere)
-	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template}" -n openshift-machine-api)
-    ;;
-  gcp)
-	# we need the value after family/
-	# in this example projects/windows-cloud/global/images/family/windows-2022-core
-	# windows_os_image_id needs to be windows-2022-core
-	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api | tr "/" "\n" | tail -n1)
-    ;;
-  nutanix)
-        # Extract the image name from Nutanix providerSpec
-        windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.name}" -n openshift-machine-api)
-    ;;
-  *)
-    echo "Cloud provider \"$IAAS_PLATFORM\" is not supported by WMCO"
-    exit 1
-    ;;
-esac
 
 create_workloads $windows_container_image
 

@@ -3,22 +3,30 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
-  ocp_4.19_base-rhel9:
-    name: "4.19"
+    tag: latest
+  ocp_4.20_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   rhel-coreos-base:
-    name: "4.19"
+    name: "4.21"
     namespace: ocp
     tag: rhel-coreos
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
 binary_build_commands: make binaries
 build_root:
   from_repository: true
@@ -26,21 +34,21 @@ canonical_go_repository: github.com/kubernetes-sigs/cloud-provider-azure
 images:
 - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: azure-cloud-controller-manager
 - dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: azure-cloud-node-manager
 - dockerfile_literal: |
     # This uses the new rhel-coreos base image
@@ -69,7 +77,7 @@ promotion:
       cloud-provider-azure-rpms: rpms
     excluded_images:
     - rhel-coreos
-    name: "4.19"
+    name: "4.21"
     namespace: ocp
 raw_steps:
 - rpm_image_injection_step:
@@ -78,12 +86,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -92,7 +100,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: openshift-hack/build-rpms.sh 4.16.0
+rpm_build_commands: openshift-hack/build-rpms.sh 4.20.0
 rpm_build_location: _output/RPMS/x86_64
 tests:
 - as: verify-git-history
@@ -115,22 +123,45 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-azurestack-ipi
+  cluster: build01
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azurestack-dev
+    workflow: openshift-e2e-azurestack
+  timeout: 6h0m0s
 - as: e2e-azure-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+- as: regression-clusterinfra-azure-ipi-ccm
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: azure4
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-azure-ipi
+  timeout: 7h0m0s
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
   optional: true
-- as: security
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: cloud-provider-azure
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

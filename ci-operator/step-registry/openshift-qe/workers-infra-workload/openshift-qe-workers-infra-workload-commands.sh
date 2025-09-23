@@ -413,6 +413,9 @@ function create_machineset() {
     echo -e "Reference Machineset Name: $REF_MACHINESET_NAME \nNODE_REPLICAS: $NODE_REPLICAS\nMACHINESET_TYPE: $MACHINESET_TYPE\nNODE_INSTANCE_TYPE: $NODE_INSTANCE_TYPE\nINSTANCE_VCPU: $INSTANCE_VCPU\nNODE_CPU_COUNT: $NODE_CPU_COUNT\nNODE_CPU_CORE_PER_SOCKET_COUNT: $NODE_CPU_CORE_PER_SOCKET_COUNT\nINSTANCE_MEMORYSIZE: $INSTANCE_MEMORYSIZE\ncpusPerSocket: $cpusPerSocket\nnNODE_MEMORY_SIZE: $NODE_MEMORY_SIZE\nVOLUME_TYPE: $VOLUME_TYPE\nVOLUME_SIZE: $VOLUME_SIZE\nVOLUME_IOPS: $VOLUME_IOPS"
     echo "It's normal if some ENV is empty, vsphere and nutanix use INSTANCE_VCPU/NODE_CPU_COUNT instead of NODE_INSTANCE_TYPE"
     echo "###########################################################################################"
+    echo "Remove autoscaling.openshift.io/machineautoscaler: openshift-machine-api/worker-autoscaling"
+    sed -i "/autoscaling.openshift.io/d" /tmp/machineset.json
+    sed -i "/cluster-api-autoscaler/d" /tmp/machineset.json
     if [[ $MACHINESET_TYPE == "infra" ]];then
         cat /tmp/machineset.json | jq '.spec.template.spec.metadata.labels."node-role.kubernetes.io/infra" = ""' | oc create -f -
     elif [[ $MACHINESET_TYPE == "workload" ]];then
@@ -578,8 +581,8 @@ platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatu
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 node_arch=$(echo $node_arch | tr -s " " "\n"| sort -u)
 all_machinesets=$(oc -n openshift-machine-api get machinesets.m -ojsonpath='{.items[*].metadata.name}{"\n"}')
-machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3)
-machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3 |wc -l)
+machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3)
+machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3 |wc -l)
 total_worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker= -oname|wc -l)
 
 scale_type=""

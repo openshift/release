@@ -7,24 +7,24 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 images:
 - inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-ingress-operator
 promotion:
   to:
@@ -58,9 +58,13 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
+- as: e2e-aws-ovn-hypershift-conformance
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-azure-ovn
   optional: true
@@ -75,7 +79,7 @@ tests:
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -116,40 +120,23 @@ tests:
     workflow: ipi-azure
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
-    workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-gatewayapi
-  optional: true
-  steps:
     cluster_profile: aws
-    env:
-      FEATURE_GATES: '[GatewayAPI=true,GatewayAPIController=true]'
-      FEATURE_SET: CustomNoUpgrade
-    test:
-    - as: test
-      cli: latest
-      commands: make TEST=TestGatewayAPI test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
+    workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-aws-gatewayapi-conformance
   optional: true
   steps:
-    cluster_profile: aws-3
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -162,7 +149,7 @@ tests:
 - as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -183,7 +170,7 @@ tests:
 - as: e2e-aws-operator-techpreview
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -219,8 +206,14 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      TECH_PREVIEW_NO_UPGRADE: "true"
+      HYPERSHIFT_AZURE_LOCATION: uksouth
     workflow: hypershift-azure-aks-e2e
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

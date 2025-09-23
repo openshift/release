@@ -3,19 +3,19 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.22-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.22-linux
   stolostron_builder_go1.23-linux:
     name: builder
     namespace: stolostron
     tag: go1.23-linux
+  stolostron_builder_go1.24-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.24-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: operators/multiclusterobservability/Dockerfile
   from: base
@@ -23,6 +23,9 @@ images:
     stolostron_builder_go1.23-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.23-linux
+    stolostron_builder_go1.24-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multicluster-observability-operator
 - dockerfile_path: proxy/Dockerfile
   from: base
@@ -30,6 +33,9 @@ images:
     stolostron_builder_go1.23-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.23-linux
+    stolostron_builder_go1.24-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: rbac-query-proxy
 - dockerfile_path: operators/endpointmetrics/Dockerfile
   from: base
@@ -37,6 +43,9 @@ images:
     stolostron_builder_go1.23-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.23-linux
+    stolostron_builder_go1.24-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: endpoint-monitoring-operator
 - dockerfile_path: tests/Dockerfile
   from: base
@@ -51,6 +60,9 @@ images:
     stolostron_builder_go1.23-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.23-linux
+    stolostron_builder_go1.24-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: metrics-collector
 - dockerfile_path: loaders/dashboards/Dockerfile
   from: base
@@ -58,21 +70,14 @@ images:
     stolostron_builder_go1.23-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.23-linux
+    stolostron_builder_go1.24-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: grafana-dashboard-loader
 promotion:
   to:
-  - name: "2.14"
+  - name: "2.15"
     namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.16"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.18"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -131,6 +136,7 @@ tests:
     VERBOSE="-v" make unit-tests
   container:
     from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: e2e-kind
   steps:
     env:
@@ -171,20 +177,20 @@ tests:
           memory: 200Mi
     workflow: ocm-e2e-kind
 - as: test-e2e
-  skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
+  skip_if_only_changed: ^docs/|hack/|^\.tekton/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
     allow_skip_on_success: true
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
-      ACM_RELEASE_VERSION: release-2.14
+      ACM_RELEASE_VERSION: release-2.15
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-418
+      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-419
       CLUSTERPOOL_LIFETIME: 1h
       CLUSTERPOOL_MANAGED_COUNT: "1"
-      CLUSTERPOOL_MANAGED_FILTER: sno-418
+      CLUSTERPOOL_MANAGED_FILTER: sno-419
       COMPONENT_NAME: multicluster-observability-operator
       DEPLOY_HUB_ADDITIONAL_YAML: |
         LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl
@@ -211,7 +217,7 @@ tests:
         bHVzdGVyLW9ic2VydmFiaWxpdHktb3BlcmF0b3ItZTJlLXRlc3RpbmcKc3ViamVjdHM6Ci0ga2lu
         ZDogU2VydmljZUFjY291bnQKICBuYW1lOiBtdWx0aWNsdXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVy
         YXRvcgogIG5hbWVzcGFjZTogb3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQKLS0tCg==
-      PIPELINE_STAGE: dev
+      PIPELINE_STAGE: integration
     post:
     - as: obs-must-gather
       best_effort: true
@@ -251,31 +257,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: sonarcloud
-  commands: |
-    export SELF="make"
-    make sonar/go/prow
-  container:
-    from: src
-  optional: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonarcloud-post-submit
-  commands: |
-    export SELF="make"
-    make sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: fast-forward
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.14
+      DESTINATION_BRANCH: release-2.15
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

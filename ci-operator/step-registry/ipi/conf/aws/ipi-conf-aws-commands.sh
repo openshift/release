@@ -296,13 +296,6 @@ rm /tmp/pull-secret
 
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
-if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
-  # TODO: move repo to a more appropriate location
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
-  echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
-fi
-
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
   if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then

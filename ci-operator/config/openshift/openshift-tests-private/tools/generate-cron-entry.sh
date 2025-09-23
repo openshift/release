@@ -39,7 +39,7 @@ if ! [[ "$TEST_NAME" =~ (p[1-3])?-f[0-9]+ ]] ; then
 fi
 
 FN="$(echo $TEST_NAME | sed -E 's/.*-f([0-9]+)(.*)?/\1/')"
-NUMBERS="$(echo $TEST_NAME $YAML_FILE | md5sum | tr [a-f] [1-6] | tr -d ' -')"
+NUMBERS="$(echo $TEST_NAME $YAML_FILE | md5sum | tr 'a-f' '1-6' | tr -d ' -')"
 if [[ $DEBUG = "true" ]] ; then
 	echo "FN: $FN"
 	echo "NUMBERS: $NUMBERS"
@@ -84,7 +84,7 @@ case "$FN" in
 	1)
 		echo "$MINUTE $HOUR * * *"
 		;;
-	2|3|4|5|6|7|9|10|14|28|30)
+	2|3|4|5|6|7|10|14|28)
 		DAY_OF_MONTH_TMP=$DAY_OF_MONTH
 		for ((i=1 ; i<31/FN; ++i)) ; do
 			let TMP=(i*FN+DAY_OF_MONTH-1)%30+1

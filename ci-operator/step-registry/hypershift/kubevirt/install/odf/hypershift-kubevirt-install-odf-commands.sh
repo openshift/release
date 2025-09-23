@@ -11,11 +11,30 @@ ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
 ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
 
+# TODO: update to 4.20 once ODF 4.20 is released in the official redhat-operators 4.20 catalog
+ODF_MAX_VERSION="4.19"
+ODF_MAX_VERSION_NUMERIC=$(echo "${ODF_MAX_VERSION}" | awk -F. '{ printf "%d%02d", $1, $2 }')
+
+function ocp_version() {
+  oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
+}
+
+function ocp_version_numeric() {
+  ocp_version | awk -F. '{ printf "%d%02d", $1, $2 }'
+}
+
 # Make the masters schedulable so we have more capacity to run VMs
 CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
 if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
 then
   oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+fi
+
+if [ "$(ocp_version_numeric)" -ge "${ODF_MAX_VERSION_NUMERIC}" ]
+then
+  ODF_OPERATOR_CHANNEL=stable-${ODF_MAX_VERSION}
+else
+  ODF_OPERATOR_CHANNEL=stable-$(ocp_version)
 fi
 
 echo "Installing ODF from ${ODF_OPERATOR_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
@@ -25,48 +44,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
-EOF
-
-oc apply -f - <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  annotations:
-    operatorframework.io/managed-by: marketplace-operator
-    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-  generation: 5
-  name: redhat-operators-4-15
-  namespace: openshift-marketplace
-spec:
-  displayName: Red Hat Operators
-  grpcPodConfig:
-    nodeSelector:
-      kubernetes.io/os: linux
-      node-role.kubernetes.io/master: ""
-    priorityClassName: system-cluster-critical
-    securityContextConfig: restricted
-    tolerations:
-    - effect: NoSchedule
-      key: node-role.kubernetes.io/master
-      operator: Exists
-    - effect: NoExecute
-      key: node.kubernetes.io/unreachable
-      operator: Exists
-      tolerationSeconds: 120
-    - effect: NoExecute
-      key: node.kubernetes.io/not-ready
-      operator: Exists
-      tolerationSeconds: 120
-  icon:
-    base64data: ""
-    mediatype: ""
-  image: registry.redhat.io/redhat/redhat-operator-index:v4.15
-  priority: -100
-  publisher: Red Hat
-  sourceType: grpc
-  updateStrategy:
-    registryPoll:
-      interval: 10m
 EOF
 
 # deploy new operator group
@@ -137,6 +114,13 @@ echo "Preparing nodes"
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
   --selector='node-role.kubernetes.io/worker' --overwrite
 
+echo "Wait for StorageCluster CRD to be created"
+timeout 30m bash -c '
+  until oc get crd storageclusters.ocs.openshift.io &>/dev/null; do
+    sleep 5
+  done
+'
+
 echo "Create StorageCluster"
 cat <<EOF | oc apply -f -
 kind: StorageCluster
@@ -156,10 +140,8 @@ spec:
         memory: "0"
   monDataDirHostPath: /var/lib/rook
   managedResources:
-    cephFilesystems:
-      reconcileStrategy: ignore
-    cephObjectStores:
-      reconcileStrategy: ignore
+    cephFilesystems: {}
+    cephObjectStores: {}
   multiCloudGateway:
     reconcileStrategy: ignore
   storageDeviceSets:
@@ -185,15 +167,25 @@ EOF
 
 echo "Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
-   -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
+   -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m'
 
 echo "ODF/OCS Operator is deployed successfully"
+ODF_VIRT_SC=ocs-storagecluster-ceph-rbd-virtualization
 
-# Setting ocs-storagecluster-ceph-rbd the default storage class
+echo "Wait for the storage class ${ODF_VIRT_SC} to be created"
+timeout 30m bash -c "
+  until oc get storageclass ${ODF_VIRT_SC} &>/dev/null; do
+    sleep 5
+  done
+" || true
+
+oc get sc
+
+# Setting ocs-storagecluster-ceph-rbd-virtualization the default storage class
 for item in $(oc get sc --no-headers | awk '{print $1}'); do
 	oc annotate --overwrite sc $item storageclass.kubernetes.io/is-default-class='false'
 done
-oc annotate --overwrite sc ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class='true'
+oc annotate --overwrite sc ${ODF_VIRT_SC} storageclass.kubernetes.io/is-default-class='true'
 oc annotate --overwrite volumesnapshotclass ocs-storagecluster-rbdplugin-snapclass snapshot.storage.kubernetes.io/is-default-class='true'
 echo "ocs-storagecluster-ceph-rbd is set as default storage class"
 
@@ -223,4 +215,3 @@ echo "managing deployment again, will restore to needed value"
 oc patch csisnapshotcontroller cluster --type=json -p='[{"op": "add", "path": "/spec/managementState", "value": "Managed"}]' -n openshift-cluster-storage-operator
 echo "waiting for deployment to be ready"
 oc rollout status deployment/csi-snapshot-controller -n openshift-cluster-storage-operator
-

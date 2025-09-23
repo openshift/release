@@ -48,8 +48,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: krkn-hub-tests
-  cron: 0 4 8 * *
+- always_run: false
+  as: krkn-hub-tests
   steps:
     cluster_profile: aws-chaos
     env:
@@ -66,17 +66,12 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
     test:
-    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
-- as: krkn-hub-node-tests
-  cron: 0 4 7 * *
+- always_run: false
+  as: krkn-hub-node-tests
   steps:
     cluster_profile: aws-chaos
     env:
@@ -93,13 +88,9 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - ref: redhat-chaos-start-krkn
-    workflow: redhat-chaos-krkn-hub-node-tests
+    test:
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-tests-azure
@@ -116,10 +107,9 @@ tests:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     - chain: redhat-chaos-hog-scenarios
-    workflow: openshift-qe-installer-azure
+    workflow: redhat-chaos-installer-azure
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-tests-gcp
@@ -136,14 +126,14 @@ tests:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
     test:
-    - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-tests
     - chain: redhat-chaos-hog-scenarios
-    workflow: openshift-qe-installer-gcp
+    workflow: redhat-chaos-installer-gcp
   timeout: 6h0m0s
 - always_run: false
   as: krkn-hub-tests-aro
   steps:
+    allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
@@ -166,7 +156,7 @@ tests:
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
     - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
     - chain: redhat-chaos-hog-scenarios
-    workflow: openshift-qe-installer-azure-aro-upi
+    workflow: redhat-chaos-installer-azure-aro-upi
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: main

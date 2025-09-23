@@ -3,10 +3,14 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.19"
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
     name: "4.19"
     namespace: ocp
@@ -22,7 +26,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: latest
+    tag: "4.19"
 binary_build_commands: go build ./cmd/cloud-controller-manager
 build_root:
   from_repository: true
@@ -62,7 +66,6 @@ promotion:
   to:
   - additional_images:
       cloud-provider-gcp-rpms: rpms
-    disabled: true
     excluded_images:
     - rhel-coreos
     name: "4.19"
@@ -105,17 +108,17 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upgrade
-- as: regression-clusterinfra-cucushift-rehearse-gcp-ipi
+- as: regression-clusterinfra-gcp-ipi-ccm
   optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp-3
     env:
-      TEST_FILTERS: NonHyperShiftHOST
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
       TEST_SCENARIOS: Cluster_Infrastructure CCM
-      TEST_TIMEOUT: "90"
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-gcp-ipi
   timeout: 7h0m0s
 - as: verify-commits
@@ -124,11 +127,12 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: cloud-provider-gcp
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

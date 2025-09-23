@@ -1,8 +1,12 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.19"
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
+    tag: latest
   ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -14,7 +18,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.19"
 binary_build_commands: go build -o cluster-api-provider-vsphere main.go
 build_root:
   from_repository: true
@@ -31,8 +35,7 @@ images:
   to: vsphere-cluster-api-controllers
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -52,6 +55,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: unit
+  commands: openshift/unit-tests.sh
+  container:
+    from: src
 - as: e2e-vsphere
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -84,17 +91,17 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-serial
-- as: regression-clusterinfra-vsphere-ipi-techpreview
+- as: regression-clusterinfra-vsphere-ipi-techpreview-capi
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
+      E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_FILTERS: CAPI
-      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: verify-commits
   commands: |
@@ -102,11 +109,12 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: cluster-api-provider-vsphere
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

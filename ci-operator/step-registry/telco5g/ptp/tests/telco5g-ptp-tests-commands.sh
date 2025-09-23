@@ -5,6 +5,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+LATEST_RELEASE="$(curl -s "https://api.github.com/repos/openshift/release/contents/ci-operator/config/openshift/release?ref=master" | jq -r '.[].name' | grep -E '^openshift-release-master__nightly-[0-9]+\.[0-9]+\.yaml$' | sed -E 's/^openshift-release-master__nightly-([0-9]+\.[0-9]+)\.yaml$/\1/' | sort -V | tail -n1)"
+export LATEST_RELEASE
 build_images(){
 oc delete namespace openshift-ptp || true
 oc create namespace openshift-ptp -o yaml | oc label -f - pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged || true
@@ -83,19 +85,33 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
-          cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
+          export LATEST_RELEASE="LATEST_RELEASE_VAL"
+          export USE_UPSTREAM="USE_UPSTREAM_VAL"
+
+          # run latest release on upstream main branch
+          if [[ "${USE_UPSTREAM:-false}" == "true" ]]; then
+            echo "Running on upstream main branch"
+            git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/ptp-operator.git
+          else
+            git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          fi
+          cd ptp-operator
           # OCPBUGS-52327 fix build due to libresolv.so link error
           sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
           if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
             sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
             make docker-build
           else
-            # Dockerfile is updated to upstream in 4.19+
-            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile.ocp
-            podman build -t ${IMG} -f Dockerfile.ocp
+            # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions
+            if [ -f "Dockerfile.ocp" ]; then
+              DOCKERFILE="Dockerfile.ocp"
+            else
+              DOCKERFILE="Dockerfile.ci"
+            fi
+            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" "$DOCKERFILE"
+            podman build -t "${IMG}" -f "$DOCKERFILE"
           fi
           podman push ${IMG} --tls-verify=false
           cd ..
@@ -123,6 +139,8 @@ spec:
   jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#LATEST_RELEASE_VAL#${LATEST_RELEASE}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
@@ -218,7 +236,12 @@ export CNF_ORIGIN_TESTS
 # always use the latest test code
 export TEST_BRANCH="main"
 
-export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
+# run latest release on upstream main branch
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+  export PTP_UNDER_TEST_BRANCH="main"
+else
+  export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
+fi
 export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
@@ -243,8 +266,12 @@ export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-op
 build_images
 
 # deploy ptp-operator
-
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+  echo "Running on upstream main branch"
+  git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+else
+  git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+fi
 
 cd ptp-operator-under-test
 
@@ -273,10 +300,15 @@ else
 fi
 
 if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+  echo "Version is less than 4.19"
+  # release-4.18 consumer image supports event API v1
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
-# event API v1 is removed from 4.19 onwards
+  TEST_MODES=("dualnicbc" "bc" "oc")
 else
+  echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
+  # Only run tgm and dualfollower tests from 4.19 onwards
+  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "bc" "oc")
 fi
 
 # wait for the linuxptp-daemon to be deployed
@@ -285,7 +317,8 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+# always run test from latest upstream
+git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
@@ -293,8 +326,8 @@ cd ptp-operator-conformance-test
 cat <<'EOF' >"${SHARED_DIR}"/test-config.yaml
 ---
 global:
- maxoffset: 100
- minoffset: -100
+  maxoffset: 100
+  minoffset: -100
 soaktest:
   disable_all: false
   event_output_file: "./event-output.csv"
@@ -352,18 +385,6 @@ sleep 300
 # get RTC logs
 print_time
 
-# Only run dual follower tests for versions < 4.19
-version=$(oc version -ojson| jq -r '.openshiftVersion')
-min_required="4.19"
-
-if [[ "$(printf '%s\n' "$version" "$min_required" | sort -V | head -n1)" != "$min_required" ]]; then
-  echo "Version is less than 4.19"
-  TEST_MODES=("dualnicbc" "bc" "oc")
-else
-  echo "Version is 4.19 or greater"
-  TEST_MODES=("dualfollower" "dualnicbc" "bc" "oc")
-fi
-
 # Run tests
 for mode in "${TEST_MODES[@]}"; do
   echo "Running tests for PTP_TEST_MODE=${mode}"
@@ -373,7 +394,9 @@ for mode in "${TEST_MODES[@]}"; do
   set_events_output_file
 
   temp_status="temp_status_${mode}" # Convert to lowercase for variable naming
-  make functests; declare "$temp_status=$?"
+  exit_code=0
+  make functests || exit_code=$?
+  declare "$temp_status=$exit_code"
 
   # Get RTC logs
   print_time

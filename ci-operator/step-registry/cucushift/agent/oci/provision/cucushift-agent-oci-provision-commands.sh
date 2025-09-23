@@ -34,13 +34,10 @@ platform:
     platformName: oci
 "
 
-pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build03_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build03_auth=$(jq -c '.auths."registry.build03.ci.openshift.org"' ${build03_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build03_auth" '.auths["registry.build03.ci.openshift.org"] += $auth' "${pull_secret_path}")
-
-echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
-pull_secret=$(<"${SHARED_DIR}/pull-secrets")
+cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+pull_secret_path=/tmp/pull-secret
+pull_secret=$(jq -c . < "$pull_secret_path")
 
 # Add build03 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
@@ -56,10 +53,10 @@ mkdir -p "${INSTALL_DIR}"/openshift
 pushd ${INSTALL_DIR}
 cp -t "${INSTALL_DIR}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
-echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "${SHARED_DIR}"/pull-secrets "$RELEASE_IMAGE_LATEST" \
+echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+oc adm release extract -a "$pull_secret_path" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
   --command=openshift-install --to=/tmp
-
+rm ${pull_secret_path}
 echo "Copying Custom Manifest"
 oci resource-manager job-output-summary list-job-outputs \
 --job-id "${JOB_ID}" \
@@ -108,7 +105,12 @@ VARIABLES=$(cat <<EOF
 "tenancy_ocid":"${OCI_CLI_TENANCY}",
 "create_openshift_instances":true,
 "compartment_ocid":"${COMPARTMENT_ID}",
-"region":"${OCI_CLI_REGION}"}
+"region":"${OCI_CLI_REGION}",
+"tag_namespace_name":"openshift-ci-abi",
+"enable_public_api_lb":true,
+"use_existing_tags":true,
+"tag_namespace_compartment_ocid":"${COMPARTMENT_ID}",
+"tag_namespace_compartment_ocid_resource_tagging":"${OCI_CLI_TENANCY}"}
 EOF
 )
 

@@ -14,7 +14,14 @@ if [[ -z ${AGENT_NAMESPACE} ]] ; then
   AGENT_NAMESPACE=${HOSTED_CLUSTER_NS}"-"${CLUSTER_NAME}
 fi
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_NAME" "$AGENT_NAMESPACE" "$EXTRA_BAREMETALHOSTS_FILE" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+function gather() {
+  oc get InfraEnv -n ${AGENT_NAMESPACE} ${CLUSTER_NAME} -o yaml > "${ARTIFACT_DIR}/InfraEnv.yaml"
+  oc get BareMetalHost -n ${AGENT_NAMESPACE} -o yaml > "${ARTIFACT_DIR}/extra_baremetalhosts.yaml"
+}
+
+trap gather EXIT
+
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_NAME" "$AGENT_NAMESPACE" "$EXTRA_BAREMETALHOSTS_FILE" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g' &
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 set -xeo pipefail
@@ -41,6 +48,7 @@ spec:
     name: pull-secret
   sshAuthorizedKey: "${SSH_PUB_KEY}"
 END
+oc wait --for=condition=ImageCreated infraenv/${CLUSTER_NAME} -n ${AGENT_NAMESPACE} --timeout=5m
 
 while IFS= read -r host; do
     host_name=$(echo "$host" | jq -r '.name')
@@ -74,6 +82,7 @@ spec:
   bmc:
     address: '${driver_info_address}'
     credentialsName: '${host_name}-bmc-secret'
+    disableCertificateVerification: true
 END
 done < <(jq -c '.[]' ${EXTRA_BAREMETALHOSTS_FILE})
 
@@ -97,5 +106,8 @@ echo "wait agent ready"
 oc wait --all=true agent -n ${AGENT_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
 EOF
 
-oc get InfraEnv -n ${AGENT_NAMESPACE} ${CLUSTER_NAME} -o yaml > "${ARTIFACT_DIR}/InfraEnv.yaml"
-oc get BareMetalHost -n ${AGENT_NAMESPACE} -o yaml > "${ARTIFACT_DIR}/extra_baremetalhosts.yaml"
+# Running the previous ssh command in background and waiting for it here
+# allows catching the SIGTERM signal immediately, even if the ssh command
+# runs indefinitely.
+# See https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_11
+wait

@@ -1,0 +1,37 @@
+ref:
+  as: file-integrity-konflux-catalogsource
+  from_image:
+    namespace: ocp
+    name: "4.20"
+    tag: upi-installer
+  commands: file-integrity-konflux-catalogsource-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - namespace: test-credentials
+      name: openshift-custom-mirror-registry
+      mount_path: /var/run/vault/mirror-registry
+  env:
+    - name: MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE
+      documentation: |-
+        The var can be set when using the Gangway API, pass it as:
+        "pod_spec_options": {
+          "envs": {
+            "MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE": "quay.io/example/file-integrity-index:latest"
+          }
+        }
+      default: ""
+    - name: CATALOG_SOURCE_NAME
+      documentation: The name of the catalog source to create.
+      default: "file-integrity-operator"
+    - name: ICSP_NAME
+      documentation: The name of the ImageContentSourcePolicy to create.
+      default: "custom-icsp-isc"
+    - name: TEST_TYPE
+      documentation: The test type, could be "release" or "dev". It will determine what ICSP to be used.
+      default: "release"
+  documentation: |-
+    Create a custom catalog source with an index image.

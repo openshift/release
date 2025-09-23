@@ -51,10 +51,11 @@ mkdir -p "${logdir}"
 
 aws_cluster_age_cutoff="$(TZ=":Africa/Abidjan" date --date="${CLUSTER_TTL}" '+%Y-%m-%dT%H:%M+0000')"
 echo "deprovisioning clusters with an expirationDate before ${aws_cluster_age_cutoff} in AWS ..."
-# we need to pass --region for ... some reason?
+# --region is necessary when there is no profile customization
 for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ); do
 	echo "deprovisioning in AWS region ${region} ..."
-	for cluster in $( aws ec2 describe-vpcs --output json --region "${region}" | jq --arg date "${aws_cluster_age_cutoff}" -r -S '.Vpcs[] | select (.Tags[]? | (.Key == "expirationDate" and .Value < $date)) | .Tags[] | select (.Value == "owned") | .Key' ); do
+	aws ec2 describe-vpcs --output json --region ${region} | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | .Key' > /tmp/clusters
+	while read cluster; do
 		workdir="${logdir}/${cluster:22}"
 		mkdir -p "${workdir}"
 		cat <<-EOF >"${workdir}/metadata.json"
@@ -68,8 +69,11 @@ for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].
 		}
 		EOF
 		echo "will deprovision AWS cluster ${cluster} in region ${region}"
-	done
+	done < /tmp/clusters
 done
+
+# log installer version for debugging purposes
+openshift-install version
 
 clusters=$( find "${logdir}" -mindepth 1 -type d )
 for workdir in $(shuf <<< ${clusters}); do

@@ -2,7 +2,7 @@ base_images:
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
-    tag: latest
+    tag: "4.19"
   ocp_4.19_base-rhel9:
     name: 4.19-priv
     namespace: ocp-private
@@ -14,7 +14,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.16"
+    tag: "4.19"
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -31,8 +31,7 @@ images:
   to: gcp-machine-controllers
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -87,19 +86,18 @@ tests:
     cluster_profile: gcp
     env:
       E2E_RUN_TAGS: '@mapi'
-      TEST_FILTERS: NonHyperShiftHOST
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
       TEST_SCENARIOS: Cluster_Infrastructure MAPI
-      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-gcp-ipi
   timeout: 7h0m0s
-- as: security
+- as: verify-deps
   steps:
     env:
-      PROJECT_NAME: machine-api-provider-gcp
-    workflow: openshift-ci-security
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

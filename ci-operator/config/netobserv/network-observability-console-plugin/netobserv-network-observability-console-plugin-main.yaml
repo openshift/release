@@ -14,7 +14,7 @@ base_images:
   tests-private-ui:
     name: tests-private-ui
     namespace: ci
-    tag: "4.18"
+    tag: "4.20"
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -46,7 +46,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -61,20 +61,13 @@ tests:
   container:
     from: plugin-cypress-tests
 - as: qe-e2e-console-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-netobserv
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.18"
   optional: true
   steps:
+    cluster_profile: aws-qe
     dependencies:
       PATCH_CONSOLE_PLUGIN_IMAGE: pipeline:network-observability-console-plugin
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       CYPRESS_NO_COMMAND_LOG: "1"
       CYPRESS_NOO_CATALOG_SOURCE: upstream
       CYPRESS_SKIP_NOO_INSTALL: "true"
@@ -83,7 +76,7 @@ tests:
     - ref: netobserv-install-operator
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: netobserv

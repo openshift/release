@@ -49,7 +49,7 @@ elif $INTERNAL; then
 fi
 
 # We run SRIOV jobs only on internal network
-if [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
+if [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     CL_SEARCH="internalbos"
 fi
 
@@ -59,7 +59,7 @@ ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_
 EOF
 
 ADDITIONAL_ARG=""
-# default to the first cluster in the array, unless 4.17
+# default to the first cluster in the array, unless 4.17 or 4.18
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
     if [[ "$T5CI_VERSION" == "4.17" ]] || [[ "$T5CI_VERSION" == "4.18" ]]; then
@@ -92,8 +92,15 @@ elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
 elif [[ "$T5CI_JOB_TYPE"  == "sno-cnftests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
-elif [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
+elif [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
+fi
+
+if [[ "$JOB_NAME" == *"telcov10n-functional-llc-cnf"* ]]; then
+    # For QE AMD jobs
+    INTERNAL=true
+    INTERNAL_ONLY=true
+    ADDITIONAL_ARG=" -e amd"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -179,7 +186,9 @@ cat << EOF > ~/ocp-install.yml
       timeout: 300
 
   - name: Remove last run
-    shell: kcli delete plan --yes ${PLAN_NAME}
+    shell: |
+        kcli delete plan --yes ${PLAN_NAME}
+        kcli delete plan --yes ${CLUSTER_NAME}
     ignore_errors: yes
 
   - name: Remove lock file

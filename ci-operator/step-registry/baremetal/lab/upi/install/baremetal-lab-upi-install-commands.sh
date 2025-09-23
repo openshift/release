@@ -71,8 +71,9 @@ function destroy_bootstrap() {
   sed -i "/bootstrap.*${BUILD_ID:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
   if [ "${DISCONNECTED}" == "true" ]; then
     echo "Destroying bootstrap: removing drop rule for disconnected network..."
-    RULE=$(sed 's/^-A /-D /' <(iptables -S FORWARD | grep "${ip}" | grep DROP))
-    [[ $RULE =~ D.*$ip.*DROP ]] && iptables ${RULE}
+    rule=$(iptables -S FORWARD | grep "${ip}" | grep DROP | sed 's/^-A /-D /')
+    read -r -a RULE <<< "${rule}"
+    [[ "${rule}" =~ D.*$ip.*DROP ]] && iptables "${RULE[@]}"
   fi
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
   # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
@@ -225,6 +226,29 @@ function update_image_registry() {
   oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
 }
 
+function update_sno_bip_live_iso {
+  CONSOLE="ttyS1,115200n8"
+  root_device=$(echo "$architecture" | sed 's/arm64/\/dev\/nvme0n1/;s/amd64/\/dev\/sda/')
+  escaped_root_device=$(echo "$root_device" | sed 's/\//\\\//g')
+  shim_arch=$(echo "$architecture" | sed 's/arm64/aa64/;s/amd64/x64/')
+
+  b64_pre=$(jq -r '.storage.files[] | select( .path == "/usr/local/bin/install-to-disk.sh" ).contents.source' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign | cut -d"," -f2)
+  b64_new=$(echo "${b64_pre}" | base64 -d | sed -e '
+  s/^\(.*coreos-installer install.*\)$/\
+  if [ -e \/dev\/md126 ]; then mdadm --stop \/dev\/md126; fi\n \
+  if [ -e \/dev\/md127 ]; then mdadm --stop \/dev\/md127; fi\n \
+  for i in $(lsblk -I8,259 -nd --output name); do wipefs -a \/dev\/$i; done\n \
+  \1 --delete-karg console=ttyS0,115200n8 --console '"${CONSOLE}"' --insecure-ignition --copy-network\n \
+  echo "Adding UEFI boot entry for Red Hat CoreOS"\n \
+  efibootmgr -c -d '"${escaped_root_device}"' -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shim'"${shim_arch}"'.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | base64 -w0)
+
+  sed -i -e 's/'"${b64_pre}"'/'"${b64_new}"'/g' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign
+
+  mv ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign ${INSTALL_DIR}/bootstrap.ign
+  chmod 644 ${INSTALL_DIR}/bootstrap.ign
+
+}
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -298,7 +322,13 @@ done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.ya
 
 ### Create Ignition configs
 echo -e "\nCreating Ignition configs..."
-oinst create ignition-configs
+if [ "${BOOTSTRAP_IN_PLACE:-false}" == "true" ]; then
+  oinst create single-node-ignition-config
+  update_sno_bip_live_iso
+else
+  oinst create ignition-configs
+fi
+
 export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 
 echo -e "\nPreparing firstboot ignitions for sync..."
@@ -343,8 +373,10 @@ if ! wait $!; then
   exit 1
 fi
 
-destroy_bootstrap &
-approve_csrs &
+if [ "${BOOTSTRAP_IN_PLACE:-false}" != "true" ]; then
+  destroy_bootstrap &
+  approve_csrs &
+fi
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &

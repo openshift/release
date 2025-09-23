@@ -5,13 +5,13 @@ chain:
       cli: latest
       env:
         - name: MCE_VERSION
-          default: "2.2"
-          documentation: "version of the mce.(2.2, 2.3, 2.4)"
+          default: "2.4"
+          documentation: "version of the mce.(2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
         - name: HYPERSHIFT_NODE_COUNT
           default: "3"
           documentation: "The number nodes to automatically create and join to the cluster."
         - name: HYPERSHIFT_BASE_DOMAIN
-          default: "origin-ci-int-aws.dev.rhcloud.com"
+          default: "ci.hypershift.devcluster.openshift.com"
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
         - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
           default: "HighlyAvailable"
@@ -29,6 +29,9 @@ chain:
           default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
           default: /var/run/brew-pull-secret/token
+        - name: PUBLIC_ONLY
+          default: "false"
+          documentation: "If true, only public subnets are created (requires release version 4.16 or higher)"
         - name: EXTRA_ARGS
           default: ""
           documentation: "Extra args to pass to the create cluster aws command"
@@ -38,11 +41,18 @@ chain:
         trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
         
         debug() {
-          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
-          oc get pod -n local-cluster-${CLUSTER_NAME}
-          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
-          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster
+          oc get pod -n local-cluster-${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster_cp_pods
+          oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml > $ARTIFACT_DIR/hostedcluster.yaml
+          oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml > $ARTIFACT_DIR/hostedcluster_cp_pods.yaml
+          oc get managedcluster > $ARTIFACT_DIR/managedcluster
+          oc get managedcluster -oyaml > $ARTIFACT_DIR/managedcluster.yaml
           oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
+          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+          oc get clusterversion/version > $ARTIFACT_DIR/guestcluster_clusterversion
+          oc get clusterversion/version -oyaml > $ARTIFACT_DIR/guestcluster_clusterversion.yaml
+          oc get clusteroperator > $ARTIFACT_DIR/guestcluster_clusteroperator
+          oc get clusteroperator -oyaml > $ARTIFACT_DIR/guestcluster_clusteroperator.yaml
         }
 
         support_np_skew() {
@@ -58,21 +68,16 @@ chain:
 
         MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
         HYPERSHIFT_NAME=hcp
-        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-          echo "MCE version is less than 2.4, use hypershift command"
-          HYPERSHIFT_NAME=hypershift
-        else
-          set +x
-          echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
-          oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-          HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
-          mkdir /tmp/hs-cli
-          brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
-          echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
-          oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
-          chmod +x /tmp/hs-cli/hypershift-no-cgo
-          set -x
-        fi
+        set +x
+        echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
+        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+        HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
+        mkdir /tmp/hs-cli
+        brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
+        echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
+        oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
+        chmod +x /tmp/hs-cli/hypershift-no-cgo
+        set -x
 
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
@@ -82,7 +87,7 @@ chain:
           cd -
         fi
 
-        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 
         PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
@@ -98,13 +103,18 @@ chain:
           HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
         fi
         
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        if [[ $HYPERSHIFT_BASE_DOMAIN == "ci.hypershift.devcluster.openshift.com" ]]; then
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+        fi
+        
         CRED_COMMAND=""
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
           echo "MCE version is less than 2.6, use --aws-creds command"
-          CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
+          CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
         else
           set +x
-          export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+          export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
           /tmp/hs-cli/hypershift-no-cgo create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
           aws sts get-session-token --output json > ${SHARED_DIR}/sts-creds.json
@@ -114,7 +124,11 @@ chain:
           CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
           sleep 60
         fi
-      
+        
+        if [[ $PUBLIC_ONLY == "true" ]]; then
+          EXTRA_ARGS+=" --public-only "
+        fi
+        
         eval "/tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
@@ -127,28 +141,6 @@ chain:
         --namespace local-cluster \
         --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} $(support_np_skew)"
         
-        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-          echo "MCE version is less than 2.4"
-          oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-          oc apply -f - <<EOF
-        apiVersion: cluster.open-cluster-management.io/v1
-        kind: ManagedCluster
-        metadata:
-          annotations:
-            import.open-cluster-management.io/hosting-cluster-name: local-cluster
-            import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
-            open-cluster-management/created-via: other
-          labels:
-            cloud: auto-detect
-            cluster.open-cluster-management.io/clusterset: default
-            name: ${CLUSTER_NAME}
-            vendor: OpenShift
-          name: ${CLUSTER_NAME}
-        spec:
-          hubAcceptsClient: true
-          leaseDurationSeconds: 60
-        EOF
-        fi
         
         echo "Waiting for cluster to become available"
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
@@ -156,21 +148,27 @@ chain:
         /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
         echo "Waiting for clusteroperators to be ready"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        until \
-        oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
-        echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-        oc get clusterversion 2>/dev/null || true
-        sleep 10s
-        done
+        
+        timeout 20m bash -c '
+          until \
+            oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
+            echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+            oc get clusterversion 2>/dev/null || true
+            sleep 10s
+          done
+        '
         echo "Waiting for ManagedCluster to be ready"
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        until \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
-        oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
-        echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
-        sleep 10s
-        done
+        
+        timeout 20m bash -c '
+          until \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
+            oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
+            echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
+            sleep 10s
+          done
+        '        
         echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
       from_image:
         namespace: ocp
@@ -181,13 +179,16 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 30m0s
+      timeout: 60m0s
       credentials:
         - mount_path: /etc/ci-pull-credentials
           name: ci-pull-credentials
           namespace: test-credentials
         - mount_path: /var/run/brew-pull-secret
           name: cnv-ci-brew-pull-secret
+          namespace: test-credentials
+        - mount_path: /etc/hypershift-ci-jobs-awscreds
+          name: hypershift-ci-jobs-awscreds
           namespace: test-credentials
       dependencies:
         - name: "release:latest"

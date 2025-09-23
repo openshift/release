@@ -9,6 +9,10 @@ ref:
     default: ""
     documentation: |-
       Additional arguments to be passed to 'openshift-test'
+  - name: SHARD_ARGS
+    default: ""
+    documentation: |-
+      Arguments to be passed to 'openshift-test' regarding the sharding parameters of this run
   - name: TEST_TYPE
     default: "suite"
     documentation: |
@@ -31,6 +35,9 @@ ref:
                   an upgrade completes or have explicit logic in their test to tolerate behavior after
                   upgrade.
       * 'upgrade-paused' - Perform an upgrade to the images defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE with paused worker pool.
+      * 'ipsec-suite' - Runs IPsec test suite. The test suite is invoked separately for IPsec Full and External modes.
+                   1. Rollout IPsec Full mode, wait for it to complete and run the ipsec test suite.
+                   2. Change IPsec Full -> External mode, wait for rollout to complete, run the ipsec test suite.
   - name: TEST_SUITE
     default: openshift/conformance/parallel
     documentation: The test suite to run.  Use 'openshift-test run --help' to list available suites.
@@ -53,6 +60,10 @@ ref:
       If the test suite requires SSH access, setting this variable will install a bastion and configure
       the Kube e2e test infrastructure to use the bastion. Otherwise, tests that require SSH will fail because
       OpenShift does not expose SSH to nodes by default.
+  - name: TEST_REQUIRES_BUILDFARM_NET_ADMIN
+    default: ""
+    documentation:
+      If the test suite requires NET_ADMIN/NET_RAW caps on the build farm.
   - name: TEST_INSTALL_CSI_DRIVERS
     default: ""
     documentation: The CSI driver(s) to use.  Used by the `openshift-tests` program, see its documentation for details.

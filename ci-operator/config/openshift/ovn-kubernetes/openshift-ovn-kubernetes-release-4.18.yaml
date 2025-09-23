@@ -7,22 +7,18 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.17_base-rhel9:
-    name: "4.18"
+  ocp_4.19_base-rhel9:
+    name: "4.19"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    tag: rhel-8-golang-1.23-openshift-4.19
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.19
   tests-private:
     name: tests-private
     namespace: ci
@@ -35,29 +31,26 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.19_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -97,6 +90,10 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
+- as: e2e-aws-ovn-edge-zones
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-local-gateway
   steps:
     cluster_profile: aws
@@ -140,7 +137,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
@@ -159,7 +156,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
@@ -185,7 +182,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
       TEST_TYPE: upgrade-conformance
@@ -243,22 +240,22 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-ibmcloud-ipi-ovn-periodic
-  cron: 1 3 13,15 * *
+  cron: 35 2 15 12 *
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-ovn
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
-  cron: 52 13 10,15 * *
+  cron: 0 7 15 6 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -270,7 +267,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-  cron: 6 11 14,15 * *
+  cron: 37 4 20 11 *
   steps:
     cluster_profile: aws
     env:
@@ -299,46 +296,17 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        FEATURE_SET=TechPreviewNoUpgrade
-        # https://issues.redhat.com/browse/OCPBUGS-52194
-        DHCP_LEASE_EXPIRY=0
-      EXTRA_MG_ARGS: --host-network
-      TEST_SKIPS: Services should fallback to local terminating endpoints when there
-        are no ready endpoints with externalTrafficPolicy=Local
-    pre:
-    - chain: baremetalds-ofcir-pre
-    - ref: baremetalds-e2e-ovn-bgp-pre
-    workflow: baremetalds-e2e-ovn-dualstack
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-bgp-dualstack
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        FEATURE_SET=TechPreviewNoUpgrade
-        # https://issues.redhat.com/browse/OCPBUGS-52194
-        DHCP_LEASE_EXPIRY=0
-      EXTRA_MG_ARGS: --host-network
-      EXTRA_NETWORK_CONFIG: |
-        EXTRA_NETWORK_NAMES="extranet"
-        EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
-        EXTRANET_NETWORK_SUBNET_V6='fd2e:6f44:5dd8:ca56::/120'
-      NMSTATE_OPERATOR_SUB_SOURCE: qe-app-registry
-      TEST_SKIPS: Services should fallback to local terminating endpoints when there
-        are no ready endpoints with externalTrafficPolicy=Local\|CPU Partitioning
-        cluster platform workloads should be annotated correctly for Deployments
-    pre:
-    - ref: baremetalds-devscripts-conf-extranetwork
-    - chain: baremetalds-ofcir-pre
-    - ref: ovn-shared-to-local-gateway-mode-migration
-    - ref: enable-qe-catalogsource
-    - ref: operatorhub-subscribe-nmstate-operator
-    - ref: baremetalds-e2e-ovn-bgp-pre
-    workflow: baremetalds-e2e-ovn-dualstack
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
   timeout: 5h0m0s
 - as: e2e-aws-ovn-hypershift
   steps:
@@ -369,12 +337,12 @@ tests:
     from: src
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 6h0m0s
-- as: e2e-aws-ovn-kubevirt
+- as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
     cluster_profile: aws
@@ -538,7 +506,7 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
     workflow: hypershift-aws-conformance
   timeout: 6h0m0s
 - as: e2e-azure-ovn-techpreview
@@ -631,7 +599,7 @@ tests:
   as: e2e-aws-ovn-virt
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal

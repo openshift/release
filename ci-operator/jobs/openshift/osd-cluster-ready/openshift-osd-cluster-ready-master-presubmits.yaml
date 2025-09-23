@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
@@ -22,7 +22,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -54,11 +54,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     labels:
@@ -66,6 +66,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-osd-cluster-ready-master-lint
     rerun_command: /test lint
+    run_if_changed: (\.go$)|(go\.(mod|sum)$)|(^\.ci-operator\.yaml$)|(^Makefile$)
     spec:
       containers:
       - args:
@@ -75,7 +76,7 @@ presubmits:
         - --target=lint
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -107,11 +108,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build02
     context: ci/prow/scan
     decorate: true
     labels:
@@ -120,6 +121,7 @@ presubmits:
     name: pull-ci-openshift-osd-cluster-ready-master-scan
     optional: true
     rerun_command: /test scan
+    run_if_changed: (\.go$)|(go\.(mod|sum)$)|(^\.ci-operator\.yaml$)|(^Makefile$)
     spec:
       containers:
       - args:
@@ -129,7 +131,7 @@ presubmits:
         - --target=scan
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -161,11 +163,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )scan,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build02
     context: ci/prow/test
     decorate: true
     labels:
@@ -173,6 +175,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-osd-cluster-ready-master-test
     rerun_command: /test test
+    run_if_changed: (\.go$)|(go\.(mod|sum)$)|(^\.ci-operator\.yaml$)|(^Makefile$)
     spec:
       containers:
       - args:
@@ -182,7 +185,7 @@ presubmits:
         - --target=test
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

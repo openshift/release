@@ -25,8 +25,7 @@ images:
   to: baremetal-runtimecfg
 promotion:
   to:
-  - disabled: true
-    name: "4.19"
+  - name: "4.19"
     namespace: ocp
 releases:
   initial:
@@ -74,13 +73,15 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -89,6 +90,12 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift
