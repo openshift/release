@@ -7,14 +7,18 @@ set -x
 
 echo "************ assisted tools setup command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
+assisted_load_host_contract
+
+REMOTE_TARGET="${SSH_USER}@${IP}"
+
+tar -czf - . | ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" "cat > /root/assisted.tar.gz"
 
 echo "### Setting up tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" bash -x - << EOF
     # install and start docker
     dnf install -y 'dnf-command(config-manager)'
     dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
@@ -51,5 +55,4 @@ EOF
 REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
 
 echo "************ Copying secret file ${REGISTRY_TOKEN_FILE} *****************************"
-cat ${REGISTRY_TOKEN_FILE} | ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir -p /root/.docker; cat > /root/.docker/config.json"
-
+cat ${REGISTRY_TOKEN_FILE} | ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" "mkdir -p /root/.docker; cat > /root/.docker/config.json"

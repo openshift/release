@@ -7,12 +7,14 @@ set -x
 
 echo "************ assisted tools build+publish multi arch ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
+
+assisted_load_host_contract
 
 echo "### Building multi arch images"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" bash -x - << EOF
     cd /home/assisted
 
     EXTRA_PARAMS=""

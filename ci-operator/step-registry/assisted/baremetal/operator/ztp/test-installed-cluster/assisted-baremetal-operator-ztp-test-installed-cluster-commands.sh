@@ -6,12 +6,14 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator ztp add day2 workers optionally command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
+
+assisted_load_host_contract
 
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" bash - << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1

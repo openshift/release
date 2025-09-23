@@ -7,12 +7,14 @@ set -x
 
 echo "************ assisted agent gather command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
+
+assisted_load_host_contract
 
 echo "### Gathering artifacts"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" bash - << EOF
     mkdir /tmp/artifacts
 
     # collect junit reports and logs
@@ -26,4 +28,4 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
         -k docker.all -k docker.logs
 EOF
 
-scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+scp "${SSHOPTS[@]}" "${REMOTE_TARGET}:/tmp/artifacts/*" "${ARTIFACT_DIR}"

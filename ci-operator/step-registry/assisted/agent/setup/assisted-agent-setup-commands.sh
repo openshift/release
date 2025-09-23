@@ -7,18 +7,20 @@ set -x
 
 echo "************ assisted agent setup command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
+assisted_load_host_contract
+
+tar -czf - . | ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" "cat > /root/assisted.tar.gz"
 
 # copy pull-secret
-ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir -p /root/.docker"
-cat "${CLUSTER_PROFILE_DIR}/pull-secret" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/.docker/config.json"
+ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" "mkdir -p /root/.docker"
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" | ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" "cat > /root/.docker/config.json"
 
 echo "### Setting up tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" bash - << EOF
     # install and start docker
     dnf install -y 'dnf-command(config-manager)'
     dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo

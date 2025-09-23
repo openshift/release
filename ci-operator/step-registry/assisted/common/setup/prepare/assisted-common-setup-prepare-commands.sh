@@ -6,13 +6,11 @@ set -o pipefail
 
 echo "************ assisted common setup prepare command ************"
 
-# source common configuration, if missing, fallback on packet configuration
-# shellcheck source=/dev/null
-if ! source "${SHARED_DIR}/ci-machine-config.sh"; then
-  source "${SHARED_DIR}/packet-conf.sh"
-  export IP
-  export SSH_KEY_FILE="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
-fi
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
+
+assisted_load_host_contract
 
 mkdir -p build/ansible
 cd build/ansible
@@ -44,14 +42,14 @@ cat > packing-test-infra.yaml <<-EOF
         dest: "{{ SHARED_DIR }}/inventory"
         content: |
           [primary]
-          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user={{ lookup('env', 'SSH_USER') | default('root') }} ansible_ssh_user={{ lookup('env', 'SSH_USER') | default('root') }} ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
       when: not inventory.stat.exists
     - name: Create ssh config file
       ansible.builtin.copy:
         dest: "{{ SHARED_DIR }}/ssh_config"
         content: |
           Host ci_machine
-            User root
+            User {{ lookup('env', 'SSH_USER') | default('root') }}
             HostName {{ lookup('env', 'IP') }}
             ConnectTimeout 5
             StrictHostKeyChecking no

@@ -6,18 +6,22 @@ set -o pipefail
 
 echo "************ ofcir gather command ************"
 
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
+
+assisted_load_host_contract
+
 CIRFILE="$SHARED_DIR/cir"
-PACKET_CONF="$SHARED_DIR/packet-conf.sh"
 ANSIBLE_CFG="$SHARED_DIR/ansible.cfg"
-SSH_KEY_FILE="$CLUSTER_PROFILE_DIR/packet-ssh-key"
 
 if [[ ! -f "$CIRFILE" ]]; then
     echo "Error: CIR file not found at $CIRFILE"
     exit 1
 fi
 
-if [[ ! -f "$PACKET_CONF" ]]; then
-    echo "Error: packet-conf.sh not found at $PACKET_CONF"
+if [[ -z "${SSH_KEY_FILE:-}" ]]; then
+    echo "Error: SSH_KEY_FILE not defined in ${SHARED_DIR}/ci-machine-config.sh"
     exit 1
 fi
 
@@ -29,16 +33,9 @@ fi
 echo "cir file content:"
 cat "$CIRFILE" > "$ARTIFACT_DIR/cir.json"
 
-echo "executing packet-conf.sh..."
-# shellcheck disable=SC1090
-source "$PACKET_CONF"
-
 export ANSIBLE_CONFIG="$ANSIBLE_CFG"
-export SSH_KEY_FILE="$SSH_KEY_FILE"
-
-if [[ -z "${IP:-}" ]]; then
-    IP=$(jq -r '.ip' "$CIRFILE")
-fi
+export SSH_KEY_FILE
+export SSH_USER
 export IP
 
 IBM_CLOUD_API_KEY_FILE="${CLUSTER_PROFILE_DIR}/ibm-cloud-api-key"
@@ -72,7 +69,7 @@ cat > prepare-ansible.yaml <<-EOF
         dest: "{{ SHARED_DIR }}/inventory"
         content: |
           [primary]
-          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user={{ lookup('env', 'SSH_USER') | default('root') }} ansible_ssh_user={{ lookup('env', 'SSH_USER') | default('root') }} ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
       when: not inventory.stat.exists
     - name: Create ansible configuration
       ansible.builtin.copy:

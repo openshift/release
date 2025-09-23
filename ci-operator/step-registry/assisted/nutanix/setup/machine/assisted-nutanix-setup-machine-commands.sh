@@ -36,12 +36,26 @@ EOF
 terraform init -input=false
 terraform apply -var-file=nutanix-params.hcl -input=false -auto-approve
 IP=$(terraform output ip_address)
+PORT=${NUTANIX_SSH_PORT:-22}
 
 cd ..
 tar -cvzf terraform.tgz --exclude=".terraform" /home/assisted-test-infra/build/terraform
 cp terraform.tgz ${SHARED_DIR}
 
-cat >> "${SHARED_DIR}/ci-machine-config.sh" << EOF
+cat > "${SHARED_DIR}/ci-machine-config.sh" << EOF
 export IP="${IP}"
 export SSH_KEY_FILE=/var/run/vault/assisted-ci-vault/ssh_private_key
+export SSH_USER="root"
+export SSH_PORT="${PORT}"
+SSHOPTS=(
+  -o Port=${PORT}
+  -o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "/var/run/vault/assisted-ci-vault/ssh_private_key"
+)
 EOF
+
+chmod 0600 "${SHARED_DIR}/ci-machine-config.sh"

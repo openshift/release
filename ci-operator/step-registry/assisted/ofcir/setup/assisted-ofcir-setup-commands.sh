@@ -6,36 +6,19 @@ set -o pipefail
 
 echo "************ assisted ofcir setup command ************"
 
-PACKET_CONF="$SHARED_DIR/packet-conf.sh"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
+
+assisted_load_host_contract
+
 CIRFILE="$SHARED_DIR/cir"
-SSH_KEY_FILE="$CLUSTER_PROFILE_DIR/packet-ssh-key"
 ANSIBLE_CONFIG_FILE="${SHARED_DIR}/ansible.cfg"
 
 if [[ ! -f "$CIRFILE" ]]; then
     echo "Error: CIR file not found at $CIRFILE"
     exit 1
 fi
-
-if [[ ! -f "$PACKET_CONF" ]]; then
-    echo "Error: packet-conf.sh not found at $PACKET_CONF"
-    exit 1
-fi
-
-if [[ ! -f "$SSH_KEY_FILE" ]]; then
-    echo "Error: SSH key file not found at $SSH_KEY_FILE"
-    exit 1
-fi
-
-echo "executing packet-conf.sh..."
-# shellcheck disable=SC1090
-source "$PACKET_CONF"
-
-export SSH_KEY_FILE="$SSH_KEY_FILE"
-
-if [[ -z "${IP:-}" ]]; then
-    IP=$(jq -r '.ip' "$CIRFILE")
-fi
-export IP
 
 mkdir -p build/ansible
 cd build/ansible
@@ -59,14 +42,14 @@ cat > prepare-ansible.yaml <<-EOF
         dest: "{{ SHARED_DIR }}/inventory"
         content: |
           [primary]
-          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user={{ lookup('env', 'SSH_USER') | default('root') }} ansible_ssh_user={{ lookup('env', 'SSH_USER') | default('root') }} ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
       when: not inventory.stat.exists
     - name: Create ssh config file
       ansible.builtin.copy:
         dest: "{{ SHARED_DIR }}/ssh_config"
         content: |
           Host ci_machine
-            User root
+            User {{ lookup('env', 'SSH_USER') | default('root') }}
             HostName {{ lookup('env', 'IP') }}
             ConnectTimeout 5
             StrictHostKeyChecking no

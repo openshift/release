@@ -12,15 +12,17 @@ if [[ ! -e "${SHARED_DIR}/server-ip" ]]; then
   exit 0
 fi
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# shellcheck source=ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh
+source "${REPO_ROOT}/ci-operator/step-registry/assisted/common/lib/assisted-common-lib-commands.sh"
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+assisted_load_host_contract
+
+tar -czf - . | ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" "cat > /root/assisted-service.tar.gz"
 
 function getlogs() {
   echo "### Downloading logs..."
-  scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+  scp -r "${SSHOPTS[@]}" "${REMOTE_TARGET}:/tmp/artifacts/*" "${ARTIFACT_DIR}" || true
 }
 
 # Gather logs regardless of what happens after this
@@ -28,7 +30,7 @@ trap getlogs EXIT
 
 echo '#### Gathering Sos reports from all Nodes'
 
-timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOFTOP"
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" bash - << "EOFTOP"
     if [ $(virsh list --name |  tr -s '\n'  | wc -l) > 0 ]
     then
       export SOS_BASEDIR="/tmp/artifacts/sos"
@@ -73,11 +75,11 @@ EOF
     fi
 EOFTOP
 
-scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+scp -r "${SSHOPTS[@]}" "${REMOTE_TARGET}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
-timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "$REMOTE_TARGET" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 

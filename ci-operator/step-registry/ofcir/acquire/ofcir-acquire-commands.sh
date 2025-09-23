@@ -16,6 +16,30 @@ function send_slack(){
     set -x
 }
 
+write_machine_contract() {
+  local ip="$1"
+  local port="$2"
+  local key_path="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+
+  cat > "${SHARED_DIR}/ci-machine-config.sh" <<EOF
+export IP="${ip}"
+export SSH_KEY_FILE="${key_path}"
+export SSH_USER="root"
+export SSH_PORT="${port}"
+SSHOPTS=(
+  -o Port=${port}
+  -o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${key_path}"
+)
+EOF
+
+  chmod 0600 "${SHARED_DIR}/ci-machine-config.sh"
+}
+
 function exit_with_success(){
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="0">
@@ -110,7 +134,9 @@ function getCIR(){
 
     jq -r .ip < "$CIRFILE" > "$IPFILE"
     jq -r ".extra | select( . != \"\") // {}" < "$CIRFILE" | jq ".ofcir_port_ssh // 22" -r > "$PORTFILE"
-    if [ "$(cat "$IPFILE")" == "" ] ; then
+    local resolved_ip
+    resolved_ip="$(cat "$IPFILE")"
+    if [ -z "$resolved_ip" ] ; then
         set +x
         echo "<==== OFCIR ACQUIRE ERROR ====="
         echo "Timeout waiting for CI resource provisioning"
@@ -118,6 +144,10 @@ function getCIR(){
         set -x
         exit_with_failure "Timeout waiting for CI resource provisioning"
     fi
+
+    local resolved_port
+    resolved_port="$(cat "$PORTFILE")"
+    write_machine_contract "$resolved_ip" "$resolved_port"
 }
 
 CIRTYPE=host_el9
