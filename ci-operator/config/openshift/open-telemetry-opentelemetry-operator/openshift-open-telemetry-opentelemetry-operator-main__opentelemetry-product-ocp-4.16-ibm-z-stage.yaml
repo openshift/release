@@ -32,7 +32,6 @@ tests:
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
@@ -47,7 +46,19 @@ tests:
         tests/e2e-targetallocator/targetallocator-prometheuscr tests/e2e-otel/*aws*
         tests/e2e-openshift/must-gather
     test:
-    - ref: distributed-tracing-install-otel-konflux-catalogsource
+    - as: install-opentelemetry-operator
+      cli: latest
+      commands: |
+        oc create -f https://raw.githubusercontent.com/openshift/distributed-tracing-qe/refs/heads/main/resources/otel-icsp.yaml
+        oc create namespace openshift-opentelemetry-operator
+        oc label namespace openshift-opentelemetry-operator openshift.io/cluster-monitoring="true"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-opentelemetry-operator "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
+        oc wait --for condition=Available -n openshift-opentelemetry-operator deployment opentelemetry-operator-controller-manager
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
     workflow: openshift-observability-ibm-z

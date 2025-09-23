@@ -13,12 +13,14 @@ fi
 
 echo "$MCE_VERSION"
 
-_REPO="quay.io/acm-d/mce-custom-registry"
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
-  _REPO="quay.io:443/acm-d/mce-dev-catalog"
+MCE_CATALOG_PATH="acm-d/mce-custom-registry"
+_REPO="quay.io/$MCE_CATALOG_PATH"
+if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
+  MCE_CATALOG_PATH="acm-d/mce-dev-catalog"
+  _REPO="quay.io:443/$MCE_CATALOG_PATH"
 fi
 if [[ "$DISCONNECTED" == "true" ]]; then
-  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
+  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/$MCE_CATALOG_PATH
   # Setup disconnected quay mirror container repo
   oc apply -f - <<EOF
 apiVersion: operator.openshift.io/v1alpha1
@@ -82,11 +84,11 @@ EOF
 fi
 
 sleep 60
-oc wait mcp master worker --for condition=updated --timeout=20m
+oc wait mcp master worker --for condition=updated --timeout=30m
 
 echo "Install MCE custom catalog source"
 IMG="${_REPO}:${MCE_VERSION}-latest"
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
+if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
   IMG="${_REPO}:latest-${MCE_VERSION}"
 fi
 oc apply -f - <<EOF
@@ -284,7 +286,7 @@ EOF
 fi
 
 # display HyperShift cli version
-HYPERSHIFT_NAME=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )) && echo "hypershift" || echo "hcp" )
+HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
   downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
@@ -292,7 +294,7 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.3)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+/tmp/${HYPERSHIFT_NAME} version
 
 # display HyperShift Operator Version and MCE version
 oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
