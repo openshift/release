@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "Creating manifests to set osImageURL to the relevant RHCOS 10 version"
 
-cat <<EOF >> "${SHARED_DIR}/manifests/manifest_rhcos10_worker.yaml"
+cat > "${SHARED_DIR}/manifest_rhcos10_worker.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -18,7 +18,7 @@ spec:
 
 EOF
 
-cat <<EOF >> "${SHARED_DIR}/manifests/manifest_rhcos10_master.yaml"
+cat > "${SHARED_DIR}/manifest_rhcos10_master.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
