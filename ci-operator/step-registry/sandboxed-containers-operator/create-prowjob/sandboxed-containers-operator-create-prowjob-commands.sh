@@ -104,159 +104,159 @@ get_expected_version() {
         echo ""
     fi
 }
+# Function to validate parameters and set defaults
+validate_and_set_defaults() {
+    echo "Validating parameters and setting defaults..."
+
+    # OCP version to test
+    OCP_VERSION="${OCP_VERSION:-4.19}"
+    # Validate OCP version format
+    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
+        exit 1
+    fi
+
+    # AWS Region Configuration
+    AWS_REGION_OVERRIDE="${AWS_REGION_OVERRIDE:-us-east-2}"
+
+    # Azure Region Configuration
+    CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
+
+    # OSC Version Configuration
+    EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
+
+    # Kata RPM Configuration
+    INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
+    if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
+        echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
+        exit 1
+    fi
+
+    # Kata RPM version (includes OCP version)
+    if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
+        KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
+    else
+        KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
+    fi
+
+    # test is Pre-GA for brew builds or GA for operators/rpms already on OCP
+    # this triggers the mirror redirect install, creating brew & trustee catsrc,
+    TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
+    # Validate TEST_RELEASE_TYPE
+    if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
+        echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
+        exit 1
+    fi
+
+    # Prow Run Type depends on TEST_RELEASE_TYPE
+    if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+        PROW_RUN_TYPE="candidate"
+    else
+        PROW_RUN_TYPE="release"
+        CATALOG_SOURCE_NAME="redhat-operators"
+        TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+    fi
+
+    # After the tests finish, wait before killing the cluster
+    SLEEP_DURATION="${SLEEP_DURATION:-0h}"
+    # Validate SLEEP_DURATION format (0-12 followed by 'h')
+    if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
+        echo "ERROR: SLEEP_DURATION must be a number between 0-12 followed by 'h' (e.g., 2h, 8h), got: ${SLEEP_DURATION}"
+        exit 1
+    fi
+
+    # Allow override of test scenarios
+    TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
+
+    # Let the tests run for this many minutes before killing the cluster and interupting the test
+    TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
+    # Validate TEST_TIMEOUT is numeric
+    if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: TEST_TIMEOUT should be numeric, got: ${TEST_TIMEOUT}"
+        exit 1
+    fi
+
+    # Must-gather Configuration
+    ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
+    # Validate ENABLE_MUST_GATHER
+    if [[ "${ENABLE_MUST_GATHER}" != "true" && "${ENABLE_MUST_GATHER}" != "false" ]]; then
+        echo "ERROR: ENABLE_MUST_GATHER should be 'true' or 'false', got: ${ENABLE_MUST_GATHER}"
+        exit 1
+    fi
+
+    # Must-gather image to use for collecting debug information
+    MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
+
+    # Only collect must-gather on test failure
+    MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
+    # Validate MUST_GATHER_ON_FAILURE_ONLY
+    if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
+        echo "ERROR: MUST_GATHER_ON_FAILURE_ONLY should be 'true' or 'false', got: ${MUST_GATHER_ON_FAILURE_ONLY}"
+        exit 1
+    fi
+
+    # Catalog Source Configuration
+    echo "Configuring catalog sources..."
+
+    # Set catalog source variables based on TEST_RELEASE_TYPE
+    if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+      # OSC Catalog Configuration - get latest or use provided
+      if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
+          OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
+
+      else
+          echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
+      fi
+
+      # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
+      extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
+      if [[ -n "${extracted_version}" ]]; then
+          EXPECTED_OSC_VERSION="${extracted_version}"
+          echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+      fi
+
+      CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
+      CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
+
+      # Trustee Catalog Configuration
+      # Convert OCP version for Trustee catalog naming
+      OCP_VER=$(echo "${OCP_VERSION}" | tr '.' '-')
+      subfolder=""
+      if [[ "${OCP_VER}" == "4-16" ]]; then
+          subfolder="trustee-fbc/"
+      fi
+      # Get latest Trustee catalog tag with page limit safety
+      TRUSTEE_REPO_NAME="${subfolder}trustee-fbc-${OCP_VER}"
+      TRUSTEE_CATALOG_REPO="quay.io/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
+
+      APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
+      TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
+
+      # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
+      extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
+      if [[ -n "${extracted_trustee_version}" ]]; then
+          EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
+          echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
+      else
+          EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
+          echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
+      fi
+
+      TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
+      TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
+    else # GA
+      CATALOG_SOURCE_NAME="redhat-operators"
+      TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+      CATALOG_SOURCE_IMAGE="none"
+      TRUSTEE_CATALOG_SOURCE_IMAGE="none"
+    fi
+}
 
 echo "=========================================="
 echo "Sandboxed Containers Operator - Prowjob Configuration Generator"
 
-
-# Validate required parameters and set defaults
-echo "Validating parameters and setting defaults..."
-
-# OCP version to test
-OCP_VERSION="${OCP_VERSION:-4.19}"
-# Validate OCP version format
-if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-    echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
-    exit 1
-fi
-
-# AWS Region Configuration
-AWS_REGION_OVERRIDE="${AWS_REGION_OVERRIDE:-us-east-2}"
-
-# Azure Region Configuration
-CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
-
-# OSC Version Configuration
-EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
-
-# Kata RPM Configuration
-INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
-if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
-    echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
-    exit 1
-fi
-
-# Kata RPM version (includes OCP version)
-if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
-else
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
-fi
-
-# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
-# this triggers the mirror redirect install, creating brew & trustee catsrc,
-TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
-# Validate TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
-    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
-    exit 1
-fi
-
-# Prow Run Type depends on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    PROW_RUN_TYPE="candidate"
-else
-    PROW_RUN_TYPE="release"
-    CATALOG_SOURCE_NAME="redhat-operators"
-    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-fi
-
-# After the tests finish, wait before killing the cluster
-SLEEP_DURATION="${SLEEP_DURATION:-0h}"
-# Validate SLEEP_DURATION format (0-12 followed by 'h')
-if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
-    echo "ERROR: SLEEP_DURATION must be a number between 0-12 followed by 'h' (e.g., 2h, 8h), got: ${SLEEP_DURATION}"
-    exit 1
-fi
-
-
-# Allow override of test scenarios
-TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
-
-# Let the tests run for this many minutes before killing the cluster and interupting the test
-TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
-# Validate TEST_TIMEOUT is numeric
-if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: TEST_TIMEOUT should be numeric, got: ${TEST_TIMEOUT}"
-    exit 1
-fi
-
-# Must-gather Configuration
-ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
-# Validate ENABLE_MUST_GATHER
-if [[ "${ENABLE_MUST_GATHER}" != "true" && "${ENABLE_MUST_GATHER}" != "false" ]]; then
-    echo "ERROR: ENABLE_MUST_GATHER should be 'true' or 'false', got: ${ENABLE_MUST_GATHER}"
-    exit 1
-fi
-
-# Must-gather image to use for collecting debug information
-MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
-
-# Only collect must-gather on test failure
-MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
-# Validate MUST_GATHER_ON_FAILURE_ONLY
-if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
-    echo "ERROR: MUST_GATHER_ON_FAILURE_ONLY should be 'true' or 'false', got: ${MUST_GATHER_ON_FAILURE_ONLY}"
-    exit 1
-fi
-
-
-
-# Catalog Source Configuration
-echo "Configuring catalog sources..."
-
-# Set catalog source variables based on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    # OSC Catalog Configuration - get latest or use provided
-    if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
-        OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
-
-    else
-        echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
-    fi
-
-    # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
-    extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
-    if [[ -n "${extracted_version}" ]]; then
-        EXPECTED_OSC_VERSION="${extracted_version}"
-        echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
-    fi
-
-    CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
-    CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
-
-    # Trustee Catalog Configuration
-    # Convert OCP version for Trustee catalog naming
-    OCP_VER=$(echo "${OCP_VERSION}" | tr '.' '-')
-    subfolder=""
-    if [[ "${OCP_VER}" == "4-16" ]]; then
-        subfolder="trustee-fbc/"
-    fi
-    # Get latest Trustee catalog tag with page limit safety
-    TRUSTEE_REPO_NAME="${subfolder}trustee-fbc-${OCP_VER}"
-    TRUSTEE_CATALOG_REPO="quay.io/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-
-    APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-    TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
-
-    # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
-    extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
-    if [[ -n "${extracted_trustee_version}" ]]; then
-        EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
-        echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
-    else
-        EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
-        echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
-    fi
-
-    TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
-    TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
-else # GA
-    CATALOG_SOURCE_NAME="redhat-operators"
-    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-    CATALOG_SOURCE_IMAGE="none"
-    TRUSTEE_CATALOG_SOURCE_IMAGE="none"
-fi
+# Call the validation function
+validate_and_set_defaults
 
 # Generate output file path
 OCP_PROWJOB_VERSION=$(echo "${OCP_VERSION}" | tr -d '.' )
