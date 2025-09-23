@@ -110,11 +110,11 @@ if [ -n "${REBASE_TO}" ]; then
   PULLSPEC_RELEASE_AMD64="${REBASE_TO}" \
     PULLSPEC_RELEASE_ARM64="${ARM_RELEASE_IMAGE}" \
     DRY_RUN=y \
-    if ! ./scripts/auto-rebase/rebase_job_entrypoint.sh; then
+    ./scripts/auto-rebase/rebase_job_entrypoint.sh || {
       echo "Rebase failed"
       trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
       exit 1
-    fi
+    }
   REBASE_SUCCEEDED=true
 else
   echo "REBASE_TO is not set, skipping rebase"

@@ -120,7 +120,6 @@ EOF
             </testcase>
         </testcase>
 EOF
-    fi
     else
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
       <testsuite name="cluster install" tests="2" failures="2">
