@@ -6,36 +6,19 @@ set -o pipefail
 
 echo "************ assisted ofcir setup command ************"
 
-PACKET_CONF="$SHARED_DIR/packet-conf.sh"
-CIRFILE="$SHARED_DIR/cir"
-SSH_KEY_FILE="$CLUSTER_PROFILE_DIR/packet-ssh-key"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
+
+host_contract::load
+
+export IP="$HOST_SSH_HOST"
+export SSH_KEY_FILE="$HOST_SSH_KEY_FILE"
 ANSIBLE_CONFIG_FILE="${SHARED_DIR}/ansible.cfg"
 
-if [[ ! -f "$CIRFILE" ]]; then
-    echo "Error: CIR file not found at $CIRFILE"
-    exit 1
-fi
-
-if [[ ! -f "$PACKET_CONF" ]]; then
-    echo "Error: packet-conf.sh not found at $PACKET_CONF"
-    exit 1
-fi
-
-if [[ ! -f "$SSH_KEY_FILE" ]]; then
-    echo "Error: SSH key file not found at $SSH_KEY_FILE"
-    exit 1
-fi
-
-echo "executing packet-conf.sh..."
-# shellcheck disable=SC1090
-source "$PACKET_CONF"
-
-export SSH_KEY_FILE="$SSH_KEY_FILE"
-
-if [[ -z "${IP:-}" ]]; then
-    IP=$(jq -r '.ip' "$CIRFILE")
-fi
-export IP
+host_contract::write_inventory "${SHARED_DIR}/inventory"
+host_contract::write_ansible_cfg "$ANSIBLE_CONFIG_FILE"
+host_contract::write_ssh_config "${SHARED_DIR}/ssh_config"
 
 mkdir -p build/ansible
 cd build/ansible

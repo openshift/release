@@ -12,15 +12,24 @@ if [[ ! -e "${SHARED_DIR}/server-ip" ]]; then
   exit 0
 fi
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+host_contract::load
+
+host_contract::write_inventory "${SHARED_DIR}/inventory"
+host_contract::write_ansible_cfg "${SHARED_DIR}/ansible.cfg"
+host_contract::write_ssh_config "${SHARED_DIR}/ssh_config"
+
+HOST_TARGET="${HOST_SSH_USER}@${HOST_SSH_HOST}"
+SSH_ARGS=("${HOST_SSH_OPTIONS[@]}")
+
+tar -czf - . | ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" "cat > /root/assisted-service.tar.gz"
 
 function getlogs() {
   echo "### Downloading logs..."
-  scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+  scp -r "${SSH_ARGS[@]}" "${HOST_TARGET}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 }
 
 # Gather logs regardless of what happens after this
@@ -28,7 +37,7 @@ trap getlogs EXIT
 
 echo '#### Gathering Sos reports from all Nodes'
 
-timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOFTOP"
+timeout -s 9 30m ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" bash - << "EOFTOP"
     if [ $(virsh list --name |  tr -s '\n'  | wc -l) > 0 ]
     then
       export SOS_BASEDIR="/tmp/artifacts/sos"
@@ -73,11 +82,11 @@ EOF
     fi
 EOFTOP
 
-scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+scp -r "${SSH_ARGS[@]}" "${HOST_TARGET}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
-timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
+timeout -s 9 30m ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 

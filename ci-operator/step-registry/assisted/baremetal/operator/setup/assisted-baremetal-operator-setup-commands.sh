@@ -6,36 +6,23 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator setup command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
 
-echo "Creating Ansible inventory file"
-cat > "${SHARED_DIR}/inventory" <<-EOF
+host_contract::load
 
-[primary]
-${IP} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file=${CLUSTER_PROFILE_DIR}/packet-ssh-key ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+host_contract::write_inventory "${SHARED_DIR}/inventory"
+host_contract::write_ansible_cfg "${SHARED_DIR}/ansible.cfg"
+host_contract::write_ssh_config "${SHARED_DIR}/ssh_config"
 
-EOF
+HOST_TARGET="${HOST_SSH_USER}@${HOST_SSH_HOST}"
+SSH_ARGS=("${HOST_SSH_OPTIONS[@]}")
 
-echo "Creating Ansible configuration file"
-cat > "${SHARED_DIR}/ansible.cfg" <<-EOF
-
-[defaults]
-callback_whitelist = profile_tasks
-host_key_checking = False
-
-verbosity = 2
-stdout_callback = yaml
-bin_ansible_callbacks = True
-
-EOF
-
-
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+tar -czf - . | ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" "cat > /root/assisted-service.tar.gz"
 
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" bash - << EOF
 
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0 }') 2>&1

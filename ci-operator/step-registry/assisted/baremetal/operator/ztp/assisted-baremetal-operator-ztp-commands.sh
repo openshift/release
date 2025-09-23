@@ -6,9 +6,14 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator ztp command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
+
+host_contract::load
+
+HOST_TARGET="${HOST_SSH_USER}@${HOST_SSH_HOST}"
+SSH_ARGS=("${HOST_SSH_OPTIONS[@]}")
 
 # ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
 if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
@@ -23,13 +28,13 @@ fi
 # Copy configuration for ZTP vars if present
 if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
 then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
+  scp "${SSH_ARGS[@]}" "${SHARED_DIR}/assisted-ztp-config" "${HOST_TARGET}:assisted-ztp-config"
 fi
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+tar -czf - . | ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" "cat > /root/assisted-service.tar.gz"
 
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" bash - << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1

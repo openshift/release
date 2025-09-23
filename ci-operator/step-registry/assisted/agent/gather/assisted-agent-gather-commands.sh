@@ -7,12 +7,17 @@ set -x
 
 echo "************ assisted agent gather command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
+
+host_contract::load
+
+HOST_TARGET="${HOST_SSH_USER}@${HOST_SSH_HOST}"
+SSH_ARGS=("${HOST_SSH_OPTIONS[@]}")
 
 echo "### Gathering artifacts"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+timeout --kill-after 10m 120m ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" bash - << EOF
     mkdir /tmp/artifacts
 
     # collect junit reports and logs
@@ -26,4 +31,4 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
         -k docker.all -k docker.logs
 EOF
 
-scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+scp "${SSH_ARGS[@]}" "${HOST_TARGET}:/tmp/artifacts/*" "${ARTIFACT_DIR}"

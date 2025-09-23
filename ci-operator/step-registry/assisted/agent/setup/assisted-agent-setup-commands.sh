@@ -7,18 +7,23 @@ set -x
 
 echo "************ assisted agent setup command ************"
 
-# Fetch packet basic configuration
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
+host_contract::load
+
+HOST_TARGET="${HOST_SSH_USER}@${HOST_SSH_HOST}"
+SSH_ARGS=("${HOST_SSH_OPTIONS[@]}")
+
+tar -czf - . | ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" "cat > /root/assisted.tar.gz"
 
 # copy pull-secret
-ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir -p /root/.docker"
-cat "${CLUSTER_PROFILE_DIR}/pull-secret" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/.docker/config.json"
+ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" "mkdir -p /root/.docker"
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" | ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" "cat > /root/.docker/config.json"
 
 echo "### Setting up tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+timeout --kill-after 10m 120m ssh "${SSH_ARGS[@]}" "${HOST_TARGET}" bash - << EOF
     # install and start docker
     dnf install -y 'dnf-command(config-manager)'
     dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo

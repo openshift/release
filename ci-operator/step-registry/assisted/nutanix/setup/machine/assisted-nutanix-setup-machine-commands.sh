@@ -12,6 +12,10 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
+
 # shellcheck source=/dev/random
 source $SHARED_DIR/nutanix_context.sh
 # shellcheck source=/dev/random
@@ -41,7 +45,10 @@ cd ..
 tar -cvzf terraform.tgz --exclude=".terraform" /home/assisted-test-infra/build/terraform
 cp terraform.tgz ${SHARED_DIR}
 
-cat >> "${SHARED_DIR}/ci-machine-config.sh" << EOF
-export IP="${IP}"
-export SSH_KEY_FILE=/var/run/vault/assisted-ci-vault/ssh_private_key
-EOF
+host_contract::writer::begin
+host_contract::writer::set HOST_PROVIDER "nutanix"
+host_contract::writer::set HOST_PRIMARY_IP "$IP"
+host_contract::writer::set HOST_PRIMARY_SSH_USER "root"
+host_contract::writer::set HOST_PRIMARY_SSH_KEY_PATH "/var/run/vault/assisted-ci-vault/ssh_private_key"
+host_contract::writer::set HOST_PRIMARY_SSH_ADDITIONAL_OPTIONS "-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+host_contract::writer::commit

@@ -6,76 +6,22 @@ set -o pipefail
 
 echo "************ assisted common setup prepare command ************"
 
-# source common configuration, if missing, fallback on packet configuration
-# shellcheck source=/dev/null
-if ! source "${SHARED_DIR}/ci-machine-config.sh"; then
-  source "${SHARED_DIR}/packet-conf.sh"
-  export IP
-  export SSH_KEY_FILE="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../lib/host-contract/assisted-common-lib-host-contract-commands.sh"
 
-mkdir -p build/ansible
-cd build/ansible
+host_contract::load
 
-cat > packing-test-infra.yaml <<-EOF
-- name: Prepare locally
-  hosts: localhost
-  collections:
-    - community.general
-  gather_facts: no
-  vars:
-    ansible_remote_tmp: ../tmp
-    SHARED_DIR: "{{ lookup('env', 'SHARED_DIR') }}"
-  tasks:
-    - name: Ensuring assisted-additional-config existence
-      ansible.builtin.file:
-        path: "{{ SHARED_DIR }}/assisted-additional-config"
-        state: touch
-    - name: Ensuring platform-conf.sh existence
-      ansible.builtin.file:
-        path: "{{ SHARED_DIR }}/platform-conf.sh"
-        state: touch
-    - name: Check if ansible inventory exists
-      stat:
-        path: "{{ SHARED_DIR }}/inventory"
-      register: inventory
-    - name: Create default ansible inventory
-      ansible.builtin.copy:
-        dest: "{{ SHARED_DIR }}/inventory"
-        content: |
-          [primary]
-          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
-      when: not inventory.stat.exists
-    - name: Create ssh config file
-      ansible.builtin.copy:
-        dest: "{{ SHARED_DIR }}/ssh_config"
-        content: |
-          Host ci_machine
-            User root
-            HostName {{ lookup('env', 'IP') }}
-            ConnectTimeout 5
-            StrictHostKeyChecking no
-            ServerAliveInterval 90
-            LogLevel ERROR
-            IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
-            ConnectionAttempts 10
-    - name: Create ansible configuration
-      ansible.builtin.copy:
-        dest: "{{ SHARED_DIR }}/ansible.cfg"
-        content: |
-          [defaults]
-          callback_whitelist = profile_tasks
-          host_key_checking = False
+export IP="$HOST_SSH_HOST"
+export SSH_KEY_FILE="$HOST_SSH_KEY_FILE"
 
-          verbosity = 2
-          stdout_callback = yaml
-          bin_ansible_callbacks = True
+mkdir -p "$SHARED_DIR"
+touch "$SHARED_DIR/assisted-additional-config"
+touch "$SHARED_DIR/platform-conf.sh"
 
-          [ssh_connection]
-          retries = 10
-EOF
-
-ansible-playbook packing-test-infra.yaml
+host_contract::write_inventory "${SHARED_DIR}/inventory"
+host_contract::write_ansible_cfg "${SHARED_DIR}/ansible.cfg"
+host_contract::write_ssh_config "${SHARED_DIR}/ssh_config"
 
 # shellcheck disable=SC2034
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
