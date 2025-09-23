@@ -10318,6 +10318,94 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
+    context: ci/prow/ibmcloud-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: ibmcloud
+      ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-qe
+      ci-operator.openshift.io/variant: ibmcloud-4.20-nightly-x86-loaded-upgrade-from-4.19
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-ibmcloud-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24nodes
+    reporter_config:
+      slack:
+        channel: '#ocp-qe-scale-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test ibmcloud-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=loaded-upgrade-419to420-24nodes
+        - --variant=ibmcloud-4.20-nightly-x86-loaded-upgrade-from-4.19
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(ibmcloud-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/ibmcloud-4.20-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -13924,6 +14012,84 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(metal-x86-health-check|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/metal-x86-health-check-jetlagci
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: metal-perfscale-jetlag
+      ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-jetlag
+      ci-operator.openshift.io/variant: metal-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-health-check-jetlagci
+    rerun_command: /test metal-x86-health-check-jetlagci
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=health-check-jetlagci
+        - --variant=metal-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(metal-x86-health-check-jetlagci|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
