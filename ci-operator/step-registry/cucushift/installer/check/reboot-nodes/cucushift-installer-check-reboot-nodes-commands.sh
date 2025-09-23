@@ -55,11 +55,16 @@ exit_handler() {
 # Add EXIT trap to log script completion
 trap 'exit_handler' EXIT
 
-# Configuration constants
-readonly API_SERVER_TIMEOUT=30      # 30 attempts × 30 seconds = 15 minutes
-readonly NODE_READY_TIMEOUT=90      # 90 attempts × 60 seconds = 90 minutes
-readonly CLUSTER_OPERATOR_TIMEOUT=120  # 120 attempts × 60 seconds = 120 minutes
+# Configuration constants - Reduced timeouts based on test results
+readonly API_SERVER_TIMEOUT=20      # 20 attempts × 30 seconds = 10 minutes
+readonly NODE_READY_TIMEOUT=60      # 60 attempts × 60 seconds = 60 minutes
+readonly CLUSTER_OPERATOR_TIMEOUT=90   # 90 attempts × 60 seconds = 90 minutes
 readonly CLUSTER_OPERATOR_STABLE_PATTERN="True.*False.*False"
+
+# Reboot strategy configuration
+# SEQUENTIAL: Stop first node, wait for it to be running, then move to next (current default)
+# BATCH_STOP_START: Stop all nodes at once, wait fixed time, then start them one by one
+readonly REBOOT_STRATEGY="${REBOOT_STRATEGY:-SEQUENTIAL}"
 
 # Record script start time for execution time calculation
 SECONDS=0
@@ -73,12 +78,16 @@ echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Working directory: $(pwd)"
 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - User: $(whoami)"
 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - =========================================="
 
-# Set AWS credentials
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.aws"
-
-# Set AWS region
-export AWS_REGION="${AWS_REGION:-$LEASED_RESOURCE}"
+# Platform detection and AWS-specific setup
+if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+    # Set AWS credentials only for AWS platform
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+    export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.aws"
+    export AWS_REGION="${AWS_REGION:-$LEASED_RESOURCE}"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - AWS platform detected, AWS CLI configured"
+else
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Non-AWS platform detected (${CLUSTER_TYPE}), using SSH-based reboot"
+fi
 
 function run_command() {
     local CMD="$1"
@@ -178,11 +187,80 @@ function ssh_command() {
 
 function reboot_node() {
     local node_ip=$1 node_name=$2
-    local instance_id
+    
+    if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+        # AWS platform: Use EC2 stop/start for more reliable reboot
+        local instance_id
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting instance ID for node ${node_name} (${node_ip})"
+        
+        # Get instance ID from AWS using run_command for consistent error handling
+        local describe_cmd="aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --filters 'Name=private-ip-address,Values=${node_ip}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text | grep -E '\\s+running$' | awk '{print \$1}' | head -1"
+        instance_id=$(run_command_silent "${describe_cmd}")
+        
+        if [[ -z "${instance_id}" ]]; then
+            echo "ERROR: Could not find running instance for IP ${node_ip}"
+            return 1
+        fi
+        
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Found instance ${instance_id} for node ${node_name}"
+        
+        # Stop the instance
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stopping instance ${instance_id}"
+        if ! run_command "aws ec2 stop-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}'"; then
+            echo "ERROR: Failed to stop instance ${instance_id}"
+            return 1
+        fi
+        
+        # Wait for instance to stop using wait_for_condition
+        if ! wait_for_condition "instance ${instance_id} to stop" \
+            "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -q 'stopped'" \
+            20 10 \
+            "Instance ${instance_id} did not stop within 3.5 minutes" \
+            "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
+            return 1
+        fi
+        
+        # Start the instance
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting instance ${instance_id}"
+        if ! run_command "aws ec2 start-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}'"; then
+            echo "ERROR: Failed to start instance ${instance_id}"
+            return 1
+        fi
+        
+        # Wait for instance to start using wait_for_condition
+        if ! wait_for_condition "instance ${instance_id} to start" \
+            "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -q 'running'" \
+            20 10 \
+            "Instance ${instance_id} did not start within 3.5 minutes" \
+            "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
+            return 1
+        fi
+        
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Instance ${instance_id} successfully restarted"
+    else
+        # Non-AWS platform: Use SSH-based reboot
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Using SSH-based reboot for ${node_name} (${node_ip})"
+        if ! ssh_command "${node_ip}" "sudo reboot"; then
+            echo "ERROR: Failed to reboot node ${node_name} via SSH"
+            return 1
+        fi
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - SSH reboot command sent to ${node_name}"
+    fi
+    
+    return 0
+}
 
+function reboot_node_stop_only() {
+    local node_ip=$1 node_name=$2
+    local instance_id
+    
+    if [[ "${CLUSTER_TYPE}" != "aws" ]]; then
+        echo "ERROR: BATCH_STOP_START strategy only supported on AWS platform"
+        return 1
+    fi
+    
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting instance ID for node ${node_name} (${node_ip})"
     
-    # Get instance ID from AWS using run_command for consistent error handling
     local describe_cmd="aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --filters 'Name=private-ip-address,Values=${node_ip}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text | grep -E '\\s+running$' | awk '{print \$1}' | head -1"
     instance_id=$(run_command_silent "${describe_cmd}")
     
@@ -191,26 +269,35 @@ function reboot_node() {
         return 1
     fi
     
-    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Found instance ${instance_id} for node ${node_name}"
-    
-    # Stop the instance
-    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stopping instance ${instance_id}"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stopping instance ${instance_id} for node ${node_name}"
     if ! run_command "aws ec2 stop-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}'"; then
         echo "ERROR: Failed to stop instance ${instance_id}"
         return 1
     fi
     
-    # Wait for instance to stop using wait_for_condition
-    if ! wait_for_condition "instance ${instance_id} to stop" \
-        "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -q 'stopped'" \
-        30 10 \
-        "Instance ${instance_id} did not stop within 5 minutes" \
-        "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
+    return 0
+}
+
+function reboot_node_start_only() {
+    local node_ip=$1 node_name=$2
+    local instance_id
+    
+    if [[ "${CLUSTER_TYPE}" != "aws" ]]; then
+        echo "ERROR: BATCH_STOP_START strategy only supported on AWS platform"
         return 1
     fi
     
-    # Start the instance
-    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting instance ${instance_id}"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Getting instance ID for node ${node_name} (${node_ip})"
+    
+    local describe_cmd="aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --filters 'Name=private-ip-address,Values=${node_ip}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text | grep -E '\\s+stopped$' | awk '{print \$1}' | head -1"
+    instance_id=$(run_command_silent "${describe_cmd}")
+    
+    if [[ -z "${instance_id}" ]]; then
+        echo "ERROR: Could not find stopped instance for IP ${node_ip}"
+        return 1
+    fi
+    
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting instance ${instance_id} for node ${node_name}"
     if ! run_command "aws ec2 start-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}'"; then
         echo "ERROR: Failed to start instance ${instance_id}"
         return 1
@@ -219,13 +306,13 @@ function reboot_node() {
     # Wait for instance to start using wait_for_condition
     if ! wait_for_condition "instance ${instance_id} to start" \
         "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -q 'running'" \
-        30 10 \
-        "Instance ${instance_id} did not start within 5 minutes" \
+        20 10 \
+        "Instance ${instance_id} did not start within 3.5 minutes" \
         "aws ec2 describe-instances --region '${AWS_REGION:-us-east-1}' --instance-ids '${instance_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         return 1
     fi
     
-    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Instance ${instance_id} successfully restarted"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Instance ${instance_id} successfully started"
     return 0
 }
 
@@ -266,13 +353,42 @@ function reboot_cluster() {
         node_ip_array[${node_name}]=${node_ip}
     done
 
-    for node_name in ${node_list}; do
-        node_ip=${node_ip_array[${node_name}]}
-        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - rebooting node ${node_name}, node ip is ${node_ip}"
-        if ! reboot_node "${node_ip}" "${node_name}"; then
-            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Failed to reboot node ${node_name}, continuing with other nodes..."
-        fi
-    done
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Using reboot strategy: ${REBOOT_STRATEGY}"
+    
+    if [[ "${REBOOT_STRATEGY}" == "BATCH_STOP_START" && "${CLUSTER_TYPE}" == "aws" ]]; then
+        # Batch stop all nodes first
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Batch stopping all nodes..."
+        for node_name in ${node_list}; do
+            node_ip=${node_ip_array[${node_name}]}
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Stopping node ${node_name} (${node_ip})"
+            if ! reboot_node_stop_only "${node_ip}" "${node_name}"; then
+                echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Failed to stop node ${node_name}, continuing with other nodes..."
+            fi
+        done
+        
+        # Wait fixed time for all nodes to stop
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Waiting 2 minutes for all nodes to stop completely..."
+        sleep 120
+        
+        # Start all nodes one by one
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting all nodes..."
+        for node_name in ${node_list}; do
+            node_ip=${node_ip_array[${node_name}]}
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Starting node ${node_name} (${node_ip})"
+            if ! reboot_node_start_only "${node_ip}" "${node_name}"; then
+                echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Failed to start node ${node_name}, continuing with other nodes..."
+            fi
+        done
+    else
+        # Sequential reboot (default behavior)
+        for node_name in ${node_list}; do
+            node_ip=${node_ip_array[${node_name}]}
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - rebooting node ${node_name}, node ip is ${node_ip}"
+            if ! reboot_node "${node_ip}" "${node_name}"; then
+                echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - ERROR: Failed to reboot node ${node_name}, continuing with other nodes..."
+            fi
+        done
+    fi
 
            total_nodes_count=$(echo "${node_list}" | awk '{print NF}' 2>/dev/null | tr -d '\n' || echo "0")
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Total nodes to reboot: ${total_nodes_count}"
