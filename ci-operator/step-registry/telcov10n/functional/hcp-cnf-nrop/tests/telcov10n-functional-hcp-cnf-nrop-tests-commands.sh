@@ -20,7 +20,7 @@ export E2E_NROP_DEVICE_TYPE_3=example.com/deviceC
 # local variables
 NROP_REPO="https://github.com/openshift-kni/numaresources-operator.git"
 NROP_BRANCH="main"
-GINKGO_LABEL="tier0 && !reboot_required && !openshift"
+GINKGO_LABEL="(tier0 || tier1 || tier2 || tier3) && !schedrst && !reboot_required && !openshift"
 GINKGO_SUITES="test/e2e/serial/"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"

@@ -48,6 +48,7 @@ spec:
     name: pull-secret
   sshAuthorizedKey: "${SSH_PUB_KEY}"
 END
+oc wait --for=condition=ImageCreated infraenv/${CLUSTER_NAME} -n ${AGENT_NAMESPACE} --timeout=5m
 
 while IFS= read -r host; do
     host_name=$(echo "$host" | jq -r '.name')
