@@ -109,6 +109,18 @@ EOF
         <failure message="">MicroShift install failed overall</failure>
     </testcase>
 EOF
+    elif [ "$EXIT_CODE" == "$EXIT_CODE_REBASE_FAILURE" ]; then
+        cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+        <testsuite name="cluster install" tests="5" failures="2">
+            <testcase name="install should succeed: MicroShift rebase">
+                <failure message="">MicroShift rebase failed, check the rebase logs for details</failure>
+            </testcase>
+            <testcase name="install should succeed: overall">
+                <failure message="">MicroShift install failed because of rebase</failure>
+            </testcase>
+        </testcase>
+EOF
+    fi
     else
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
       <testsuite name="cluster install" tests="2" failures="2">
