@@ -13,109 +13,102 @@ set -o pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
+# Function to validate parameters and set defaults
+validate_and_set_defaults() {
+    echo "Validating parameters and setting defaults..."
 
-echo "=========================================="
-echo "Sandboxed Containers Operator - Prowjob Configuration Generator"
+    # OCP version to test
+    OCP_VERSION="${OCP_VERSION:-4.19}"
+    # Validate OCP version format
+    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
+        exit 1
+    fi
 
+    # AWS Region Configuration
+    AWS_REGION_OVERRIDE="${AWS_REGION_OVERRIDE:-us-east-2}"
 
-# Validate required parameters and set defaults
-echo "Validating parameters and setting defaults..."
+    # Azure Region Configuration
+    CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
 
-# OCP version to test
-OCP_VERSION="${OCP_VERSION:-4.19}"
-# Validate OCP version format
-if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-    echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
-    exit 1
-fi
+    # OSC Version Configuration
+    EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
 
-# AWS Region Configuration
-AWS_REGION_OVERRIDE="${AWS_REGION_OVERRIDE:-us-east-2}"
+    # Kata RPM Configuration
+    INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
+    if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
+        echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
+        exit 1
+    fi
 
-# Azure Region Configuration
-CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
+    # Kata RPM version (includes OCP version)
+    if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
+        KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
+    else
+        KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
+    fi
 
-# OSC Version Configuration
-EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
+    # test is Pre-GA for brew builds or GA for operators/rpms already on OCP
+    # this triggers the mirror redirect install, creating brew & trustee catsrc,
+    TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
+    # Validate TEST_RELEASE_TYPE
+    if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
+        echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
+        exit 1
+    fi
 
-# Kata RPM Configuration
-INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
-if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
-    echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
-    exit 1
-fi
+    # Prow Run Type depends on TEST_RELEASE_TYPE
+    if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+        PROW_RUN_TYPE="candidate"
+    else
+        PROW_RUN_TYPE="release"
+        CATALOG_SOURCE_NAME="redhat-operators"
+        TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+    fi
 
-# Kata RPM version (includes OCP version)
-if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
-else
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
-fi
+    # After the tests finish, wait before killing the cluster
+    SLEEP_DURATION="${SLEEP_DURATION:-0h}"
+    # Validate SLEEP_DURATION format (0-12 followed by 'h')
+    if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
+        echo "ERROR: SLEEP_DURATION must be a number between 0-12 followed by 'h' (e.g., 2h, 8h), got: ${SLEEP_DURATION}"
+        exit 1
+    fi
 
-# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
-# this triggers the mirror redirect install, creating brew & trustee catsrc,
-TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
-# Validate TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
-    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
-    exit 1
-fi
+    # Allow override of test scenarios
+    TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
 
-# Prow Run Type depends on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    PROW_RUN_TYPE="candidate"
-else
-    PROW_RUN_TYPE="release"
-    CATALOG_SOURCE_NAME="redhat-operators"
-    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-fi
+    # Let the tests run for this many minutes before killing the cluster and interupting the test
+    TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
+    # Validate TEST_TIMEOUT is numeric
+    if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: TEST_TIMEOUT should be numeric, got: ${TEST_TIMEOUT}"
+        exit 1
+    fi
 
-# After the tests finish, wait before killing the cluster
-SLEEP_DURATION="${SLEEP_DURATION:-0h}"
-# Validate SLEEP_DURATION format (0-12 followed by 'h')
-if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
-    echo "ERROR: SLEEP_DURATION must be a number between 0-12 followed by 'h' (e.g., 2h, 8h), got: ${SLEEP_DURATION}"
-    exit 1
-fi
-
-
-# Allow override of test scenarios
-TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
-
-# Let the tests run for this many minutes before killing the cluster and interupting the test
-TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
-# Validate TEST_TIMEOUT is numeric
-if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: TEST_TIMEOUT should be numeric, got: ${TEST_TIMEOUT}"
-    exit 1
-fi
-
-# Must-gather Configuration
-ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
-# Validate ENABLE_MUST_GATHER
-if [[ "${ENABLE_MUST_GATHER}" != "true" && "${ENABLE_MUST_GATHER}" != "false" ]]; then
+  # Must-gather Configuration
+  ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
+  # Validate ENABLE_MUST_GATHER
+  if [[ "${ENABLE_MUST_GATHER}" != "true" && "${ENABLE_MUST_GATHER}" != "false" ]]; then
     echo "ERROR: ENABLE_MUST_GATHER should be 'true' or 'false', got: ${ENABLE_MUST_GATHER}"
     exit 1
-fi
+  fi
 
-# Must-gather image to use for collecting debug information
-MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
+  # Must-gather image to use for collecting debug information
+  MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
 
-# Only collect must-gather on test failure
-MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
-# Validate MUST_GATHER_ON_FAILURE_ONLY
-if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
+  # Only collect must-gather on test failure
+  MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
+  # Validate MUST_GATHER_ON_FAILURE_ONLY
+  if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
     echo "ERROR: MUST_GATHER_ON_FAILURE_ONLY should be 'true' or 'false', got: ${MUST_GATHER_ON_FAILURE_ONLY}"
     exit 1
-fi
-
-
+  fi
 
 # Catalog Source Configuration
 echo "Configuring catalog sources..."
 
-# Set catalog source variables based on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+  # Set catalog source variables based on TEST_RELEASE_TYPE
+  if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
@@ -160,12 +153,19 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
 
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
-else # GA
+  else # GA
     CATALOG_SOURCE_NAME="redhat-operators"
     TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
     CATALOG_SOURCE_IMAGE="none"
     TRUSTEE_CATALOG_SOURCE_IMAGE="none"
-fi
+  fi
+}
+
+echo "=========================================="
+echo "Sandboxed Containers Operator - Prowjob Configuration Generator"
+
+# Call the validation function
+validate_and_set_defaults
 
 # Generate output file path
 OCP_PROWJOB_VERSION=$(echo "${OCP_VERSION}" | tr -d '.' )
