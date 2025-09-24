@@ -121,3 +121,18 @@ echo "fd99:2222:3456::3:${VLAN_ID}" > "${SHARED_DIR}/ipi_bootstrap_ipv6_address"
 #  build_user: ci-op
 #  name: master-02 # This name must be either master or worker or bootstrap in order for the steps to set the role correctly
 #  ipxe_via_vmedia: true # Whether to use ipxe via virtual media or not (some UEFI has no drivers for the network card being used)
+
+# shellcheck disable=SC2154
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${arch}" == "aarch64" ]]; then
+      # HPE ARM64 servers frequently hang on boot with a black screen, BMC reset seems to fix the issue
+      echo "ARM64 node, resetting BMC"
+      ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+        -U "$bmc_user" -P "$bmc_pass" mc reset cold
+  fi
+done
+
+# Safety sleep for BMCs reset
+sleep 120
