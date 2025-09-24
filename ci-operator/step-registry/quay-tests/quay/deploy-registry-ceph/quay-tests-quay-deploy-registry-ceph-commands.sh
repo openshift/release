@@ -10,11 +10,9 @@ QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
 # env variables from shared dir for aws sts
-QUAY_CEPH_S3_BUCKET=$([ -f "${SHARED_DIR}/QUAY_CEPH_S3_BUCKET" ] && cat "${SHARED_DIR}/QUAY_CEPH_S3_BUCKET" || echo "")
 QUAY_CEPH_S3_HOSTNAME=$([ -f "${SHARED_DIR}/QUAY_CEPH_S3_HOSTNAME" ] && cat "${SHARED_DIR}/QUAY_CEPH_S3_HOSTNAME" || echo "") 
 QUAY_CEPH_S3_ACCESSKEY=$([ -f "${SHARED_DIR}/QUAY_CEPH_S3_ACCESSKEY" ] && cat "${SHARED_DIR}/QUAY_CEPH_S3_ACCESSKEY" || echo "")
 QUAY_CEPH_S3_SECRETKEY=$([ -f "${SHARED_DIR}/QUAY_CEPH_S3_SECRETKEY" ] && cat "${SHARED_DIR}/QUAY_CEPH_S3_SECRETKEY" || echo "")
-
 
 echo "Create registry ${QUAYREGISTRY} with ceph in ns ${QUAYNAMESPACE}"
 
@@ -52,7 +50,7 @@ DISTRIBUTED_STORAGE_PREFERENCE:
 DISTRIBUTED_STORAGE_CONFIG:
   default:
     - RadosGWStorage
-    - bucket_name: ${QUAY_CEPH_S3_BUCKET}
+    - bucket_name: quay
       storage_path: /datafile
       access_key: ${QUAY_CEPH_S3_ACCESSKEY}
       secret_key: ${QUAY_CEPH_S3_SECRETKEY}

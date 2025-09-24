@@ -374,7 +374,7 @@ metadata:
   name: ${OBC_NAME}
   namespace: ${NAMESPACE}
 spec:
-  generateBucketName: ${BUCKET_PREFIX}
+  bucketName: quay
   storageClassName: ${STORAGE_CLASS}
 EOF
 
@@ -412,7 +412,6 @@ EOF
 
 	export BUCKET_NAME ACCESS_KEY SECRET_KEY
 	echo "OBC bucket created successfully: ${BUCKET_NAME}"
-	echo "${BUCKET_NAME}" > "${SHARED_DIR}/QUAY_CEPH_S3_BUCKET"
     echo "${ACCESS_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_ACCESSKEY"
     echo "${SECRET_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_SECRETKEY"
 
@@ -433,12 +432,13 @@ create_bucket_s3api() {
 	echo "${ceph_toolbox_pod}"
 	oc exec -n openshift-storage "${ceph_toolbox_pod}" -- ceph osd status
 	oc exec -n openshift-storage "${ceph_toolbox_pod}" -- ceph status
+    BUCKET_NAME="${BUCKET_PREFIX}"
 
-	echo "Creating RGW user: ${BUCKET_PREFIX}"
+	echo "Creating RGW user: ${BUCKET_NAME}"
 	local rgw_user_output
 	rgw_user_output=$(oc exec -n openshift-storage "${ceph_toolbox_pod}" -- radosgw-admin user create \
-		--uid="${BUCKET_PREFIX}" \
-		--display-name="${BUCKET_PREFIX} user")
+		--uid="${BUCKET_NAME}" \
+		--display-name="${BUCKET_NAME} user")
 
 	ACCESS_KEY=$(echo "$rgw_user_output" | jq -r '.keys[0].access_key')
 	SECRET_KEY=$(echo "$rgw_user_output" | jq -r '.keys[0].secret_key')
@@ -449,10 +449,10 @@ create_bucket_s3api() {
 	fi
 
 	oc exec -n openshift-storage "${ceph_toolbox_pod}" -- radosgw-admin caps add \
-		--uid="${BUCKET_PREFIX}" \
+		--uid="${BUCKET_NAME}" \
 		--caps="buckets=*" >/dev/null
 
-	BUCKET_NAME="${BUCKET_PREFIX}-prow)"
+	
 
 	if command -v aws &>/dev/null; then
 		echo "Creating bucket: ${BUCKET_NAME}"
@@ -475,12 +475,12 @@ create_bucket_s3api() {
 	export BUCKET_NAME ACCESS_KEY SECRET_KEY
 	echo "AWS s3api bucket setup completed: ${BUCKET_NAME}"
 
-	echo "${BUCKET_NAME}" > "${SHARED_DIR}/QUAY_CEPH_S3_BUCKET"
     echo "${ACCESS_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_ACCESSKEY"
     echo "${SECRET_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_SECRETKEY"
 }
 
 create_s3_bucket() {
+	echo "Creating S3 bucket (method: auto-detect based on ODF version)..."
 
 	local channel="${ODF_OPERATOR_CHANNEL:-stable-4.19}"
 	local odf_version="${channel#stable-}"
@@ -490,16 +490,41 @@ create_s3_bucket() {
 		local minor="${BASH_REMATCH[2]}"
 
 		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 19 ]]; then
-			#odf 4.19+
+			echo "Using ODF ${odf_version} ObjectBucketClaim method"
 			oc patch storagecluster ocs-storagecluster -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
-	        create_bucket_obc	
-		else #odf 4.18-
-			oc patch OCSInitialization ocsinit -n openshift-storage --type json --patch  '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
+
+			echo "Waiting for ceph-tools pod to be ready..."
+			for i in {1..30}; do
+				if oc wait --for=condition=Ready pod -l app=rook-ceph-tools -n openshift-storage --timeout=30s 2>/dev/null; then
+					echo "ceph-tools pod is ready"
+					break
+				fi
+				echo "Waiting for ceph-tools pod..."
+				sleep 10
+			done
+
+	        create_bucket_obc
+		else
+			echo "Using ODF ${odf_version} legacy AWS CLI method"
+			oc patch OCSInitialization ocsinit -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
+
+			echo "Waiting for ceph-tools pod to be ready..."
+			for i in {1..30}; do
+				if oc wait --for=condition=Ready pod -l app=rook-ceph-tools -n openshift-storage --timeout=30s 2>/dev/null; then
+					echo "ceph-tools pod is ready"
+					break
+				fi
+				echo "Waiting for ceph-tools pod..."
+				sleep 10
+			done
+
 		    create_bucket_s3api
 		fi
+	else
+		echo "Could not parse ODF version, defaulting to legacy method"
+		oc patch OCSInitialization ocsinit -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
+		create_bucket_s3api
 	fi
-
-	echo "Creating S3 bucket (method: auto-detect based on ODF version)..."
 }
 
 generate_quay_config() {
