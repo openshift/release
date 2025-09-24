@@ -17,31 +17,6 @@ build_root:
     namespace: openshift
     tag: golang-1.21
 images:
-- dockerfile_literal: "FROM base \nWORKDIR /tmp/src\nRUN dnf install -y git &&\\\ngit
-    clone https://github.com/amp-rh/openshift-fusion-access-operator.git .\n"
-  from: base
-  to: git-src
-- dockerfile_literal: |
-    FROM fedora
-    WORKDIR /tmp/src/console
-    COPY --from=git-src /tmp/src/console .
-    ENV PATH $PATH:/cli:/tmp/src/console/node_modules/.bin
-    ENV npm_config_cache /tmp/src/cache
-    ENV CYPRESS_CACHE_FOLDER /tmp/src/cache/cypress
-    ENV KUBECONFIG $SHARED_DIR/kubeconfig
-    RUN dnf install jq ps at-spi2-atk npm xorg-x11-server-Xvfb npm xauth nss alsa-lib unzip cups-libs gtk3-devel git which -y
-    RUN dnf clean all
-    RUN npm set progress=false
-    RUN npm install --save-dev
-    RUN cypress verify
-    RUN chgrp -R 0 /tmp/src/
-    RUN chmod -R g+w /tmp/src/
-  from: fedora
-  inputs:
-    git-src:
-      as:
-      - git-src
-  to: fusion-access-test-runner
 - dockerfile_literal: FROM icr.io/cpopen/ibm-spectrum-scale-must-gather:v5.2.3.1
   from: base
   to: ibm-must-gather
@@ -63,9 +38,11 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
       CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
-      CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp
+      CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
       CUSTOM_SECURITY_GROUP_SOURCES: ""
       FIPS_ENABLED: "false"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
@@ -75,36 +52,24 @@ tests:
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       FUSION_ACCESS_NAMESPACE: ibm-fusion-access
       FUSION_ACCESS_STORAGE_SCALE_VERSION: v5.2.3.1
-      OPERATORS: |
-        [
-          {
-            "name": "openshift-fusion-access-operator",
-            "source": "certified-operators",
-            "channel": "stable-v1",
-            "install_namespace": "openshift-operators",
-            "target_namespaces": "!install"
-          }
-        ]
+      FUSION_PULL_SECRET_EXTRA: ""
+      IBM_ENTITLEMENT_KEY: ""
       RE_TRIGGER_ON_FAILURE: "false"
       STORAGE_SCALE_CLIENT_CPU: "2"
       STORAGE_SCALE_CLIENT_MEMORY: 4Gi
       STORAGE_SCALE_CLUSTER_NAME: ibm-spectrum-scale
-      STORAGE_SCALE_NAMESPACE: ibm-spectrum-scale
       STORAGE_SCALE_STORAGE_CPU: "2"
       STORAGE_SCALE_STORAGE_MEMORY: 8Gi
       USER_TAGS: |
         scenario fusion-access
     post:
-    - ref: interop-tests-custom-ibm-must-gather
+    - ref: interop-tests-fusion-access-custom-ibm-must-gather
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     test:
     - chain: cucushift-installer-check-cluster-health
-    - ref: install-operators
-    # - ref: interop-tests-configure-aws-security-groups
-    - ref: interop-tests-deploy-fusion-access
-    - ref: interop-tests-fusion-access-tests
+    - chain: interop-tests-fusion-access-ebs-deployment
     workflow: firewatch-ipi-aws
   timeout: 6h0m0s
 zz_generated_metadata:
