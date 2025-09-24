@@ -20,12 +20,12 @@ consumers interact with it.
 
 ## Contract file
 
-- **Location**: `${SHARED_DIR}/host-contract.sh` by default. Writers or
+- **Location**: `${SHARED_DIR}/assisted-common-lib-host-contract-commands.sh` by default. Writers or
   consumers can override the path by setting `HOST_CONTRACT_PATH` before sourcing
   the helper library.
 - **Format**: POSIX shell fragment containing one `export KEY=value` per line
   (it can be safely sourced).
-- **Helper library**: `host-contract.sh` (next to this README) offers utilities
+- **Helper library**: `assisted-common-lib-host-contract-commands.sh` (next to this README) offers utilities
   to generate and consume the contract consistently.
 
 ### Required keys
@@ -59,9 +59,9 @@ emit the contract. Example:
 
 ```bash
 # shellcheck disable=SC1091
-source "$(dirname "$0")/../common/lib/host-contract/host-contract.sh"
+source "$(dirname "$0")/../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
 
-host_contract::writer::begin  # defaults to ${SHARED_DIR}/host-contract.sh
+host_contract::writer::begin  # defaults to ${SHARED_DIR}/assisted-common-lib-host-contract-commands.sh
 host_contract::writer::set HOST_PROVIDER "ofcir"
 host_contract::writer::set HOST_PRIMARY_IP "$acquired_ip"
 host_contract::writer::set HOST_PRIMARY_SSH_USER "root"
@@ -90,7 +90,7 @@ artifacts they previously generated manually:
 
 ```bash
 # shellcheck disable=SC1091
-source "$(dirname "$0")/../common/lib/host-contract/host-contract.sh"
+source "$(dirname "$0")/../common/lib/host-contract/assisted-common-lib-host-contract-commands.sh"
 
 host_contract::load
 host_contract::write_inventory "${SHARED_DIR}/inventory"
@@ -128,7 +128,7 @@ Consumers **must not** attempt to read provider specific artifacts (e.g.
 
 1. Provider steps populate the contract file (and stop writing provider specific
    shell snippets).
-2. All Assisted workflows and chains source `host-contract.sh` and use its
+2. All Assisted workflows and chains source `assisted-common-lib-host-contract-commands.sh` and use its
    helpers instead of `packet-conf.sh` or custom SSH scaffolding.
 3. Documentation and troubleshooting guides reference the contract when
    discussing host setup.
