@@ -182,7 +182,7 @@ EOF
 			echo "ODF StorageCluster is Ready"
 			break
 		fi
-		echo "Waiting for StorageCluster to be Ready, current status is ${phase}..."
+		echo "Waiting for StorageCluster to be Ready, current status is ${phase} ${i} ..."
 		sleep 30
 	done
 	phase=$(oc get storagecluster -n openshift-storage ocs-storagecluster -o jsonpath='{.status.phase}' || echo "Failure")
