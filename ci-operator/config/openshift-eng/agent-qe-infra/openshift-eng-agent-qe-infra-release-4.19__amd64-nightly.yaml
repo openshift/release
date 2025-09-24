@@ -1,0 +1,531 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: baremetal-3-plus-1-agent-ipv4-static-f14
+  capabilities:
+  - intranet
+  cron: 15 18 1,17 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+    workflow: baremetal-lab-agent-install-network-static-3-plus-1
+- as: baremetal-compact-agent-platform-none-ipv4-static-f14
+  capabilities:
+  - intranet
+  cron: 37 18 1,17 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-ha-agent-ipv4-static-disc-fips-f7
+  capabilities:
+  - intranet
+  cron: 35 18 6,15,22,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "2"
+    workflow: baremetal-lab-agent-install-network-static-disconnected
+- as: baremetal-ha-agent-platform-none-ipv4-static-f14
+  capabilities:
+  - intranet
+  cron: 28 18 5,21 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "2"
+    workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-sno-agent-ipv4-static-fips-day2-f14
+  capabilities:
+  - intranet
+  cron: 39 15 9,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-static-day2
+- as: baremetal-ha-agent-ipv4-static-disc-day2-f14
+  capabilities:
+  - intranet
+  cron: 16 15 15,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "2"
+    workflow: baremetal-lab-agent-install-network-static-disconnected-day2
+- as: baremetal-pxe-sno-agent-ipv4-static-disc-day2-f14
+  capabilities:
+  - intranet
+  cron: 33 15 10,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-pxe-day2-disconnected
+- as: baremetal-pxe-compact-agent-ipv4-static-connected-f14
+  capabilities:
+  - intranet
+  cron: 31 15 3,19 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-pxe
+- as: baremetal-pxe-ha-agent-ipv4-static-connected-f14
+  capabilities:
+  - intranet
+  cron: 27 13 7,21 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "2"
+    workflow: baremetal-lab-agent-install-pxe
+- as: baremetal-pxe-sno-agent-ipv4-static-connected-f14
+  capabilities:
+  - intranet
+  cron: 43 13 15,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-pxe
+- as: baremetal-ha-agent-dualstack-dynamic-fips-f14
+  capabilities:
+  - intranet
+  cron: 2 15 11,27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      FIPS_ENABLED: "true"
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "true"
+      masters: "3"
+      workers: "2"
+    workflow: baremetal-lab-agent-install-network-dynamic
+- as: baremetal-sno-agent-dualstack-dynamic-f14
+  capabilities:
+  - intranet
+  cron: 7 19 1,17 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "true"
+      masters: "1"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic
+- as: baremetal-compact-agent-dualstack-dynamic-disc-fips-f7
+  capabilities:
+  - intranet
+  cron: 37 13 3,10,17,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "true"
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic-disconnected
+- as: baremetal-sno-agent-ipv6-dynamic-fips-f14
+  capabilities:
+  - intranet
+  cron: 43 13 9,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic-ipv6
+- as: baremetal-compact-agent-ipv6-dynamic-f14
+  capabilities:
+  - intranet
+  cron: 2 21 9,23 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic-ipv6
+- as: baremetal-ha-agent-ipv6-dynamic-f14
+  capabilities:
+  - intranet
+  cron: 24 14 5,19 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    workflow: baremetal-lab-agent-install-network-dynamic-ipv6
+- as: baremetal-sno-agent-ipv4-static-connected-fips-f7
+  capabilities:
+  - intranet
+  cron: 22 20 3,10,17,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-static
+- as: oci-agent-baremetal-ha-iscsi-f14
+  cluster: build05
+  cron: 23 13 14,28 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    env:
+      ISCSI: "true"
+      MASTERS: "3"
+      WORKERS: "2"
+    workflow: cucushift-agent-oci
+- as: oci-agent-baremetal-5cp-iscsi-f14
+  cluster: build05
+  cron: 26 17 9,25 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    env:
+      ISCSI: "true"
+      MASTERS: "5"
+    workflow: cucushift-agent-oci
+- as: oci-agent-vm-5cp-f14
+  cluster: build05
+  cron: 3 17 2,16 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    env:
+      MASTERS: "5"
+    workflow: cucushift-agent-oci
+- as: oci-agent-baremetal-sno-iscsi-f14
+  cluster: build05
+  cron: 16 21 6,22 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    env:
+      ISCSI: "true"
+    workflow: cucushift-agent-oci
+- as: oci-agent-baremetal-compact-iscsi-f14
+  cluster: build05
+  cron: 8 21 7,21 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    env:
+      ISCSI: "true"
+      MASTERS: "3"
+    workflow: cucushift-agent-oci
+- as: oci-agent-vm-ha-f14
+  cluster: build05
+  cron: 31 0 4,18 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    env:
+      MASTERS: "3"
+      WORKERS: "2"
+    workflow: cucushift-agent-oci
+- as: oci-agent-vm-sno-f14
+  cluster: build05
+  cron: 34 0 4,18 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    workflow: cucushift-agent-oci
+- as: oci-agent-vm-compact-fips-f14
+  cluster: build05
+  cron: 1 0 12,26 * *
+  steps:
+    cluster_profile: oci-agent-qe
+    env:
+      FIPS_ENABLED: "true"
+      MASTERS: "3"
+    workflow: cucushift-agent-oci
+- as: nutanix-agent-sno-f28
+  cluster: build01
+  cron: 44 18 4 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      MASTERS: "1"
+    workflow: agent-qe-nutanix
+- as: nutanix-agent-compact-fips-f28
+  cluster: build01
+  cron: 11 8 22 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      FIPS_ENABLED: "true"
+    workflow: agent-qe-nutanix
+- as: nutanix-agent-ha-f28
+  cluster: build01
+  cron: 12 11 24 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      WORKERS: "2"
+    workflow: agent-qe-nutanix
+- as: nutanix-agent-disc-compact-f60
+  cluster: build01
+  cron: 38 11 24 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    workflow: agent-qe-nutanix-disconnected
+- as: vsphere-agent-compact-day2-add-nodes-f14
+  cron: 33 3 6,22 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      MASTERS: "3"
+      WORKERS: "0"
+    workflow: cucushift-agent-vsphere-install-day2-add-nodes
+- as: vsphere-agent-ha-day2-add-nodes-fips-f14
+  cron: 53 13 9,23 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      FIPS_ENABLED: "true"
+      MASTERS: "3"
+      WORKERS: "2"
+    workflow: cucushift-agent-vsphere-install-day2-add-nodes
+- as: vsphere-agent-compact-fips-f14
+  cron: 41 21 10,26 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FIPS_ENABLED: "true"
+    workflow: cucushift-agent-vsphere-install-compact
+- as: vsphere-agent-disc-compact-day2-add-nodes-f14
+  cron: 25 23 6,20 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      MASTERS: "3"
+      WORKERS: "0"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    workflow: cucushift-agent-vsphere-disconnected-install-day2-add-nodes
+- as: vsphere-agent-disc-compact-f14
+  cron: 14 15 1,15 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    workflow: cucushift-agent-vsphere-disconnected-install-compact
+- as: vsphere-agent-disc-ha-f14
+  cron: 25 5 11,25 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    workflow: cucushift-agent-vsphere-disconnected-install-ha
+- as: vsphere-agent-disc-sno-f14
+  cron: 25 16 5,21 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    workflow: cucushift-agent-vsphere-disconnected-install-sno
+- as: vsphere-agent-dualstack-compact-day2-add-nodes-f14
+  cron: 15 20 14,28 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      IP_FAMILIES: DualStack
+      MASTERS: "3"
+      WORKERS: "0"
+    workflow: cucushift-agent-vsphere-dualstack-install-day2-add-nodes
+- as: vsphere-agent-dualstack-compact-f14
+  cron: 19 1 12,28 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      IP_FAMILIES: DualStack
+    workflow: cucushift-agent-vsphere-dualstack-install-compact
+- as: vsphere-agent-dualstack-ha-f14
+  cron: 20 6 11,27 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      IP_FAMILIES: DualStack
+    workflow: cucushift-agent-vsphere-dualstack-install-ha
+- as: vsphere-agent-dualstack-sno-f14
+  cron: 9 7 6,22 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      IP_FAMILIES: DualStack
+    workflow: cucushift-agent-vsphere-dualstack-install-sno
+- as: vsphere-agent-ha-day2-add-nodes-f14
+  cron: 49 1 4,18 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      MASTERS: "3"
+      WORKERS: "2"
+    workflow: cucushift-agent-vsphere-install-day2-add-nodes
+- as: vsphere-agent-ha-f14
+  cron: 19 23 16,30 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: cucushift-agent-vsphere-install-ha
+- as: vsphere-agent-sno-day2-add-nodes-f14
+  cron: 22 22 14,28 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      MASTERS: "1"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+      WORKERS: "0"
+    workflow: cucushift-agent-vsphere-install-day2-add-nodes
+- as: vsphere-agent-sno-f14
+  cron: 34 8 4,20 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: cucushift-agent-vsphere-install-sno
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift-eng
+  repo: agent-qe-infra
+  variant: amd64-nightly

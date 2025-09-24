@@ -28,6 +28,7 @@ ALLOWED_REPOS=('openshift/openshift-tests-private'
                'openshift/rosa'
                'openshift/verification-tests'
                'oadp-qe/oadp-qe-automation'
+               'openshift-eng/agent-qe-infra'
               )
 org="$(jq -r 'if .extra_refs then .extra_refs[0].org
               elif .refs then .refs.org

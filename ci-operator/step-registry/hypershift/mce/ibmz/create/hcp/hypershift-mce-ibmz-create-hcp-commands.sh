@@ -42,7 +42,6 @@ else
 fi
 
 # Installing hypershift cli
-
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -o jsonpath="{.status.currentVersion}" | awk -F. '{print $1"."$2}')
 HYPERSHIFT_CLI_NAME=hcp
 echo "$(date) Installing hypershift cli"
@@ -161,13 +160,13 @@ if [[ $ENABLE_ICSP == "true" ]]; then
 fi
 
 # Set RENDER_COMMAND based on MCE_VERSION
-# >2.6: "--render-sensitive --render", else: "--render"
-if [[ "$(printf '%s\n' "$MCE_VERSION" "2.6" | sort -V | head -n1)" == "2.6" ]]; then
-  RENDER_COMMAND="--render-sensitive --render"
-else
-  RENDER_COMMAND="--render"
-fi
 
+# >= 2.7: "--render-sensitive --render", else: "--render"
+if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+  extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+else
+  extra_flags+="--render > /tmp/hc.yaml "
+fi
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HC_NAME} \
