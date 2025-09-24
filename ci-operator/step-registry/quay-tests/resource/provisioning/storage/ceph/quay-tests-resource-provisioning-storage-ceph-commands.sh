@@ -287,8 +287,7 @@ EOF
 			break
 		fi
 		echo "Waiting for rook-ceph-rgw pods to be Ready..."
-	done
-	
+	done	
 
 }
 
@@ -356,8 +355,10 @@ get_rgw_route() {
 
 	export RGW_ROUTE
 	echo "RGW route: ${RGW_ROUTE}"
+	echo "${RGW_ROUTE}" > "${SHARED_DIR}/QUAY_CEPH_S3_HOSTNAME"
 }
 
+# ObjectBucketClaim (OBC) method for ODF 4.19+
 create_bucket_obc() {
 	echo "Creating S3 bucket using ObjectBucketClaim (ODF 4.19+ method)..."
 
@@ -411,6 +412,9 @@ EOF
 
 	export BUCKET_NAME ACCESS_KEY SECRET_KEY
 	echo "OBC bucket created successfully: ${BUCKET_NAME}"
+	echo "${BUCKET_NAME}" > "${SHARED_DIR}/QUAY_CEPH_S3_BUCKET"
+    echo "${ACCESS_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_ACCESSKEY"
+    echo "${SECRET_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_SECRETKEY"
 
 	return 0
 }
@@ -466,6 +470,10 @@ create_bucket_s3api() {
 
 	export BUCKET_NAME ACCESS_KEY SECRET_KEY
 	echo "AWS s3api bucket setup completed: ${BUCKET_NAME}"
+
+	echo "${BUCKET_NAME}" > "${SHARED_DIR}/QUAY_CEPH_S3_BUCKET"
+    echo "${ACCESS_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_ACCESSKEY"
+    echo "${SECRET_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_SECRETKEY"
 }
 
 create_s3_bucket() {
@@ -598,11 +606,11 @@ EOF
 }
 
 
-## main
+## Provisioning Ceph Steps, based on ODF has been deployed
 	echo "Starting Ceph S3 Storage Provisioning for Quay Tests"
 	echo "=================================================="
 
-	deploy_odf_operator
+	# deploy_odf_operator
 	deploy_storage_cluster
 	deploy_ceph_rgw
 	check_prerequisites
