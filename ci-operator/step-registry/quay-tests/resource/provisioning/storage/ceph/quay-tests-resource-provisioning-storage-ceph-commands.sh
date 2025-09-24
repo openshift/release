@@ -214,6 +214,9 @@ spec:
     failureDomain: host
     replicated:
       size: 3
+    parameters:
+      pg_num: "8"
+      pgp_num: "8"
   gateway:
     allNodes: false
     instances: 1
@@ -260,7 +263,27 @@ spec:
     failureDomain: host
     replicated:
       size: 3
+    parameters:
+      pg_num: "8"
+      pgp_num: "8"
+  protocols:
+    s3:
+      authUseKeystone: false
+      enabled: true
+  zone:
+    name: "default"
 EOF
+
+	# Wait for CephObjectStore to be ready
+	for i in {1..20}; do
+		phase=$(oc get cephobjectstore -n openshift-storage ocs-storagecluster-cephobjectstore -o jsonpath='{.status.phase}' || echo "Failure")
+		if [[ "$phase" == "Ready" ]]; then
+			echo "CephObjectStore is Ready"
+			break
+		fi
+		echo "Waiting for CephObjectStore to be Ready, current status is ${phase} ${i} ..."
+		sleep 30
+	done
 
 	# Service and Route
 	cat <<EOF | oc apply -f -
@@ -511,13 +534,13 @@ verify_bucket_connectivity() {
 	fi
 }
 
-## Provisioning Ceph Steps, based on ODF has been deployed
-	echo "Starting Ceph Storage Provisioning"
+## Provisioning Ceph Storage Steps, ODF has been deployed in previous step
+	echo "Starting ODF Ceph Storage Provisioning"
 	echo "=================================================="
 
 	check_prerequisites
 	deploy_storage_cluster
-	deploy_ceph_rgw
+	deploy_ceph_rgw || true
 	get_rgw_route
 	create_s3_bucket
 	verify_bucket_connectivity
