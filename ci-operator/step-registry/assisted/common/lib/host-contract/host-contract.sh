@@ -9,7 +9,7 @@
 # metadata in a provider agnostic way.
 #
 # The contract file is a shell fragment containing "export KEY=value" lines.
-# By default the file lives at "${SHARED_DIR}/assisted-common-lib-host-contract-commands.sh", but callers
+# By default the file lives at "${SHARED_DIR}/host-contract.sh", but callers
 # can override HOST_CONTRACT_PATH before sourcing this helper.
 #
 # Minimal contract keys (must be provided by the writer):
@@ -40,9 +40,9 @@ _host_contract::default_path() {
     if [[ -n "${HOST_CONTRACT_PATH:-}" ]]; then
         printf '%s\n' "$HOST_CONTRACT_PATH"
     elif [[ -n "$shared_dir" ]]; then
-        printf '%s\n' "${shared_dir%/}/assisted-common-lib-host-contract-commands.sh"
+        printf '%s\n' "${shared_dir%/}/host-contract.sh"
     else
-        printf '%s\n' "${PWD}/assisted-common-lib-host-contract-commands.sh"
+        printf '%s\n' "${PWD}/host-contract.sh"
     fi
 }
 

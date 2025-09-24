@@ -9,7 +9,7 @@ LIB_DIR="${SCRIPT_DIR}/../../lib"
 
 : "${HOST_PROVIDER:?HOST_PROVIDER must be defined (e.g. ofcir, vsphere, nutanix)}"
 
-provider_script="${LIB_DIR}/host-providers/assisted-common-lib-host-providers-${HOST_PROVIDER}-commands.sh"
+provider_script="${LIB_DIR}/host-providers/${HOST_PROVIDER}.sh"
 if [[ ! -f "$provider_script" ]]; then
     echo "Unknown host provider: ${HOST_PROVIDER}" >&2
     exit 1
@@ -30,4 +30,3 @@ if ! "$acquire_fn"; then
 fi
 
 echo "Host acquisition completed via provider ${HOST_PROVIDER}" >&2
-
