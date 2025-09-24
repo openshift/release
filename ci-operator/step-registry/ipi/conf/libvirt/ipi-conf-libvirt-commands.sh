@@ -36,6 +36,16 @@ echo "Installing from initial release ${RELEASE_IMAGE_LATEST}"
 openshift-install version
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
+echo "LEASED RESOURCE"
+echo ${LEASED_RESOURCE}
+echo "sleeping....."
+
+sleep 360s
+if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
+    echo "${UNIQUE_HASH}"
+    UNIQUE_HASH=""
+fi
+
 BASE_DOMAIN="${LEASED_RESOURCE}.ci"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 CLUSTER_SUBNET="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases")"
@@ -43,6 +53,9 @@ if [[ -z "${CLUSTER_SUBNET}" ]]; then
   echo "Failed to lookup subnet"
   exit 1
 fi
+echo "Cluster name"
+echo $CLUSTER_NAME
+
 
 cat >> "${CONFIG}" << EOF
 apiVersion: v1
