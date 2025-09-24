@@ -3026,6 +3026,99 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: 0 20 25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
+    ci-operator.openshift.io/variant: ocp-419-quay
+    ci.openshift.io/generator: prowgen
+    job-release: "4.19"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-ocp-419-quay-quay-acs-violations-check-ocp419-quay315
+  reporter_config:
+    slack:
+      channel: '#quay-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-acs-violations-check-ocp419-quay315
+      - --variant=ocp-419-quay
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -6792,9 +6885,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-operator-test
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-operator-test-quay315-ocp418-operator-test-allns
+  name: periodic-ci-quay-quay-tests-master-quay-operator-test-quay315-ocp419-operator-test-allns
   reporter_config:
     slack:
       channel: '#quay-qe'
@@ -6815,7 +6908,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay315-ocp418-operator-test-allns
+      - --target=quay315-ocp419-operator-test-allns
       - --variant=quay-operator-test
       command:
       - ci-operator
@@ -6886,9 +6979,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-operator-test
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-operator-test-quay315-ocp418-operator-test-singlens
+  name: periodic-ci-quay-quay-tests-master-quay-operator-test-quay315-ocp419-operator-test-singlens
   reporter_config:
     slack:
       channel: '#quay-qe'
@@ -6909,7 +7002,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay315-ocp418-operator-test-singlens
+      - --target=quay315-ocp419-operator-test-singlens
       - --variant=quay-operator-test
       command:
       - ci-operator

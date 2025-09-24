@@ -4,13 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# https://docs.aws.amazon.com/cli/latest/topic/config-vars.html
 export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws/.awscred"
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
-
-if [ -z "${AWS_PROFILE:-}" ]; then
-  unset AWS_PROFILE
-fi 
 
 TMP_DIR=$(mktemp -d)
 
@@ -20,11 +17,15 @@ else
   CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
 fi
 
+if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ]; then
+  echo "Credentials file is not correctly mounted"
+fi
+
 echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"
 HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${BASE_DOMAIN}" \
-            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
-            --output text)"
+  --dns-name "${BASE_DOMAIN}" \
+  --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
+  --output text)"
 
 cat > "${SHARED_DIR}/dns_up.json" <<EOF
 {

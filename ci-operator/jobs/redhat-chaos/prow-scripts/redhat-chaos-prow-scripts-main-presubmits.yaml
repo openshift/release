@@ -413,7 +413,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.15-nightly-krkn-hub-tests-gcp
     decorate: true
     decoration_config:
@@ -613,7 +613,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.16-nightly-krkn-hub-cloud-gcp-node-tests
     decorate: true
     labels:
@@ -1192,7 +1192,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.16-nightly-krkn-hub-tests-gcp
     decorate: true
     decoration_config:
@@ -1454,7 +1454,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.16-nightly-upgrade-chaos-gcp-loaded-upgrade-415to416
     decorate: true
     decoration_config:
@@ -1756,7 +1756,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.17-nightly-krkn-hub-cloud-gcp-node
     decorate: true
     labels:
@@ -2267,7 +2267,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.17-nightly-krkn-hub-tests-gcp
     decorate: true
     decoration_config:
@@ -2355,7 +2355,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.18-nightly-gcp-fipsetcd-krkn-hub-node-tests
     decorate: true
     decoration_config:
@@ -2443,7 +2443,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.18-nightly-gcp-fipsetcd-krkn-hub-tests
     decorate: true
     decoration_config:
@@ -3098,7 +3098,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.18-nightly-x86-cpou-upgrade-4.16-loaded-upgrade-416to418-gcp
     decorate: true
     decoration_config:
@@ -3186,7 +3186,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/4.19-nightly-gcp-fipsetcd-krkn-hub-node-tests
     decorate: true
     decoration_config:
@@ -4441,6 +4441,62 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cr-4.19-nightly-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/cr-4.20-nightly-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: cr-4.20-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-cr-4.20-nightly-images
+    rerun_command: /test cr-4.20-nightly-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=cr-4.20-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cr-4.20-nightly-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

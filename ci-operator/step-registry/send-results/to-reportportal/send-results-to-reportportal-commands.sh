@@ -28,6 +28,7 @@ ALLOWED_REPOS=('openshift/openshift-tests-private'
                'openshift/rosa'
                'openshift/verification-tests'
                'oadp-qe/oadp-qe-automation'
+               'openshift-eng/agent-qe-infra'
               )
 org="$(jq -r 'if .extra_refs then .extra_refs[0].org
               elif .refs then .refs.org
@@ -90,14 +91,14 @@ mkdir --parents "$LOCAL_DIR" "$LOCAL_DIR_ORI" "$LOCAL_DIR_RST"
 function download_logs() {
   export PATH="$PATH:/opt/google-cloud-sdk/bin"
   gcloud_auth_cmd='gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private 2>&1'
-  for (( i=1; i<=3; i++ ))
+  for (( i=1; i<=10; i++ ))
   do
     if (eval $gcloud_auth_cmd | grep -q -i 'Activated service account')
     then
       break
     fi
-    echo "Retry 'gcloud auth' after sleep $i minutes"
-    sleep ${i}m
+    echo "Retry 'gcloud auth' after sleep 2 minutes"
+    sleep 2m
   done
   logfile_name="${ARTIFACT_DIR}/rsync.log"
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
@@ -198,7 +199,8 @@ function generate_attribute_install() {
                  'openshift-extended-test-supplementary' \
                  'openshift-extended-web-tests' \
                  'openshift-e2e-test-clusterinfra-qe' \
-                 'openshift-e2e-test-qe-report'
+                 'openshift-e2e-test-qe-report' \
+                 'cucushift-installer-check-cluster-health'
   do
     if [[ -d "$LOCAL_DIR_ORI/$keyword" ]]
     then
@@ -411,7 +413,7 @@ function generate_results() {
   else
     generate_result_teststeps
   fi
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' ! -empty -exec cp {} "$LOCAL_DIR_RST" \;
 }
 
 function fix_xmls() {
@@ -464,14 +466,14 @@ function droute_send() {
                                 --wait
                    2>&1
                   '
-  for (( i=1; i<=3; i++ ))
+  for (( i=1; i<=10; i++ ))
   do
     if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
       break
     fi
-    echo "Retry 'droute send' after sleep $i minutes"
-    sleep ${i}m
+    echo "Retry 'droute send' after sleep 2 minutes"
+    sleep 2m
   done
 }
 

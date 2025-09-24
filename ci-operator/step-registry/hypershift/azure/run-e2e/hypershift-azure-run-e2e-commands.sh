@@ -87,12 +87,6 @@ if [[ "${AZURE_MULTI_ARCH:-}" == "true" ]]; then
   AZURE_MULTI_ARCH_PARAMS="--e2e.azure-multi-arch=true"
 fi
 
-KMS_ARGS=""
-if [[ "${ENABLE_AKS_KMS:-}" == "true" ]]; then
-    KMS_ARGS+="--e2e.azure-encryption-key-id=${AKS_KMS_KEY} "
-    KMS_ARGS+="--e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET}"
-fi
-
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -110,7 +104,8 @@ hack/ci-test-e2e.sh -test.v \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
-    ${KMS_ARGS:-} \
+  --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
+  --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
   --e2e.azure-marketplace-publisher "azureopenshift" \
   --e2e.azure-marketplace-offer "aro4" \
   --e2e.azure-marketplace-sku "aro_419" \
