@@ -74,7 +74,6 @@ if "${SRC_FROM_GIT}"; then
 fi
 ci_clone_src
 
-REBASE_SUCCEEDED=false
 REBASE_TO=""
 # RELEASE_IMAGE_LATEST is always set by the release-controller, whether this is
 # a payload job, a periodic, or a presubmit. In order to distinguish between
@@ -115,7 +114,6 @@ if [ -n "${REBASE_TO}" ]; then
       trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
       exit 1
     }
-  REBASE_SUCCEEDED=true
 else
   echo "REBASE_TO is not set, skipping rebase"
 fi
