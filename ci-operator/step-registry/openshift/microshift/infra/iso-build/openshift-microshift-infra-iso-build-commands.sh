@@ -54,8 +54,6 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
         y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
-        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}"
-
         # Fetch brew RPMs for release regression testing
         # Condition to skip it if manage_brew_rpms.sh script latest version is not backported to all release branches
         if ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type'  ; then
