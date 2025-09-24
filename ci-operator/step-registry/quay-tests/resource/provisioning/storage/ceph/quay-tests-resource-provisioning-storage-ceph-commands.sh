@@ -292,30 +292,30 @@ EOF
 }
 
 # Using the Rook-Ceph toolbox to check on the Ceph backing storage
-deploy_s3_bucket() {
-	ceph_toolbox_pod_name=$(oc get pod -n openshift-storage -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}')
-	echo "${ceph_toolbox_pod_name}"
-	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- ceph osd status
-	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- ceph status
+# deploy_s3_bucket() {
+# 	ceph_toolbox_pod_name=$(oc get pod -n openshift-storage -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}')
+# 	echo "${ceph_toolbox_pod_name}"
+# 	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- ceph osd status
+# 	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- ceph status
 
-	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- radosgw-admin user create --uid="quay" --display-name="quay user" >quayuser.json
-	cat quayuser.json
-	echo "Ceph RGW Storage is deployed successfully"
+# 	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- radosgw-admin user create --uid="quay" --display-name="quay user" >quayuser.json
+# 	cat quayuser.json
+# 	echo "Ceph RGW Storage is deployed successfully"
 
-	cat quayuser.json | jq '.keys[0].access_key' >ceph_access_key
-	cat quayuser.json | jq '.keys[0].secret_key' >ceph_secret_key
-	cat ceph_access_key | tr -d '\\n' >ceph_access_key_new
-	cat ceph_secret_key | tr -d '\\n' >ceph_secret_key_new
+# 	cat quayuser.json | jq '.keys[0].access_key' >ceph_access_key
+# 	cat quayuser.json | jq '.keys[0].secret_key' >ceph_secret_key
+# 	cat ceph_access_key | tr -d '\\n' >ceph_access_key_new
+# 	cat ceph_secret_key | tr -d '\\n' >ceph_secret_key_new
 
-	oc get route -n openshift-storage s3-rgw -o json | jq '.spec.host' >ceph_gw_hostname
-	cat ceph_gw_hostname | tr -d '\\n' >ceph_gw_hostname_new
-	export AWS_ACCESS_KEY_ID="${env.ceph_access_key}"
-	export AWS_SECRET_ACCESS_KEY="${env.ceph_secret_key}"
+# 	oc get route -n openshift-storage s3-rgw -o json | jq '.spec.host' >ceph_gw_hostname
+# 	cat ceph_gw_hostname | tr -d '\\n' >ceph_gw_hostname_new
+# 	export AWS_ACCESS_KEY_ID="${env.ceph_access_key}"
+# 	export AWS_SECRET_ACCESS_KEY="${env.ceph_secret_key}"
 
-	aws s3api create-bucket --bucket quay --no-verify-ssl --region "us-east-1" --endpoint https://"${ceph_gw_hostname}"
-	aws s3 cp quayuser.json s3://quay --no-verify-ssl --region "us-east-1" --endpoint https://"${ceph_gw_hostname}"
+# 	aws s3api create-bucket --bucket quay --no-verify-ssl --region "us-east-1" --endpoint https://"${ceph_gw_hostname}"
+# 	aws s3 cp quayuser.json s3://quay --no-verify-ssl --region "us-east-1" --endpoint https://"${ceph_gw_hostname}"
 
-}
+# }
 
 # Script: quay-tests-resource-provisioning-storage-ceph-commands.sh
 # Purpose: Provision Ceph S3 storage for Quay tests with ODF 4.18/4.19 compatibility
@@ -419,6 +419,7 @@ EOF
 	return 0
 }
 
+# Using the Rook-Ceph toolbox to check on the Ceph backing storage
 create_bucket_s3api() {
 	echo "Creating S3 bucket using AWS CLI method (ODF 4.18 method)..."
 
@@ -429,6 +430,9 @@ create_bucket_s3api() {
 		echo "ERROR: Ceph toolbox pod not found"
 		exit 1
 	fi
+	echo "${ceph_toolbox_pod}"
+	oc exec -n openshift-storage "${ceph_toolbox_pod}" -- ceph osd status
+	oc exec -n openshift-storage "${ceph_toolbox_pod}" -- ceph status
 
 	echo "Creating RGW user: ${BUCKET_PREFIX}"
 	local rgw_user_output
