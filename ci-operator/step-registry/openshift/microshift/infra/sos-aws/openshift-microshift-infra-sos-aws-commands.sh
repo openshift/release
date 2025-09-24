@@ -17,11 +17,12 @@ function generate_junit() {
     cp "${SHARED_DIR}/install-status.txt" "${ARTIFACT_DIR}/"
     if [ "$EXIT_CODE" ==  0  ]; then
         cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
-<testsuite name="cluster install" tests="5" failures="0">
+<testsuite name="cluster install" tests="6" failures="0">
     <testcase name="install should succeed: cluster bootstrap"/>
     <testcase name="install should succeed: configuration"/>
     <testcase name="install should succeed: infrastructure"/>
     <testcase name="install should succeed: other"/>
+    <testcase name="install should succeed: MicroShift rebase"/>
     <testcase name="install should succeed: overall"/>
 EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_AWS_EC2_FAILURE" ]; then
@@ -111,7 +112,7 @@ EOF
 EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_REBASE_FAILURE" ]; then
         cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
-        <testsuite name="cluster install" tests="5" failures="2">
+        <testsuite name="cluster install" tests="2" failures="2">
             <testcase name="install should succeed: MicroShift rebase">
                 <failure message="">MicroShift rebase failed, check the rebase logs for details</failure>
             </testcase>
