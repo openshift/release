@@ -11,7 +11,6 @@ python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
-sleep 300
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
