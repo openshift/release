@@ -20,7 +20,7 @@ set -o pipefail
 STORAGE_CLASS="ocs-storagecluster-ceph-rgw"
 BUCKET_PREFIX="${BUCKET_PREFIX:-quay}"
 OBC_NAME="${BUCKET_PREFIX}-bucket"
-NAMESPACE="${NAMESPACE:-openshift-storage}"
+OBCNAMESPACE="${OBCNAMESPACE:-openshift-storage}"
 REGION_NAME="${REGION_NAME:-us-east-1}"
 TIMEOUT="${TIMEOUT:-300}"
 
@@ -317,32 +317,6 @@ EOF
 
 }
 
-# Using the Rook-Ceph toolbox to check on the Ceph backing storage
-# deploy_s3_bucket() {
-# 	ceph_toolbox_pod_name=$(oc get pod -n openshift-storage -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}')
-# 	echo "${ceph_toolbox_pod_name}"
-# 	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- ceph osd status
-# 	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- ceph status
-
-# 	oc exec -n openshift-storage "${ceph_toolbox_pod_name}" -- radosgw-admin user create --uid="quay" --display-name="quay user" >quayuser.json
-# 	cat quayuser.json
-# 	echo "Ceph RGW Storage is deployed successfully"
-
-# 	cat quayuser.json | jq '.keys[0].access_key' >ceph_access_key
-# 	cat quayuser.json | jq '.keys[0].secret_key' >ceph_secret_key
-# 	cat ceph_access_key | tr -d '\\n' >ceph_access_key_new
-# 	cat ceph_secret_key | tr -d '\\n' >ceph_secret_key_new
-
-# 	oc get route -n openshift-storage s3-rgw -o json | jq '.spec.host' >ceph_gw_hostname
-# 	cat ceph_gw_hostname | tr -d '\\n' >ceph_gw_hostname_new
-# 	export AWS_ACCESS_KEY_ID="${env.ceph_access_key}"
-# 	export AWS_SECRET_ACCESS_KEY="${env.ceph_secret_key}"
-
-# 	aws s3api create-bucket --bucket quay --no-verify-ssl --region "us-east-1" --endpoint https://"${ceph_gw_hostname}"
-# 	aws s3 cp quayuser.json s3://quay --no-verify-ssl --region "us-east-1" --endpoint https://"${ceph_gw_hostname}"
-
-# }
-
 
 get_rgw_route() {
 	echo "Getting RGW route..."
@@ -359,8 +333,8 @@ get_rgw_route() {
 }
 
 # ObjectBucketClaim (OBC) method for ODF 4.16+
-# ceph version 19.2.1-245.el9cp squid -> Red Hat Ceph Storage 8.x
-# ceph version 18.2.1-340.el9cp reef -> Red Hat Ceph Storage 7.x
+# ceph version 19.2.1-245.el9cp squid -> Red Hat Ceph Storage 8.x -> odf4.19/4.18
+# ceph version 18.2.1-340.el9cp reef -> Red Hat Ceph Storage 7.x  -> odf4.17/4.16
 create_bucket_obc() {
 	echo "Creating S3 bucket using ObjectBucketClaim (ODF 4.16+ method) $ODF_OPERATOR_CHANNEL ..."
 
@@ -374,7 +348,7 @@ apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
 metadata:
   name: ${OBC_NAME}
-  namespace: ${NAMESPACE}
+  namespace: ${OBCNAMESPACE}
 spec:
   bucketName: quay
   storageClassName: ${STORAGE_CLASS}
@@ -386,7 +360,7 @@ EOF
 
 	while [ $elapsed -lt "$TIMEOUT" ]; do
 		local phase
-		phase=$(oc get obc "${OBC_NAME}" -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+		phase=$(oc get obc "${OBC_NAME}" -n "${OBCNAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
 
 		if [ "$phase" = "Bound" ]; then
 			echo "ObjectBucketClaim is bound"
@@ -403,9 +377,9 @@ EOF
 		return 1
 	fi
 
-	BUCKET_NAME=$(oc get obc "${OBC_NAME}" -n "${NAMESPACE}" -o jsonpath='{.spec.bucketName}')
-	ACCESS_KEY=$(oc get secret "${OBC_NAME}" -n "${NAMESPACE}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
-	SECRET_KEY=$(oc get secret "${OBC_NAME}" -n "${NAMESPACE}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
+	BUCKET_NAME=$(oc get obc "${OBC_NAME}" -n "${OBCNAMESPACE}" -o jsonpath='{.spec.bucketName}')
+	ACCESS_KEY=$(oc get secret "${OBC_NAME}" -n "${OBCNAMESPACE}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
+	SECRET_KEY=$(oc get secret "${OBC_NAME}" -n "${OBCNAMESPACE}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
 
 	if [[ -z "$BUCKET_NAME" ]] || [[ -z "$ACCESS_KEY" ]] || [[ -z "$SECRET_KEY" ]]; then
 		echo "ERROR: Failed to extract bucket information from OBC"
@@ -421,7 +395,6 @@ EOF
 }
 
 # Using the Rook-Ceph toolbox to check on the Ceph backing storage
-
 create_bucket_legacy() {
 	echo "Creating S3 bucket using AWS CLI method ODF $ODF_OPERATOR_CHANNEL ..."
 
@@ -478,8 +451,9 @@ create_bucket_legacy() {
     echo "${SECRET_KEY}" > "${SHARED_DIR}/QUAY_CEPH_S3_SECRETKEY"
 }
 
+# odf 4.16+ use ObjectBucketClaim method, older version use legacy awscli method
 create_s3_bucket() {
-	echo "Creating S3 bucket (method: auto-detect based on ODF version)..."
+	echo "Creating Ceph S3 compatible bucket ..."
 
 	local channel="${ODF_OPERATOR_CHANNEL:-stable-4.19}"
 	local odf_version="${channel#stable-}"
@@ -504,7 +478,6 @@ create_s3_bucket() {
 				fi
 				sleep 10
 			done
-
 		    create_bucket_legacy
 		fi
 	else
@@ -539,10 +512,9 @@ verify_bucket_connectivity() {
 }
 
 ## Provisioning Ceph Steps, based on ODF has been deployed
-	echo "Starting Ceph Storage Provisioning for Quay Tests"
+	echo "Starting Ceph Storage Provisioning"
 	echo "=================================================="
 
-	# deploy_odf_operator
 	check_prerequisites
 	deploy_storage_cluster
 	deploy_ceph_rgw
