@@ -9,175 +9,115 @@ set -o pipefail
 # Steps:
 # 1, Deploy Odf operator first, 
 # 2, next create a StorageCluster,
-# 3, then deploy three Ceph related stuff: CephObjectStore,s3-rgw, StorageClass
-# 4, finally create s3 bucket for Quay config.yaml
-# See: https://issues.redhat.com/browse/OCPQE-14826
+# 3, then deploy three Ceph RGW: CephObjectStore,s3-rgw, StorageClass
+# 4, finally create s3 bucket with ObjectBucketClaim
+# See: https://issues.redhat.com/browse/OCPQE-14826 https://issues.redhat.com/browse/OCPQE-30200
 ###
 
-# Deploy ODF Operator to OCP namespace 'openshift-storage'
-OO_INSTALL_NAMESPACE=openshift-storage
-# ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
-# ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
+# ODF Operator has Deployed to OCP namespace 'openshift-storage'
 
-deploy_odf_operator() {
+# Configuration
+STORAGE_CLASS="ocs-storagecluster-ceph-rgw"
+BUCKET_PREFIX="${BUCKET_PREFIX:-quay}"
+OBC_NAME="${BUCKET_PREFIX}-bucket"
+NAMESPACE="${NAMESPACE:-openshift-storage}"
+REGION_NAME="${REGION_NAME:-us-east-1}"
+TIMEOUT="${TIMEOUT:-300}"
 
-	cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-storage
-EOF
+check_prerequisites() {
 
-	OPERATORGROUP=$(oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o jsonpath="{.items[*].metadata.name}" || true)
-	if [[ -n "$OPERATORGROUP" ]]; then
-		echo "OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
-		OG_OPERATION=apply
-		OG_NAMESTANZA="name: $OPERATORGROUP"
-	else
-		echo "OperatorGroup does not exist: creating it"
-		OG_OPERATION=create
-		OG_NAMESTANZA="generateName: oo-"
+	if ! oc get deployment odf-operator-controller-manager -n openshift-storage &>/dev/null; then
+		echo "ERROR: odf-operator-controller-manager deployment not found"
+		exit 1
 	fi
 
-	OPERATORGROUP=$(
-		oc $OG_OPERATION -f - -o jsonpath='{.metadata.name}' <<EOF
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  $OG_NAMESTANZA
-  namespace: $OO_INSTALL_NAMESPACE
-spec:
-  targetNamespaces: [$OO_INSTALL_NAMESPACE]
-EOF
-	)
-
-	SUB=$(
-		cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: $ODF_SUBSCRIPTION_NAME
-  namespace: $OO_INSTALL_NAMESPACE
-spec:
-  channel: $ODF_OPERATOR_CHANNEL
-  installPlanApproval: Automatic
-  name: $ODF_SUBSCRIPTION_NAME
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
-EOF
-	)
-
-	for i in {1..60}; do
-		CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
-		if [[ -n "$CSV" ]]; then
-			if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-				echo "ODF ClusterServiceVersion \"$CSV\" ready"
-				break
-			fi
-		fi
-		echo "wait $((i * 10))s"
-		sleep 10
-	done
-	echo "ODF Operator is deployed successfully"
-
-	# Wait for odf operator pod startup
-	for i in {1..60}; do
-		PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
-		if [[ "$PStatus" == "True" ]]; then
-			echo "ODF pod is running \"$PStatus\""
-			break
-		fi
-		podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod)
-		echo "odf pod status $podstatus"
-		echo "wait $((i * 10))s"
-		sleep 10
-	done
+	echo "Prerequisites check passed"
 }
 
-# prepare for create storage cluster
+
+# deploy_odf_operator() {
+
+# 	cat <<EOF | oc apply -f -
+# apiVersion: v1
+# kind: Namespace
+# metadata:
+#   name: openshift-storage
+# EOF
+
+# 	OPERATORGROUP=$(oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o jsonpath="{.items[*].metadata.name}" || true)
+# 	if [[ -n "$OPERATORGROUP" ]]; then
+# 		echo "OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
+# 		OG_OPERATION=apply
+# 		OG_NAMESTANZA="name: $OPERATORGROUP"
+# 	else
+# 		echo "OperatorGroup does not exist: creating it"
+# 		OG_OPERATION=create
+# 		OG_NAMESTANZA="generateName: oo-"
+# 	fi
+
+# 	OPERATORGROUP=$(
+# 		oc $OG_OPERATION -f - -o jsonpath='{.metadata.name}' <<EOF
+# apiVersion: operators.coreos.com/v1
+# kind: OperatorGroup
+# metadata:
+#   $OG_NAMESTANZA
+#   namespace: $OO_INSTALL_NAMESPACE
+# spec:
+#   targetNamespaces: [$OO_INSTALL_NAMESPACE]
+# EOF
+# 	)
+
+# 	SUB=$(
+# 		cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
+# apiVersion: operators.coreos.com/v1alpha1
+# kind: Subscription
+# metadata:
+#   name: $ODF_SUBSCRIPTION_NAME
+#   namespace: $OO_INSTALL_NAMESPACE
+# spec:
+#   channel: $ODF_OPERATOR_CHANNEL
+#   installPlanApproval: Automatic
+#   name: $ODF_SUBSCRIPTION_NAME
+#   source: redhat-operators
+#   sourceNamespace: openshift-marketplace
+# EOF
+# 	)
+
+# 	for i in {1..60}; do
+# 		CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
+# 		if [[ -n "$CSV" ]]; then
+# 			if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+# 				echo "ODF ClusterServiceVersion \"$CSV\" ready"
+# 				break
+# 			fi
+# 		fi
+# 		echo "wait $((i * 10))s"
+# 		sleep 10
+# 	done
+# 	echo "ODF Operator is deployed successfully"
+
+# 	# Wait for odf operator pod startup
+# 	for i in {1..60}; do
+# 		PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
+# 		if [[ "$PStatus" == "True" ]]; then
+# 			echo "ODF pod is running \"$PStatus\""
+# 			break
+# 		fi
+# 		podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod)
+# 		echo "odf pod status $podstatus"
+# 		echo "wait $((i * 10))s"
+# 		sleep 10
+# 	done
+# }
+
+# Deploy ODF StorageSystem
 deploy_storage_cluster() {
 	oc patch console.operator cluster -n openshift-storage --type json -p '[{"op": "add", "path": "/spec/plugins", "value": ["odf-console"]}]'
 
 	#Default label is: cluster.ocs.openshift.io/openshift-storage=
     #as node may recreate, we use a more general label "node-role.kubernetes.io/worker" for worker, set in cephobjectstore.yaml
 	oc label node -l node-role.kubernetes.io/worker -l '!node-role.kubernetes.io/master' cluster.ocs.openshift.io/openshift-storage=''
-	cat <<EOF | oc apply -f -
-apiVersion: ocs.openshift.io/v1
-kind: StorageCluster
-metadata:
-  name: ocs-storagecluster
-  namespace: openshift-storage
-spec:
-  arbiter: {}
-  encryption:
-    kms: {}
-  externalStorage: {}
-  flexibleScaling: true
-  resources:
-    mds:
-      limits:
-        cpu: "3"
-        memory: "8Gi"
-      requests:
-        cpu: "3"
-        memory: "8Gi"
-  monDataDirHostPath: /var/lib/rook
-  managedResources:
-    cephBlockPools:
-      reconcileStrategy: manage
-    cephConfig: {}
-    cephFilesystems: {}
-    cephObjectStoreUsers: {}
-    cephObjectStores: {}
-  multiCloudGateway:
-    reconcileStrategy: manage
-  storageDeviceSets:
-  - count: 1
-    dataPVCTemplate:
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: "1Ti"
-        storageClassName: gp3-csi
-        volumeMode: Block
-    name: ocs-deviceset-gp3-csi
-    placement: {}
-    portable: true
-    replica: 3
-    resources:
-      limits:
-        cpu: "2"
-        memory: "5Gi"
-      requests:
-        cpu: "2"
-        memory: "5Gi"
-# Use below common label for all worker
-  nodeTopologies:
-    labels:
-      node-role.kubernetes.io/worker:
-EOF
-    sleep 5m
-	for i in {1..50}; do
-		phase=$(oc get storagecluster -n openshift-storage ocs-storagecluster -o jsonpath='{.status.phase}' || echo "Failure")
-		if [[ "$phase" == "Ready" ]]; then
-			echo "ODF StorageCluster is Ready"
-			break
-		fi
-		echo "Waiting for StorageCluster to be Ready, current status is ${phase}..."
-		sleep 30
-	done
-	phase=$(oc get storagecluster -n openshift-storage ocs-storagecluster -o jsonpath='{.status.phase}' || echo "Failure")
-	if [[ "$phase" != "Ready" ]]; then
-		echo "Timed out waiting for StorageCluster to be Ready"
-		exit 1
-	fi
-
-}
-
-deploy_ceph_rgw() {
-	# Creating the CephObjectStore
+	
 	cat <<EOF | oc apply -f -
 apiVersion: ocs.openshift.io/v1
 kind: StorageCluster
@@ -235,6 +175,92 @@ spec:
     labels:
       node-role.kubernetes.io/worker:
 EOF
+    sleep 5m
+	for i in {1..50}; do
+		phase=$(oc get storagecluster -n openshift-storage ocs-storagecluster -o jsonpath='{.status.phase}' || echo "Failure")
+		if [[ "$phase" == "Ready" ]]; then
+			echo "ODF StorageCluster is Ready"
+			break
+		fi
+		echo "Waiting for StorageCluster to be Ready, current status is ${phase}..."
+		sleep 30
+	done
+	phase=$(oc get storagecluster -n openshift-storage ocs-storagecluster -o jsonpath='{.status.phase}' || echo "Failure")
+	if [[ "$phase" != "Ready" ]]; then
+		echo "Timed out waiting for StorageCluster to be Ready"
+		exit 1
+	fi
+
+}
+
+# Ceph Storage’s RADOS Object Gateway deployment
+deploy_ceph_rgw() {
+	# Creating the CephObjectStore
+	cat <<EOF | oc apply -f -
+---
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: ocs-storagecluster-cephobjectstore
+  namespace: openshift-storage
+spec:
+  dataPool:
+    crushRoot: ""
+    deviceClass: ""
+    erasureCoded:
+      algorithm: ""
+      codingChunks: 0
+      dataChunks: 0
+    failureDomain: host
+    replicated:
+      size: 3
+  gateway:
+    allNodes: false
+    instances: 1
+    placement:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: cluster.ocs.openshift.io/openshift-storage
+              operator: Exists
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - rook-ceph-rgw
+            topologyKey: kubernetes.io/hostname
+          weight: 100
+      tolerations:
+      - effect: NoSchedule
+        key: node.ocs.openshift.io/storage
+        operator: Equal
+        value: "true"
+    port: 80
+    resources:
+      limits:
+        cpu: "2"
+        memory: 4Gi
+      requests:
+        cpu: "1"
+        memory: 4Gi
+    securePort: 0
+    sslCertificateRef: ""
+  metadataPool:
+    crushRoot: ""
+    deviceClass: ""
+    erasureCoded:
+      algorithm: ""
+      codingChunks: 0
+      dataChunks: 0
+    failureDomain: host
+    replicated:
+      size: 3
+EOF
 
 	# Service and Route
 	cat <<EOF | oc apply -f -
@@ -281,7 +307,7 @@ reclaimPolicy: Delete
 volumeBindingMode: Immediate
 EOF
 
-	for i in {1..20}; do
+	for _ in {1..20}; do
 		if oc wait --for=condition=Ready pod -l app=rook-ceph-rgw -n openshift-storage --timeout=30s; then
 			echo "rook-ceph-rgw pod is Ready"
 			break
@@ -317,32 +343,6 @@ EOF
 
 # }
 
-# Script: quay-tests-resource-provisioning-storage-ceph-commands.sh
-# Purpose: Provision Ceph S3 storage for Quay tests with ODF 4.18/4.19 compatibility
-# Supports both legacy AWS CLI bucket creation and modern ObjectBucketClaim approaches
-
-# Configuration
-STORAGE_CLASS="ocs-storagecluster-ceph-rgw"
-BUCKET_PREFIX="${BUCKET_PREFIX:-quay}"
-OBC_NAME="${BUCKET_PREFIX}-bucket"
-NAMESPACE="${NAMESPACE:-openshift-storage}"
-REGION_NAME="${REGION_NAME:-us-east-1}"
-TIMEOUT="${TIMEOUT:-300}"
-
-check_prerequisites() {
-	echo "Checking prerequisites..."
-	if ! oc get storageclass ${STORAGE_CLASS} &>/dev/null; then
-		echo "ERROR: StorageClass ${STORAGE_CLASS} not found"
-		exit 1
-	fi
-
-	if ! oc get deployment rook-ceph-tools -n openshift-storage &>/dev/null; then
-		echo "ERROR: rook-ceph-tools deployment not found"
-		exit 1
-	fi
-
-	echo "Prerequisites check passed"
-}
 
 get_rgw_route() {
 	echo "Getting RGW route..."
@@ -358,9 +358,11 @@ get_rgw_route() {
 	echo "${RGW_ROUTE}" > "${SHARED_DIR}/QUAY_CEPH_S3_HOSTNAME"
 }
 
-# ObjectBucketClaim (OBC) method for ODF 4.19+
+# ObjectBucketClaim (OBC) method for ODF 4.16+
+# ceph version 19.2.1-245.el9cp squid -> Red Hat Ceph Storage 8.x
+# ceph version 18.2.1-340.el9cp reef -> Red Hat Ceph Storage 7.x
 create_bucket_obc() {
-	echo "Creating S3 bucket using ObjectBucketClaim (ODF 4.19+ method)..."
+	echo "Creating S3 bucket using ObjectBucketClaim (ODF 4.16+ method) $ODF_OPERATOR_CHANNEL ..."
 
 	if ! oc get crd objectbucketclaims.objectbucket.io &>/dev/null; then
 		echo "ERROR: ObjectBucketClaim CRD not found. Falling back to legacy method."
@@ -419,8 +421,9 @@ EOF
 }
 
 # Using the Rook-Ceph toolbox to check on the Ceph backing storage
-create_bucket_s3api() {
-	echo "Creating S3 bucket using AWS CLI method (ODF 4.18 method)..."
+
+create_bucket_legacy() {
+	echo "Creating S3 bucket using AWS CLI method ODF $ODF_OPERATOR_CHANNEL ..."
 
 	local ceph_toolbox_pod
 	ceph_toolbox_pod=$(oc get pod -n openshift-storage -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
@@ -452,8 +455,6 @@ create_bucket_s3api() {
 		--uid="${BUCKET_NAME}" \
 		--caps="buckets=*" >/dev/null
 
-	
-
 	if command -v aws &>/dev/null; then
 		echo "Creating bucket: ${BUCKET_NAME}"
 		export AWS_ACCESS_KEY_ID="$ACCESS_KEY"
@@ -466,10 +467,8 @@ create_bucket_s3api() {
 			--no-verify-ssl 2>/dev/null; then
 			echo "Bucket created successfully via AWS CLI"
 		else
-			echo "WARNING: Bucket creation via AWS CLI failed, but credentials should still work for auto-creation"
+			echo "WARNING: Bucket creation via aws s3api failed, but credentials should still work for auto-creation"
 		fi
-	else
-		echo "WARNING: AWS CLI not available, skipping bucket creation (Quay will auto-create if needed)"
 	fi
 
 	export BUCKET_NAME ACCESS_KEY SECRET_KEY
@@ -489,93 +488,28 @@ create_s3_bucket() {
 		local major="${BASH_REMATCH[1]}"
 		local minor="${BASH_REMATCH[2]}"
 
-		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 19 ]]; then
+		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 16 ]]; then
 			echo "Using ODF ${odf_version} ObjectBucketClaim method"
-			oc patch storagecluster ocs-storagecluster -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
-
-			echo "Waiting for ceph-tools pod to be ready..."
-			for i in {1..30}; do
-				if oc wait --for=condition=Ready pod -l app=rook-ceph-tools -n openshift-storage --timeout=30s 2>/dev/null; then
-					echo "ceph-tools pod is ready"
-					break
-				fi
-				echo "Waiting for ceph-tools pod..."
-				sleep 10
-			done
-
 	        create_bucket_obc
 		else
 			echo "Using ODF ${odf_version} legacy AWS CLI method"
 			oc patch OCSInitialization ocsinit -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
+	        oc patch storagecluster ocs-storagecluster -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
 
 			echo "Waiting for ceph-tools pod to be ready..."
-			for i in {1..30}; do
+			for _ in {1..10}; do
 				if oc wait --for=condition=Ready pod -l app=rook-ceph-tools -n openshift-storage --timeout=30s 2>/dev/null; then
 					echo "ceph-tools pod is ready"
 					break
 				fi
-				echo "Waiting for ceph-tools pod..."
 				sleep 10
 			done
 
-		    create_bucket_s3api
+		    create_bucket_legacy
 		fi
 	else
-		echo "Could not parse ODF version, defaulting to legacy method"
-		oc patch OCSInitialization ocsinit -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
-		create_bucket_s3api
+		echo "Could not parse ODF version ${odf_version} from ${ODF_OPERATOR_CHANNEL}"
 	fi
-}
-
-generate_quay_config() {
-	echo "Generating Quay configuration..."
-
-	mkdir -p /tmp/quay-config
-
-	cat <<EOF >/tmp/quay-config/storage-config.yaml
-bucket_name: ${BUCKET_NAME}
-access_key: ${ACCESS_KEY}
-secret_key: ${SECRET_KEY}
-endpoint: ${RGW_ROUTE}
-region: ${REGION_NAME}
-quay_radosgw_config: |
-  DISTRIBUTED_STORAGE_CONFIG:
-      default:
-          - RadosGWStorage
-          - hostname: ${RGW_ROUTE}
-            port: 443
-            is_secure: true
-            bucket_name: ${BUCKET_NAME}
-            access_key: ${ACCESS_KEY}
-            secret_key: ${SECRET_KEY}
-            storage_path: /quaydata
-quay_s3_config: |
-  DISTRIBUTED_STORAGE_CONFIG:
-      default:
-          - S3Storage
-          - s3_endpoint: https://${RGW_ROUTE}
-            bucket_name: ${BUCKET_NAME}
-            s3_access_key: ${ACCESS_KEY}
-            s3_secret_key: ${SECRET_KEY}
-            calling_format: OrdinaryCallingFormat
-            storage_path: /quaydata
-EOF
-
-	cat <<EOF >/tmp/quay-config/env-vars.sh
-export CEPH_BUCKET_NAME="${BUCKET_NAME}"
-export CEPH_ACCESS_KEY="${ACCESS_KEY}"
-export CEPH_SECRET_KEY="${SECRET_KEY}"
-export CEPH_RGW_HOSTNAME="${RGW_ROUTE}"
-export CEPH_REGION_NAME="${REGION_NAME}"
-export ODF_VERSION="${ODF_VERSION}"
-export ODF_BUCKET_METHOD="$([ "$ODF_VERSION" == "4.19" ] && echo "obc" || echo "legacy")"
-EOF
-
-	chmod +x /tmp/quay-config/env-vars.sh
-
-	echo "Configuration files generated in /tmp/quay-config/"
-	echo "- storage-config.yaml: Complete storage configuration"
-	echo "- env-vars.sh: Environment variables for CI pipeline"
 }
 
 verify_bucket_connectivity() {
@@ -601,52 +535,20 @@ verify_bucket_connectivity() {
 		else
 			echo "WARNING: Bucket access verification failed (may still work with Quay)"
 		fi
-	else
-		echo "AWS CLI not available, skipping bucket access verification"
 	fi
 }
 
-display_summary() {
-	cat <<EOF
-=====================================
-Ceph S3 Storage Provisioned!
-=====================================
-ODF Information:
----------------
-Version: ${ODF_VERSION}
-Method: $([ "$ODF_VERSION" == "4.19" ] && echo "ObjectBucketClaim (OBC)" || echo "Legacy AWS CLI")
-Operator: ${ODF_OPERATOR_TYPE}
-Storage Configuration:
----------------------
-Bucket Name: ${BUCKET_NAME}
-Access Key:  ${ACCESS_KEY}
-Secret Key:  ${SECRET_KEY}
-RGW Route:   ${RGW_ROUTE}
-Region:      ${REGION_NAME}
-Files Generated:
----------------
-- /tmp/quay-config/storage-config.yaml
-- /tmp/quay-config/env-vars.sh
-Usage in CI Pipeline:
---------------------
-source /tmp/quay-config/env-vars.sh
-=====================================
-EOF
-}
-
-
 ## Provisioning Ceph Steps, based on ODF has been deployed
-	echo "Starting Ceph S3 Storage Provisioning for Quay Tests"
+	echo "Starting Ceph Storage Provisioning for Quay Tests"
 	echo "=================================================="
 
 	# deploy_odf_operator
+	check_prerequisites
 	deploy_storage_cluster
 	deploy_ceph_rgw
-	check_prerequisites
 	get_rgw_route
 	create_s3_bucket
 	verify_bucket_connectivity
-	display_summary
 
-	echo "Ceph S3 storage provisioning completed successfully!"
+	echo "Ceph storage provisioning completed successfully!"
 
