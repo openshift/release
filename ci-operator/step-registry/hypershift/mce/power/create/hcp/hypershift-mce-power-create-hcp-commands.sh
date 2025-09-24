@@ -19,9 +19,7 @@ curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /t
 curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 export PATH=$PATH:/tmp/bin
 
-MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_CLI_NAME=hcp
-
 # Installing hypershift cli
 echo "$(date) Installing hypershift cli"
 mkdir /tmp/${HYPERSHIFT_CLI_NAME}_cli
@@ -140,8 +138,12 @@ fi
 SSH_PUB_KEY_FILE="${AGENT_POWER_CREDENTIALS}/ssh-publickey"
 
 # Set RENDER_COMMAND based on MCE_VERSION
-# >2.6: "--render-sensitive --render", else: "--render"
-RENDER_COMMAND=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render" || echo "--render" )
+# >= 2.7: "--render-sensitive --render", else: "--render"
+if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+  extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+else
+  extra_flags+="--render > /tmp/hc.yaml "
+fi
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HOSTED_CLUSTER_NAME} \
