@@ -270,8 +270,6 @@ spec:
     s3:
       authUseKeystone: false
       enabled: true
-  zone:
-    name: "default"
 EOF
 
 	# Wait for CephObjectStore to be ready
