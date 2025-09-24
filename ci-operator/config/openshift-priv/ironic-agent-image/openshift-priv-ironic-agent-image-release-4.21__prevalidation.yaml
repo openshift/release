@@ -12,19 +12,20 @@ build_root:
 canonical_go_repository: github.com/openshift/ironic-agent-image
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ironic-agent-base
+  from: prevalidation-base
   to: ironic-agent
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-21-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.art/ci/base-4-21-rhel-9-server-ironic.repo
+      curl http://base-4-21-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-4-21-rhel-9-ironic-prevalidation.repo
     from: ocp_4.20_base-rhel9
-    to: ironic-agent-base
+    to: prevalidation-base
 releases:
   initial:
     integration:
@@ -41,50 +42,43 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-bm
+- as: e2e-metal-ipi-bm-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-serial-ipv4
+- as: e2e-metal-ipi-serial-ipv4-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h30m0s
-- as: e2e-metal-ipi-virtualmedia
+  timeout: 5h0m0s
+- as: e2e-metal-ipi-virtualmedia-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-metal-ipi-ovn-ipv6
+- as: e2e-metal-ipi-ovn-ipv6-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-prevalidation
   cluster: build05
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: check-requirements
-  commands: |-
-    #!/bin/bash
-    set -euxo pipefail
-    # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="main"
-    make check-reqs
-  container:
-    from: src
 zz_generated_metadata:
-  branch: main
+  branch: release-4.21
   org: openshift-priv
   repo: ironic-agent-image
+  variant: prevalidation
