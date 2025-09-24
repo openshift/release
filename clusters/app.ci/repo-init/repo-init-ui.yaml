@@ -45,7 +45,10 @@ items:
     namespace: ci
     name: repo-init-ui
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"repo-init:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"repo-init-ui\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
   spec:
     replicas: 2
     strategy:
@@ -74,7 +77,8 @@ items:
                 topologyKey: "kubernetes.io/hostname"
         containers:
         - name: repo-init-ui
-          image: repo-init:latest
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-init_latest
+          imagePullPolicy: Always
           args:
           - --loglevel=info
           - --mode=ui

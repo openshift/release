@@ -32,6 +32,9 @@ spec:
   sshAuthorizedKey: $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
 
+# Wait until ISO is generated for InfraEnv
+oc wait --for=condition=ImageCreated infraenv/${HOSTED_CLUSTER_NAME} -n ${AGENT_NAMESPACE} --timeout=5m
+
 # shellcheck disable=SC2154
 # We use the additional workers implemented for heterogeneous clusters as nodes for the hypershift hosted cluster
 for bmhost in $(yq -o=j -I=0 e '.[] | select(.name|test("worker-a"))' "${SHARED_DIR}/hosts.yaml"); do
@@ -101,6 +104,7 @@ metadata:
     bmac.agent-install.openshift.io/hostname: ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}
 spec:
   automatedCleaningMode: disabled
+  architecture: ${ADDITIONAL_WORKER_ARCHITECTURE}
   bmc:
     address: ${redfish_scheme}://${bmc_address}${redfish_base_uri}
     disableCertificateVerification: true

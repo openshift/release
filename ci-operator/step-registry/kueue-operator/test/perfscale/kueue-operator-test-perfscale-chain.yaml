@@ -1,0 +1,19 @@
+chain:
+  as: kueue-operator-test-perfscale
+  steps:
+  - ref: kueue-operator-image-env-setup
+  - as: run-sdk
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  - ref: kueue-operator-image-patch
+  - ref: cert-manager-install-operator
+  - chain: openshift-qe-kueue-operator
+  documentation: |-
+    This chain runs the perfscale test suites for The Kueue operator.

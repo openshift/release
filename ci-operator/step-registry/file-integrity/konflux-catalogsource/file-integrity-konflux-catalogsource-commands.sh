@@ -41,6 +41,21 @@ spec:
   - mirrors:
     - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-$TEST_TYPE
     source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-operator-bundle  
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-rhel8-operator
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-content-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-content-rhel8
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-openscap-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-openscap-rhel8
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-must-gather-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-must-gather-rhel8
 EOF
     echo "!!! fail to create the ICSP"
     return 1
@@ -72,7 +87,7 @@ check_mcp_status() {
 
 create_catalog_sources() {
   local node_name
-  echo "creating catalogsource: $CATALOG_SOURCE_NAME using index image: $INDEX_IMAGE"
+  echo "creating catalogsource: $CATALOG_SOURCE_NAME using index image: $MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE"
 
   cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -82,7 +97,7 @@ metadata:
   namespace: openshift-marketplace
 spec:
   displayName: Konflux
-  image: $INDEX_IMAGE
+  image: $MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE
   publisher: OpenShift QE
   sourceType: grpc
   updateStrategy:
@@ -109,7 +124,7 @@ EOF
     node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE_NAME" -o=jsonpath='{.items[0].spec.nodeName}')
     run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
       pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
-    run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json $INDEX_IMAGE"
+    run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json $MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE"
 
     run "oc get mcp,node"
     run "oc get mcp worker -o yaml"
@@ -168,8 +183,8 @@ main() {
     return 1
   }
 
-  if [[ -z "${INDEX_IMAGE}" ]]; then
-    echo "'INDEX_IMAGE' is empty. Skipping catalog source creation..."
+  if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE}" ]]; then
+    echo "'MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE' is empty. Skipping catalog source creation..."
     exit 0
   fi
 

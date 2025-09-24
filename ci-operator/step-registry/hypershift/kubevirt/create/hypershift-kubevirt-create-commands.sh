@@ -20,20 +20,11 @@ fi
 if [[ -n ${MCE} ]] ; then
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then
-    if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-      echo "MCE version is less than 2.4, use hypershift command"
-      downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hypershift CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hypershift.tar.gz" "${downURL}"
-      cd /tmp && tar -xvf "/tmp/hypershift.tar.gz"
-      chmod +x "/tmp/hypershift"
-      HCP_CLI="/tmp/hypershift"
-      cd -
-    else
-      downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
-      cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
-      chmod +x "/tmp/hcp"
-      HCP_CLI="/tmp/hcp"
-      cd -
-    fi
+    downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
+    cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
+    chmod +x "/tmp/hcp"
+    HCP_CLI="/tmp/hcp"
+    cd -
   fi
 fi
 
@@ -220,41 +211,10 @@ else
 fi
 
 
-if [[ -n ${MCE} ]] ; then
-  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-    oc annotate hostedclusters -n "${CLUSTER_NAMESPACE_PREFIX}" "${CLUSTER_NAME}" "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-    oc apply -f - <<EOF
-apiVersion: cluster.open-cluster-management.io/v1
-kind: ManagedCluster
-metadata:
-  annotations:
-    import.open-cluster-management.io/hosting-cluster-name: local-cluster
-    import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
-    open-cluster-management/created-via: other
-  labels:
-    cloud: auto-detect
-    cluster.open-cluster-management.io/clusterset: default
-    name: ${CLUSTER_NAME}
-    vendor: OpenShift
-  name: ${CLUSTER_NAME}
-spec:
-  hubAcceptsClient: true
-  leaseDurationSeconds: 60
-EOF
-  fi
-fi
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
-
-if [ -n "${KUBEVIRT_CSI_INFRA}" ]
-then
-  for item in $(oc get sc --no-headers | awk '{print $1}'); do
-  oc annotate --overwrite sc "${item}" storageclass.kubernetes.io/is-default-class='false'
-  done
-  oc annotate --overwrite sc "${KUBEVIRT_CSI_INFRA}" storageclass.kubernetes.io/is-default-class='true'
-fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
