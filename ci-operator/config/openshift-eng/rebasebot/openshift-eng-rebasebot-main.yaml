@@ -216,6 +216,37 @@ tests:
         requests:
           cpu: 800m
           memory: 2Gi
+- as: cluster-api-provider-nutanix
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-nutanix
+      commands: |
+        rebasebot --source-repo nutanix-cloud-native/cluster-api-provider-nutanix \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api-provider-nutanix:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-nutanix:rebase-bot-main \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - collection: ""
+        mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
 - as: cluster-api
   cron: 0 12 * * Mon,Thu
   steps:
