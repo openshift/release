@@ -64,11 +64,19 @@ common_params=(--output json --anonymize --with-doc "$explain_arg" --filter "$ac
 mkdir -p "${ARTIFACT_DIR}/namespaces" "${ARTIFACT_DIR}/hostedcluster"
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}')
+HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}' --ignore-not-found)
+
+mgmt_namespaces=(hypershift)
+
+if [[ -n "${HOSTED_CLUSTER_NS}" ]]; then
+    mgmt_namespaces+=("${HOSTED_CLUSTER_NS}" "${HOSTED_CLUSTER_NS}-${CLUSTER_NAME}")
+fi
+
+echo "Collecting data from namespaces: ${mgmt_namespaces[*]}"
 
 mgmt_fail=false
 # Collect only hypershift-related namespaces from the management cluster.
-for namespace in hypershift "${HOSTED_CLUSTER_NS}" "${HOSTED_CLUSTER_NS}-${CLUSTER_NAME}"; do
+for namespace in "${mgmt_namespaces[@]}"; do
     mkdir -p "${ARTIFACT_DIR}/namespaces/$namespace"
     # Run the scan on the management cluster
     result_file="${ARTIFACT_DIR}/namespaces/$namespace/result.json"
@@ -106,7 +114,7 @@ failures=0
 if [[ "${mgmt_fail}" == "true" ]]; then
     failures=$((failures + 1))
     result_mgmt=""
-    for namespace in hypershift "${HOSTED_CLUSTER_NS}" "${HOSTED_CLUSTER_NS}-${CLUSTER_NAME}"; do
+    for namespace in "${mgmt_namespaces[@]}"; do
         result_mgmt+=$(cat "${ARTIFACT_DIR}/namespaces/$namespace/result.json")
     done
     testcase_mgmt=$(cat <<EOF
