@@ -13,15 +13,24 @@ export TEST_USER_TENANT_ID; TEST_USER_TENANT_ID=$(cat /var/run/hcp-integration-c
 az login --service-principal -u "${TEST_USER_CLIENT_ID}" -p "${TEST_USER_CLIENT_SECRET}" --tenant "${TEST_USER_TENANT_ID}"
 az bicep install
 az bicep version
-echo "${CUSTOMER_SUBSCRIPTION}"
-az account show
-az account set --subscription "ARO Hosted Control Planes (EA Subscription 1)"
+az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 az account show
 
 # install required tools
-curl -sL "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" -o /usr/local/bin/jq && chmod +x /usr/local/bin/jq
-curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" -o /usr/local/bin/yq && chmod +x /usr/local/bin/yq
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && rm get_helm.sh
+
+# Install jq 
+dnf install -y jq
+# Install yq (following repo pattern with proper path)
+curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq
+chmod +x /tmp/yq 
+mv /tmp/yq /usr/local/bin/yq
+# Install helm (following stackrox pattern)
+mkdir /tmp/helm
+curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz
+(cd /tmp/helm && tar xvfpz helm-v3.16.2-linux-amd64.tar.gz)
+cp /tmp/helm/linux-amd64/helm /usr/local/bin/helm
+chmod +x /usr/local/bin/helm
+rm -rf /tmp/helm
 
 
 unset GOFLAGS
