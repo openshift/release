@@ -1,0 +1,41 @@
+ref:
+  as: sandboxed-containers-operator-bm-sno-setup
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: sandboxed-containers-operator-bm-sno-setup-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: bm-bastion-pek
+    mount_path: /usr/local/bm-bastion-pek/secrets
+  - namespace: test-credentials
+    name: bm-sno-tdx-pek
+    mount_path: /usr/local/bm-sno-tdx-pek/secrets
+  - namespace: test-credentials
+    name: bm-sno-snp-pek
+    mount_path: /usr/local/bm-sno-snp-pek/secrets
+  timeout: 3h
+  env:
+  - name: OCP_VERSION
+    default: "latest-4.19"
+    documentation: Version of OCP SNO cluster to install.
+  - name: OCP_BUILD
+    default: "ga"
+    documentation: |-
+      OCP_VERSION is used in conjunction with OCP_BUILD.
+      For "ga" builds, examples are "latest-4.17", "latest-4.16", "4.17.17" or "4.16.35"
+      For "dev" builds, examples are "candidate-4.17", "candidate-4.16" or "latest"
+      For "ci" builds, an example is "4.19.0-0.nightly-2025-02-25-035256"
+  - name: TEE_TYPE
+    default: "tdx"
+    documentation: Two TEE types tdx or snp are supported, "tdx" or "snp". For non-TEE type, we can input "notee" here. 
+  - name: BM_LAB
+    default: "pek"
+    documentation: The lab where the bare mental servers are located.
+  documentation: |-
+    Set up OCP SNO cluster on the TDX or SNP bare metal server. 

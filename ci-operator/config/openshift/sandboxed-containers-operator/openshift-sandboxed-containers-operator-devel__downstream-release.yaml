@@ -1,4 +1,8 @@
 base_images:
+  telco-runner:
+    name: telco-runner
+    namespace: ci
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -149,6 +153,16 @@ tests:
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-aws
   timeout: 24h0m0s
+- as: coco-bm-sno
+  cron: 0 0 31 2 1
+  steps:
+    env:
+      BM_LAB: pek
+      OCP_VERSION: "4.20"
+      TEE_TYPE: snp
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_SCENARIOS: sig-cocobm.*Kata Author
+    workflow: sandboxed-containers-operator-bm-coco-sno-e2e
 zz_generated_metadata:
   branch: devel
   org: openshift

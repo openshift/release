@@ -417,6 +417,10 @@ base_images:
     name: "${OCP_VERSION}"
     namespace: ocp
     tag: upi-installer
+  telco-runner:
+    name: telco-runner
+    namespace: ci
+    tag: latest
 releases:
   latest:
     release:
@@ -436,6 +440,146 @@ generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure coco >>
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws peerpods >> "${OUTPUT_FILE}"
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws coco >> "${OUTPUT_FILE}"
 	cat >> "${OUTPUT_FILE}" <<EOF
+- as: azure-ipi-kata
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
+      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
+      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
+      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
+      SLEEP_DURATION: ${SLEEP_DURATION}
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
+      TEST_TIMEOUT: "${TEST_TIMEOUT}"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
+      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
+    workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
+- as: azure-ipi-peerpods
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
+      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
+      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: ${SLEEP_DURATION}
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
+      TEST_TIMEOUT: "${TEST_TIMEOUT}"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
+      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
+- as: azure-ipi-coco
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
+      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
+      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: ${SLEEP_DURATION}
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
+      TEST_TIMEOUT: "${TEST_TIMEOUT}"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
+      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
+      WORKLOAD_TO_TEST: coco
+    workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
+- as: aws-ipi-peerpods
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: aws-sandboxed-containers-operator
+    env:
+      AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
+      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
+      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: ${SLEEP_DURATION}
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
+      TEST_TIMEOUT: "${TEST_TIMEOUT}"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
+      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aws
+  timeout: 24h0m0s
+- as: aws-ipi-coco
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: aws-sandboxed-containers-operator
+    env:
+      AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
+      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
+      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
+      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
+      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
+      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: ${SLEEP_DURATION}
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
+      TEST_SCENARIOS: ${TEST_SCENARIOS}
+      TEST_TIMEOUT: "${TEST_TIMEOUT}"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
+      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
+      WORKLOAD_TO_TEST: coco
+    workflow: sandboxed-containers-operator-e2e-aws
+  timeout: 24h0m0s
+- as: coco-bm-sno
+  cron: 0 0 31 2 1
+  steps:
+    env:
+      OCP_VERSION: "4.20"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      BM_LAB: "pek"
+      TEE_TYPE: "snp"
+      TEST_SCENARIOS: "sig-cocobm.*Kata Author"
+    workflow: sandboxed-containers-operator-bm-coco-sno-e2e
 zz_generated_metadata:
   branch: devel
   org: openshift
