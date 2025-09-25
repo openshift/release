@@ -13,6 +13,9 @@ export TEST_USER_TENANT_ID; TEST_USER_TENANT_ID=$(cat /var/run/hcp-integration-c
 az login --service-principal -u "${TEST_USER_CLIENT_ID}" -p "${TEST_USER_CLIENT_SECRET}" --tenant "${TEST_USER_TENANT_ID}"
 az bicep install
 az bicep version
+az account show
+az account set --subscription "ARO Hosted Control Planes (EA Subscription 1)"
+az account show
 
 unset GOFLAGS
 make infra.all deployall
