@@ -178,7 +178,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
-    --release-image=${OCP_IMAGE_MULTI} ${RENDER_COMMAND} > /tmp/hc-manifests/cluster-agent.yaml
+    --release-image=${OCP_IMAGE_MULTI} ${extra_flags} > /tmp/hc-manifests/cluster-agent.yaml
     
 MGMT_CLUSTER_ARCH=$(oc get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.io/arch}')
 
