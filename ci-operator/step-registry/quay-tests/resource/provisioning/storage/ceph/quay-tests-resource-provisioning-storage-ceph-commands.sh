@@ -143,9 +143,6 @@ spec:
     failureDomain: host
     replicated:
       size: 3
-    parameters:
-      pg_num: "8"
-      pgp_num: "8"
   gateway:
     allNodes: false
     instances: 1
@@ -192,13 +189,6 @@ spec:
     failureDomain: host
     replicated:
       size: 3
-    parameters:
-      pg_num: "8"
-      pgp_num: "8"
-  protocols:
-    s3:
-      authUseKeystone: false
-      enabled: true
 EOF
 
 	# Wait for CephObjectStore to be ready
