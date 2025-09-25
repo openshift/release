@@ -19,7 +19,8 @@ az account show
 # install required tools
 
 # Install jq 
-dnf install -y jq
+curl -sL "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" -o /usr/local/bin/jq 
+chmod +x /usr/local/bin/jq
 # Install yq (following repo pattern with proper path)
 curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq
 chmod +x /tmp/yq 
