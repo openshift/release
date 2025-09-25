@@ -40,7 +40,7 @@ echo ""
 echo "Checking for IBM Storage Scale StorageClass..."
 if oc get storageclass | grep -i spectrum >/dev/null 2>&1; then
   echo "✅ IBM Storage Scale StorageClass found:"
-  oc get storageclass | grep -i spectrum -o custom-columns="NAME:.metadata.name,PROVISIONER:.provisioner,RECLAIMPOLICY:.reclaimPolicy,VOLUMEBINDINGMODE:.volumeBindingMode"
+  oc get storageclass -o custom-columns="NAME:.metadata.name,PROVISIONER:.provisioner,RECLAIMPOLICY:.reclaimPolicy,VOLUMEBINDINGMODE:.volumeBindingMode" | grep -i spectrum
 else
   echo "⚠️  No IBM Storage Scale StorageClass found"
   echo "Available StorageClasses:"
