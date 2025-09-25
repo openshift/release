@@ -74,7 +74,6 @@ if "${SRC_FROM_GIT}"; then
 fi
 ci_clone_src
 
-REBASE_SUCCEEDED=false
 REBASE_TO=""
 # RELEASE_IMAGE_LATEST is always set by the release-controller, whether this is
 # a payload job, a periodic, or a presubmit. In order to distinguish between
@@ -89,6 +88,7 @@ if [[ -n "${PROWJOB_ID}" && "${PROWJOB_ID}" =~ .*nightly.* ]]; then
 fi
 
 if [ -n "${REBASE_TO}" ]; then
+  # Under this condition we need to force traps at the last moment to not override the one above.
   echo "REBASE_TO is set to ${REBASE_TO}"
   export PATH="${HOME}/.local/bin:${PATH}"
   python3 -m ensurepip --upgrade
@@ -102,15 +102,18 @@ if [ -n "${REBASE_TO}" ]; then
   ARM_RELEASE_IMAGE=$(grep -o 'registry\.ci\.openshift\.org/ocp-arm64/release-arm64:[^[:space:]"]*' ./scripts/auto-rebase/last_rebase.sh | head -1)
   if [[ -z "${ARM_RELEASE_IMAGE}" ]]; then
     echo "Failed to extract ARM release image from last_rebase.sh"
-    echo "rebase failed" > "${SHARED_DIR}"/rebase_failure
-    exit 0
+    trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
+    exit 1
   fi
   # Bail out without error if the rebase fails. Next steps should be skipped if this happens.
   PULLSPEC_RELEASE_AMD64="${REBASE_TO}" \
     PULLSPEC_RELEASE_ARM64="${ARM_RELEASE_IMAGE}" \
     DRY_RUN=y \
-    ./scripts/auto-rebase/rebase_job_entrypoint.sh || { echo "rebase failed" > "${SHARED_DIR}"/rebase_failure; exit 0; }
-  REBASE_SUCCEEDED=true
+    ./scripts/auto-rebase/rebase_job_entrypoint.sh || {
+      echo "Rebase failed"
+      trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
+      exit 1
+    }
 else
   echo "REBASE_TO is not set, skipping rebase"
 fi
@@ -127,12 +130,4 @@ scp \
   /tmp/config.yaml \
   "${INSTANCE_PREFIX}:/tmp"
 
-ssh "${INSTANCE_PREFIX}" "/tmp/install.sh" || {
-  # If the rebase succeeded but the build fails we also need to skip next steps
-  # as it could be that the rebase needs manual intervention.
-  if [[ "${REBASE_SUCCEEDED}" == "true" ]]; then
-    echo "build failed after successful rebase" > "${SHARED_DIR}"/rebase_failure
-    exit 0
-  fi
-  exit 1
-}
+ssh "${INSTANCE_PREFIX}" "/tmp/install.sh"
