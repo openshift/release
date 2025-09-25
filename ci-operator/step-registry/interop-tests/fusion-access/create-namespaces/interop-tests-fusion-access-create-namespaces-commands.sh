@@ -48,3 +48,23 @@ echo "✅ Namespace creation completed successfully!"
 echo "Created namespaces:"
 echo "  - ${FUSION_ACCESS_NAMESPACE}"
 echo "  - ${STORAGE_SCALE_NAMESPACE}"
+
+# Debug: Final verification that namespaces are accessible
+echo "🔍 Debug: Final namespace verification..."
+echo "All namespaces in cluster:"
+oc get namespaces --no-headers | awk '{print "  - " $1}' | sort
+
+echo "🔍 Debug: Specific namespace verification..."
+if oc get namespace "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
+  echo "✅ ${FUSION_ACCESS_NAMESPACE} namespace is accessible"
+  oc get namespace "${FUSION_ACCESS_NAMESPACE}" -o jsonpath='{.status.phase}' && echo ""
+else
+  echo "❌ ${FUSION_ACCESS_NAMESPACE} namespace is NOT accessible"
+fi
+
+if oc get namespace "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+  echo "✅ ${STORAGE_SCALE_NAMESPACE} namespace is accessible"
+  oc get namespace "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.status.phase}' && echo ""
+else
+  echo "❌ ${STORAGE_SCALE_NAMESPACE} namespace is NOT accessible"
+fi

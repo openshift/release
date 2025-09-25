@@ -8,22 +8,56 @@ FUSION_ACCESS_STORAGE_SCALE_VERSION="${FUSION_ACCESS_STORAGE_SCALE_VERSION:-5.2.
 
 echo "🚀 Creating FusionAccess resource..."
 
-# Check if namespace exists
-if ! oc get namespace "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
-  echo "❌ ERROR: Namespace ${FUSION_ACCESS_NAMESPACE} does not exist"
-  echo "Please ensure the namespace creation step runs before this step"
-  exit 1
-fi
+# Debug: List all namespaces to see what's available
+echo "🔍 Debug: Listing all namespaces in the cluster..."
+oc get namespaces --no-headers | awk '{print $1}' | sort
+
+# Debug: Check current context
+echo "🔍 Debug: Current cluster context..."
+oc config current-context
+
+# Debug: Check if we can access the cluster
+echo "🔍 Debug: Cluster access test..."
+oc get nodes --no-headers | wc -l
+echo " nodes found in cluster"
+
+# Check if namespace exists with retry mechanism
+echo "🔍 Debug: Checking for namespace ${FUSION_ACCESS_NAMESPACE}..."
+MAX_RETRIES=10
+RETRY_COUNT=0
+
+while ! oc get namespace "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; do
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -gt $MAX_RETRIES ]; then
+    echo "❌ ERROR: Namespace ${FUSION_ACCESS_NAMESPACE} does not exist after ${MAX_RETRIES} retries"
+    echo "Available namespaces:"
+    oc get namespaces --no-headers | awk '{print "  - " $1}'
+    echo "Please ensure the namespace creation step runs before this step"
+    exit 1
+  fi
+  echo "⏳ Namespace ${FUSION_ACCESS_NAMESPACE} not found, retrying... (${RETRY_COUNT}/${MAX_RETRIES})"
+  sleep 10
+done
 
 echo "✅ Namespace ${FUSION_ACCESS_NAMESPACE} exists"
 
-# Check if Fusion Access Operator is installed
+# Check if Fusion Access Operator is installed with retry mechanism
 echo "Checking if Fusion Access Operator is installed..."
-if ! oc get csv -n "${FUSION_ACCESS_NAMESPACE}" | grep -q "fusion-access-operator"; then
-  echo "❌ ERROR: Fusion Access Operator is not installed in namespace ${FUSION_ACCESS_NAMESPACE}"
-  echo "Please ensure the operator installation step runs before this step"
-  exit 1
-fi
+MAX_OPERATOR_RETRIES=20
+OPERATOR_RETRY_COUNT=0
+
+while ! oc get csv -n "${FUSION_ACCESS_NAMESPACE}" | grep -q "fusion-access-operator"; do
+  OPERATOR_RETRY_COUNT=$((OPERATOR_RETRY_COUNT + 1))
+  if [ $OPERATOR_RETRY_COUNT -gt $MAX_OPERATOR_RETRIES ]; then
+    echo "❌ ERROR: Fusion Access Operator is not installed in namespace ${FUSION_ACCESS_NAMESPACE} after ${MAX_OPERATOR_RETRIES} retries"
+    echo "Available CSVs in namespace:"
+    oc get csv -n "${FUSION_ACCESS_NAMESPACE}" --no-headers | awk '{print "  - " $1}' || echo "  No CSVs found"
+    echo "Please ensure the operator installation step runs before this step"
+    exit 1
+  fi
+  echo "⏳ Fusion Access Operator not found, retrying... (${OPERATOR_RETRY_COUNT}/${MAX_OPERATOR_RETRIES})"
+  sleep 15
+done
 
 echo "✅ Fusion Access Operator is installed"
 
