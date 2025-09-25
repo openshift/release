@@ -32,7 +32,7 @@ echo "Artifact directory contents under ${ARTIFACT_DIR}:"
 ls -laR "${ARTIFACT_DIR}"
 
 # Validate that a JUnit report was produced (search recursively in case oc cp nested paths)
-if ! find "${ARTIFACT_DIR}" -type f -name 'junit*.xml' -print -quit | grep -q .; then
+if ! find "${ARTIFACT_DIR}" -type f \( -name 'junit*.xml' -o -name 'report.xml' \) -print -quit | grep -q .; then
   echo "ERROR: No JUnit report found in ${ARTIFACT_DIR}. Marking job as failed." >&2
   if [ "${TEST_RC}" -eq 0 ]; then
     TEST_RC=1
