@@ -55,7 +55,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller-signer
   namespace: ci
 spec:
@@ -79,7 +82,8 @@ spec:
         - --sign=/etc/release-controller/signer/openshift-ci.gpg
         - --audit-gcs-service-account=/etc/release-controller/publisher/service-account.json
         - -v=6
-        image: release-controller:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        imagePullPolicy: Always
         name: controller
         volumeMounts:
         - mountPath: /etc/release-controller/publisher

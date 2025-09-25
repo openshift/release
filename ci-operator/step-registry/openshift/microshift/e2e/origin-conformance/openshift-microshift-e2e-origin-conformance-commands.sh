@@ -5,11 +5,6 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 trap_subprocesses_on_term
 
-if [[ -f "${SHARED_DIR}"/rebase_failure ]]; then
-  echo "Rebase failed, skipping origin conformance"
-  exit 0
-fi
-
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 MICROSHIFT_URL="https://${IP_ADDRESS}:6443"
 CONFORMANCE_SKIP="/tmp/skip.txt"

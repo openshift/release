@@ -6,11 +6,6 @@ source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 trap_install_status_exit_code $EXIT_CODE_CONFORMANCE_SETUP_FAILURE
 
-if [[ -f "${SHARED_DIR}"/rebase_failure ]]; then
-  echo "Rebase failed, skipping conformance setup"
-  exit 0
-fi
-
 if "${SRC_FROM_GIT}"; then
   branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
   # MicroShift repo is recent enough to use main instead of master.

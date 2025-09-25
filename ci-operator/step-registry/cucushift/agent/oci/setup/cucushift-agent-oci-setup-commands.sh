@@ -40,7 +40,7 @@ echo "Creating Stack"
 STACK_ID=$(oci resource-manager stack create-from-template \
 --compartment-id "${COMPARTMENT_ID}" \
 --template-id "${TEMPLATE_ID}" \
---terraform-version 1.2.x \
+--terraform-version 1.5.x \
 --variables '{"openshift_image_source_uri":"",
 "zone_dns":"'"${DNS_ZONE}"'",
 "installation_method":"Agent-based",
@@ -48,7 +48,12 @@ STACK_ID=$(oci resource-manager stack create-from-template \
 "tenancy_ocid":"'"${TENANCY_ID}"'",
 "create_openshift_instances":false,
 "compartment_ocid":"'"${COMPARTMENT_ID}"'",
-"region":"'"${REGION}"'"}' \
+"region":"'"${REGION}"'",
+"tag_namespace_name":"openshift-ci-abi",
+"enable_public_api_lb":true,
+"use_existing_tags":true,
+"tag_namespace_compartment_ocid":"'"${COMPARTMENT_ID}"'",
+"tag_namespace_compartment_ocid_resource_tagging":"'"${OCI_CLI_TENANCY}"'"}' \
 --query 'data.id' --raw-output)
 
 echo "${STACK_ID}" >"${SHARED_DIR}"/stack-id.txt

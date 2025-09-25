@@ -1,0 +1,47 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.19"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: loaded-upgrade-419to420-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe-zone
+    env:
+      COMPUTE_CPU: "8"
+      COMPUTE_MEMORY: "32000"
+      COMPUTE_REPLICAS: "3"
+      GC: "false"
+      RUN_CERBERUS: "false"
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: openshift-qe-upgrade-max-unavailable
+    - ref: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: nutanix-4.20-nightly-x86-loaded-upgrade-from-4.19
