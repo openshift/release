@@ -32,7 +32,12 @@ function support_np_skew() {
   curl -L "https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq && chmod +x /tmp/yq
   local EXTRA_FLARGS=""
   if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && -n "$MCE" ]]; then
-    EXTRA_FLARGS+=$( (( $(awk 'BEGIN {print ("'"$MCE"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+    # >= 2.7: "--render-sensitive --render", else: "--render"
+    if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+      extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+    else
+      extra_flags+="--render > /tmp/hc.yaml "
+    fi
     EXTRA_FLARGS+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
     EXTRA_FLARGS+="&& oc apply -f /tmp/hc.yaml"
   fi

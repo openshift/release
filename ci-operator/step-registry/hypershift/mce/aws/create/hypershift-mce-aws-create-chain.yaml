@@ -59,26 +59,38 @@ chain:
           curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
           local extra_flags=""
           if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
-            extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+            # >= 2.7: "--render-sensitive --render", else: "--render"
+            if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+              extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+            else
+              extra_flags+="--render > /tmp/hc.yaml "
+            fi
           fi
           extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
           extra_flags+="&& oc apply -f /tmp/hc.yaml"
           echo "$extra_flags"
         }
 
-        MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
-        HYPERSHIFT_NAME=hcp
-        set +x
+        HCP_CLI=""
         echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
-        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-        HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
         mkdir /tmp/hs-cli
-        brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
-        echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
-        oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
-        chmod +x /tmp/hs-cli/hypershift-no-cgo
-        set -x
+        HCP_CLI="/tmp/hs-cli/hypershift"
+        # >= 2.9
+        if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
+          oc cp -n hypershift "$(oc get pod -n hypershift -l app=operator -o jsonpath='{.items[0].metadata.name}')":/usr/bin/hypershift /tmp/hs-cli/hypershift
+        else
+          set +x
+          oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+          HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
+          brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
+          echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
+          oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
+          HCP_CLI="/tmp/hs-cli/hypershift-no-cgo"
+          set -x
+        fi
+        chmod +x "$HCP_CLI"
 
+        HYPERSHIFT_NAME=hcp
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
           downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
@@ -109,20 +121,20 @@ chain:
         fi
         
         CRED_COMMAND=""
-        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
-          echo "MCE version is less than 2.6, use --aws-creds command"
-          CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
-        else
+        if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
           set +x
           export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
-          /tmp/hs-cli/hypershift-no-cgo create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
+          "${HCP_CLI}" create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
           aws sts get-session-token --output json > ${SHARED_DIR}/sts-creds.json
           ACCOUNT=$(aws sts get-caller-identity | jq -r '.Account')
           echo "arn:aws:iam::$ACCOUNT:role/$CLUSTER_NAME" > ${SHARED_DIR}/hcp-role-arn
           set -x
           CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
           sleep 60
+        else
+          echo "MCE version is less than 2.6, use --aws-creds command"
+          CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
         fi
         
         if [[ $PUBLIC_ONLY == "true" ]]; then

@@ -42,6 +42,5 @@ export OCM_ENV=$OCM_LOGIN_ENV
 export OCPE2E_TEST=true
 export DEBUG=false
 
-
 cms --ginkgo.v --ginkgo.no-color --ginkgo.timeout 1h --ginkgo.focus CleanClusterByProfile --ginkgo.label-filter feature-cleaner
 

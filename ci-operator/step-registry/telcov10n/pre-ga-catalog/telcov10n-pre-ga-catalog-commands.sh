@@ -99,17 +99,33 @@ image_index_ocp_version="${4}"
 tag_version="v${4}.0"
 
 function findout_manifest_digest {
-  res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
+  # Try Release Canditates
+  res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version}-rc." | jq -r '
     [ .tags[] ]
     | sort_by(.start_ts)
     | last.manifest_digest')
 
+  # Try Engineer Canditates
   if [ "${res}" == "null" ]; then
-    res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" | jq -r '
-      [ .tags[]
-      | select(has("end_ts") | not)]
+    res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version}-ec." | jq -r '
+      [ .tags[] ]
       | sort_by(.start_ts)
-      | .[-2].manifest_digest')
+      | last.manifest_digest')
+
+    if [ "${res}" == "null" ]; then
+      res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
+        [ .tags[] ]
+        | sort_by(.start_ts)
+        | last.manifest_digest')
+
+      if [ "${res}" == "null" ]; then
+        res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" | jq -r '
+          [ .tags[]
+          | select(has("end_ts") | not)]
+          | sort_by(.start_ts)
+          | .[-2].manifest_digest')
+      fi
+    fi
   fi
 
   echo "${res}"
