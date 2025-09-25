@@ -119,27 +119,21 @@ tests:
     workflow: openshift-qe-installer-bm-self-sched-deploy
   timeout: 6h0m0s
 - always_run: false
-  as: aws-virt
+  as: gcp-virt
   steps:
-    cluster_profile: aws-chaos
+    cluster_profile: gcp-chaos
     env:
-      BASE_DOMAIN: aws.rhperfscale.org
       GC: "false"
       SPOT_INSTANCES: "false"
-      TELEMETRY_GROUP: prow-ocp-4.19
-      USER_TAGS: |
-        TicketId 419
+      TELEMETRY_GROUP: prow-ocp-4.20
       COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: c5n.metal
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
-    post:
-    - chain: ipi-aws-post 
-    pre:
-    - chain: ipi-aws-pre
-    - ref: kubevirt-install
+      SIZE_VARIANT: xlarge
     test:
+    - ref: kubevirt-install
     - ref: openshift-qe-virt-density
     - ref: redhat-chaos-kubevirt-outage
+    workflow: ipi-gcp
   timeout: 6h0m0s
 - as: krkn-hub-tests-udn
   cron: 0 4 * * 1
