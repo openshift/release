@@ -26,18 +26,11 @@ else
   # Get IBM entitlement key from credentials
   IBM_ENTITLEMENT_KEY=""
 
-  # Check common credential locations
-  for path in \
-    "/tmp/secrets/ibm-entitlement-credentials/ibm-entitlement-key" \
-    "/var/run/secrets/ibm-entitlement-key" \
-    "/secrets/ibm-entitlement-key" \
-    "/tmp/ibm-entitlement-key"; do
-    if [[ -f "$path" ]]; then
-      echo "IBM entitlement key found at: $path"
-      IBM_ENTITLEMENT_KEY="$(cat "$path")"
-      break
-    fi
-  done
+# Check for IBM entitlement key at the standard mount path
+if [[ -f "/var/run/secrets/fusion-access-operator/ibm-entitlement-key" ]]; then
+  echo "IBM entitlement key found at: /var/run/secrets/fusion-access-operator/ibm-entitlement-key"
+  IBM_ENTITLEMENT_KEY="$(cat "/var/run/secrets/fusion-access-operator/ibm-entitlement-key")"
+fi
 
   # Check if credentials are available as environment variable
   if [[ -n "${IBM_ENTITLEMENT_KEY:-}" ]]; then
