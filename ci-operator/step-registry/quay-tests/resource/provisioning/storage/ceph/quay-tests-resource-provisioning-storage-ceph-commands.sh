@@ -411,7 +411,7 @@ create_s3_bucket() {
 		local major="${BASH_REMATCH[1]}"
 		local minor="${BASH_REMATCH[2]}"
 
-		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 18 ]]; then
+		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 16 ]]; then
 			echo "Using ObjectBucketClaim method for ODF ${odf_version}"
 	        create_bucket_obc
 		else
@@ -468,7 +468,7 @@ verify_bucket_connectivity() {
 	deploy_storage_cluster
 	deploy_ceph_rgw || true
 	get_rgw_route
-	create_s3_bucket
+	create_s3_bucket 
 	verify_bucket_connectivity
 
 	echo "Ceph storage provisioning completed successfully!"
