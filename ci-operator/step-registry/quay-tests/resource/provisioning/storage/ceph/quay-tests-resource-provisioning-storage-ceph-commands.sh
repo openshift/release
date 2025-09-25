@@ -411,7 +411,7 @@ create_s3_bucket() {
 		local major="${BASH_REMATCH[1]}"
 		local minor="${BASH_REMATCH[2]}"
 
-		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 16 ]]; then
+		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 18 ]]; then
 			echo "Using ObjectBucketClaim method for ODF ${odf_version}"
 	        create_bucket_obc
 		else
