@@ -51,7 +51,7 @@ DISTRIBUTED_STORAGE_CONFIG:
   default:
     - RadosGWStorage
     - bucket_name: quay
-      storage_path: /datafile
+      storage_path: /quaydata
       access_key: ${QUAY_CEPH_S3_ACCESSKEY}
       secret_key: ${QUAY_CEPH_S3_SECRETKEY}
       hostname: ${QUAY_CEPH_S3_HOSTNAME}

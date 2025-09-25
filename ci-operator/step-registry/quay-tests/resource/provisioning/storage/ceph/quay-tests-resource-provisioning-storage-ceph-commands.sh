@@ -5,13 +5,16 @@ set -o errexit
 set -o pipefail
 
 ###
-# Ceph storage requires large resources: 30 CPUs and 72 GiB of RAM
-# Steps:
-# 1, Deploy Odf operator first, 
-# 2, next create a StorageCluster,
+# Ceph storage requires large resources and need in 3 zones
+# 1, Deploy odf operator first, 
+# 2, next create odf StorageCluster,
 # 3, then deploy three Ceph RGW: CephObjectStore,s3-rgw, StorageClass
 # 4, finally create s3 bucket with ObjectBucketClaim
-# See: https://issues.redhat.com/browse/OCPQE-14826 https://issues.redhat.com/browse/OCPQE-30200
+# 5, for odf 4.18+ only support ObjectBucketClaim method to create bucket, 4.17/4,16 support both ObjectBucketClaim and legacy awscli method
+# See: https://issues.redhat.com/browse/OCPQE-30200 https://issues.redhat.com/browse/OCPQE-14826 
+#
+# Ceph squid 19.2.1-245.el9cp -> Red Hat Ceph Storage 8.x -> odf4.19/4.18
+# Ceph reef  18.2.1-340.el9cp -> Red Hat Ceph Storage 7.x -> odf4.17/4.16
 ###
 
 # ODF Operator has Deployed to OCP namespace 'openshift-storage'
@@ -34,81 +37,6 @@ check_prerequisites() {
 	echo "Prerequisites check passed"
 }
 
-
-# deploy_odf_operator() {
-
-# 	cat <<EOF | oc apply -f -
-# apiVersion: v1
-# kind: Namespace
-# metadata:
-#   name: openshift-storage
-# EOF
-
-# 	OPERATORGROUP=$(oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o jsonpath="{.items[*].metadata.name}" || true)
-# 	if [[ -n "$OPERATORGROUP" ]]; then
-# 		echo "OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
-# 		OG_OPERATION=apply
-# 		OG_NAMESTANZA="name: $OPERATORGROUP"
-# 	else
-# 		echo "OperatorGroup does not exist: creating it"
-# 		OG_OPERATION=create
-# 		OG_NAMESTANZA="generateName: oo-"
-# 	fi
-
-# 	OPERATORGROUP=$(
-# 		oc $OG_OPERATION -f - -o jsonpath='{.metadata.name}' <<EOF
-# apiVersion: operators.coreos.com/v1
-# kind: OperatorGroup
-# metadata:
-#   $OG_NAMESTANZA
-#   namespace: $OO_INSTALL_NAMESPACE
-# spec:
-#   targetNamespaces: [$OO_INSTALL_NAMESPACE]
-# EOF
-# 	)
-
-# 	SUB=$(
-# 		cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
-# apiVersion: operators.coreos.com/v1alpha1
-# kind: Subscription
-# metadata:
-#   name: $ODF_SUBSCRIPTION_NAME
-#   namespace: $OO_INSTALL_NAMESPACE
-# spec:
-#   channel: $ODF_OPERATOR_CHANNEL
-#   installPlanApproval: Automatic
-#   name: $ODF_SUBSCRIPTION_NAME
-#   source: redhat-operators
-#   sourceNamespace: openshift-marketplace
-# EOF
-# 	)
-
-# 	for i in {1..60}; do
-# 		CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
-# 		if [[ -n "$CSV" ]]; then
-# 			if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-# 				echo "ODF ClusterServiceVersion \"$CSV\" ready"
-# 				break
-# 			fi
-# 		fi
-# 		echo "wait $((i * 10))s"
-# 		sleep 10
-# 	done
-# 	echo "ODF Operator is deployed successfully"
-
-# 	# Wait for odf operator pod startup
-# 	for i in {1..60}; do
-# 		PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
-# 		if [[ "$PStatus" == "True" ]]; then
-# 			echo "ODF pod is running \"$PStatus\""
-# 			break
-# 		fi
-# 		podstatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod)
-# 		echo "odf pod status $podstatus"
-# 		echo "wait $((i * 10))s"
-# 		sleep 10
-# 	done
-# }
 
 # Deploy ODF StorageSystem
 deploy_storage_cluster() {
@@ -175,7 +103,7 @@ spec:
     labels:
       node-role.kubernetes.io/worker:
 EOF
-    sleep 5m
+    sleep 300 # usually need 10 mins to be ready
 	for i in {1..50}; do
 		phase=$(oc get storagecluster -n openshift-storage ocs-storagecluster -o jsonpath='{.status.phase}' || echo "Failure")
 		if [[ "$phase" == "Ready" ]]; then
@@ -193,8 +121,9 @@ EOF
 
 }
 
-# Ceph Storage’s RADOS Object Gateway deployment
+# Deploy Ceph Storage’s RADOS Object Gateway
 deploy_ceph_rgw() {
+	
 	# Creating the CephObjectStore
 	cat <<EOF | oc apply -f -
 ---
@@ -283,7 +212,7 @@ EOF
 		sleep 30
 	done
 
-	# Service and Route
+	# Ceph Service and Route
 	cat <<EOF | oc apply -f -
 ---
 kind: Route
@@ -354,8 +283,7 @@ get_rgw_route() {
 }
 
 # ObjectBucketClaim (OBC) method for ODF 4.16+
-# ceph version 19.2.1-245.el9cp squid -> Red Hat Ceph Storage 8.x -> odf4.19/4.18
-# ceph version 18.2.1-340.el9cp reef -> Red Hat Ceph Storage 7.x  -> odf4.17/4.16
+
 create_bucket_obc() {
 	echo "Creating S3 bucket using ObjectBucketClaim (ODF 4.16+ method) $ODF_OPERATOR_CHANNEL ..."
 
@@ -417,7 +345,7 @@ EOF
 
 # Using the Rook-Ceph toolbox to check on the Ceph backing storage
 create_bucket_legacy() {
-	echo "Creating S3 bucket using AWS CLI method ODF $ODF_OPERATOR_CHANNEL ..."
+	echo "Creating S3 bucket using AWS CLI method ODF:$ODF_OPERATOR_CHANNEL ..."
 
 	local ceph_toolbox_pod
 	ceph_toolbox_pod=$(oc get pod -n openshift-storage -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
@@ -484,10 +412,10 @@ create_s3_bucket() {
 		local minor="${BASH_REMATCH[2]}"
 
 		if [[ $major -gt 4 ]] || [[ $major -eq 4 && $minor -ge 16 ]]; then
-			echo "Using ODF ${odf_version} ObjectBucketClaim method"
+			echo "Using ObjectBucketClaim method for ODF ${odf_version}"
 	        create_bucket_obc
 		else
-			echo "Using ODF ${odf_version} legacy AWS CLI method"
+			echo "Using legacy AWS CLI method for ODF ${odf_version}"
 			oc patch OCSInitialization ocsinit -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
 	        oc patch storagecluster ocs-storagecluster -n openshift-storage --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
 
