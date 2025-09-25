@@ -1,0 +1,37 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-confidential-encrypt-provision
+  steps:
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-confidential
+  - ref: ipi-conf-azure-custom-region
+  - ref: ipi-conf-azure-custom-az
+  - ref: ipi-conf-encrypt-disk
+  - chain: azure-provision-service-principal-minimal-permission
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-azure-confidential
+  - ref: cucushift-installer-check-azure-encrypt
+  env:
+  - name: CUSTOM_AZURE_REGION
+    default: "eastus"
+    documentation: |-
+      Specify the region where vm size supports ConfidentailVM
+  - name: AZURE_SECURITY_TYPE
+    default: "ConfidentialVM"
+    documentation: |-
+      Specify the security type for azure machines
+      Valid Values: "TrustedLaunch", "ConfidentialVM"
+  - name: OS_DISK_SECURITY_ENCRYPTION_TYPE
+    default: "VMGuestStateOnly"
+    documentation: |-
+      Specify the encryption type of the managed disk
+      Valid Values: "VMGuestStateOnly","DiskWithVMGuestState"
+  - name: CP_CUSTOM_AZURE_AZ
+    default: ""
+    documentation: Using custom azure availability zone for controlplane machines
+  - name: COMPUTE_CUSTOM_AZURE_AZ
+    default: ""
+    documentation: Using custom azure availability zone for Compute machines
+  documentation: |-
+    Create an IPI cluster with confidentialVM security type enabled on Azure for QE e2e tests, and encrypt the disk root partation, applicable on 4.17+.
