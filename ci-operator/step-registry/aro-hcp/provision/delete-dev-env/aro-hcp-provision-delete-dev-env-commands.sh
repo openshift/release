@@ -18,20 +18,23 @@ az account show
 
 # install required tools
 
-# Install jq 
-curl -sL "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" -o /usr/local/bin/jq 
-chmod +x /usr/local/bin/jq
-# Install yq (following repo pattern with proper path)
-curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq
-chmod +x /tmp/yq 
-mv /tmp/yq /usr/local/bin/yq
-# Install helm (following stackrox pattern)
-mkdir /tmp/helm
-curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz --output /tmp/helm/helm-v3.16.2-linux-amd64.tar.gz
-(cd /tmp/helm && tar xvfpz helm-v3.16.2-linux-amd64.tar.gz)
-cp /tmp/helm/linux-amd64/helm /usr/local/bin/helm
-chmod +x /usr/local/bin/helm
-rm -rf /tmp/helm
+ # Create tools directory
+  mkdir -p /tmp/tools
+  # Install jq
+  curl -sL "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" -o /tmp/tools/jq
+  chmod +x /tmp/tools/jq
+  # Install yq  
+  curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/tools/yq
+  chmod +x /tmp/tools/yq
+  # Install helm
+  curl https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz -o /tmp/helm.tar.gz
+  tar -xzf /tmp/helm.tar.gz -C /tmp
+  cp /tmp/linux-amd64/helm /tmp/tools/helm
+  chmod +x /tmp/tools/helm
+  rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
+  # Add to PATH
+  export PATH="/tmp/tools:$PATH"
+
 
 
 unset GOFLAGS
