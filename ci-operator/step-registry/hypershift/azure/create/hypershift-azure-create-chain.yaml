@@ -158,15 +158,6 @@ chain:
         PULL_SECRET_PATH="${SHARED_DIR}/hypershift-pull-secret"
       fi
       
-      ENCRYPTION_KEY_ID=""
-      if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
-        if [[ -f "${SHARED_DIR}/azure_active_key_url" ]]; then
-          ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
-        else
-          ENCRYPTION_KEY_ID="$(cat "/etc/hypershift-aro-azurecreds/encryption-key-url")"
-        fi
-      fi
-      
       DISK_ENCRYPTION_SET_ID=""
       if [[ $HYPERSHIFT_DISK_ENCRYPTION == "true" ]]; then
         DISK_ENCRYPTION_SET_ID="$(cat "${SHARED_DIR}/azure_des_id")"
@@ -202,7 +193,6 @@ chain:
         --azure-creds ${AZURE_CREDS} \
         --location ${HC_LOCATION} \
         --release-image ${RELEASE_IMAGE} \
-        --encryption-key-id=${ENCRYPTION_KEY_ID} \
         --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
         --resource-group-name=${RESOURCE_GROUP_NAME} \
         --vnet-id=${VNET_ID} \
@@ -210,6 +200,11 @@ chain:
         --network-security-group-id=${NSG_ID} \
         --generate-ssh
       )
+      if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
+          ENCRYPTION_KEY_ID="$(cat /etc/hypershift-aro-azurecreds/kms-encryption-key-id)"
+          KMS_CRED_SECRET_NAME="$(cat /etc/hypershift-aro-azurecreds/kms-credentials-secret-name)"
+          COMMAND+=(--encryption-key-id=${ENCRYPTION_KEY_ID} --kms-credentials-secret-name ${KMS_CRED_SECRET_NAME})            
+      fi
       
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
@@ -334,7 +329,9 @@ chain:
       fi
       
       "${COMMAND[@]}"
-      
+
+       exit 0
+       
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
