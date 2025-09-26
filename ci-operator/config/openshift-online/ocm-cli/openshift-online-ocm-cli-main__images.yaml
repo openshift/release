@@ -1,37 +1,37 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
-  openshift_release_golang-1.23:
+    tag: rhel-9-golang-1.24-openshift-4.20
+  openshift_release_golang-1.24:
     name: release
     namespace: openshift
-    tag: golang-1.23
+    tag: golang-1.24
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.23
+    tag: golang-1.24
 images:
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/openshift/release:golang-1.23 AS builder
+    FROM registry.ci.openshift.org/openshift/release:golang-1.24 AS builder
     WORKDIR /go/src/github.com/openshift-online/ocm-cli
     COPY . .
     ENV GOFLAGS=-buildvcs=false
     RUN make install
 
-    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     COPY --from=builder /go/bin/ocm /usr/bin/
     RUN yum -y install --setopt=skip_missing_names_on_install=False \
     jq \
     git && yum clean all
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-    openshift_release_golang-1.23:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+    openshift_release_golang-1.24:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.23
+      - registry.ci.openshift.org/openshift/release:golang-1.24
   to: ocm-cli
 promotion:
   to:
