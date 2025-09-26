@@ -45,7 +45,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    cd ${JETLAG_REPO_PATH}
    source bootstrap.sh
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-scale-out.yml -vvv | tee /tmp/ansible-mno-scaleout-$(date +%s)
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/ocp-scale-out.yml -vvv | tee /tmp/ansible-ocp-scaleout-$(date +%s)
    deactivate
    rm -rf .ansible
 "
