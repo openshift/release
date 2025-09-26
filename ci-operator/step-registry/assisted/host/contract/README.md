@@ -39,26 +39,29 @@ Downstream steps (like `assisted-ofcir-setup`) consume the same files regardless
 
 ### Host Contract Steps
 
-- `host-contract-acquire` - Provisions or configures host access
-- `host-contract-gather` - Collects logs and artifacts
-- `host-contract-release` - Cleans up resources
+- `assisted-host-contract-acquire` - Provisions or configures host access
+- `assisted-host-contract-gather` - Collects logs and artifacts
+- `assisted-host-contract-release` - Cleans up resources
+- `assisted-host-contract-baremetalds-post` - Gathers artifacts and performs release for assisted baremetal workflows
 
 ### Workflow Integration
 
-All `assisted-ofcir-*` workflows have been updated to use host contract steps:
+All `assisted-ofcir-*` workflows use the host contract steps and post chain:
 
 ```yaml
 pre:
-  - ref: host-contract-acquire     # was: ofcir-acquire
+  - ref: assisted-host-contract-acquire     # was: ofcir-acquire
   - ref: assisted-ofcir-setup
   - chain: assisted-common-pre
 test:
   - ref: assisted-baremetal-test
 post:
   - ref: assisted-common-gather
-  - ref: host-contract-gather      # was: ofcir-gather
-  - ref: host-contract-release     # was: ofcir-release
+  - ref: assisted-host-contract-gather      # was: ofcir-gather
+  - ref: assisted-host-contract-release     # was: ofcir-release
 ```
+
+Operator workflows that rely on the baremetalds post chain use `chain: assisted-host-contract-baremetalds-post` to gather artifacts and run the release step.
 
 ## Benefits
 
@@ -85,7 +88,6 @@ ci run --job-name e2e-metal-assisted-4-20 \
 
 ## Migration Status
 
-✅ **Completed**: All assisted-ofcir workflows converted to use host-contract interface
+✅ **Completed**: All assisted-ofcir workflows converted to use the host-contract interface
 ✅ **Backward Compatible**: Existing job configurations work without changes
 ✅ **Ready for Use**: Can be used immediately with ci-tool for local execution
-
