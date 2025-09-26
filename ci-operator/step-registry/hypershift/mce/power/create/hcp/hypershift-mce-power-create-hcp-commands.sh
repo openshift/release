@@ -157,7 +157,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --node-pool-replicas -1 \
-    ${RENDER_COMMAND} > /tmp/hc-manifests/cluster-agent.yaml
+    ${extra_flags} > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{5}"
