@@ -194,7 +194,7 @@ else
     cat <<EOF > /tmp/hc-manifests/replacement.yaml
   - service: APIServer
     servicePublishingStrategy:
-      type: LoadBalancervi
+      type: LoadBalancer
   - service: OAuthServer
     servicePublishingStrategy:
       type: Route
