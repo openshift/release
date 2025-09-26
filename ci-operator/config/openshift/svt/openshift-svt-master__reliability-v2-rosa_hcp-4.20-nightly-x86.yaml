@@ -17,7 +17,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -34,11 +34,12 @@ tests:
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m5.xlarge
+      CONFIG_TEMPLATE: reliability-rosa-hcp.yaml
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
       HOSTED_CP: "true"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.15"
+      OPENSHIFT_VERSION: "4.20"
       PROW_CLUSTER_TYPE: rosa
       RELIABILITY_DURATION: 20h
       REPLICAS: "3"
@@ -54,11 +55,12 @@ tests:
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m5.xlarge
+      CONFIG_TEMPLATE: reliability-rosa-hcp.yaml
       DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
       HOSTED_CP: "true"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.15"
+      OPENSHIFT_VERSION: "4.20"
       PROW_CLUSTER_TYPE: rosa
       RELIABILITY_DURATION: 1h
       REPLICAS: "3"
@@ -66,8 +68,30 @@ tests:
     test:
     - chain: openshift-svt-reliability-v2
     workflow: rosa-aws-sts-hcp
+- always_run: false
+  as: reliability-v2-install
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-lrc-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.20"
+      REMOTE_CLIENT: "true"
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    pre:
+    - chain: rosa-aws-sts-hcp-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    test:
+    - chain: openshift-svt-reliability-v2
 zz_generated_metadata:
   branch: master
   org: openshift
   repo: svt
-  variant: reliability-v2-rosa_hcp-4.17-nightly-x86
+  variant: reliability-v2-rosa_hcp-4.20-nightly-x86
