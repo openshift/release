@@ -8,6 +8,28 @@ STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
 
 echo "🔍 Verifying IBM Storage Scale Cluster status..."
 
+# Wait for pods to be created and start scheduling
+echo "⏳ Waiting for IBM Storage Scale pods to be created..."
+MAX_WAIT_TIME=300  # 5 minutes
+WAIT_TIME=0
+POD_COUNT=0
+
+while [[ $WAIT_TIME -lt $MAX_WAIT_TIME ]]; do
+  POD_COUNT=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers 2>/dev/null | wc -l)
+  if [[ $POD_COUNT -gt 0 ]]; then
+    echo "✅ Found $POD_COUNT IBM Storage Scale pods after ${WAIT_TIME}s"
+    break
+  fi
+  echo "⏳ Waiting for pods to be created... (${WAIT_TIME}s/${MAX_WAIT_TIME}s)"
+  sleep 10
+  WAIT_TIME=$((WAIT_TIME + 10))
+done
+
+if [[ $POD_COUNT -eq 0 ]]; then
+  echo "⚠️  No IBM Storage Scale pods found after ${MAX_WAIT_TIME}s"
+  echo "This may indicate that the cluster deployment failed or is taking longer than expected"
+fi
+
 # Check cluster status
 if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
   echo "✅ IBM Storage Scale Cluster found"
@@ -60,9 +82,148 @@ if [[ $POD_COUNT -gt 0 ]]; then
   echo "✅ Found $POD_COUNT IBM Storage Scale pods:"
   oc get pods -n "${STORAGE_SCALE_NAMESPACE}" -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,READY:.status.containerStatuses[0].ready,AGE:.metadata.creationTimestamp"
   
-  # Check pod readiness
-  READY_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep "Running" | wc -l)
+  # Check pod readiness with better pattern matching
+  READY_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Running" {print $1}' | wc -l)
+  PENDING_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Pending" {print $1}' | wc -l)
+  FAILED_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Failed" {print $1}' | wc -l)
+  IMAGE_PULL_BACKOFF=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "ImagePullBackOff" {print $1}' | wc -l)
+  CONTAINER_CREATING=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "ContainerCreating" {print $1}' | wc -l)
+  INIT_IMAGE_PULL_BACKOFF=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Init:ImagePullBackOff" {print $1}' | wc -l)
+  OTHER_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 != "Running" && $3 != "Pending" && $3 != "Failed" && $3 != "ImagePullBackOff" && $3 != "ContainerCreating" && $3 != "Init:ImagePullBackOff" {print $1}' | wc -l)
+  
   echo "Running pods: $READY_PODS/$POD_COUNT"
+  echo "Pending pods: $PENDING_PODS/$POD_COUNT"
+  echo "Failed pods: $FAILED_PODS/$POD_COUNT"
+  echo "ImagePullBackOff pods: $IMAGE_PULL_BACKOFF/$POD_COUNT"
+  echo "ContainerCreating pods: $CONTAINER_CREATING/$POD_COUNT"
+  echo "Init:ImagePullBackOff pods: $INIT_IMAGE_PULL_BACKOFF/$POD_COUNT"
+  echo "Other status pods: $OTHER_PODS/$POD_COUNT"
+  
+  # Debug: Show actual pod statuses
+  echo "Debug - Pod status breakdown:"
+  oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '{print "  " $1 ": " $3}' | sort
+  
+  # Check for image pull issues first (most common cause)
+  if [[ $IMAGE_PULL_BACKOFF -gt 0 ]] || [[ $INIT_IMAGE_PULL_BACKOFF -gt 0 ]] || [[ $CONTAINER_CREATING -gt 0 ]]; then
+    echo "⚠️  Found image pull issues. Investigating..."
+    
+    # Check each pod with image pull issues
+    for pod in $(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "ImagePullBackOff" || $3 == "Init:ImagePullBackOff" || $3 == "ContainerCreating" {print $1}'); do
+      echo ""
+      echo "🔍 Investigating image pull issues for pod: $pod"
+      
+      # Get pod events related to image pull
+      echo "📅 Pod events for $pod:"
+      oc get events -n "${STORAGE_SCALE_NAMESPACE}" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp' | grep -i "pull\|image\|backoff" || echo "No image pull events found"
+      
+      # Get pod description for image pull errors
+      echo "📊 Pod description for $pod:"
+      oc describe pod "$pod" -n "${STORAGE_SCALE_NAMESPACE}" | grep -A 10 -B 5 -i "pull\|image\|backoff\|error" || echo "No image pull errors found in description"
+      
+      # Check container status
+      echo "🐳 Container status for $pod:"
+      oc get pod "$pod" -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.status.containerStatuses[*].state}' 2>/dev/null || echo "Could not get container status"
+    done
+    
+    # Check for pull secrets
+    echo ""
+    echo "🔐 Checking for pull secrets:"
+    oc get secrets -n "${STORAGE_SCALE_NAMESPACE}" | grep -i pull || echo "No pull secrets found in namespace"
+    
+    # Check for image pull secrets in default service account
+    echo "🔑 Checking default service account for image pull secrets:"
+    oc get serviceaccount default -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.imagePullSecrets[*].name}' 2>/dev/null || echo "No image pull secrets in default service account"
+    
+    # Check for IBM entitlement credentials
+    echo "🏢 Checking for IBM entitlement credentials:"
+    if oc get secret fusion-pullsecret -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+      echo "✅ IBM entitlement secret found"
+    else
+      echo "❌ IBM entitlement secret not found - this is likely the cause of image pull failures"
+      echo "The IBM Storage Scale images require IBM entitlement credentials to pull from icr.io"
+    fi
+  fi
+  
+  # If there are pending pods, investigate why
+  if [[ $PENDING_PODS -gt 0 ]]; then
+    echo "⚠️  Found $PENDING_PODS pending pods. Investigating..."
+    
+    # Get detailed pod information first
+    echo "📋 Detailed pod information:"
+    oc get pods -n "${STORAGE_SCALE_NAMESPACE}" -o wide
+    
+    # Check each pending pod for scheduling issues
+    for pod in $(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep "Pending" | awk '{print $1}'); do
+      echo ""
+      echo "🔍 Investigating pending pod: $pod"
+      
+      # Get pod events (more comprehensive)
+      echo "📅 Pod events for $pod:"
+      oc get events -n "${STORAGE_SCALE_NAMESPACE}" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp' || echo "No events found for $pod"
+      
+      # Get pod status conditions
+      echo "📊 Pod status conditions for $pod:"
+      oc get pod "$pod" -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.status.conditions[*]}' | jq -r '.[] | "\(.type): \(.status) - \(.message)"' 2>/dev/null || echo "Could not get pod conditions"
+      
+      # Get scheduling condition specifically
+      echo "🎯 Scheduling condition for $pod:"
+      oc get pod "$pod" -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="PodScheduled")]}' 2>/dev/null || echo "No scheduling condition found"
+    done
+    
+    echo ""
+    echo "🔍 Cluster-level diagnostics:"
+    
+    # Check node resources
+    echo "📊 Node information:"
+    echo "Total nodes: $(oc get nodes --no-headers | wc -l)"
+    echo "Worker nodes: $(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)"
+    echo "Control plane nodes: $(oc get nodes -l node-role.kubernetes.io/control-plane --no-headers | wc -l)"
+    
+    # Check node capacity
+    echo "💾 Node capacity:"
+    oc get nodes -o custom-columns="NAME:.metadata.name,CPU:.status.capacity.cpu,MEMORY:.status.capacity.memory" || echo "Could not get node capacity"
+    
+    # Check for taints that might prevent scheduling
+    echo "🚫 Node taints:"
+    oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.taints[*].key}{"\n"}{end}' | grep -v "^$" || echo "No taints found"
+    
+    # Check resource quotas
+    echo "📈 Resource quotas in namespace:"
+    oc get resourcequota -n "${STORAGE_SCALE_NAMESPACE}" || echo "No resource quotas found"
+    
+    # Check for storage class issues
+    echo "💾 Storage classes:"
+    oc get storageclass || echo "No storage classes found"
+    
+    # Check for persistent volumes
+    echo "💿 Persistent volumes:"
+    oc get pv || echo "No persistent volumes found"
+    
+    # Check for persistent volume claims
+    echo "📦 Persistent volume claims in namespace:"
+    oc get pvc -n "${STORAGE_SCALE_NAMESPACE}" || echo "No PVCs found in namespace"
+    
+    # Check namespace events
+    echo "📅 Namespace events:"
+    oc get events -n "${STORAGE_SCALE_NAMESPACE}" --sort-by='.lastTimestamp' | tail -10 || echo "No events found in namespace"
+    
+    # Quick diagnostic summary
+    echo ""
+    echo "🔍 Quick diagnostic summary:"
+    echo "1. Check if nodes have sufficient resources:"
+    oc get nodes -o custom-columns="NAME:.metadata.name,CPU:.status.allocatable.cpu,MEMORY:.status.allocatable.memory" | head -5
+    
+    echo ""
+    echo "2. Check for any resource constraints in pod descriptions:"
+    for pod in $(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep "Pending" | awk '{print $1}' | head -2); do
+      echo "Pod $pod scheduling issues:"
+      oc describe pod "$pod" -n "${STORAGE_SCALE_NAMESPACE}" | grep -A 5 -B 5 "Warning\|Error" || echo "No warnings/errors found"
+    done
+    
+    echo ""
+    echo "3. Check if storage is available:"
+    oc get storageclass | grep -v "NAME" | head -3 || echo "No storage classes available"
+  fi
   
   # Check for any failed pods
   FAILED_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep -E "(Failed|Error|CrashLoopBackOff)" | wc -l)
@@ -86,4 +247,65 @@ else
   echo "⚠️  No IBM Storage Scale daemon resources found"
 fi
 
-echo "✅ IBM Storage Scale Cluster verification completed!"
+# Final verification - check if pods are actually ready
+echo ""
+echo "🔍 Final verification - checking pod readiness..."
+READY_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Running" {print $1}' | wc -l)
+PENDING_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Pending" {print $1}' | wc -l)
+IMAGE_PULL_BACKOFF=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "ImagePullBackOff" {print $1}' | wc -l)
+INIT_IMAGE_PULL_BACKOFF=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Init:ImagePullBackOff" {print $1}' | wc -l)
+CONTAINER_CREATING=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "ContainerCreating" {print $1}' | wc -l)
+INIT_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 ~ /^Init/ {print $1}' | wc -l)
+FAILED_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Failed" {print $1}' | wc -l)
+TOTAL_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | wc -l)
+
+# Calculate acceptable pods (Running + Init pods that are not failed)
+ACCEPTABLE_PODS=$((READY_PODS + INIT_PODS))
+PROBLEMATIC_PODS=$((PENDING_PODS + IMAGE_PULL_BACKOFF + INIT_IMAGE_PULL_BACKOFF + FAILED_PODS))
+
+echo "📊 Pod status summary:"
+echo "- Total pods: $TOTAL_PODS"
+echo "- Running pods: $READY_PODS"
+echo "- Init pods (initializing): $INIT_PODS"
+echo "- Acceptable pods (Running + Init): $ACCEPTABLE_PODS"
+echo "- Problematic pods: $PROBLEMATIC_PODS"
+
+if [[ $TOTAL_PODS -gt 0 ]]; then
+  # Check if all pods are in acceptable states (Running or Init)
+  if [[ $PROBLEMATIC_PODS -eq 0 ]]; then
+    echo "✅ All IBM Storage Scale pods are in acceptable states ($ACCEPTABLE_PODS/$TOTAL_PODS)"
+    echo "✅ IBM Storage Scale Cluster verification completed successfully!"
+  else
+    echo "⚠️  Some IBM Storage Scale pods are in problematic states ($PROBLEMATIC_PODS/$TOTAL_PODS)"
+    echo "❌ IBM Storage Scale Cluster verification failed - pods are not ready"
+    
+    # Provide summary of issues
+    echo ""
+    echo "📋 Summary of issues found:"
+    echo "- Total pods: $TOTAL_PODS"
+    echo "- Running pods: $READY_PODS"
+    echo "- Init pods (initializing): $INIT_PODS"
+    echo "- Acceptable pods (Running + Init): $ACCEPTABLE_PODS"
+    echo "- Pending pods: $PENDING_PODS"
+    echo "- ImagePullBackOff pods: $IMAGE_PULL_BACKOFF"
+    echo "- Init:ImagePullBackOff pods: $INIT_IMAGE_PULL_BACKOFF"
+    echo "- ContainerCreating pods: $CONTAINER_CREATING"
+    echo "- Failed pods: $FAILED_PODS"
+    echo "- Problematic pods: $PROBLEMATIC_PODS"
+    
+    # Provide specific guidance based on the issues found
+    if [[ $IMAGE_PULL_BACKOFF -gt 0 ]] || [[ $INIT_IMAGE_PULL_BACKOFF -gt 0 ]]; then
+      echo ""
+      echo "🔧 Image Pull Issues Detected:"
+      echo "The IBM Storage Scale pods are failing to pull images from icr.io"
+      echo "This is likely due to missing IBM entitlement credentials"
+      echo "Check if the fusion-pullsecret was created with the correct IBM entitlement key"
+    fi
+    
+    # Exit with error code to fail the step
+    exit 1
+  fi
+else
+  echo "❌ No IBM Storage Scale pods found - cluster deployment may have failed"
+  exit 1
+fi
