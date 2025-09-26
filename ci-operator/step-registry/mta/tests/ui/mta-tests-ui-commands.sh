@@ -6,7 +6,7 @@ set -o pipefail
 
 # Set the TARGET_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-TARGET_URL="http://mta-mta.${CONSOLE_URL#"https://console-openshift-console."}"
+TARGET_URL="https://mta-mta.${CONSOLE_URL#"https://console-openshift-console."}"
 
 # Set the scope
 export CYPRESS_INCLUDE_TAGS=$MTA_TESTS_UI_SCOPE
