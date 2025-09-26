@@ -56,7 +56,9 @@ STORAGE="20Gi"
 # prevent the operator from reporting Upgradeable=false.
 cat >> "${PATCH}" << EOF
 prometheusK8s:
-  queryLogFile: /tmp/prometheus_queries.log
+  logLevel: debug
+  # queryLogFile: /tmp/prometheus_queries.log
+  queryLogFile: /dev/stdout
   volumeClaimTemplate:
     metadata:
       name: prometheus-data
@@ -66,6 +68,9 @@ prometheusK8s:
       resources:
         requests:
           storage: ${STORAGE}
+thanosQuerier:
+  enableRequestLogging: true
+  logLevel: debug
 EOF
 
 CONFIG_CONTENTS="$(echo "${CONFIG_CONTENTS}" | yq-go m - "${PATCH}")"
