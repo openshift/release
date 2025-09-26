@@ -173,6 +173,9 @@ else
     echo "No service instances are present in $infra_name-rg"
 fi
 
+echo "Waiting for all the resources to get deleted before deleting the resource group"
+sleep 300 
+
 echo "Triggering the $infra_name-rg resource group deletion in the $IC_REGION region."
 ibmcloud resource group-delete $infra_name-rg -f
 echo "Successfully completed the deletion of all the resources that are created during the CI."
