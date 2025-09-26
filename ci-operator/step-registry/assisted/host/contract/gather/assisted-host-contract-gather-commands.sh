@@ -8,7 +8,8 @@ if [[ "${HOST_CONTRACT_LOCAL:-}" != "true" ]]; then
   # Running in Prow - delegate to ofcir-gather
   echo "[host-contract] Running in Prow environment - delegating to ofcir-gather"
 
-  STEP_ROOT=$(realpath "$(dirname "${BASH_SOURCE[0]}")/../../../..")
+  SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]:-$0}")
+  STEP_ROOT=$(realpath "$(dirname "${SCRIPT_PATH}")/../../../..")
   OFCIR_CMD="${STEP_ROOT}/ofcir/gather/ofcir-gather-commands.sh"
 
   if [[ ! -f "${OFCIR_CMD}" ]]; then

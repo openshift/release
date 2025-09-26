@@ -42,7 +42,9 @@ Downstream steps (like `assisted-ofcir-setup`) consume the same files regardless
 - `assisted-host-contract-acquire` - Provisions or configures host access
 - `assisted-host-contract-gather` - Collects logs and artifacts
 - `assisted-host-contract-release` - Cleans up resources
+- `assisted-host-contract-baremetalds-pre` - Prepares baremetald environments using the host contract acquire step
 - `assisted-host-contract-baremetalds-post` - Gathers artifacts and performs release for assisted baremetal workflows
+- `assisted-host-contract-agent-pre` / `assisted-host-contract-agent-post` - Host-contract aware wrappers around the agent pre/post chains
 
 ### Workflow Integration
 
@@ -61,7 +63,7 @@ post:
   - ref: assisted-host-contract-release     # was: ofcir-release
 ```
 
-Operator workflows that rely on the baremetalds post chain use `chain: assisted-host-contract-baremetalds-post` to gather artifacts and run the release step.
+Operator workflows that rely on the baremetalds post chain use `chain: assisted-host-contract-baremetalds-post` to gather artifacts and run the release step. Agent workflows use the host-contract wrappers (`assisted-host-contract-agent-pre` / `assisted-host-contract-agent-post`) alongside the new `assisted-host-contract-agent-*` workflows so they share the same provider-neutral interface.
 
 ## Benefits
 
