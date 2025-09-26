@@ -580,6 +580,10 @@ CONFIG = {
     'metal-redhat-gs-quota-slice': {
         'default': 1,
     },
+    'rdu2-baremetal-qe-quota-slice': {
+        'amd64': 43,
+        'arm64': 26
+    },
 }
 
 for i in range(2,7):
