@@ -40,7 +40,7 @@ hack/ci-test-e2e.sh ${E2E_EXTRA_ARGS} \
         --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
         --e2e.node-pool-replicas=2 \
         --e2e.aws-credentials-file=${CLUSTER_PROFILE_DIR}/.awscred \
-        --e2e.base-domain=shiftstack.devcluster.openshift.com \
+        --e2e.base-domain=origin-ci-int-aws.dev.rhcloud.com \
         --test.run="${E2E_TESTS_REGEX}" \
         --test.parallel=20 \
         --e2e.platform="OpenStack" \
