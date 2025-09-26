@@ -242,6 +242,9 @@ CONFIG = {
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
     },
+    'aws-sandboxed-containers-operator-quota-slice': {
+        'us-east-2': 10,
+    },
     'oex-aws-qe-quota-slice': {
         'default': 40,
     },
