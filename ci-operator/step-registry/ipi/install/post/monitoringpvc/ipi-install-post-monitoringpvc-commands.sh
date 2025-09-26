@@ -56,6 +56,7 @@ STORAGE="20Gi"
 # prevent the operator from reporting Upgradeable=false.
 cat >> "${PATCH}" << EOF
 prometheusK8s:
+  queryLogFile: /tmp/prometheus_queries.log
   volumeClaimTemplate:
     metadata:
       name: prometheus-data
