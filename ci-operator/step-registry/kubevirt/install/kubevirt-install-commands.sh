@@ -82,7 +82,20 @@ spec:
     registryPoll:
       interval: 8h
 EOF
+
+sleep 30
+
+STARTING_CSV=$(oc get packagemanifest -l cnv-prerelease-catalog-source -n openshift-marketplace)
+
+oc get catalogsources -n openshift-marketplace
+
+oc get packagemanifests -A -o custom-columns=NAME:.metadata.name,CATALOGSOURCE:.status.catalogSource,CATALOGSOURCENAMESPACE:.status.catalogSourceNamespace 
+
+
+
 fi
+
+
 
 oc apply -f - <<EOF
 apiVersion: v1
@@ -153,6 +166,8 @@ for i in $(seq ${RETRIES}); do
   fi
 done
 
+sleep 100
+
 if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
   echo "Error: Failed to deploy CNV"
   echo "CSV ${CSV} YAML"
@@ -188,3 +203,5 @@ spec:
 EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+
+
