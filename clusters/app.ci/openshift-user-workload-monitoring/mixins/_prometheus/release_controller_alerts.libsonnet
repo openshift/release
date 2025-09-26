@@ -66,6 +66,23 @@
           },
         ],
       },
+      {
+        name: 'release-controller-container-waiting',
+        rules: [
+          {
+            alert: 'releaseControllerContainerWaiting',
+            expr: 'kube_pod_container_status_waiting_reason{reason!="CrashLoopBackOff", namespace="ci", pod=~"release-controller.*"} > 0',
+            'for': '1h',
+            labels: {
+              severity: 'warning',
+              team: 'crt',
+            },
+            annotations: {
+              message: 'pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container}} has been in waiting state for longer than 1 hour. (reason: "{{ $labels.reason }}").',
+            },
+          },
+        ],
+      },
     ],
   },
 }
