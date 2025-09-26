@@ -50,7 +50,8 @@ STORAGE="20Gi"
 cat >> "${PATCH}" << EOF
 prometheusK8s:
   logLevel: debug
-  queryLogFile: /tmp/prometheus_queries.log
+  # queryLogFile: /tmp/prometheus_queries.log
+  queryLogFile: /dev/stdout
   volumeClaimTemplate:
     metadata:
       name: prometheus-data
