@@ -10,7 +10,7 @@ if [ ${BAREMETAL} == "true" ]; then
   bastion="$(cat /secret/address)"
   # Copy over the kubeconfig
   if [ ! -f "${SHARED_DIR}/kubeconfig" ]; then
-    ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
+    ssh ${SSH_ARGS} root@$bastion "cat ${BM_KUBECONFIG_PATH}" > /tmp/kubeconfig
     export KUBECONFIG=/tmp/kubeconfig
   else
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
