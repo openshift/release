@@ -214,6 +214,18 @@ for pqn in $(oc get pods -n openshift-etcd -l app=etcd --no-headers -o=name); do
 done
 echo "INFO: done attempting to fetch etcd debug info"
 
+echo "INFO: gathering coredumps if present"
+output_dir="${ARTIFACT_DIR}/coredumps"
+mkdir -p "$output_dir"
+oc adm node-logs -l kubernetes.io/os=linux --path="/var/lib/systemd/coredump/" | \
+  tee ${output_dir}/.coredumps_listing
+while IFS= read -r item; do
+  node=$(echo $item |cut -d ' ' -f 1)
+  fname=$(echo $item |cut -d ' ' -f 2)
+  echo "INFO: Queueing download/gzip of /var/lib/systemd/coredump/${fname} from ${node}";
+  echo "INFO: gziping to ${output_dir}/${node}-${fname}.gz";
+  FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/var/lib/systemd/coredump/${fname}
+done < ${output_dir}/.coredumps_listing
 
 function gather_network() {
   local namespace=$1
