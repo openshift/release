@@ -33,6 +33,8 @@ mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-list --all --name
 
 set +e
 
+echo "${LEASED_RESOURCE}"
+
 # Remove conflicting domains
 for DOMAIN in $(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" list --all --name | grep "${LEASED_RESOURCE}")
 do

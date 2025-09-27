@@ -141,6 +141,7 @@ export TF_LOG_PATH=${ARTIFACT_DIR}/terraform.log
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "Creating manifest"
+sleep 30m
 mock-nss.sh openshift-install create manifests --dir=${dir}
 sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 
