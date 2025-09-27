@@ -153,6 +153,9 @@ CONFIG = {
         'us-west-1': 60,
         'us-west-2': 60,
     },
+    'aws-confidential-qe-quota-slice': {
+        'us-east-2': 6,
+    },
     'aws-devfile-quota-slice': {
         'us-west-2': 10
     },
