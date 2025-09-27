@@ -374,7 +374,7 @@ tests:
 - as: aws-ipi-peerpods
   cron: 0 0 31 2 1
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-sandboxed-containers-operator
     env:
       AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
@@ -399,7 +399,7 @@ tests:
 - as: aws-ipi-coco
   cron: 0 0 31 2 1
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-sandboxed-containers-operator
     env:
       AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
