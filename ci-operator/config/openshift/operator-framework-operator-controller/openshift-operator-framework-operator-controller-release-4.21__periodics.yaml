@@ -1,0 +1,68 @@
+base_images:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  ocp_4.21_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: default-catalog-consistency
+  cron: 0 */4 * * *
+  steps:
+    test:
+    - as: default-catalog-tests
+      commands: |
+        echo "Running Default Catalog Tests"
+        cd openshift/default-catalog-consistency
+        REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
+      credentials:
+      - collection: ""
+        mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-aws-ovn-techpreview-f2
+  cron: 9 13 1-31/2 * *
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/parallel
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-f3
+  cron: 10 5 1-31/3 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/parallel
+    workflow: openshift-e2e-aws-ovn
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: operator-framework-operator-controller
+  variant: periodics

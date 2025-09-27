@@ -41,6 +41,21 @@ spec:
   - mirrors:
     - quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-$TEST_TYPE
     source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-operator-bundle  
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-rhel8-operator
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-content-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-content-rhel8
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-openscap-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-openscap-rhel8
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-must-gather-$TEST_TYPE
+    source: registry.redhat.io/compliance/openshift-compliance-must-gather-rhel8
 EOF
     echo "!!! fail to create the ICSP"
     return 1
