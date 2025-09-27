@@ -333,7 +333,11 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-check_clusteroperators_status
+if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+    echo "$(date) - skipping clusteroperators status check"
+else
+    check_clusteroperators_status
+fi
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
@@ -375,9 +379,34 @@ done
 
 # wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
 # any e2e tests that might require specific workload capacity.
-echo "$(date) - waiting for nodes to be ready..."
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-echo "$(date) - all nodes are ready"
+if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+  echo "$(date) - skipping node readiness check because SKIP_READINESS_CHECKS is set to true"
+else
+  echo "$(date) - waiting for nodes to be ready..."
+  oc wait nodes --all --for=condition=Ready=true --timeout=10m
+  echo "$(date) - all nodes are ready"
+fi
+
+
+# Check for image registry availability
+for _ in {1..11}; do
+  count=$(oc get configs.imageregistry.operator.openshift.io/cluster --no-headers | wc -l)
+  echo "Image registry count: ${count}"
+  if [[ ${count} -gt 0 ]]; then
+    break
+  fi
+  sleep 30
+done
+
+# Check for imagestreams availability
+for _ in {1..11}; do
+  if ! oc get imagestreams --all-namespaces; then
+    sleep 30
+  else
+    echo "$(date) - Imagestreams are available"
+    break
+  fi
+done
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 echo "$(date) - waiting for non-samples imagesteams to import..."
@@ -412,10 +441,14 @@ echo "$(date) - all imagestreams are imported."
 
 # In some cases the cluster events are processed slowly by the kube-apiservers,
 # producing a late revision updates that could be missed by the previous co check.
-echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
-sleep 10m
+if [[ "${SKIP_READINESS_CHECKS}" == "true" ]]; then
+    echo "$(date) - skipping secondary clusteroperators status check"
+else
+  echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
+  sleep 10m
 
-check_clusteroperators_status
+  check_clusteroperators_status
+fi
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
