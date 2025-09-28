@@ -18,6 +18,14 @@ else
     PUBLIC_PROXY_URL=$(< "${proxy_public_url_file}")
 fi
 
+NO_PROXY_URLS="localhost,127.0.0.1"
+if [[ -f "${SHARED_DIR}/additional_no_proxy_urls" ]]; then
+    echo "Appending cluster's API/API-INT/APPS URLs as NO_PROXY URLs..."
+    additional_no_proxy_urls=$(cat "${SHARED_DIR}/additional_no_proxy_urls")
+    NO_PROXY_URLS="${NO_PROXY_URLS},${additional_no_proxy_urls}"
+fi
+echo "NO_PROXY_URLS: '${NO_PROXY_URLS}'"
+
 if [ -z "${PUBLIC_PROXY_URL}" ]; then
     echo "Empty proxy setting!"
     exit 1
@@ -25,10 +33,10 @@ else
     cat > "${SHARED_DIR}/proxy-conf.sh" << EOF
 export http_proxy=${PUBLIC_PROXY_URL}
 export https_proxy=${PUBLIC_PROXY_URL}
-export no_proxy="localhost,127.0.0.1"
+export no_proxy="${NO_PROXY_URLS}"
 export HTTP_PROXY=${PUBLIC_PROXY_URL}
 export HTTPS_PROXY=${PUBLIC_PROXY_URL}
-export NO_PROXY="localhost,127.0.0.1"
+export NO_PROXY="${NO_PROXY_URLS}"
 EOF
     cat > "${SHARED_DIR}/unset-proxy.sh" << EOF
 unset http_proxy
