@@ -14,11 +14,11 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.20"
+    tag: "4.21"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.19"
+    tag: "4.20"
   tools:
     name: "4.14"
     namespace: ocp
@@ -41,7 +41,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
   intermediate415:
     candidate:
       architecture: amd64
@@ -72,6 +72,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.19"
+  intermediate420:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
   latest:
     release:
       architecture: amd64
@@ -82,7 +88,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -90,14 +96,16 @@ resources:
       memory: 200Mi
 tests:
 - as: ibmcloud-ipi-ovn-ipsec-f28
-  cron: 38 9 4 * *
+  cron: 27 1 17 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -119,16 +127,18 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
-  cron: 54 7 2 * *
+  cron: 11 1 10 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
       FIPS_ENABLED: "true"
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -149,16 +159,18 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-ipi-ovn-dualstack-privmaryv6-f28
-  cron: 50 3 5 * *
+  cron: 34 8 26 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStackIPv6Primary
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -179,7 +191,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.21
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-4.20-upgrade-from-stable-4.14
+  variant: amd64-nightly-4.21-upgrade-from-stable-4.14

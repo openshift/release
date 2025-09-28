@@ -14,11 +14,11 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.20"
+    tag: "4.21"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.19"
+    tag: "4.20"
   tools:
     name: "4.12"
     namespace: ocp
@@ -41,17 +41,16 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
   intermediate413:
     release:
       architecture: amd64
       channel: fast
       version: "4.13"
   intermediate414:
-    candidate:
+    release:
       architecture: amd64
-      product: ocp
-      stream: nightly
+      channel: fast
       version: "4.14"
   intermediate415:
     candidate:
@@ -83,6 +82,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.19"
+  intermediate420:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
   latest:
     release:
       architecture: amd64
@@ -93,7 +98,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -101,14 +106,16 @@ resources:
       memory: 200Mi
 tests:
 - as: vsphere-upi-f28
-  cron: 38 17 13 * *
+  cron: 6 13 20 * *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -133,7 +140,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-vsphere-upi
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.21
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-4.20-upgrade-from-stable-4.12
+  variant: amd64-nightly-4.21-upgrade-from-stable-4.12
