@@ -590,7 +590,11 @@ export HOME=/tmp
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     # shellcheck disable=SC1090
+    echo "[INFO] Export http_proxy/https_proxy/no_proxy setting..."
+    cat "${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
+    echo "[DEBUG] the enabled proxy settings: "
+    env | grep -E "http_proxy=|https_proxy=|no_proxy=|HTTP_PROXY=|HTTPS_PROXY=|NO_PROXY="
 fi
 
 case "${CLUSTER_TYPE}" in
