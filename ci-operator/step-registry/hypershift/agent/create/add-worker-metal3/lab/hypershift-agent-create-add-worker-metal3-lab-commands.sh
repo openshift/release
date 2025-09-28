@@ -118,6 +118,14 @@ spec:
     name: ${name}-network-config-secret
     namespace: ${AGENT_NAMESPACE}
 EOF
+
+  # Wait for BMH to be ready before proceeding to next host
+  echo "[INFO] Waiting for BMH ${name} to be ready..."
+  oc wait -n "${AGENT_NAMESPACE}" --for=condition=Ready --timeout=10m bmh/${name}
+  
+  # Add delay between BMH creations to avoid race conditions
+  echo "[INFO] Waiting 30 seconds before creating next BMH..."
+  sleep 30
 done
 
 nodepool_expected_size=$(yq e '[.[] | select(.name|test("worker-a"))]|length' "${SHARED_DIR}/hosts.yaml")
