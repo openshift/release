@@ -1,0 +1,26 @@
+workflow:
+  as: openshift-e2e-azure-custom-dns
+  steps: 
+    env:
+      BASE_DOMAIN: qe1.devcluster.openshift.com
+    pre:
+    - chain: ipi-conf-azure
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install
+    - ref: azure-provision-public-custom-dns
+    - ref: aws-provision-route53-public-record-sets
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-user-provisioned-dns
+    test:
+    - ref: openshift-e2e-test
+    post:
+      - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+      - ref: aws-deprovision-route53-public-record-sets
+  documentation: |-
+    The OpenShift Azure Custom DNS workflow for testing the feature
