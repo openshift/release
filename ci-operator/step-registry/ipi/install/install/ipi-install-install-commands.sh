@@ -609,7 +609,11 @@ export HOME=/tmp
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     # shellcheck disable=SC1090
+    echo "[INFO] Export http_proxy/https_proxy/no_proxy setting..."
+    cat "${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
+    echo "[DEBUG] the enabled proxy settings: "
+    env | grep -E "http_proxy=|https_proxy=|no_proxy=|HTTP_PROXY=|HTTPS_PROXY=|NO_PROXY="
 fi
 
 case "${CLUSTER_TYPE}" in
@@ -861,6 +865,9 @@ set -o errexit
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+
+echo "[DEBUG] Saving the kubeconfig..."
+cp "${dir}/auth/kubeconfig" "${ARTIFACT_DIR}/"
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
