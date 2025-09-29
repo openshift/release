@@ -13,7 +13,7 @@ export KUBECONFIG=/tmp/kubeconfig
 CLUSTER_NAME="$(cat "${SHARED_DIR}/managed.cluster.name")"
 POLICY_NS=${POLICY_NS:-"install-cnv"}
 
-oc create namepsace $POLICY_NS
+oc create namespace $POLICY_NS
 
 # oc create -f - <<EOF
 #         apiVersion: cluster.open-cluster-management.io/v1beta2

@@ -106,6 +106,7 @@ list_deprovision_crs() {
 }
 
 echo "[INFO] $(now) waiting for deprovision job to complete (timeout: ${TIMEOUT_MINUTES}m)_"
+sleep 3600
 while true; do
 #start or switch log stream if a provision pod exists
   POD="$(pick_deprovision_pod || true)"
