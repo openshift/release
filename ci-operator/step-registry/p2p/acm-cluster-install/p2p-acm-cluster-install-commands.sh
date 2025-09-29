@@ -295,57 +295,6 @@ while true; do
   sleep "$POLL_SECONDS"
 done
 
-# dump_diag() {
-#   echo "====== DIAGNOSTICS ($(now)) ========"
-#   echo "CLuster Deployment CRD conditions"
-#   oc -n "$CLUSTER_NAME" get clusterdeployment "$CLUSTER_NAME" -ojson \
-#      | jq -r '.status.conditions[]? | "\(.type)=\(.status) \(.reason) \(.message)"' || true
-#   echo
-#   echo "[Recent events]"
-#   oc -n "$CLUSTER_NAME" get events --sort-by=.lastTimestamp | tail -n 30 || true
-#   echo
-#   echo "[ClusterProvisions]"
-#   oc -n "$CLUSTER_NAME" get clusterprovisions -l hive.openshift.io/cluster-deployment-name="$CLUSTER_NAME" || true
-#   echo
-#   echo "[Provision pod logs (tail)]"
-#   provPod=$(oc -n "$CLUSTER_NAME" get pod -l hive.openshift.io/job-type=provision -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-#   if [[ -n "${provPod:-}" ]]; then
-#      oc -n "$CLUSTER_NAME" logs "$provPod" -c installer --tail=200 || true
-#   else
-#      echo "No provision pod found"
-#   fi
-#   echo "==================================="
-# }
-
-
-
-#monitor install untill success/fail/timeout
-# while true; do
-#   installed=$(oc -n "$CLUSTER_NAME" get clusterdeployment "$CLUSTER_NAME" -o jsonpath='{.spec.installed}' 2>/dev/null || echo "")
-#   if [[ "$installed" == "true" ]]; then
-#      echo "[INFO] $(now) Install complete: spec.installed=true"
-#      break
-#   fi
-
-#   # check for terminal failure:
-#   reason=$(oc -n "$CLUSTER_NAME" get clusterdeployment "$CLUSTER_NAME" -o json \
-#     | jq -r '.status.condition[]? | select(.type=="ProvisionStopped" and .status=="True") | .reason' || true)
-#   if [[ "${reason:-}" ]]; then
-#      echo "[ERROR] Provision stopped (reason=${reason})."
-#      dump_diag; exit 2
-#   fi
-#   #progress hints
-#   msg=$(oc -n "$CLUSTER_NAME" get clusterdeployment "$CLUSTER_NAME" -o json \
-#     | jq -r '.status.conditions[]? | select(.type=="ProvisionSucceeded" or .type=="ProvisionStopped" or .type=="RequirementsMet" or .type=="Provisioned" or .type=="InstallImagesNotResolved" or .type=="ProvisionFailed") | "\(.type): \(.status) \| \(.reason)  \| \(.message)"' | tr '\n' ' ' || true)
-#   [[ -n "${msg:-}" ]] && echo "[INFO] $(now) ${msg}"
-  
-#   if (( $(date +%s) > deadline )); then
-#     echo "[ERROR] install timed out after ${INSTALL_TIMEOUT_MINUTES} minutes"
-#     dump_diag; exit 3
-#   fi
-#   sleep "$POLL_SECONDS"
-# done
-
 # fetch kubeconfig on success
 KUBE_SECRET=$(oc -n "$CLUSTER_NAME" get clusterprovision -o json \
   | jq -r '.items | sort_by(.metadata.creationTimestamp)[-1].spec.adminKubeconfigSecretRef.name')

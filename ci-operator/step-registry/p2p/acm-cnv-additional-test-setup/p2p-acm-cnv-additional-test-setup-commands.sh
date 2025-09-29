@@ -13,7 +13,7 @@ export KUBECONFIG=/tmp/kubeconfig
 CLUSTER_NAME="$(cat "${SHARED_DIR}/managed.cluster.name")"
 POLICY_NS=${POLICY_NS:-"install-cnv"}
 
-oc create namepsace $POLICY_NS
+oc create namespace $POLICY_NS
 
 # oc create -f - <<EOF
 #         apiVersion: cluster.open-cluster-management.io/v1beta2
@@ -28,19 +28,12 @@ oc create -f - <<EOF
         apiVersion: cluster.open-cluster-management.io/v1beta2
         kind: ManagedClusterSetBinding
         metadata:
-          name: ${CLUSTER_NAME}
+          name: ${CLUSTER_NAME}-set
           namespace: ${POLICY_NS}
         spec:
-          clusterSet: ${CLUSTER_NAME}
+          clusterSet: ${CLUSTER_NAME}-set
 EOF
-
-
-
 # oc label managedcluster local-cluster cluster.open-cluster-management.io/clusterset=managed-cluster-set --overwrite
-
-
-
-
 
 oc create -f - <<EOF
 apiVersion: policy.open-cluster-management.io/v1
@@ -190,7 +183,7 @@ apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
   name: install-cnv-placement
-  namespace: ${CLUSTER_NAME}
+  namespace: ${POLICY_NS}
 spec:
   tolerations:
     - key: cluster.open-cluster-management.io/unreachable
@@ -204,17 +197,19 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
 metadata:
   name: install-cnv-placement
-  namespace: ${CLUSTER_NAME}
+  namespace: ${POLICY_NS}
 placementRef:
   name: install-cnv-placement
   apiGroup: cluster.open-cluster-management.io
   kind: Placement
 subjects:
-  - name: install-cnv
+  - name: install-cnv-operator
     apiGroup: policy.open-cluster-management.io
     kind: Policy
 
 EOF
 
-oc --kubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig" wait HyperConverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m
+sleep 900
+
+oc --kubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig" wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=20m
 
