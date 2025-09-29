@@ -1,14 +1,14 @@
+base_images:
+  base:
+    name: "4.18"
+    namespace: ocp
+    tag: base-rhel9
 binary_build_commands: go build .
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.23
-base_images:
-  base:
-    name: "4.18"
-    namespace: ocp
-    tag: base-rhel9
 images:
 - dockerfile_literal: |-
     FROM base
@@ -38,15 +38,16 @@ tests:
 - as: tls-scanner
   steps:
     cluster_profile: aws
-    workflow: ipi-aws
     test:
     - as: run-scanner-on-cluster
       cli: latest
-      commands: ./deploy.sh "$ARTIFACT_DIR"/tls-scanner-report.xml
+      commands: /usr/local/bin/tls-scanner -all-pods -junitxml "${ARTIFACT_DIR}/tls-scanner/report.xml"
+        -limit-ips 4
       from: src
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
