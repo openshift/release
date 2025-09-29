@@ -112,6 +112,27 @@ tests:
       PUBLIC_VLAN: "false"
       TYPE: mno
     workflow: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: deploy-mno-hybrid-private-vlan
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BAREMETAL: "true"
+      NUM_HYBRID_WORKER_NODES: "2"
+      NUM_NODES: "1"
+      NUM_WORKER_NODES: "1"
+      PUBLIC_VLAN: "false"
+      STARTING_NODE: "5"
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-foreman
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
 zz_generated_metadata:
   branch: main
   org: redhat-performance
