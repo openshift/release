@@ -53,7 +53,8 @@ DriverInfo:
     controllerExpansion: true
     nodeExpansion: true
     volumeLimits: false
-    snapshotDataSource: false
+    snapshotDataSource: true
+    pvcDataSource: true
 EOF
 
 echo "Using manifest file ${MANIFEST_LOCATION}"
