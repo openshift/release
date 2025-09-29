@@ -119,9 +119,39 @@ spec:
     namespace: ${AGENT_NAMESPACE}
 EOF
 
-  # Wait for BMH to be ready before proceeding to next host
-  echo "[INFO] Waiting for BMH ${name} to be ready..."
-  oc wait -n "${AGENT_NAMESPACE}" --for=condition=Ready --timeout=10m bmh/${name}
+  # Wait for BMH to reach available state before proceeding to next host
+  echo "[INFO] Waiting for BMH ${name} to become available..."
+  retries=3
+  for attempt in $(seq 1 ${retries}); do
+    # Wait for BMH to reach 'available' state (ready to be provisioned)
+    timeout_seconds=1200  # 20 minutes
+    elapsed=0
+    while [ ${elapsed} -lt ${timeout_seconds} ]; do
+      bmh_state=$(oc get -n "${AGENT_NAMESPACE}" bmh/${name} -o jsonpath='{.status.provisioning.state}' 2>/dev/null || echo "")
+      if [ "${bmh_state}" = "available" ]; then
+        echo "[INFO] BMH ${name} is available after attempt ${attempt}"
+        break 2  # Break out of both loops
+      elif [ "${bmh_state}" = "provisioning" ] || [ "${bmh_state}" = "provisioned" ]; then
+        echo "[INFO] BMH ${name} is already being provisioned (state: ${bmh_state})"
+        break 2  # Break out of both loops - this is also acceptable
+      fi
+      echo "[DEBUG] BMH ${name} state: ${bmh_state}, waiting..."
+      sleep 30
+      elapsed=$((elapsed + 30))
+    done
+    
+    if [ ${elapsed} -ge ${timeout_seconds} ] && [ ${attempt} -lt ${retries} ]; then
+      echo "[WARN] BMH ${name} not available on attempt ${attempt}/${retries}, retrying in 60 seconds..."
+      sleep 60
+    elif [ ${elapsed} -ge ${timeout_seconds} ]; then
+      echo "[ERROR] BMH ${name} failed to become available after ${retries} attempts"
+      oc get -n "${AGENT_NAMESPACE}" bmh/${name} -o yaml || true
+      oc describe -n "${AGENT_NAMESPACE}" bmh/${name} || true
+      exit 1
+    else
+      break  # Success, exit retry loop
+    fi
+  done
   
   # Add delay between BMH creations to avoid race conditions
   echo "[INFO] Waiting 30 seconds before creating next BMH..."
