@@ -1,22 +1,20 @@
+base_images:
+  lightspeed-service-api:
+    name: lightspeed-service-api
+    namespace: ols
+    tag: latest
 build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
       RUN dnf install -y podman
-images:
-- dockerfile_path: Containerfile
-  to: lightspeed-service-api
-promotion:
-  to:
-  - namespace: ols
-    tag: latest
 releases:
   latest:
-    release:
-      architecture: multi
-      channel: stable
-      version: "4.16"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -25,43 +23,7 @@ resources:
       cpu: 100m
       memory: 4Gi
 tests:
-- as: verify
-  commands: make verify
-  container:
-    from: src
-  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
-- as: unit
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make install-deps && make install-deps-test && make test-unit
-  container:
-    from: src
-  secret:
-    mount_path: /tmp/secret
-    name: ols-codecov-token
-  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
-- as: integration
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make install-deps && make install-deps-test && make test-integration
-  container:
-    from: src
-  secret:
-    mount_path: /tmp/secret
-    name: ols-codecov-token
-  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
-- as: security
-  optional: true
-  steps:
-    workflow: openshift-ci-security
-- as: fips-image-scan-service
-  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    dependencies:
-      SCAN_IMAGE: lightspeed-service-api
-    test:
-    - ref: fips-check-image-scan
-- as: e2e-ols-cluster
+- as: e2e-ols-cluster-periodics
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -72,7 +34,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.19"
-  run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
+  cron: 10 4 * * *
   steps:
     allow_skip_on_success: true
     post:
@@ -99,7 +61,7 @@ tests:
 
         export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
 
-        tests/scripts/test-e2e-cluster.sh
+        tests/scripts/test-e2e-cluster-periodics.sh
       credentials:
       - collection: ""
         mount_path: /var/run/azure_openai
@@ -149,7 +111,7 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: ols-evaluation
+- as: ols-evaluation-periodics
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -160,7 +122,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.19"
-  run_if_changed: ^(Containerfile|tests/e2e/scripts/test-evaluation.sh|tests/e2e/scripts/utils.sh|Makefile|tests/e2e/evaluation/.*|ols/src/llms/providers/.*|ols/src/prompts/.*|ols/src/query_helpers/docs_summarizer.py|ols/src/rag_index/.*|ols/src/tools/.*|ols/utils/token_handler.py|ols/constants.py)$
+  cron: 10 8 * * *
   steps:
     allow_skip_on_success: true
     post:
@@ -199,3 +161,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: lightspeed-service
+  variant: "4.19"
