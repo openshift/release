@@ -55,9 +55,6 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
-  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/config" | jq ".hypervisor_nic_interface")
-  export HV_NIC_INTERFACE
-
   cat <<EOF >>/tmp/all.yml
 hybrid_worker_count: $NUM_HYBRID_WORKER_NODES
 hv_ip_offset: 0
@@ -66,7 +63,6 @@ hv_inventory: true
 compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_ssh_pass: $LOGIN
-hypervisor_nic_interface_idx: $HV_NIC_INTERFACE
 EOF
   cat <<EOF >>/tmp/hv.yml
 install_tc: false
@@ -78,7 +74,6 @@ compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_vm_generate_manifests: false
 sno_cluster_count: 0
-hypervisor_nic_interface_idx: $HV_NIC_INTERFACE
 EOF
 fi
 
