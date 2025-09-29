@@ -4,6 +4,11 @@ set -o errexit
 set -o pipefail
 
 FUSION_ACCESS_NAMESPACE="${FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
+IBM_REGISTRY="${IBM_REGISTRY:-cp.icr.io}"
+
+# Credential paths
+IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/fusion-access-operator/ibm-entitlement-key"
+FUSION_PULL_SECRET_EXTRA_PATH="/var/run/secrets/fusion-access-operator/fusion-pullsecret-extra"
 
 echo "🚀 Creating Fusion Access pull secrets..."
 
@@ -17,30 +22,35 @@ fi
 echo "✅ Namespace ${FUSION_ACCESS_NAMESPACE} exists"
 
 # Get IBM entitlement key from the standard location
-IBM_ENTITLEMENT_KEY=""
 IBM_ENTITLEMENT_AVAILABLE=false
 
 echo "🔍 Checking for IBM entitlement credentials..."
 
 # Check the standard mounted secret path
-if [[ -f "/var/run/secrets/ibm-entitlement-key" ]]; then
-  echo "✅ IBM entitlement credentials found at: /var/run/secrets/ibm-entitlement-key"
-  IBM_ENTITLEMENT_KEY="$(cat /var/run/secrets/ibm-entitlement-key)"
+if [[ -f "$IBM_ENTITLEMENT_KEY_PATH" ]]; then
+  echo "✅ IBM entitlement credentials found at: $IBM_ENTITLEMENT_KEY_PATH"
+  IBM_ENTITLEMENT_KEY="$(cat "$IBM_ENTITLEMENT_KEY_PATH")"
   IBM_ENTITLEMENT_AVAILABLE=true
 else
-  echo "❌ IBM entitlement credentials not found at: /var/run/secrets/ibm-entitlement-key"
+  echo "❌ IBM entitlement credentials not found at: $IBM_ENTITLEMENT_KEY_PATH"
 fi
 
 # Get additional pull secret from the standard location
 echo "🔍 Checking for additional pull secret credentials..."
 
 # Check the standard mounted secret path
-if [[ -f "/var/run/secrets/fusion-pullsecret-extra" ]]; then
-  echo "✅ Additional pull secret credentials found at: /var/run/secrets/fusion-pullsecret-extra"
-  FUSION_PULL_SECRET_EXTRA="$(cat /var/run/secrets/fusion-pullsecret-extra)"
+if [[ -f "$FUSION_PULL_SECRET_EXTRA_PATH" ]]; then
+  echo "✅ Additional pull secret credentials found at: $FUSION_PULL_SECRET_EXTRA_PATH"
+  FUSION_PULL_SECRET_EXTRA="$(cat "$FUSION_PULL_SECRET_EXTRA_PATH")"
   echo "✅ FUSION_PULL_SECRET_EXTRA environment variable set from mounted secret"
 else
-  echo "❌ Additional pull secret credentials not found at: /var/run/secrets/fusion-pullsecret-extra"
+  echo "❌ Additional pull secret credentials not found at: $FUSION_PULL_SECRET_EXTRA_PATH"
+fi
+
+# Check if credentials are available as environment variable (fallback)
+if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "false" ]] && [[ -n "${IBM_ENTITLEMENT_KEY:-}" ]]; then
+  echo "✅ IBM entitlement credentials found in environment variable"
+  IBM_ENTITLEMENT_AVAILABLE=true
 fi
 
 # Check if credentials are missing (unexpected in rehearsal runs)
@@ -49,7 +59,7 @@ if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "false" ]]; then
   echo "❌ ERROR: IBM entitlement credentials not found at expected location"
   echo "IBM Storage Scale images require IBM entitlement to pull from icr.io"
   echo ""
-  echo "Expected location: /var/run/secrets/ibm-entitlement-key"
+  echo "Expected location: $IBM_ENTITLEMENT_KEY_PATH"
   echo ""
   echo "This is unexpected - rehearsal runs should have IBM credentials available"
   echo "Please check the credential mounting configuration"
@@ -82,7 +92,7 @@ elif [[ "$IBM_ENTITLEMENT_AVAILABLE" == "true" ]]; then
   echo "🔍 Credential details:"
   echo "  - Key length: ${#IBM_ENTITLEMENT_KEY} characters"
   echo "  - Key format: ${IBM_ENTITLEMENT_KEY:0:10}... (first 10 chars)"
-  echo "  - Target registry: icr.io"
+  echo "  - Target registry: ${IBM_REGISTRY}"
   
   # Create the secret in the correct format for IBM Container Registry
   oc apply -f=- <<EOF
@@ -96,7 +106,7 @@ stringData:
   .dockerconfigjson: |
     {
       "auths": {
-        "icr.io": {
+        "${IBM_REGISTRY}": {
           "auth": "$(echo -n "cp:${IBM_ENTITLEMENT_KEY}" | base64 -w 0)",
           "email": ""
         }
@@ -107,6 +117,56 @@ EOF
   echo "Waiting for fusion-pullsecret to be ready..."
   oc wait --for=jsonpath='{.metadata.name}'=fusion-pullsecret secret/fusion-pullsecret -n ${FUSION_ACCESS_NAMESPACE} --timeout=60s
   echo "✅ fusion-pullsecret created successfully"
+  
+  # Also create ibm-entitlement-key secret for IBM Storage Scale pods
+  echo "🔐 Creating ibm-entitlement-key secret for IBM Storage Scale..."
+  oc apply -f=- <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ibm-entitlement-key
+  namespace: ${FUSION_ACCESS_NAMESPACE}
+type: kubernetes.io/dockerconfigjson
+stringData:
+  .dockerconfigjson: |
+    {
+      "auths": {
+        "${IBM_REGISTRY}": {
+          "auth": "$(echo -n "cp:${IBM_ENTITLEMENT_KEY}" | base64 -w 0)",
+          "email": ""
+        }
+      }
+    }
+EOF
+  
+  echo "Waiting for ibm-entitlement-key to be ready..."
+  oc wait --for=jsonpath='{.metadata.name}'=ibm-entitlement-key secret/ibm-entitlement-key -n ${FUSION_ACCESS_NAMESPACE} --timeout=60s
+  echo "✅ ibm-entitlement-key created successfully"
+  
+  # Also create ibm-entitlement-key secret in ibm-spectrum-scale namespace
+  echo "🔐 Creating ibm-entitlement-key secret in ibm-spectrum-scale namespace..."
+  oc apply -f=- <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ibm-entitlement-key
+  namespace: ibm-spectrum-scale
+type: kubernetes.io/dockerconfigjson
+stringData:
+  .dockerconfigjson: |
+    {
+      "auths": {
+        "${IBM_REGISTRY}": {
+          "auth": "$(echo -n "cp:${IBM_ENTITLEMENT_KEY}" | base64 -w 0)",
+          "email": ""
+        }
+      }
+    }
+EOF
+  
+  echo "Waiting for ibm-entitlement-key in ibm-spectrum-scale namespace..."
+  oc wait --for=jsonpath='{.metadata.name}'=ibm-entitlement-key secret/ibm-entitlement-key -n ibm-spectrum-scale --timeout=60s
+  echo "✅ ibm-entitlement-key created in ibm-spectrum-scale namespace"
   
   # Verify the secret was created
   if oc get secret fusion-pullsecret -n "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
@@ -234,11 +294,14 @@ if oc get secret fusion-pullsecret -n "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>
   echo "✅ Service account: Updated with pull secret"
 elif [[ "$IBM_ENTITLEMENT_AVAILABLE" == "true" ]]; then
   echo "✅ IBM entitlement credentials: Available"
-  echo "✅ fusion-pullsecret: Created"
+  echo "✅ fusion-pullsecret: Created (supports ${IBM_REGISTRY})"
+  echo "✅ ibm-entitlement-key: Created in fusion-access namespace"
+  echo "✅ ibm-entitlement-key: Created in ibm-spectrum-scale namespace"
   echo "✅ Service account: Updated with pull secret"
 else
   echo "❌ IBM entitlement credentials: Not available (unexpected)"
   echo "❌ fusion-pullsecret: Not created"
+  echo "❌ ibm-entitlement-key: Not created"
   echo "❌ This indicates a credential mounting issue"
 fi
 
