@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build07
+  cluster: build06
   cron: 0 */4 * * 1-5
   decorate: true
   decoration_config:
@@ -16,6 +16,14 @@ periodics:
     job-release: "4.17"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-tests-master-jira-notificator
+  reporter_config:
+    slack:
+      channel: '#alerts-ocp-ert'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> @errata-reliability-team Please check!
   spec:
     containers:
     - args:
@@ -63,7 +71,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build09
   cron: 15 * * * *
   decorate: true
   decoration_config:

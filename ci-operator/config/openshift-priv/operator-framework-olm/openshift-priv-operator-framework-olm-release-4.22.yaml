@@ -102,7 +102,7 @@ tests:
   container:
     from: ci-image
 - as: e2e-gcp-olm
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
     cluster_profile: gcp-3
     test:
@@ -132,7 +132,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-gcp-olm-flaky
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
     cluster_profile: gcp
     test:
@@ -145,7 +145,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-gcp-console-olm
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
     cluster_profile: gcp
     test:
@@ -160,7 +160,7 @@ tests:
 - as: e2e-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-4
     workflow: openshift-upgrade-aws
 - as: verify-deps
   steps:
@@ -168,6 +168,29 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: tests-extension
+  run_if_changed: ^(tests-extension/)
+  steps:
+    test:
+    - as: sanity
+      commands: |
+        cd tests-extension
+        make verify
+        make build
+        make verify-metadata
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-aws-olmv0-ext
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/all
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv
