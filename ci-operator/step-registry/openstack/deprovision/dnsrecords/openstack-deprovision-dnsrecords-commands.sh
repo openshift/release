@@ -8,10 +8,6 @@ export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws/.awscred"
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
 
-if [ -z "${AWS_PROFILE:-}" ]; then
-  unset AWS_PROFILE
-fi
-
 if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ]; then
   echo "Credentials file is not correctly mounted"
 fi

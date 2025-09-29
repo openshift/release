@@ -1,0 +1,107 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: baremetal-compact-agent-ipv4-dhcp-day2-amd-mixarch-f28
+  capabilities:
+  - intranet
+  cron: 34 17 13 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "1"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic-day2
+- as: baremetal-compact-agent-ipv4-dhcp-disc-day2-amd-mixarch-f28
+  capabilities:
+  - intranet
+  cron: 12 13 24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "1"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic-disconnected-day2
+- as: baremetal-compact-agent-ipv4-dhcp-day2-arm-mixarch-f28
+  capabilities:
+  - intranet
+  cron: 32 14 5 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic-day2
+- as: baremetal-compact-agent-ipv4-dhcp-disc-day2-arm-mixarch-f28
+  capabilities:
+  - intranet
+  cron: 34 21 3 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    workflow: baremetal-lab-agent-install-network-dynamic-disconnected-day2
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-eng
+  repo: agent-qe-infra
+  variant: multi-nightly
