@@ -101,12 +101,16 @@ if [[ -d "/tmp/$NODE_DENSITY_HEAVY_UUID" &&  -f "/tmp/$NODE_DENSITY_HEAVY_UUID/i
     jq ".iterations = $PODS_PER_NODE"  >> "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json"
     cp "/tmp/$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}/${WORKLOAD}-index_data.json"
     cp "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" "${SHARED_DIR}/${WORKLOAD}-index_data.json"
+else
+    echo "$WORKLOAD UUID not found" && exit 1
 fi
 
 if [[ -d "/tmp/$INGRESS_PERF_UUID" && -f "/tmp/$INGRESS_PERF_UUID/index_data.json" ]]; then
     cp /tmp/ingress-perf-uuid.txt "${ARTIFACT_DIR}"/ingress-perf-uuid.txt
     cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${ARTIFACT_DIR}/ingress-perf-index_data.json"
     cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${SHARED_DIR}/ingress-perf-index_data.json"
+else
+    echo "ingress-perf UUID not found" && exit 1
 fi
 
 echo "######## $WORKLOAD run logs ########"
