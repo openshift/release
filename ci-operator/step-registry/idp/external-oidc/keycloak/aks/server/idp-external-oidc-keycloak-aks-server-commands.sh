@@ -72,6 +72,11 @@ namespace: keycloak
 auth:
   adminUser: ${KEYCLOAK_ADMIN_TEST_USER}
   adminPassword: "${KEYCLOAK_ADMIN_TEST_PASSWORD}"
+image:
+  registry: docker.io
+  repository: bitnamilegacy/keycloak
+  tag: 26.3.3-debian-12-r0
+  pullPolicy: IfNotPresent
 
 securityContext:
   enabled: true
@@ -296,6 +301,12 @@ ingress:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 
+postgresql:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r0
+
 resources:
   requests:
     cpu: 500m
@@ -323,7 +334,7 @@ EOF
 oc get pods,svc,ing -n keycloak
 
 # Save user info and Keycloak host info to shared dir for later use
-ISSUER_URL=https://${KEYCLOAK_HOST}/realms/master
+KEYCLOAK_ISSUER=https://${KEYCLOAK_HOST}/realms/master
 CONSOLE_CLIENT_ID=console-test
 CONSOLE_CLIENT_SECRET_NAME=authid-console-openshift-console
 CLI_CLIENT_ID=oc-cli-test
@@ -340,12 +351,11 @@ metadata:
   annotations:
     hypershift.openshift.io/hosted-cluster-sourced: "true"
   creationTimestamp: null
-  name: test
+  name: ${CONSOLE_CLIENT_SECRET_NAME}
 EOF
 else
     oc create secret generic ${CONSOLE_CLIENT_SECRET_NAME} --from-literal=clientSecret=${CONSOLE_CLIENT_SECRET_VALUE} --dry-run=client -o yaml > "${SHARED_DIR}"/oidcProviders-secret-configmap.yaml
 fi
-
 # Spaces or symbol characters in below "name" should work, in case of similar bug OCPBUGS-44099 in old IDP area
 cat > "${SHARED_DIR}"/oidcProviders.json << EOF
 {
@@ -356,7 +366,7 @@ cat > "${SHARED_DIR}"/oidcProviders.json << EOF
         "username": {"claim": "email", "prefixPolicy": "Prefix", "prefix": {"prefixString": "oidc-user-test:"}}
       },
       "issuer": {
-        "issuerURL": "${ISSUER_URL}", "audiences": ["${AUDIENCE_1}", "${AUDIENCE_2}"],
+        "issuerURL": "${KEYCLOAK_ISSUER}", "audiences": ["${AUDIENCE_1}", "${AUDIENCE_2}"],
         "issuerCertificateAuthority": {"name": "keycloak-oidc-ca"}
       },
       "name": "keycloak oidc server",
@@ -382,7 +392,6 @@ export KEYCLOAK_ISSUER="https://${KEYCLOAK_HOST}/realms/master"
 export KEYCLOAK_TEST_USERS="${TEST_USERS}"
 export KEYCLOAK_CLI_CLIENT_ID="oc-cli-test"
 export CONSOLE_CLIENT_SECRET_VALUE="${CONSOLE_CLIENT_SECRET_VALUE}"
-export KEYCLOAK_CA_BUNDLE_FILE=${SHARED_DIR}/oidcProviders-ca.crt
 export CONSOLE_CLIENT_ID="console-test"
 EOF
 
