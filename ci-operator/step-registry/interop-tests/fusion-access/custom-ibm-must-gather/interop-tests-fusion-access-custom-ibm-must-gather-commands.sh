@@ -23,18 +23,16 @@ else
   AUTHFILE="/tmp/authfile"
   echo "Creating authfile for IBM registry..."
 
-  # Get IBM entitlement key from credentials
+  # Get IBM entitlement key from standard location
   IBM_ENTITLEMENT_KEY=""
+  IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/fusion-access-operator/ibm-entitlement-key"
 
-# Check for IBM entitlement key at the standard mount path
-if [[ -f "/var/run/secrets/fusion-access-operator/ibm-entitlement-key" ]]; then
-  echo "IBM entitlement key found at: /var/run/secrets/fusion-access-operator/ibm-entitlement-key"
-  IBM_ENTITLEMENT_KEY="$(cat "/var/run/secrets/fusion-access-operator/ibm-entitlement-key")"
-fi
-
-  # Check if credentials are available as environment variable
-  if [[ -n "${IBM_ENTITLEMENT_KEY:-}" ]]; then
-    echo "IBM entitlement key found in environment variable"
+  # Check the standard credential location
+  if [[ -f "$IBM_ENTITLEMENT_KEY_PATH" ]]; then
+    echo "✅ IBM entitlement key found at: $IBM_ENTITLEMENT_KEY_PATH"
+    IBM_ENTITLEMENT_KEY="$(cat "$IBM_ENTITLEMENT_KEY_PATH")"
+  else
+    echo "❌ IBM entitlement key not found at: $IBM_ENTITLEMENT_KEY_PATH"
   fi
 
   if [[ -n "$IBM_ENTITLEMENT_KEY" ]]; then

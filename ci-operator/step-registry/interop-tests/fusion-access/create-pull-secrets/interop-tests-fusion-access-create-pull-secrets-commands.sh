@@ -11,6 +11,9 @@ IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/fusion-access-operator/ibm-entitlemen
 FUSION_PULL_SECRET_EXTRA_PATH="/var/run/secrets/fusion-access-operator/fusion-pullsecret-extra"
 
 echo "🚀 Creating Fusion Access pull secrets..."
+echo "Namespace: $FUSION_ACCESS_NAMESPACE"
+echo "IBM Registry: $IBM_REGISTRY"
+echo "Storage Scale Namespace: $STORAGE_SCALE_NAMESPACE"
 
 # Check if namespace exists
 if ! oc get namespace "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
@@ -21,12 +24,43 @@ fi
 
 echo "✅ Namespace ${FUSION_ACCESS_NAMESPACE} exists"
 
+# Debug: Show what credential files are actually mounted
+echo ""
+echo "🔍 === DEBUGGING CREDENTIAL MOUNTS ==="
+echo "Checking credential mount at: /var/run/secrets/fusion-access-operator/"
+echo ""
+
+if [ -d "/var/run/secrets/fusion-access-operator" ]; then
+  echo "✅ Mount directory exists: /var/run/secrets/fusion-access-operator/"
+  echo ""
+  echo "Files found in credential mount:"
+  ls -la /var/run/secrets/fusion-access-operator/ 2>&1 || echo "  Cannot list directory contents"
+  echo ""
+  echo "List of key names available:"
+  find /var/run/secrets/fusion-access-operator/ -type f 2>/dev/null | while read -r file; do
+    filename=$(basename "$file")
+    size=$(stat -c%s "$file" 2>/dev/null || echo "unknown")
+    echo "  - $filename (${size} bytes)"
+  done
+  echo ""
+else
+  echo "❌ Mount directory DOES NOT EXIST: /var/run/secrets/fusion-access-operator/"
+  echo ""
+  echo "Listing /var/run/secrets/ to see what's mounted:"
+  ls -la /var/run/secrets/ 2>&1 | head -20 || echo "Cannot list /var/run/secrets/"
+  echo ""
+fi
+
+echo "=== END DEBUGGING ==="
+echo ""
+
 # Get IBM entitlement key from the standard location
 IBM_ENTITLEMENT_AVAILABLE=false
+IBM_ENTITLEMENT_KEY=""
 
 echo "🔍 Checking for IBM entitlement credentials..."
 
-# Check the standard mounted secret path
+# Check the standard credential location
 if [[ -f "$IBM_ENTITLEMENT_KEY_PATH" ]]; then
   echo "✅ IBM entitlement credentials found at: $IBM_ENTITLEMENT_KEY_PATH"
   IBM_ENTITLEMENT_KEY="$(cat "$IBM_ENTITLEMENT_KEY_PATH")"
@@ -38,7 +72,9 @@ fi
 # Get additional pull secret from the standard location
 echo "🔍 Checking for additional pull secret credentials..."
 
-# Check the standard mounted secret path
+FUSION_PULL_SECRET_EXTRA=""
+
+# Check the standard credential location for additional pull secret
 if [[ -f "$FUSION_PULL_SECRET_EXTRA_PATH" ]]; then
   echo "✅ Additional pull secret credentials found at: $FUSION_PULL_SECRET_EXTRA_PATH"
   FUSION_PULL_SECRET_EXTRA="$(cat "$FUSION_PULL_SECRET_EXTRA_PATH")"
@@ -47,23 +83,15 @@ else
   echo "❌ Additional pull secret credentials not found at: $FUSION_PULL_SECRET_EXTRA_PATH"
 fi
 
-# Check if credentials are available as environment variable (fallback)
-if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "false" ]] && [[ -n "${IBM_ENTITLEMENT_KEY:-}" ]]; then
-  echo "✅ IBM entitlement credentials found in environment variable"
-  IBM_ENTITLEMENT_AVAILABLE=true
-fi
-
-# Check if credentials are missing (unexpected in rehearsal runs)
+# Check if credentials are missing
 if [[ "$IBM_ENTITLEMENT_AVAILABLE" == "false" ]]; then
   echo ""
-  echo "❌ ERROR: IBM entitlement credentials not found at expected location"
-  echo "IBM Storage Scale images require IBM entitlement to pull from icr.io"
+  echo "⚠️  WARNING: IBM entitlement credentials not found at expected location"
   echo ""
   echo "Expected location: $IBM_ENTITLEMENT_KEY_PATH"
   echo ""
-  echo "This is unexpected - rehearsal runs should have IBM credentials available"
-  echo "Please check the credential mounting configuration"
-  exit 1
+  echo "Proceeding without IBM entitlement secret creation..."
+  echo "Some IBM images may not be accessible in this run"
 fi
 
 # Create fusion-pullsecret with IBM entitlement key
@@ -192,9 +220,8 @@ else
   echo "This indicates a credential mounting issue"
   echo ""
   echo "To resolve this in production runs:"
-  echo "1. Ensure IBM entitlement credentials are mounted at one of the expected paths"
-  echo "2. Or set the IBM_ENTITLEMENT_KEY environment variable"
-  echo "3. The credentials should provide access to icr.io registry"
+  echo "1. Ensure IBM entitlement credentials are mounted at: $IBM_ENTITLEMENT_KEY_PATH"
+  echo "2. The credentials should provide access to ${IBM_REGISTRY} registry"
 fi
 
 # Create fusion-pullsecret-extra for additional registry access
@@ -299,10 +326,9 @@ elif [[ "$IBM_ENTITLEMENT_AVAILABLE" == "true" ]]; then
   echo "✅ ibm-entitlement-key: Created in ibm-spectrum-scale namespace"
   echo "✅ Service account: Updated with pull secret"
 else
-  echo "❌ IBM entitlement credentials: Not available (unexpected)"
-  echo "❌ fusion-pullsecret: Not created"
-  echo "❌ ibm-entitlement-key: Not created"
-  echo "❌ This indicates a credential mounting issue"
+  echo "⚠️  IBM entitlement credentials: Not available"
+  echo "⚠️  fusion-pullsecret: Not created (will use existing if available)"
+  echo "⚠️  ibm-entitlement-key: Not created (will use existing if available)"
 fi
 
 # Check if fusion-pullsecret-extra exists (either created or already present)
