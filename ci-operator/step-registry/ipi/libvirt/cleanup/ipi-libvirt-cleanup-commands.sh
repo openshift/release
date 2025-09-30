@@ -31,6 +31,8 @@ mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} pool-list --all --name
 echo "--  Networks --"
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-list --all --name
 
+sleep 30m
+
 set +e
 
 # Remove conflicting domains
