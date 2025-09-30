@@ -522,7 +522,8 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
       SKIP_READINESS_CHECKS: "true"
-      TEST_ARGS: --disable-monitor=etcd-log-analyzer,node-lifecycle
+      TEST_ARGS: --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,high-cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector
+        --cluster-stability=Disruptive
       TEST_SKIPS: \[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\] local
         kubeconfig \\"check-endpoints\.kubeconfig\\" should be present in all kube-apiserver
         containers \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
@@ -592,9 +593,14 @@ tests:
         when using openshift ovn-kubernetes created using UserDefinedNetwork isolates
         overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-node\]
         Managed cluster should verify that nodes have no unexpected reboots \[Late\]
-        \[Suite:openshift/conformance/parallel\]\|\[sig-node\]\[apigroup:config\.openshift\.io\]
+        \[Suite:openshift/conformance/parallel\]\|\[sig-node\]\[apigroup:config\.openshift\.io\]|
         CPU Partitioning node validation should have correct cpuset and cpushare set
-        in crio containers \[Suite:openshift/conformance/parallel\]
+        in crio containers \[Suite:openshift/conformance/parallel\]| \|\[sig-instrumentation]
+        Prometheus .* should start and expose a secured proxy and unsecured metrics
+        \|\[sig-node]\[apigroup:config\.openshift\.io] CPU Partitioning node validation
+        should have correct cpuset and cpushare set in crio containers \|\[sig-instrumentation]\[Late]
+        Alerts shouldn.* exceed the series limit of total series sent via telemetry
+        from each cluster \[sig-node].*InPlacePodVerticalScaling
     workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-upgrade
   cluster: build05
