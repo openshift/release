@@ -7,7 +7,7 @@ set -o pipefail
 set -x # Turn on command tracing
 
 # use login script from the aro-hcp-provision-azure-login step
-"${SHARED_DIR}/az-login.sh"
+/bin/bash "${SHARED_DIR}/az-login.sh"
 
 export CUSTOMER_RG_NAME; CUSTOMER_RG_NAME=$(cat "${SHARED_DIR}/customer-resource-group-name.txt")
 MANAGED_RESOURCE_GROUP="${CUSTOMER_RG_NAME}-rg-managed"

@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 # use login script from the aro-hcp-provision-azure-login step
-"${SHARED_DIR}/az-login.sh"
+/bin/bash "${SHARED_DIR}/az-login.sh"
 
 ls -al "${SHARED_DIR}"/
 for file in "${SHARED_DIR}"/tracked-resource-group_*; do

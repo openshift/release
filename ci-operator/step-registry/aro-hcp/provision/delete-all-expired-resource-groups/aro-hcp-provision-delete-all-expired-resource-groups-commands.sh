@@ -8,7 +8,7 @@ unset GOFLAGS
 make -C test/
 
 # use login script from the aro-hcp-provision-azure-login step
-"${SHARED_DIR}/az-login.sh"
+/bin/bash "${SHARED_DIR}/az-login.sh"
 
 set -x # Turn on command tracing
 
