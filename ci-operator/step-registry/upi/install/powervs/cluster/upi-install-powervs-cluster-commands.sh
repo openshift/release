@@ -445,3 +445,4 @@ fix_user_permissions
 build_upi_cluster
 
 echo "Successfully created the PowerVS cluster"
+exit 0
