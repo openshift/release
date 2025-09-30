@@ -109,7 +109,7 @@ case "${PLATFORM}" in
       ARGS+=( "--multi-arch" )
     fi
 
-    if [[ "${HYPERSHFIT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
+    if [[ "${HYPERSHIFT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
       ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
     fi
 

@@ -82,6 +82,27 @@ done
 
 wait
 
+# IAM user cleanup (ci-op-* older than 72h)
+cutoff="$(date -u -d '72 hours ago' --iso-8601=seconds)"
+aws iam list-users --query "Users[?starts_with(UserName, 'ci-op-') && CreateDate < '${cutoff}'].UserName" --output text | tr '\t' '\n' | while read -r user; do
+	if [[ -n "$user" ]]; then
+		echo "Cleaning IAM user: $user"
+		aws iam list-attached-user-policies --user-name "$user" --query 'AttachedPolicies[].PolicyArn' --output text | tr '\t' '\n' | while read -r policy; do
+			[[ -n "$policy" ]] && aws iam detach-user-policy --user-name "$user" --policy-arn "$policy" || true
+		done
+		aws iam list-user-policies --user-name "$user" --query 'PolicyNames[]' --output text | tr '\t' '\n' | while read -r policy; do
+			[[ -n "$policy" ]] && aws iam delete-user-policy --user-name "$user" --policy-name "$policy" || true
+		done
+		aws iam list-access-keys --user-name "$user" --query 'AccessKeyMetadata[].AccessKeyId' --output text | tr '\t' '\n' | while read -r key; do
+			[[ -n "$key" ]] && aws iam delete-access-key --user-name "$user" --access-key-id "$key" || true
+		done
+		aws iam list-groups-for-user --user-name "$user" --query 'Groups[].GroupName' --output text | tr '\t' '\n' | while read -r group; do
+			[[ -n "$group" ]] && aws iam remove-user-from-group --user-name "$user" --group-name "$group" || true
+		done
+		aws iam delete-user --user-name "$user" && echo "✓ Deleted: $user"
+	fi
+done
+
 FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
 if [[ -n "${FAILED}" ]]; then
 	echo "Deprovision failed on the following clusters:"

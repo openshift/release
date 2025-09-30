@@ -6,8 +6,6 @@ set -o pipefail
 
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
-ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
-ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
 
 cat <<EOF | oc apply -f -
 apiVersion: v1
@@ -68,9 +66,9 @@ for i in {1..60}; do
 done
 echo "ODF/OCS Operator is deployed successfully"
 
-#Wait for odf operator pod startup
+#Wait for odf operator startup, from odf 4.19, there is no ocs-operator
 for i in {1..60}; do
-  PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l name=ocs-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
+  PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l app.kubernetes.io/name=odf-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
   if [[ "$PStatus" == "True" ]]; then
       echo "ODF pod is running \"$PStatus\""
       break
