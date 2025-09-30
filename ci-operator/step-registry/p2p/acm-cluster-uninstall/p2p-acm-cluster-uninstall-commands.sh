@@ -17,7 +17,7 @@ echo "$CLUSTER_NAME"
 
 #======optional
 NAMESPACE="${CLUSTER_NAME}"
-TIMEOUT_MINUTES="${TIMEOUT:-120}"
+TIMEOUT_MINUTES="${TIMEOUT:-40}"
 POLL_SECONDS="${POLL_SECONDS:-15}"
 LOG_SINCE="${LOG_SINCE:-30s}"
 DELETE_NAMESPACE="${DELETE_NAMESPACE:-true}"
@@ -92,53 +92,60 @@ start_stream() {
 }
 
 pick_deprovision_pod() {
-    oc -n "$NAMESPACE" get pod -l hive.openshift.io/job-type=deprovision \
-       -o jsonpath'{.items[0].metadata.name}' 2>/dev/null || true
+    oc -n $NAMESPACE get pod -l hive.openshift.io/job-type=deprovision -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
 }
 
 get_clusterdeployement() {
-    oc -n "$NAMESPACE" get clusterdeployment "$CLUSTER_NAME" >/dev/null 2>&1 && echo "yes" || echo "no"
+    oc -n $NAMESPACE get clusterdeployment "$CLUSTER_NAME" >/dev/null 2>&1 && echo "yes" || echo "no"
 }
 
 # Deprovision CR
 list_deprovision_crs() {
-    oc -n "$NAMESPACE" get clusterdeprovisions -l hive.openshift.io/cluster-deployment-name="$CLUSTER_NAME" --no-headers 2>/dev/null || true
+    oc -n $NAMESPACE get clusterdeprovisions -l hive.openshift.io/cluster-deployment-name="$CLUSTER_NAME" --no-headers 2>/dev/null || true
 }
 
-echo "[INFO] $(now) waiting for deprovision job to complete (timeout: ${TIMEOUT_MINUTES}m)_"
-sleep 3600
+echo "[INFO] $(now) waiting for deprovision job to complete (timeout: ${TIMEOUT_MINUTES}m)"
+sleep 900
 while true; do
 #start or switch log stream if a provision pod exists
   POD="$(pick_deprovision_pod || true)"
+  echo "deprovision-pod: $POD"
   [[ -n "$POD" ]] && start_stream "$POD"
 
   #success
-  cd_exists="$(get_clusterdeployement)"
-  deprovision_running=$(oc -n "$NAMESPACE" get pod -l hive.openshift.io/job-type=deprovision --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  #   cd_exists="$(get_clusterdeployement)"
+  #   deprovision_running=$(oc -n "$NAMESPACE" get pod -l hive.openshift.io/job-type=deprovision --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  # Determine deprovision state from the most recent ClusterDeprovision
   deprov_state="$(
-    oc -n "$NAMESPACE" get clusterdeprovisions -o json 2>/dev/null \
-    | jq -r '.items | sort_by(.metadata.creationTimestamp[-1].status.state // ""'
-  )"
-
-  if [[ "$cd_exists" == "no" && "${deprovision_running:-0}" == "0" ]]; then
-    case "$deprov_state" in
-      completed|"")
-        echo
-        echo "[INFO] $(now) Deprovision completed"
-        break
-        ;;
-      failed)
-        echo
-        echo "[ERROR] $(now) Deprovison reported failed state"
-        exit 2
-        ;;
-    esac
-  fi
-
-  #timeout
+    oc -n "${NAMESPACE}" get clusterdeprovisions -o json 2>/dev/null \
+    | jq -r '
+        (.items | sort_by(.metadata.creationTimestamp)[-1]? // {}) as $obj
+        | if ($obj == {}) then "none"
+          elif ($obj.status.completed == true) then "completed"
+          elif ([$obj.status.conditions[]? | select(.type=="DeprovisionFailed" and .status=="True")] | length) > 0 then "failed"
+          elif ([$obj.status.conditions[]? | select(.type=="AuthenticationFailure" and .status=="True")] | length) > 0 then "auth-failed"
+          else "running"
+          end
+     '
+   )"
+  case "$deprov_state" in 
+    completed)
+       echo 
+       echo "[info] Deprovision completed."
+       break
+       ;;
+    failed|auth-failed)
+       echo
+       echo "[ERROR] Deprovision failed (state=$deprov_state)."
+       exit 2
+       ;;
+   # none|running → keep waiting  
+  esac
   if (( $(date +%s) > deadline )); then
     echo
-    echo "[ERROR] $(now) Uninstall timed out after ${TIMEOUT_MINUTES} minutes"
+    echo "[ERROR]Uninstall timed out after ${TIMEOUT_MINUTES} minutes."
+    echo "[HINT] Check Hive controller logs:"
+    echo " oc -n open-cluster-management-hub logs statefulset/clusterlifecycle-statefulset -c hive --tail=300 | grep -i ${CLUSTER_NAME}"
     exit 3
   fi
 

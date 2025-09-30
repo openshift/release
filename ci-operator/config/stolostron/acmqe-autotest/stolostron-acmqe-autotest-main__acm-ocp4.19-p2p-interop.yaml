@@ -23,6 +23,10 @@ base_images:
     name: "2.14"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: cnv-4.19
   tests-private:
     name: tests-private
     namespace: ci
@@ -64,20 +68,17 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-7590
       FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCP_VERSION: "4.19"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "!default", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      REGION: us-west-2
-      TEST_IMPORTANCE: LEVEL0
-      TEST_SCENARIOS: Cluster_Observability
       USER_TAGS: |
         scenario acm-cnv-p2p
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
     - ref: acm-inspector
-    - ref: p2p-acm-cluster-uninstall
     - ref: gather-aws-console
     - chain: ipi-deprovision
     - ref: firewatch-report-issues
@@ -95,12 +96,8 @@ tests:
     - ref: p2p-acm-cluster-install
     - ref: acm-fetch-managed-clusters
     - ref: p2p-acm-cnv-additional-test-setup
-    - ref: p2p-acm-cluster-upgrade
-    - ref: acm-tests-grc
-    - ref: acm-tests-observability
-    - ref: acm-tests-alc
-    - ref: openshift-extended-test
-  timeout: 10h0m0s
+    - ref: p2p-cnv-deploy-and-validate-vm
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: stolostron
