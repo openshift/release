@@ -12,9 +12,9 @@ export CLUSTER_ARCH
 cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | jq -c > "$HOME/pull-secret" 
 export PULL_SECRET_FILE="$HOME/pull-secret"
 
-CONTROL_NODE_PROFILE=cz2-16x32
+CONTROL_NODE_PROFILE=bz2-8x32 #cz2-16x32
 export CONTROL_NODE_PROFILE
-COMPUTE_NODE_PROFILE=cz2-16x32
+COMPUTE_NODE_PROFILE=bz2-8x32 #cz2-16x32
 export COMPUTE_NODE_PROFILE
 
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
