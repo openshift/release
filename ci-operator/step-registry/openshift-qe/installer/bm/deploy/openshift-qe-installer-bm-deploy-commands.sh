@@ -31,7 +31,7 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
-
+BOND=$(cat ${CLUSTER_PROFILE_DIR}/bond)
 
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
@@ -56,7 +56,7 @@ install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
 image_type: "minimal-iso"
-enable_bond: true
+enable_bond: $BOND
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
