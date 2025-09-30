@@ -1,3 +1,8 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 binary_build_commands: make -C backend backend
 build_root:
   image_stream_tag:
@@ -14,6 +19,25 @@ images:
     RUN dnf install -y azure-cli libicu
   from: src
   to: src-plus-az
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY /src /opt/app-root/src
+    WORKDIR /opt/app-root/src/ARO-HCP
+    USER root
+    RUN dnf install -y git go make
+    RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+    RUN dnf install -y pass || true
+    RUN dnf install -y qrencode || true
+    RUN dnf install -y net-tools || true
+    RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: nested-podman-src
 resources:
   '*':
     limits:
@@ -23,6 +47,17 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make test-compile
 tests:
+- always_run: false
+  as: frontend-simulation
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  optional: true
+  steps:
+    pre:
+    - ref: aro-hcp-frontend-start-cosmos-emulator
+    test:
+    - ref: aro-hcp-frontend-run-simulation-tests
 - always_run: false
   as: create-aro-hcp-in-integration
   run_if_changed: ^(demo)
