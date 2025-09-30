@@ -48,8 +48,6 @@ export GITHUB_TOKEN
 COLLECTIVE_OCP_TOKEN=$(cat $SECRETS_DIR/alc/collective-ocp-token)
 export COLLECTIVE_OCP_TOKEN
 
-sleep 5h
-
 # run the test execution script
 bash +x ./../execute_alc_interop_commands.sh || :
 
