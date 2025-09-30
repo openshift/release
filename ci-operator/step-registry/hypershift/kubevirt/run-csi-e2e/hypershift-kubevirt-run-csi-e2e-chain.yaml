@@ -37,7 +37,14 @@ chain:
       sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
-      openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" | grep -v "provisioning should provision correct filesystem size when restoring snapshot to larger size pvc" > /tmp/tests_hs_kv
+      # No need to skip larger target size expansion tests if the version is 4.18 or more
+      # Drop this once we don't support versions without expansion
+      version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+      if [[ $(echo -e "4.18\n$version" | sort -V | tail -n 1) == "$version" ]]; then
+        openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" > /tmp/tests_hs_kv
+      else
+        openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" | grep -v "provisioning should provision correct filesystem size when restoring snapshot to larger size pvc" > /tmp/tests_hs_kv
+      fi
       TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 4 --file /tmp/tests_hs_kv"
       echo "${ARTIFACT_DIR}"
       openshift-tests run openshift/csi ${TEST_ARGS:-} \
