@@ -344,7 +344,14 @@ tests:
 - as: lint
   commands: |
     cd go-controller
-    make lint
+    GOLANGCI_LINT_VERSION=$(grep '^VERSION' hack/lint.sh | awk -F= '{print $2}')
+    mkdir -p /tmp/local/bin/
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /tmp/local/bin/ "${GOLANGCI_LINT_VERSION}"
+    mkdir -p /tmp/golangci-cache
+    export GOLANGCI_LINT_CACHE=/tmp/golangci-cache
+    extra_flags=(--verbose --print-resources-usage --modules-download-mode=vendor --timeout=15m0s)
+    /tmp/local/bin/golangci-lint run "${extra_flags[@]}" && \
+    echo "lint OK!"
   container:
     from: src
 - as: gofmt
