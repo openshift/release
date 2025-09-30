@@ -14,7 +14,7 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.dev
   inputs:
     ocp_4.19_base-rhel9:
       as:
@@ -25,7 +25,7 @@ images:
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: monitoring-plugin
+  to: monitoring-plugin-dev
 - dockerfile_path: Dockerfile.mcp
   inputs:
     ocp_4.19_base-rhel9:
@@ -44,10 +44,6 @@ images:
   dockerfile_path: web/cypress/Dockerfile
   to: monitoring-ui-tests-runner
 releases:
-  initial:
-    integration:
-      name: "4.21"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
@@ -75,20 +71,6 @@ tests:
   steps:
     test:
     - ref: monitoring-plugin-tests-monitoring-ui
-    workflow: generic-claim
-- as: e2e-coo
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
-  cron: 0 5 * * *
-  steps:
-    test:
     - ref: monitoring-plugin-tests-coo-ui
     workflow: generic-claim
 zz_generated_metadata:
