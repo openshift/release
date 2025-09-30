@@ -264,6 +264,24 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc get clusterversion version -o yaml || true
 fi
 
+#if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
+if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
+    echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+    echo "CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: $CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+    if [[ -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        tmp=$(mktemp)
+        cd ${tmp}
+        tag=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
+        echo "Extracting oc-mirror from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+        oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret"
+        chmod +x ./oc-mirror
+        ./oc-mirror version --output yaml
+        sudo "cp ./oc-mirror /usr/local/bin/"
+        oc mirror version --v2 --output yaml
+    fi
+    echo "debug...."
+    sleep 1h
+fi
 # execute the cases
 function run {
     test_scenarios=""
