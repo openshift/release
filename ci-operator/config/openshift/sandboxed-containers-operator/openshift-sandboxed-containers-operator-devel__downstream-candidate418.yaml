@@ -1,0 +1,136 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-ipi-kata
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.0-1758206543
+      CATALOG_SOURCE_NAME: brew-catalog
+      CUSTOM_AZURE_REGION: eastus
+      EXPECTED_OPERATOR_VERSION: 1.11.0
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.17.0-3.rhaos4.19.el9
+      SLEEP_DURATION: 6h
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-fbc-4-18:trustee-fbc-4-18-on-push-knxlg-build-image-index
+      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
+    workflow: sandboxed-containers-operator-e2e-azure
+- as: azure-ipi-peerpods
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.0-1758206543
+      CATALOG_SOURCE_NAME: brew-catalog
+      CUSTOM_AZURE_REGION: eastus
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.11.0
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.17.0-3.rhaos4.19.el9
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 6h
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-fbc-4-18:trustee-fbc-4-18-on-push-knxlg-build-image-index
+      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-azure
+- as: azure-ipi-coco
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.0-1758206543
+      CATALOG_SOURCE_NAME: brew-catalog
+      CUSTOM_AZURE_REGION: eastus
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.11.0
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.17.0-3.rhaos4.19.el9
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 6h
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-fbc-4-18:trustee-fbc-4-18-on-push-knxlg-build-image-index
+      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
+      WORKLOAD_TO_TEST: coco
+    workflow: sandboxed-containers-operator-e2e-azure
+- as: aws-ipi-peerpods
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_REGION_OVERRIDE: us-east-2
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.0-1758206543
+      CATALOG_SOURCE_NAME: brew-catalog
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.11.0
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.17.0-3.rhaos4.19.el9
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 6h
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-fbc-4-18:trustee-fbc-4-18-on-push-knxlg-build-image-index
+      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aws
+- as: aws-ipi-coco
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_REGION_OVERRIDE: us-east-2
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.0-1758206543
+      CATALOG_SOURCE_NAME: brew-catalog
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.11.0
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.17.0-3.rhaos4.19.el9
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 6h
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-fbc-4-18:trustee-fbc-4-18-on-push-knxlg-build-image-index
+      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
+      WORKLOAD_TO_TEST: coco
+    workflow: sandboxed-containers-operator-e2e-aws
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: downstream-candidate418
