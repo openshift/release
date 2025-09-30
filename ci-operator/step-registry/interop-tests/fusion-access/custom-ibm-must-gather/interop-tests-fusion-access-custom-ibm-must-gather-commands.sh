@@ -25,7 +25,7 @@ else
 
   # Get IBM entitlement key from standard location
   IBM_ENTITLEMENT_KEY=""
-  IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/fusion-access-operator/ibm-entitlement-key"
+  IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/ibm-entitlement-key"
 
   # Check the standard credential location
   if [[ -f "$IBM_ENTITLEMENT_KEY_PATH" ]]; then

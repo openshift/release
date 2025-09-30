@@ -5,10 +5,11 @@ set -o pipefail
 
 FUSION_ACCESS_NAMESPACE="${FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
 IBM_REGISTRY="${IBM_REGISTRY:-cp.icr.io}"
+STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
 
 # Credential paths
-IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/fusion-access-operator/ibm-entitlement-key"
-FUSION_PULL_SECRET_EXTRA_PATH="/var/run/secrets/fusion-access-operator/fusion-pullsecret-extra"
+IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/ibm-entitlement-key"
+FUSION_PULL_SECRET_EXTRA_PATH="/var/run/secrets/fusion-pullsecret-extra"
 
 echo "🚀 Creating Fusion Access pull secrets..."
 echo "Namespace: $FUSION_ACCESS_NAMESPACE"
@@ -27,27 +28,27 @@ echo "✅ Namespace ${FUSION_ACCESS_NAMESPACE} exists"
 # Debug: Show what credential files are actually mounted
 echo ""
 echo "🔍 === DEBUGGING CREDENTIAL MOUNTS ==="
-echo "Checking credential mount at: /var/run/secrets/fusion-access-operator/"
+echo "Checking credential mount at: /var/run/secrets/"
 echo ""
 
-if [ -d "/var/run/secrets/fusion-access-operator" ]; then
-  echo "✅ Mount directory exists: /var/run/secrets/fusion-access-operator/"
+if [ -d "/var/run/secrets" ]; then
+  echo "✅ Mount directory exists: /var/run/secrets/"
   echo ""
   echo "Files found in credential mount:"
-  ls -la /var/run/secrets/fusion-access-operator/ 2>&1 || echo "  Cannot list directory contents"
+  ls -la /var/run/secrets/ 2>&1 | head -20 || echo "  Cannot list directory contents"
   echo ""
-  echo "List of key names available:"
-  find /var/run/secrets/fusion-access-operator/ -type f 2>/dev/null | while read -r file; do
-    filename=$(basename "$file")
-    size=$(stat -c%s "$file" 2>/dev/null || echo "unknown")
-    echo "  - $filename (${size} bytes)"
+  echo "Checking for specific credential files:"
+  for file in "ibm-entitlement-key" "fusion-pullsecret-extra"; do
+    if [ -f "/var/run/secrets/$file" ] || [ -L "/var/run/secrets/$file" ]; then
+      size=$(stat -c%s "/var/run/secrets/$file" 2>/dev/null || echo "unknown")
+      echo "  ✅ $file (${size} bytes)"
+    else
+      echo "  ❌ $file (not found)"
+    fi
   done
   echo ""
 else
-  echo "❌ Mount directory DOES NOT EXIST: /var/run/secrets/fusion-access-operator/"
-  echo ""
-  echo "Listing /var/run/secrets/ to see what's mounted:"
-  ls -la /var/run/secrets/ 2>&1 | head -20 || echo "Cannot list /var/run/secrets/"
+  echo "❌ Mount directory DOES NOT EXIST: /var/run/secrets/"
   echo ""
 fi
 
@@ -171,14 +172,14 @@ EOF
   oc wait --for=jsonpath='{.metadata.name}'=ibm-entitlement-key secret/ibm-entitlement-key -n ${FUSION_ACCESS_NAMESPACE} --timeout=60s
   echo "✅ ibm-entitlement-key created successfully"
   
-  # Also create ibm-entitlement-key secret in ibm-spectrum-scale namespace
-  echo "🔐 Creating ibm-entitlement-key secret in ibm-spectrum-scale namespace..."
+  # Also create ibm-entitlement-key secret in IBM Storage Scale namespace
+  echo "🔐 Creating ibm-entitlement-key secret in ${STORAGE_SCALE_NAMESPACE} namespace..."
   oc apply -f=- <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
   name: ibm-entitlement-key
-  namespace: ibm-spectrum-scale
+  namespace: ${STORAGE_SCALE_NAMESPACE}
 type: kubernetes.io/dockerconfigjson
 stringData:
   .dockerconfigjson: |
@@ -192,9 +193,9 @@ stringData:
     }
 EOF
   
-  echo "Waiting for ibm-entitlement-key in ibm-spectrum-scale namespace..."
-  oc wait --for=jsonpath='{.metadata.name}'=ibm-entitlement-key secret/ibm-entitlement-key -n ibm-spectrum-scale --timeout=60s
-  echo "✅ ibm-entitlement-key created in ibm-spectrum-scale namespace"
+  echo "Waiting for ibm-entitlement-key in ${STORAGE_SCALE_NAMESPACE} namespace..."
+  oc wait --for=jsonpath='{.metadata.name}'=ibm-entitlement-key secret/ibm-entitlement-key -n ${STORAGE_SCALE_NAMESPACE} --timeout=60s
+  echo "✅ ibm-entitlement-key created in ${STORAGE_SCALE_NAMESPACE} namespace"
   
   # Verify the secret was created
   if oc get secret fusion-pullsecret -n "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
@@ -323,7 +324,7 @@ elif [[ "$IBM_ENTITLEMENT_AVAILABLE" == "true" ]]; then
   echo "✅ IBM entitlement credentials: Available"
   echo "✅ fusion-pullsecret: Created (supports ${IBM_REGISTRY})"
   echo "✅ ibm-entitlement-key: Created in fusion-access namespace"
-  echo "✅ ibm-entitlement-key: Created in ibm-spectrum-scale namespace"
+  echo "✅ ibm-entitlement-key: Created in ${STORAGE_SCALE_NAMESPACE} namespace"
   echo "✅ Service account: Updated with pull secret"
 else
   echo "⚠️  IBM entitlement credentials: Not available"
