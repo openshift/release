@@ -4,11 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# read the secrets and login as the user
-export TEST_USER_CLIENT_ID; TEST_USER_CLIENT_ID=$(cat /var/run/hcp-integration-credentials/client-id)
-export TEST_USER_CLIENT_SECRET; TEST_USER_CLIENT_SECRET=$(cat /var/run/hcp-integration-credentials/client-secret)
-export TEST_USER_TENANT_ID; TEST_USER_TENANT_ID=$(cat /var/run/hcp-integration-credentials/tenant)
-az login --service-principal -u "${TEST_USER_CLIENT_ID}" -p "${TEST_USER_CLIENT_SECRET}" --tenant "${TEST_USER_TENANT_ID}"
+# use login script from the aro-hcp-provision-azure-login step
+"${SHARED_DIR}/az-login.sh"
 
 ls -al "${SHARED_DIR}"/
 for file in "${SHARED_DIR}"/tracked-resource-group_*; do
@@ -41,5 +38,3 @@ for file in "${SHARED_DIR}"/tracked-resource-group_*; do
         done
     fi
 done
-
-

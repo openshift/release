@@ -7,12 +7,11 @@ set -o pipefail
 unset GOFLAGS
 make -C test/
 
-export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat /var/run/hcp-integration-credentials/client-id)
-export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat /var/run/hcp-integration-credentials/client-secret)
-export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat /var/run/hcp-integration-credentials/tenant)
+# use login script from the aro-hcp-provision-azure-login step
+"${SHARED_DIR}/az-login.sh"
 
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 
-./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml"
+CUSTOMER_SUBSCRIPTION="${SUBSCRIPTION}" ./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml"
