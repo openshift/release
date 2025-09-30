@@ -1,10 +1,10 @@
 base_images:
   ansible:
-    name: "4.14"
+    name: "4.19"
     namespace: ocp
     tag: ansible
   cli:
-    name: "4.14"
+    name: "4.19"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -14,17 +14,17 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.19"
+    tag: "4.21"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.18"
+    tag: "4.20"
   tools:
-    name: "4.14"
+    name: "4.19"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.14"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -32,60 +32,30 @@ releases:
     release:
       architecture: arm64
       channel: fast
-      version: "4.14"
+      version: "4.19"
   arm64-target:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.19"
-  custom:
-    candidate:
-      architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "4.19"
-  intermediate415:
+      version: "4.21"
+  intermediate:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.15"
-  intermediate416:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.16"
-  intermediate417:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.17"
-  intermediate418:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.18"
-  intermediate419:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.19"
+      version: "4.20"
   latest:
     release:
       architecture: amd64
       channel: fast
-      version: "4.14"
+      version: "4.19"
   target:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -95,7 +65,7 @@ tests:
 - as: baremetal-upi-ovn-ipv4-f28
   capabilities:
   - intranet
-  cron: 25 15 3 * *
+  cron: 27 19 10 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -108,19 +78,11 @@ tests:
       workers: "2"
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
-        > ${SHARED_DIR}/upgrade-edge
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
       dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE419
-        name: release:intermediate419
-      - env: RELEASE_IMAGE_INTERMEDIATE418
-        name: release:intermediate418
-      - env: RELEASE_IMAGE_INTERMEDIATE417
-        name: release:intermediate417
-      - env: RELEASE_IMAGE_INTERMEDIATE416
-        name: release:intermediate416
-      - env: RELEASE_IMAGE_INTERMEDIATE415
-        name: release:intermediate415
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate
       - env: RELEASE_IMAGE_TARGET
         name: release:arm64-target
       from: cli
@@ -131,7 +93,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: baremetal-lab-upi
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.21
   org: openshift
   repo: openshift-tests-private
-  variant: arm64-nightly-4.20-upgrade-from-stable-4.14
+  variant: arm64-nightly-4.21-upgrade-from-stable-4.19

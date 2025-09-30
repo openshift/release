@@ -49,6 +49,11 @@ releases:
       architecture: multi
       channel: candidate
       version: "4.19"
+  intermediate420:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.20"
   latest:
     release:
       architecture: multi
@@ -58,7 +63,7 @@ releases:
     release:
       architecture: multi
       channel: candidate
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -66,7 +71,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-proxy-sts-arm-f28
-  cron: 52 5 12 * *
+  cron: 8 9 30 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -76,9 +81,11 @@ tests:
       OCP_ARCH: arm64
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -99,7 +106,7 @@ tests:
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.21
   org: openshift
   repo: openshift-tests-private
-  variant: multi-stable-4.20-upgrade-from-stable-4.14
+  variant: multi-stable-4.21-upgrade-from-stable-4.14

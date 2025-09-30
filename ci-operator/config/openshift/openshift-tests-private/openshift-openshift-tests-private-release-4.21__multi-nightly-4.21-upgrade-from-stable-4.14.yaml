@@ -14,11 +14,11 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.20"
+    tag: "4.21"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.19"
+    tag: "4.20"
   tools:
     name: "4.14"
     namespace: ocp
@@ -37,7 +37,7 @@ releases:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
   intermediate415:
     candidate:
       architecture: multi
@@ -68,6 +68,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.19"
+  intermediate420:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.20"
   latest:
     release:
       architecture: multi
@@ -78,7 +84,7 @@ releases:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -86,7 +92,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-proxy-sts-arm-f28
-  cron: 36 4 6 * *
+  cron: 33 3 9 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -96,9 +102,11 @@ tests:
       OCP_ARCH: arm64
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -119,7 +127,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: azure-ipi-basecap-vset-additionalcap-arm-f28
-  cron: 6 2 1 * *
+  cron: 4 16 8 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -129,9 +137,11 @@ tests:
       PERSISTENT_MONITORING: "false"
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -152,7 +162,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset-additionalcaps
 - as: gcp-ipi-sdn-arm-f28
-  cron: 42 0 15 * *
+  cron: 37 17 10 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -160,9 +170,11 @@ tests:
       OCP_ARCH: arm64
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
       - env: RELEASE_IMAGE_INTERMEDIATE419
         name: release:intermediate419
       - env: RELEASE_IMAGE_INTERMEDIATE418
@@ -183,7 +195,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-gcp-ipi-sdn
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.21
   org: openshift
   repo: openshift-tests-private
-  variant: multi-nightly-4.20-upgrade-from-stable-4.14
+  variant: multi-nightly-4.21-upgrade-from-stable-4.14

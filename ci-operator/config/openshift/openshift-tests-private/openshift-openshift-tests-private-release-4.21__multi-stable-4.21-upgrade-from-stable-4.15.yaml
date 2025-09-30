@@ -24,26 +24,31 @@ base_images:
     namespace: ci
     tag: latest
 releases:
-  intermediate1:
+  intermediate416:
     release:
       architecture: multi
       channel: candidate
       version: "4.16"
-  intermediate2:
+  intermediate417:
     release:
       architecture: multi
       channel: candidate
       version: "4.17"
-  intermediate3:
+  intermediate418:
     release:
       architecture: multi
       channel: candidate
       version: "4.18"
-  intermediate4:
+  intermediate419:
     release:
       architecture: multi
       channel: candidate
       version: "4.19"
+  intermediate420:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.20"
   latest:
     release:
       architecture: multi
@@ -53,7 +58,7 @@ releases:
     release:
       architecture: multi
       channel: candidate
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -61,7 +66,7 @@ resources:
       memory: 200Mi
 tests:
 - as: azure-ipi-ovn-ipsec-arm-mixarch-f28
-  cron: 54 7 7 * *
+  cron: 13 7 22 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -73,12 +78,32 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
-    - ref: cucushift-upgrade-setedge-5hops
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE416},${RELEASE_IMAGE_INTERMEDIATE417},${RELEASE_IMAGE_INTERMEDIATE418},${RELEASE_IMAGE_INTERMEDIATE419},${RELEASE_IMAGE_INTERMEDIATE420},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE420
+        name: release:intermediate420
+      - env: RELEASE_IMAGE_INTERMEDIATE419
+        name: release:intermediate419
+      - env: RELEASE_IMAGE_INTERMEDIATE418
+        name: release:intermediate418
+      - env: RELEASE_IMAGE_INTERMEDIATE417
+        name: release:intermediate417
+      - env: RELEASE_IMAGE_INTERMEDIATE416
+        name: release:intermediate416
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: ipi-install-heterogeneous
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
 zz_generated_metadata:
-  branch: release-4.20
+  branch: release-4.21
   org: openshift
   repo: openshift-tests-private
-  variant: multi-stable-4.20-upgrade-from-stable-4.15
+  variant: multi-stable-4.21-upgrade-from-stable-4.15
