@@ -346,26 +346,51 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
-    echo "Running apply"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
-        -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
-        -state="${SHARED_DIR}"/terraform.tfstate \
-        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
-                while read LINE
-                do
-                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
-                    then
-                    OUTPUT=""
-                    fi
-                    if [ ! -z "${OUTPUT}" ]
-                    then
-                        echo "${LINE}"
-                    fi
-                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
-                    then
-                    OUTPUT="yes"
-                    fi
-                done
+    echo "Running apply - will attempt up to 3 times until successful"
+
+    MAX_ATTEMPTS=3
+    ATTEMPT=1
+    APPLY_SUCCESS=false
+    while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ "$APPLY_SUCCESS" != "true" ]; do
+        echo "Terraform apply attempt $ATTEMPT of $MAX_ATTEMPTS"
+        set +e  # Don't exit on error
+        "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
+            -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
+            -state="${SHARED_DIR}"/terraform.tfstate \
+            | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                    while read LINE
+                    do
+                        if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                        then
+                        OUTPUT=""
+                        fi
+                        if [ ! -z "${OUTPUT}" ]
+                        then
+                            echo "${LINE}"
+                        fi
+                        if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                        then
+                        OUTPUT="yes"
+                        fi
+                    done
+        APPLY_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+
+        if [ $APPLY_EXIT_CODE -eq 0 ]; then
+            echo "Terraform apply succeeded on attempt $ATTEMPT"
+            APPLY_SUCCESS=true
+        else
+            echo "Terraform apply failed on attempt $ATTEMPT with exit code $APPLY_EXIT_CODE"
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                echo "Waiting 60 seconds before next attempt..."
+                sleep 60
+            else
+                echo "All $MAX_ATTEMPTS attempts failed. Exiting with error."
+                exit $APPLY_EXIT_CODE
+            fi
+        fi
+        ATTEMPT=$((ATTEMPT+1))
+    done
     echo "Finished Running"
 
     echo "Extracting the terraform output from the state file"
