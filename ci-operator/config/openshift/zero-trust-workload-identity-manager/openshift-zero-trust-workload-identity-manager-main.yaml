@@ -90,6 +90,30 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-generic-claim
+- as: e2e-operator-hypershift
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHFIT_SKIP_VERSION_VALIDATION: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
   branch: main
   org: openshift
