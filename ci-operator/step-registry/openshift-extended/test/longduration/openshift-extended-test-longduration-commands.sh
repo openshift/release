@@ -261,7 +261,6 @@ oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
-    echo "get the cluster version:"
     oc get clusterversion version -o yaml || true
     ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
 fi
@@ -270,6 +269,7 @@ fi
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     echo "ocpversion: ${ocpVersion}"
     if [[ -n "${ocpVersion:-}" ]]; then
+        set +oe
         tmp=$(mktemp -d)
         cd ${tmp}
         tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
@@ -282,6 +282,7 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     fi
     echo "debug...."
     sleep 2h
+    Set -xeuo pipefail
 fi
 # execute the cases
 function run {
