@@ -72,9 +72,11 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
   create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
 else
-  if [[ -n "$CATALOG_SOURCE_IMAGE" || -n "$TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
-    echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
-    exit 1
+    CATALOG_SOURCE_IMAGE="GA"
+    CATALOG_SOURCE_NAME="redhat-operators"
+    TRUSTEE_CATALOG_SOURCE_IMAGE="GA"
+    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+    echo "Using default Red Hat operators catalog for GA release"
   fi
 fi
 
