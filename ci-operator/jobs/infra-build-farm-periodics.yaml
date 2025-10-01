@@ -496,3 +496,68 @@ periodics:
     - name: hive
       secret:
         secretName: hypershift-workload-credentials
+- agent: kubernetes
+  cluster: build04
+  cron: '@daily'
+  decorate: true
+  decoration_config:
+    timeout: 1h0m0s
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-dptp-4552-clusterpool-pruner
+  reporter_config:
+    slack:
+      channel: '#team-hive-alert'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      report_template: 'Job {{.Spec.Job}}: <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - command:
+      - sh
+      - -c
+      - |
+        set -e
+        set -o pipefail
+        echo "Discovering configured ClusterPools..."
+        find clusters/hosted-mgmt/hive/pools -type f -name '*.yaml' | xargs grep 'kind: ClusterPool' | awk -F: '{print $1}' | xargs /tmp/yq e '[.metadata.namespace, .metadata.name] | join(" ")' | sort > /tmp/clusterpools.configured
+        if ! [[ -s /tmp/clusterpools.configured ]]; then
+          echo "ERROR: Discovered no configured ClusterPools. This probably means something is wrong. Aborting."
+          exit 1
+        fi
+        echo "Getting extant ClusterPools..."
+        oc --context hosted-mgmt get clusterpool -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.metadata.name}{"\n"}{end}' | sort > /tmp/clusterpools.extant
+        comm -13 /tmp/clusterpools.configured /tmp/clusterpools.extant > /tmp/clusterpools.stale
+        if [[ -s /tmp/clusterpools.stale ]]; then
+          stale_count=$(wc -l < /tmp/clusterpools.stale)
+          echo "Found $stale_count zombie clusterpool(s) to clean up:"
+          while read ns name; do
+            if [[ $JOB_NAME == rehearse-* ]]; then
+              echo "    [REHEARSAL] Would delete: oc --context hosted-mgmt delete clusterpool -n $ns $name"
+            else
+              echo "Deleting zombie clusterpools"
+              oc --context hosted-mgmt delete clusterpool -n $ns $name
+            fi
+          done < /tmp/clusterpools.stale
+        else
+          echo "No zombie clusterpools to delete!"
+        fi
+      env:
+      - name: KUBECONFIG
+        value: /kubeconfig/kubeconfig
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-yq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /kubeconfig
+        name: kc
+        readOnly: true
+    volumes:
+    - name: kc
+      secret:
+        secretName: hive-hive-credentials
