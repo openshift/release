@@ -4,11 +4,11 @@ base_images:
     namespace: ocp
     tag: v1.31.0
   must-gather:
-    name: "4.21"
+    name: "4.20"
     namespace: ocp
     tag: must-gather
-  ocp_4.21_base-rhel9:
-    name: "4.21"
+  ocp_4.20_base-rhel9:
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
 binary_build_commands: make build build-vgmanager
@@ -16,10 +16,10 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_literal: |-
-    FROM ocp_4.21_base-rhel9
+    FROM ocp_4.20_base-rhel9
     RUN dnf install -y make git python3 python3-pip patch
     RUN pip3 install pre-commit
 
@@ -43,7 +43,7 @@ images:
     RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
     RUN chmod +x ${SNYK_DIR}/snyk
     ENV PATH=$PATH:${SNYK_DIR}
-  from: ocp_4.21_base-rhel9
+  from: ocp_4.20_base-rhel9
   inputs:
     root:
       as:
@@ -51,7 +51,7 @@ images:
   to: lvms-pre-commit
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.21_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
       - fedora:latest
   to: lvm-operator
@@ -73,24 +73,24 @@ promotion:
     excluded_images:
     - lvms-pre-commit
     namespace: lvms
-    tag: latest
+    tag: v4.20
     tag_by_commit: true
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.20"
       namespace: ocp
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -253,6 +253,6 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-hypershift
 zz_generated_metadata:
-  branch: main
+  branch: release-4.20
   org: openshift
   repo: lvm-operator
