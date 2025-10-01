@@ -448,10 +448,16 @@ echo "Successfully created the PowerVS cluster"
 # Kill any running terraform processes
 pkill -f terraform || true
 
+# Kill any running ibmcloud processes
+pkill -f ibmcloud || true
+
 # Kill any running curl processes
 pkill -f curl || true
 
 # Kill any SSH/SCP processes
 pkill -f ssh || true
 pkill -f scp || true
-echo "Process cleanup done"
+
+echo "Remaining Processes"
+ps -ef || true
+echo "Done"
