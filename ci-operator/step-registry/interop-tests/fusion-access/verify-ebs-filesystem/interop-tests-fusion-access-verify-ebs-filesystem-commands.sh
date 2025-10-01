@@ -15,7 +15,18 @@ if oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} >/dev/null 
   FILESYSTEM_STATUS=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
   FILESYSTEM_STORAGECLASS=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.storageClass}' 2>/dev/null || echo "Unknown")
   
-  echo "IBM Storage Scale Filesystem: ✅ $FILESYSTEM_STATUS"
+  # Check if status is empty or unknown
+  if [[ -z "$FILESYSTEM_STATUS" ]] || [[ "$FILESYSTEM_STATUS" == "Unknown" ]]; then
+    echo "⚠️  IBM Storage Scale Filesystem status is not set"
+    FILESYSTEM_STATUS="<none>"
+  fi
+  
+  if [[ -z "$FILESYSTEM_STORAGECLASS" ]] || [[ "$FILESYSTEM_STORAGECLASS" == "Unknown" ]]; then
+    echo "⚠️  IBM Storage Scale Filesystem StorageClass is not set"
+    FILESYSTEM_STORAGECLASS="<none>"
+  fi
+  
+  echo "IBM Storage Scale Filesystem status: $FILESYSTEM_STATUS"
   echo "StorageClass: $FILESYSTEM_STORAGECLASS"
   
   # Get filesystem details
@@ -24,7 +35,12 @@ if oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} >/dev/null 
   
   # Check for filesystem conditions
   echo "Filesystem conditions:"
-  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.conditions[*]}' | jq -r '.[] | "\(.type): \(.status) - \(.message)"' 2>/dev/null || echo "No conditions available or could not parse"
+  HAS_CONDITIONS=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.conditions[*]}' 2>/dev/null)
+  if [[ -n "$HAS_CONDITIONS" ]]; then
+    echo "$HAS_CONDITIONS" | jq -r '.[] | "\(.type): \(.status) - \(.message)"' 2>/dev/null || echo "Could not parse conditions"
+  else
+    echo "No conditions available"
+  fi
   
 else
   echo "❌ IBM Storage Scale Filesystem not found"
@@ -33,6 +49,9 @@ else
   
   echo "Checking for available filesystems in namespace..."
   oc get filesystem -n ${STORAGE_SCALE_NAMESPACE} || echo "No filesystems found in namespace"
+  
+  echo "❌ IBM Storage Scale Filesystem verification failed!"
+  exit 1
 fi
 
 # Check for StorageClass created by IBM Storage Scale
@@ -72,6 +91,51 @@ fi
 # Check for any storage-related events
 echo ""
 echo "Checking for storage-related events..."
-oc get events -n ${STORAGE_SCALE_NAMESPACE} --sort-by='.lastTimestamp' | grep -E "(storage|volume|pvc|pv)" | tail -5 || echo "No storage-related events found"
+STORAGE_EVENTS=$(oc get events -n ${STORAGE_SCALE_NAMESPACE} --sort-by='.lastTimestamp' | grep -E "(Warning|Error)" | tail -10 || echo "")
+if [[ -n "$STORAGE_EVENTS" ]]; then
+  echo "⚠️  Found warning/error events:"
+  echo "$STORAGE_EVENTS"
+else
+  echo "No warning/error events found"
+fi
 
-echo "✅ IBM Storage Scale Filesystem verification completed!"
+# Final verification
+echo ""
+echo "🔍 Final verification..."
+
+# Check if filesystem resource exists but is not properly configured
+if oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} >/dev/null 2>&1; then
+  FILESYSTEM_STATUS=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  
+  # Check for critical issues
+  CRITICAL_ISSUES=false
+  
+  if [[ -z "$FILESYSTEM_STATUS" ]]; then
+    echo "❌ Filesystem status is not set - filesystem may not be properly configured"
+    CRITICAL_ISSUES=true
+  fi
+  
+  # Check for failed mount events
+  FAILED_MOUNTS=$(oc get events -n ${STORAGE_SCALE_NAMESPACE} --sort-by='.lastTimestamp' | grep -c "FailedMount" || echo "0")
+  if [[ $FAILED_MOUNTS -gt 0 ]]; then
+    echo "⚠️  Found $FAILED_MOUNTS FailedMount events - volumes may not be mounting correctly"
+    CRITICAL_ISSUES=true
+  fi
+  
+  # Check if StorageClass exists
+  if ! oc get storageclass | grep -i spectrum >/dev/null 2>&1; then
+    echo "⚠️  No IBM Storage Scale StorageClass found - filesystem may not be fully operational"
+  fi
+  
+  if [[ "$CRITICAL_ISSUES" == "true" ]]; then
+    echo ""
+    echo "❌ IBM Storage Scale Filesystem verification failed - critical issues detected!"
+    exit 1
+  else
+    echo ""
+    echo "✅ IBM Storage Scale Filesystem verification completed!"
+  fi
+else
+  echo "❌ IBM Storage Scale Filesystem not found!"
+  exit 1
+fi

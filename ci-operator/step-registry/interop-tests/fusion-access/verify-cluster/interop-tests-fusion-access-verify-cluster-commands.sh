@@ -127,21 +127,45 @@ if [[ $POD_COUNT -gt 0 ]]; then
     
     # Check for pull secrets
     echo ""
-    echo "🔐 Checking for pull secrets:"
-    oc get secrets -n "${STORAGE_SCALE_NAMESPACE}" | grep -i pull || echo "No pull secrets found in namespace"
+    echo "🔐 Checking for pull secrets in ${STORAGE_SCALE_NAMESPACE} namespace:"
+    PULL_SECRETS=$(oc get secrets -n "${STORAGE_SCALE_NAMESPACE}" --no-headers 2>/dev/null | grep -i pull || echo "")
+    if [[ -n "$PULL_SECRETS" ]]; then
+      echo "Pull secrets found:"
+      echo "$PULL_SECRETS"
+    else
+      echo "No pull secrets found in namespace"
+    fi
     
     # Check for image pull secrets in default service account
+    echo ""
     echo "🔑 Checking default service account for image pull secrets:"
-    oc get serviceaccount default -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.imagePullSecrets[*].name}' 2>/dev/null || echo "No image pull secrets in default service account"
+    SA_SECRETS=$(oc get serviceaccount default -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.imagePullSecrets[*].name}' 2>/dev/null || echo "")
+    if [[ -n "$SA_SECRETS" ]]; then
+      echo "Service account pull secrets: $SA_SECRETS"
+    else
+      echo "⚠️  No image pull secrets in default service account"
+    fi
     
     # Check for IBM entitlement credentials
+    echo ""
     echo "🏢 Checking for IBM entitlement credentials:"
-    if oc get secret fusion-pullsecret -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
-      echo "✅ IBM entitlement secret found"
+    if oc get secret ibm-entitlement-key -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+      echo "✅ ibm-entitlement-key found"
     else
-      echo "❌ IBM entitlement secret not found - this is likely the cause of image pull failures"
-      echo "The IBM Storage Scale images require IBM entitlement credentials to pull from icr.io"
+      echo "❌ ibm-entitlement-key not found - this is likely the cause of image pull failures"
+      echo "   The IBM Storage Scale images require IBM entitlement credentials to pull from icr.io"
     fi
+    
+    # Check for additional pull secrets that might be needed
+    echo ""
+    echo "🔍 Checking for additional pull secrets:"
+    for secret in "fusion-pullsecret" "fusion-pullsecret-extra"; do
+      if oc get secret "$secret" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+        echo "✅ $secret found"
+      else
+        echo "ℹ️  $secret not found (may not be required in this namespace)"
+      fi
+    done
   fi
   
   # If there are pending pods, investigate why
@@ -225,11 +249,11 @@ if [[ $POD_COUNT -gt 0 ]]; then
     oc get storageclass | grep -v "NAME" | head -3 || echo "No storage classes available"
   fi
   
-  # Check for any failed pods
-  FAILED_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep -E "(Failed|Error|CrashLoopBackOff)" | wc -l)
+  # Check for any failed pods (including Init failures)
+  FAILED_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep -E "(Failed|Error|CrashLoopBackOff|Init:CrashLoopBackOff|Init:Error)" | wc -l)
   if [[ $FAILED_PODS -gt 0 ]]; then
     echo "⚠️  Found $FAILED_PODS failed pods:"
-    oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep -E "(Failed|Error|CrashLoopBackOff)"
+    oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | grep -E "(Failed|Error|CrashLoopBackOff|Init:CrashLoopBackOff|Init:Error)"
   fi
 else
   echo "⚠️  No IBM Storage Scale pods found"
@@ -255,13 +279,17 @@ PENDING_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$
 IMAGE_PULL_BACKOFF=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "ImagePullBackOff" {print $1}' | wc -l)
 INIT_IMAGE_PULL_BACKOFF=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Init:ImagePullBackOff" {print $1}' | wc -l)
 CONTAINER_CREATING=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "ContainerCreating" {print $1}' | wc -l)
-INIT_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 ~ /^Init/ {print $1}' | wc -l)
+# Only count healthy Init pods (Init:0/2, Init:1/2), exclude failed Init states
+INIT_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 ~ /^Init:[0-9]/ {print $1}' | wc -l)
 FAILED_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Failed" {print $1}' | wc -l)
+CRASHLOOP_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "CrashLoopBackOff" {print $1}' | wc -l)
+INIT_CRASHLOOP_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Init:CrashLoopBackOff" {print $1}' | wc -l)
+INIT_ERROR_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | awk '$3 == "Init:Error" {print $1}' | wc -l)
 TOTAL_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers | wc -l)
 
-# Calculate acceptable pods (Running + Init pods that are not failed)
+# Calculate acceptable pods (Running + healthy Init pods only)
 ACCEPTABLE_PODS=$((READY_PODS + INIT_PODS))
-PROBLEMATIC_PODS=$((PENDING_PODS + IMAGE_PULL_BACKOFF + INIT_IMAGE_PULL_BACKOFF + FAILED_PODS))
+PROBLEMATIC_PODS=$((PENDING_PODS + IMAGE_PULL_BACKOFF + INIT_IMAGE_PULL_BACKOFF + FAILED_PODS + CRASHLOOP_PODS + INIT_CRASHLOOP_PODS + INIT_ERROR_PODS))
 
 echo "📊 Pod status summary:"
 echo "- Total pods: $TOTAL_PODS"
@@ -291,6 +319,9 @@ if [[ $TOTAL_PODS -gt 0 ]]; then
     echo "- Init:ImagePullBackOff pods: $INIT_IMAGE_PULL_BACKOFF"
     echo "- ContainerCreating pods: $CONTAINER_CREATING"
     echo "- Failed pods: $FAILED_PODS"
+    echo "- CrashLoopBackOff pods: $CRASHLOOP_PODS"
+    echo "- Init:CrashLoopBackOff pods: $INIT_CRASHLOOP_PODS"
+    echo "- Init:Error pods: $INIT_ERROR_PODS"
     echo "- Problematic pods: $PROBLEMATIC_PODS"
     
     # Provide specific guidance based on the issues found
@@ -300,6 +331,18 @@ if [[ $TOTAL_PODS -gt 0 ]]; then
       echo "The IBM Storage Scale pods are failing to pull images from icr.io"
       echo "This is likely due to missing IBM entitlement credentials"
       echo "Check if the fusion-pullsecret was created with the correct IBM entitlement key"
+    fi
+    
+    if [[ $CRASHLOOP_PODS -gt 0 ]] || [[ $INIT_CRASHLOOP_PODS -gt 0 ]] || [[ $INIT_ERROR_PODS -gt 0 ]]; then
+      echo ""
+      echo "🔧 CrashLoopBackOff Issues Detected:"
+      echo "The IBM Storage Scale pods are crashing during initialization"
+      echo "This is often caused by:"
+      echo "  - Missing or incorrect image pull secrets"
+      echo "  - Insufficient node resources"
+      echo "  - Configuration errors in the Cluster resource"
+      echo "  - Insufficient quorum nodes (minimum 3 required)"
+      echo "Check pod logs for specific error messages"
     fi
     
     # Exit with error code to fail the step
