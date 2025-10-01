@@ -445,4 +445,13 @@ fix_user_permissions
 build_upi_cluster
 
 echo "Successfully created the PowerVS cluster"
-exit 0
+# Kill any running terraform processes
+pkill -f terraform || true
+
+# Kill any running curl processes
+pkill -f curl || true
+
+# Kill any SSH/SCP processes
+pkill -f ssh || true
+pkill -f scp || true
+echo "Process cleanup done"
