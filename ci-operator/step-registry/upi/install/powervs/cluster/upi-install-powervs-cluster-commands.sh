@@ -433,6 +433,8 @@ function build_upi_cluster() {
 
 trap 'error_handler $? $LINENO' ERR
 
+echo "Start '$(date)'"
+
 report_build
 setup_home
 setup_ibmcloud_cli
@@ -444,7 +446,6 @@ cleanup_prior
 fix_user_permissions
 build_upi_cluster
 
-echo "Successfully created the PowerVS cluster"
 # Kill any running terraform processes
 pkill -f terraform || true
 
@@ -460,4 +461,4 @@ pkill -f scp || true
 
 echo "Remaining Processes"
 ps -ef || true
-echo "Done"
+echo "Done '$(date)'"
