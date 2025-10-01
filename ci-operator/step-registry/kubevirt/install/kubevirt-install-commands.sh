@@ -24,24 +24,20 @@ CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?pro
 CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
   ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
 
-if [[ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]]; then
-  echo "redhat operators"
-  export CNV_RELEASE_CHANNEL=stable
-elif [[ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]] && [[ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]]; then
-  echo "elif1"
-  export CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
+if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
+then
+  CNV_RELEASE_CHANNEL=stable
+elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
+then
+  CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
 else
-  echo "else"
-  if [[ "${CNV_PRERELEASE_LATEST_CHANNEL}" == "true" ]]; then
-    echo "cnv latest true"
-    export cnv_version=4.99
+  if [ "${CNV_PRERELEASE_LATEST_CHANNEL}" == "true" ]; then
+    cnv_version=4.99
   else
-    echo "cnv latest false"
-    export cnv_version=$(ocp_version)
+    cnv_version=$(ocp_version)
   fi
-  export CNV_RELEASE_CHANNEL=nightly-${cnv_version}
-  export CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:${cnv_version}
-  echo "cnv pre release $CNV_PRERELEASE_CATALOG_IMAGE"
+  CNV_RELEASE_CHANNEL=nightly-${cnv_version}
+  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:${cnv_version}
 fi
 
 # The kubevirt tests require wildcard routes to be allowed
@@ -102,17 +98,6 @@ spec:
   - openshift-cnv
 EOF
 
-oc apply -f - <<EOF
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: kubevirt-hyperconverged-group
-  namespace: openshift-cnv
-spec:
-  targetNamespaces:
-  - openshift-cnv
-EOF
-
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -134,7 +119,6 @@ sleep 30
 RETRIES=30
 CSV=
 for i in $(seq ${RETRIES}); do
-  oc get subscription -n openshift-cnv kubevirt-hyperconverged -o yaml
   if [[ -z ${CSV} ]]; then
     CSV=$(oc get subscription -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.installedCSV}')
   fi
@@ -142,13 +126,11 @@ for i in $(seq ${RETRIES}); do
     echo "Try ${i}/${RETRIES}: can't get the CSV yet. Checking again in 30 seconds"
     sleep 30
   fi
-  phase=$(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}')
-  if [[ $phase == "Succeeded" ]]; then
+  if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
     echo "CNV is deployed"
     break
   else
     echo "Try ${i}/${RETRIES}: CNV is not deployed yet. Checking again in 30 seconds"
-    echo "status $phase"
     sleep 30
   fi
 done
