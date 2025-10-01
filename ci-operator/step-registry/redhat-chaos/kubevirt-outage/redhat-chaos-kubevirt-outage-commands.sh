@@ -32,7 +32,7 @@ export NAMESPACE=$TARGET_NAMESPACE
 
 oc get vmis -A 
 
-
+export KUBE_VIRT_NAMESPACE=$TARGET_NAMESPACE
 ./kubevirt-outage/prow_run.sh
 rc=$?
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
