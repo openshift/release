@@ -1,5 +1,4 @@
 #!/bin/bash
-set -o errexit
 set -o nounset
 set -o pipefail
 set -x
@@ -12,6 +11,7 @@ python --version
 if [[ $REMOTE_CLIENT = "true" ]]; then
     cp /tmp/secret/kubeconfig ${ARTIFACT_DIR}/kubeconfig
     cp /tmp/secret/kubeadmin-password ${ARTIFACT_DIR}/kubeadmin-password
+    cp ${SHARED_DIR}/kubeconfig ${ARTIFACT_DIR}/kubeconfig
     cp ${SHARED_DIR}/runtime_env ${ARTIFACT_DIR}/runtime_env
     cp ${SHARED_DIR}/metadata.json ${ARTIFACT_DIR}/metadata.json
     sleep 3600
