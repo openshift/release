@@ -261,18 +261,19 @@ oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    echo "get the cluster version:"
     oc get clusterversion version -o yaml || true
+    ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
 fi
 
 #if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
-    echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-    echo "CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: $CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-    if [[ -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+    echo "ocpversion: ${ocpVersion}"
+    if [[ -n "${ocpVersion:-}" ]]; then
         tmp=$(mktemp)
         cd ${tmp}
-        tag=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
-        echo "Extracting oc-mirror from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+        tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
+        echo "Extracting oc-mirror from ${ocpVersion}"
         oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret"
         chmod +x ./oc-mirror
         ./oc-mirror version --output yaml
@@ -280,7 +281,7 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         oc mirror version --v2 --output yaml
     fi
     echo "debug...."
-    sleep 1h
+    sleep 2h
 fi
 # execute the cases
 function run {
