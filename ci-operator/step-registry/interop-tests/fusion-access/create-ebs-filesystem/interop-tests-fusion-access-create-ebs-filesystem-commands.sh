@@ -7,9 +7,20 @@ STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
 STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
 
 echo "🗂️  Creating IBM Storage Scale Filesystem for shared storage..."
-echo "Note: Creating Filesystem using EBS volumes directly for multi-node access"
+echo "Note: Creating Filesystem using auto-discovered local disks"
+echo "The operator will discover and use available local disks based on cluster configuration"
 
-echo "Creating Filesystem resource..."
+# Check what disks are available (for debugging)
+echo ""
+echo "Checking available disks on worker nodes..."
+WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}' | head -3)
+for node in $WORKER_NODES; do
+  echo "Node: $node"
+  oc debug node/$node -- chroot /host lsblk 2>/dev/null | grep -E "NAME|sd|nvme|xvd" | head -5 || echo "  Could not check disks"
+done
+
+echo ""
+echo "Creating Filesystem resource with auto-discovery..."
 if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Filesystem
@@ -17,14 +28,12 @@ metadata:
   name: shared-filesystem
   namespace: ${STORAGE_SCALE_NAMESPACE}
 spec:
-  ebs:
+  local:
     blockSize: 4M
     pools:
     - name: system
       disks:
-      - devicePath: /dev/nvme1n1
-      - devicePath: /dev/nvme2n1
-      - devicePath: /dev/nvme3n1
+      - /dev/disk/by-id/*
     replication: 1-way
     type: shared
   seLinuxOptions:
@@ -62,25 +71,34 @@ fi
 
 echo "Waiting for IBM Storage Scale Filesystem to be ready..."
 echo "Note: Filesystem creation can take up to 1 hour for large configurations"
-if oc wait --for=jsonpath='{.status.phase}'=Ready filesystem/shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} --timeout=3600s; then
+
+# Wait for Success condition to be True
+if oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True filesystem/shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} --timeout=3600s; then
   echo "✅ IBM Storage Scale Filesystem is ready"
 else
   echo "⚠️  IBM Storage Scale Filesystem not ready within 1 hour, checking status..."
-  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o yaml | grep -A 10 -B 5 "status:" || echo "No status information available"
+  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o yaml | grep -A 20 -B 5 "status:" || echo "No status information available"
   
   # Check for specific error conditions
-  FILESYSTEM_STATUS=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-  echo "Current filesystem status: $FILESYSTEM_STATUS"
+  FILESYSTEM_SUCCESS=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Success")].status}' 2>/dev/null || echo "Unknown")
+  FILESYSTEM_MESSAGE=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Success")].message}' 2>/dev/null || echo "No message")
+  echo "Current filesystem Success condition: $FILESYSTEM_SUCCESS"
+  echo "Message: $FILESYSTEM_MESSAGE"
   
   # Check for events
   echo "Checking for filesystem-related events..."
-  oc get events -n ${STORAGE_SCALE_NAMESPACE} --sort-by='.lastTimestamp' | grep -i filesystem | tail -5 || echo "No filesystem-related events found"
+  oc get events -n ${STORAGE_SCALE_NAMESPACE} --sort-by='.lastTimestamp' | grep -i filesystem | tail -10 || echo "No filesystem-related events found"
+  
+  # Show pod status
+  echo ""
+  echo "Checking IBM Storage Scale pod status..."
+  oc get pods -n ${STORAGE_SCALE_NAMESPACE} 2>&1 | head -10 || echo "Cannot get pods"
 fi
 
 echo "Verifying IBM Storage Scale Filesystem..."
 if oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} >/dev/null 2>&1; then
   echo "✅ IBM Storage Scale Filesystem found:"
-  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass"
+  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,SUCCESS:.status.conditions[?(@.type=='Success')].status,STORAGECLASS:.status.storageClass"
 else
   echo "❌ IBM Storage Scale Filesystem not found"
   echo "Checking for any Filesystem-related events..."
@@ -124,7 +142,7 @@ echo "EBS volumes: Using direct EBS volume access for shared storage"
 
 echo ""
 echo "Filesystem status:"
-oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.status.storageClass" 2>/dev/null || echo "Filesystem not found"
+oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o custom-columns="NAME:.metadata.name,SUCCESS:.status.conditions[?(@.type=='Success')].status,STORAGECLASS:.status.storageClass" 2>/dev/null || echo "Filesystem not found"
 
 echo ""
 echo "Available StorageClasses for shared storage:"

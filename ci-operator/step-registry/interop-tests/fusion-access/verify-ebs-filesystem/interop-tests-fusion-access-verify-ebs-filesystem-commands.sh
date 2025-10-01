@@ -35,12 +35,8 @@ if oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} >/dev/null 
   
   # Check for filesystem conditions
   echo "Filesystem conditions:"
-  HAS_CONDITIONS=$(oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{.status.conditions[*]}' 2>/dev/null)
-  if [[ -n "$HAS_CONDITIONS" ]]; then
-    echo "$HAS_CONDITIONS" | jq -r '.[] | "\(.type): \(.status) - \(.message)"' 2>/dev/null || echo "Could not parse conditions"
-  else
-    echo "No conditions available"
-  fi
+  # Use jsonpath to get conditions directly without jq dependency
+  oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE} -o jsonpath='{range .status.conditions[*]}  {.type}: {.status} - {.message}{"\n"}{end}' 2>/dev/null || echo "  No conditions available"
   
 else
   echo "❌ IBM Storage Scale Filesystem not found"

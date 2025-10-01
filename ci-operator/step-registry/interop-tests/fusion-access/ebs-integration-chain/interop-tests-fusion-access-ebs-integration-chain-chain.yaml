@@ -1,18 +1,33 @@
 chain:
   as: interop-tests-fusion-access-ebs-integration-chain
   steps:
+  - ref: storage-create-aws-extra-disks
   - ref: interop-tests-fusion-access-create-ebs-filesystem
   - ref: interop-tests-fusion-access-verify-ebs-filesystem
   - ref: interop-tests-fusion-access-verify-cluster
   - ref: interop-tests-fusion-access-tests
+  env:
+  - name: NODE_ROLE
+    default: "worker"
+    documentation: The role of nodes to attach EBS volumes to
+  - name: EXTRA_DISKS_COUNT
+    default: "3"
+    documentation: Number of EBS volumes to create per worker node for IBM Storage Scale
+  - name: EXTRA_DISKS_TYPE
+    default: "gp3"
+    documentation: EBS volume type for IBM Storage Scale storage
+  - name: EXTRA_DISKS_SIZE
+    default: "100"
+    documentation: Size in GiB for each EBS volume
   documentation: |-
     EBS integration chain for Fusion Access testing with EBS filesystem.
     
     This chain provides the EBS-specific components for Fusion Access testing:
-    - EBS filesystem creation: Direct EBS volume configuration for multi-node access
-    - Filesystem verification: Validate EBS filesystem status and health
-    - Cluster verification: Validate IBM Storage Scale cluster status
-    - Functional testing: Run comprehensive tests on deployed system
+    - EBS volume creation: Creates and attaches 3x100GB gp3 EBS volumes per worker node
+    - EBS filesystem creation: Configures IBM Storage Scale filesystem using attached EBS volumes
+    - Filesystem verification: Validates EBS filesystem status and health
+    - Cluster verification: Validates IBM Storage Scale cluster status
+    - Functional testing: Runs comprehensive tests on deployed system
     
     This chain should be used after the shared deployment chain to complete
     the EBS-based Fusion Access deployment and testing.
@@ -20,4 +35,4 @@ chain:
     Prerequisites:
     - Shared deployment chain must complete successfully
     - IBM Storage Scale cluster must be ready
-    - EBS volumes must be available on worker nodes
+    - AWS cluster with worker nodes (c5n.metal instances don't have instance store)
