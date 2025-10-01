@@ -270,7 +270,7 @@ fi
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     echo "ocpversion: ${ocpVersion}"
     if [[ -n "${ocpVersion:-}" ]]; then
-        tmp=$(mktemp)
+        tmp=$(mktemp -d)
         cd ${tmp}
         tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
         echo "Extracting oc-mirror from ${ocpVersion}"
