@@ -22,23 +22,7 @@ workflow:
     post:
     - ref: sandboxed-containers-operator-gather-must-gather
     - ref: cucushift-installer-wait
-    - as: sandboxed-containers-operator-delete-kataconfig
-      cli: latest
-      commands: |
-        # Delete kataconfig if present
-        if oc get crd kataconfigurations.kataconfiguration.openshift.io &>/dev/null; then
-            oc get kataconfigurations.kataconfiguration.openshift.io -o name | while read cfg; do
-                echo "Deleting $cfg"
-                oc delete "$cfg" --wait
-            done
-        else
-            echo "kataconfigurations.kataconfiguration.openshift.io not defined, skipping cleanup"
-        fi
-      from: upi-installer
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-post
     - chain: ipi-aws-post
     test:
     - ref: openshift-extended-test
