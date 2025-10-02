@@ -393,6 +393,9 @@ function build_upi_cluster() {
     done
     echo "Finished Running"
 
+    echo "Build finished: $(date)"
+    echo "Retrieving data from built cluster"
+
     echo "Extracting the terraform output from the state file"
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
@@ -445,20 +448,15 @@ configure_terraform
 cleanup_prior
 fix_user_permissions
 build_upi_cluster
+echo "Finished, starting cleanup '$(date)'"
 
-# Kill any running terraform processes
-pkill -f terraform || true
-
-# Kill any running ibmcloud processes
-pkill -f ibmcloud || true
-
-# Kill any running curl processes
-pkill -f curl || true
-
-# Kill any SSH/SCP processes
-pkill -f ssh || true
-pkill -f scp || true
+# Kill any running processes
+pkill terraform || true
+pkill ibmcloud || true
+pkill curl || true
+pkill ssh || true
+pkill scp || true
 
 echo "Remaining Processes"
 ps -ef || true
-echo "Done '$(date)'"
+echo "Done, cleanup '$(date)'"
