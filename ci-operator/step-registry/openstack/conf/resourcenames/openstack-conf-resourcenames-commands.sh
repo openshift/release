@@ -20,7 +20,7 @@ declare -A external_network=(
 )
 
 declare -A controlplane_flavor=(
-	['openstack-vexxhost']='ci.m1.xlarge'
+	['openstack-vexxhost']='shiftstack-ci.master'
 	['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
@@ -30,7 +30,7 @@ declare -A controlplane_flavor=(
 )
 
 declare -A controlplane_flavor_alternate=(
-	['openstack-vexxhost']='ci.m2.xlarge'
+	['openstack-vexxhost']='shiftstack-ci.master-alt'
 	['openstack-vh-mecha-central']='m1.xlarge.2'
 	['openstack-vh-mecha-az0']='m1.xlarge.2'
 	['openstack-nfv']='m1.xlarge.2'
@@ -38,7 +38,7 @@ declare -A controlplane_flavor_alternate=(
 )
 
 declare -A compute_flavor=(
-	['openstack-vexxhost']='ci.m1.xlarge'
+	['openstack-vexxhost']='shiftstack-ci.worker'
 	['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
@@ -58,7 +58,7 @@ declare -A compute_azs=(
 )
 
 declare -A bastion_flavor=(
-	['openstack-vexxhost']='1vcpu_2gb'
+	['openstack-vexxhost']='shiftstack-ci.bastion'
 	['openstack-operators-vexxhost']='ci.m1.small'
 	['openstack-vh-mecha-central']='m1.small'
 	['openstack-vh-mecha-az0']='m1.small'

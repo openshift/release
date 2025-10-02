@@ -311,7 +311,7 @@ CONFIG = {
     'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 8,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
