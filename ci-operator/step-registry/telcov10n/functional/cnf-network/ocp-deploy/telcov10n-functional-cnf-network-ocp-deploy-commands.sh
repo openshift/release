@@ -79,7 +79,7 @@ fi
 
 cd /eco-ci-cd
 ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME} kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+    --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME} kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig internal_registry=${ENABLE_INTERNAL_REGISTRY}"
 
 echo "Store inventory in SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
