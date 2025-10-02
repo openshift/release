@@ -19,9 +19,10 @@ for node in $WORKER_NODES; do
 done
 
 # Define the EBS devices that were attached by storage-create-aws-extra-disks
-# These match the device names allocated in get_device_name() function:
-# fullDeviceList="sdp sdo sdn sdm sdl sdk sdj sdi sdh sdg sdf"
-# With EXTRA_DISKS_COUNT=3, we get /dev/sdf, /dev/sdg, /dev/sdh per node
+# On c5n.metal instances, EBS volumes are exposed as NVMe devices
+# The 3 attached EBS volumes (100GB each) appear as:
+# /dev/nvme2n1, /dev/nvme3n1, /dev/nvme4n1
+# (nvme0n1 is root disk, nvme1n1 is often used for other purposes)
 echo ""
 echo "Creating Filesystem resource with explicitly defined EBS devices..."
 if oc apply -f=- <<EOF
@@ -36,9 +37,9 @@ spec:
     pools:
     - name: system
       disks:
-      - /dev/sdf
-      - /dev/sdg
-      - /dev/sdh
+      - /dev/nvme2n1
+      - /dev/nvme3n1
+      - /dev/nvme4n1
     replication: 1-way
     type: shared
   seLinuxOptions:
