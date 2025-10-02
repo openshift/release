@@ -11,22 +11,14 @@ base_images:
     name: 4.22-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_4.20_base-rhel9:
-    name: 4.22-priv
-    namespace: ocp-private
-    tag: base-rhel9
   ocp_4.21_base-rhel9:
     name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-8-golang-1.24-openshift-4.21
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
@@ -42,34 +34,25 @@ canonical_go_repository: github.com/openshift/oc
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cli
 - dockerfile_path: images/tools/Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: tools
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
@@ -77,9 +60,6 @@ images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
@@ -91,12 +71,12 @@ images:
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
   inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
@@ -172,7 +152,7 @@ tests:
     from: test-bin
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-serial
   shard_count: 2
@@ -193,7 +173,7 @@ tests:
 - as: e2e-aws-certrotation
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     test:
     - ref: openshift-oc-certrotation
     - ref: openshift-e2e-test
