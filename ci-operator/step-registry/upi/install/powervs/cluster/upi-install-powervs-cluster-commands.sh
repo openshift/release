@@ -2,6 +2,7 @@
 
 set -o errexit
 set -o nounset
+set -o pipefail
 
 ############################################################
 # Variables
@@ -412,6 +413,8 @@ function build_upi_cluster() {
         echo "Unexpected it's blank"
         exit 77
     fi
+
+    set +o pipefail # avoid problems with unexpected fails after this step.
 
     echo "Retrieving the SSH key"
     scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
