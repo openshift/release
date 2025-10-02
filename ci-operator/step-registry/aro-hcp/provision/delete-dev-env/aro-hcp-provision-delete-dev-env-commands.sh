@@ -41,7 +41,8 @@ rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
 export PATH="/tmp/tools:$PATH"
 
 export USER="cide"
-export PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
+PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
+export PRINCIPAL_ID
 
 unset GOFLAGS
 make infra.svc.clean
