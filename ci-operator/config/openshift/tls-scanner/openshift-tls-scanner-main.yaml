@@ -37,9 +37,17 @@ tests:
   steps:
     cluster_profile: aws
     test:
+    - as: grant-admin-permissions
+      cli: latest
+      commands: oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:$(oc
+        project -q):tls-scanner
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: run-scanner-on-cluster
       cli: latest
-      commands: /usr/local/bin/tls-scanner -all-pods -junit-file "${ARTIFACT_DIR}/tls-scanner/report.xml"
+      commands: /usr/local/bin/tls-scanner -all-pods -csv "${ARTIFACT_DIR}/tls-scanner/report.csv"
         -limit-ips 4
       from: tls-scanner-tool
       resources:
