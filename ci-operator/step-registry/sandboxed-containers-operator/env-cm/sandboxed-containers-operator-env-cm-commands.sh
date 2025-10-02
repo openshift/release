@@ -77,7 +77,6 @@ else
     TRUSTEE_CATALOG_SOURCE_IMAGE="GA"
     TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
     echo "Using default Red Hat operators catalog for GA release"
-  fi
 fi
 
 cat <<EOF | tee "${configmap_path}"
