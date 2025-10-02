@@ -7,8 +7,7 @@ STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
 STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
 
 echo "🗂️  Creating IBM Storage Scale Filesystem for shared storage..."
-echo "Note: Creating Filesystem using auto-discovered local disks"
-echo "The operator will discover and use available local disks based on cluster configuration"
+echo "Note: Using manually specified EBS volumes"
 
 # Check what disks are available (for debugging)
 echo ""
@@ -16,11 +15,15 @@ echo "Checking available disks on worker nodes..."
 WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}' | head -3)
 for node in $WORKER_NODES; do
   echo "Node: $node"
-  oc debug node/$node -- chroot /host lsblk 2>/dev/null | grep -E "NAME|sd|nvme|xvd" | head -5 || echo "  Could not check disks"
+  oc debug node/$node -- chroot /host lsblk 2>/dev/null | grep -E "NAME|sd|nvme|xvd" | head -10 || echo "  Could not check disks"
 done
 
+# Define the EBS devices that were attached by storage-create-aws-extra-disks
+# These match the device names allocated in get_device_name() function:
+# fullDeviceList="sdp sdo sdn sdm sdl sdk sdj sdi sdh sdg sdf"
+# With EXTRA_DISKS_COUNT=3, we get /dev/sdf, /dev/sdg, /dev/sdh per node
 echo ""
-echo "Creating Filesystem resource with auto-discovery..."
+echo "Creating Filesystem resource with explicitly defined EBS devices..."
 if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Filesystem
@@ -33,7 +36,9 @@ spec:
     pools:
     - name: system
       disks:
-      - /dev/disk/by-id/*
+      - /dev/sdf
+      - /dev/sdg
+      - /dev/sdh
     replication: 1-way
     type: shared
   seLinuxOptions:
