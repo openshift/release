@@ -59,11 +59,6 @@ verify_internal_registry() {
 # check_cluster_operators waits up to 15 minutes for all OpenShift cluster
 # operators to be in a stable (not Progressing, not Degraded, and Available) state.
 check_cluster_operators() {
-  if [ "${OCP:-false}" != "true" ]; then
-    echo "Skipping ClusterOperator check on non-OCP cluster."
-    return 0
-  fi
-
   if ! command -v jq &> /dev/null; then
     echo "ERROR: jq is required for the cluster operator health check. Please install jq." >&2
     exit 1
@@ -125,7 +120,7 @@ run_tests() {
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
-    entrypoint ${E2E_COMMAND:-CI=true make test.e2e.ocp}
+    entrypoint ${E2E_COMMAND:-make test.e2e.ocp}
     "
 }
 
