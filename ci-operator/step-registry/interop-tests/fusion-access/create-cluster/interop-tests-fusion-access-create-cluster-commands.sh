@@ -60,8 +60,6 @@ spec:
         deviceType: generic
       - devicePath: /dev/nvme3n1
         deviceType: generic
-      - devicePath: /dev/nvme4n1
-        deviceType: generic
     clusterProfile:
       controlSetxattrImmutableSELinux: "yes"
       enforceFilesetQuotaOnRoot: "yes"

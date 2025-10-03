@@ -38,7 +38,6 @@ spec:
       disks:
       - shared-ebs-disk-1
       - shared-ebs-disk-2
-      - shared-ebs-disk-3
     replication: 1-way
     type: shared
   seLinuxOptions:

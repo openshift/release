@@ -24,8 +24,9 @@ echo "Using node for LocalDisk creation: $FIRST_WORKER"
 echo ""
 
 # EBS volumes on c5n.metal instances appear as NVMe devices
-# Create LocalDisk for each of the 3 EBS volumes (100GB each)
-DEVICES=("nvme2n1" "nvme3n1" "nvme4n1")
+# Note: Only using 2 devices (nvme2n1, nvme3n1) that are consistently available on all nodes
+# nvme4n1 is not reliably attached to all worker nodes
+DEVICES=("nvme2n1" "nvme3n1")
 DISK_COUNT=1
 
 for device in "${DEVICES[@]}"; do
