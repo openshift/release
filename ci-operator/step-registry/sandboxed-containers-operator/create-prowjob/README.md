@@ -11,6 +11,7 @@ The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates pr
 The script supports the following commands:
 
 - `create` - Create prowjob configuration files
+- `run` - Run prowjobs from YAML configuration
 
 ### Command Usage
 
@@ -48,6 +49,12 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 
 # Generate configuration with custom OCP version
 OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
+
+# Run jobs from generated YAML file
+PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh run openshift-sandboxed-containers-operator-devel__downstream-candidate419.yaml
+
+# Run specific job
+PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh run openshift-sandboxed-containers-operator-devel__downstream-candidate419.yaml azure-ipi-kata
 ```
 
 ### Environment Variables
@@ -136,6 +143,34 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 - **Method**: Quay API with pagination (max 50 pages)
 - **Special Case**: OCP 4.16 uses `trustee-fbc/` subfolder
 
+## Run Command
+
+The `run` command allows you to trigger ProwJobs from a generated YAML configuration file. This command requires a valid Prow API token.
+
+### Run Command Usage
+
+```bash
+# Run all jobs from a YAML file
+./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml
+
+# Run specific jobs from a YAML file
+./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata aws-ipi-peerpods
+```
+
+### Run Command Features
+
+- **Job Name Generation**: Automatically constructs job names using the pattern `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_suffix}`
+- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section
+- **API Integration**: Uses the Prow/Gangway API to trigger jobs
+- **Job Status Monitoring**: Provides job IDs and status information
+- **Flexible Job Selection**: Can run all jobs or specific jobs by name
+
+### Run Command Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PROW_API_TOKEN` | Yes | Prow API authentication token |
+
 ## Generated Test Matrix
 
 The script generates configuration for 5 test scenarios:
@@ -219,3 +254,25 @@ yq eval '.' openshift-sandboxed-containers-operator-devel__downstream-candidate4
 - **Required**: `curl`, `jq`, `awk`, `sort`, `head`
 - **Optional**: `yq` (for YAML syntax validation)
 - **Network**: Access to `quay.io` API endpoints
+
+## Prow API Token
+
+To trigger ProwJobs via the REST API, you need an authentication token. Each SSO user is entitled to obtain a personal authentication token.
+
+### Obtaining a Token
+
+Tokens can be retrieved through the UI of the app.ci cluster at [OpenShift Console](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com). Alternatively, if the app.ci cluster context is already configured, you may execute:
+
+```bash
+oc whoami -t
+```
+
+### Using the Token
+
+Once you have obtained a token, set it as an environment variable:
+
+```bash
+export PROW_API_TOKEN=your_token_here
+```
+
+For complete information about triggering ProwJobs via REST, including permanent tokens for automation, see the [OpenShift CI documentation](https://docs.ci.openshift.org/docs/how-tos/triggering-prowjobs-via-rest/#obtaining-an-authentication-token).
