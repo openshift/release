@@ -74,22 +74,22 @@ deadline=$(( $(date +%s) + TIMEOUT_MINUTES*60 ))
 STREAM_PID=""
 CURRENT_POD=""
 
-cleanup() {
-    [[ -n "${STREAM_PID:-}" ]] && kill "${STREAM_PID}" 2>/dev/null || true
-}
+#cleanup() {
+    #[[ -n "${STREAM_PID:-}" ]] && kill "${STREAM_PID}" 2>/dev/null || true
+#}
 
-trap cleanup EXIT
+#trap cleanup EXIT
 
-start_stream() {
-    local pod="$1"
-    [[ -z "$pod" ]] && return 0
-    [[ "$pod" == "$CURRENT_POD" ]] && return 0
-    [[  -n "${STREAM_PID:-}" ]] && { kill "${STREAM_PID}" 2>/dev/null || true; wait "${STREAM_PID}" 2>/dev/null || true; }
-    CURRENT_POD="$pod"
-    echo
-    echo "[INFO] $(now) Streaming deprovision logs from pod: $pod"
-    ( oc -n "$NAMESPACE" logs "$pod" -f --since="${LOG_SINCE}" || true ) & STREAM_PID=$!
-}
+# start_stream() {
+#     local pod="$1"
+#     [[ -z "$pod" ]] && return 0
+#     [[ "$pod" == "$CURRENT_POD" ]] && return 0
+#     [[  -n "${STREAM_PID:-}" ]] && { kill "${STREAM_PID}" 2>/dev/null || true; wait "${STREAM_PID}" 2>/dev/null || true; }
+#     CURRENT_POD="$pod"
+#     echo
+#     echo "[INFO] $(now) Streaming deprovision logs from pod: $pod"
+#     ( oc -n "$NAMESPACE" logs "$pod" -f --since="${LOG_SINCE}" || true ) & STREAM_PID=$!
+# }
 
 pick_deprovision_pod() {
     oc -n $NAMESPACE get pod -l hive.openshift.io/job-type=deprovision -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
@@ -104,39 +104,49 @@ list_deprovision_crs() {
     oc -n $NAMESPACE get clusterdeprovisions -l hive.openshift.io/cluster-deployment-name="$CLUSTER_NAME" --no-headers 2>/dev/null || true
 }
 
-echo "[INFO] $(now) waiting for deprovision job to complete (timeout: ${TIMEOUT_MINUTES}m)"
-sleep 900
-while true; do
-#start or switch log stream if a provision pod exists
-  POD="$(pick_deprovision_pod || true)"
-  echo "deprovision-pod: $POD"
-  [[ -n "$POD" ]] && start_stream "$POD"
-
-  #success
-  #   cd_exists="$(get_clusterdeployement)"
-  #   deprovision_running=$(oc -n "$NAMESPACE" get pod -l hive.openshift.io/job-type=deprovision --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  # Determine deprovision state from the most recent ClusterDeprovision
-  deprov_state="$(
-    oc -n "${NAMESPACE}" get clusterdeprovisions -o json 2>/dev/null \
-    | jq -r '
-        (.items | sort_by(.metadata.creationTimestamp)[-1]? // {}) as $obj
+state_from_cd() {
+   oc -n "${NAMESPACE}" get clusterdeprovisions -o json 2>/dev/null \
+    | jq -r '(.items | sort_by(.metadata.creationTimestamp)[-1]? // {}) as $obj
         | if ($obj == {}) then "none"
           elif ($obj.status.completed == true) then "completed"
           elif ([$obj.status.conditions[]? | select(.type=="DeprovisionFailed" and .status=="True")] | length) > 0 then "failed"
           elif ([$obj.status.conditions[]? | select(.type=="AuthenticationFailure" and .status=="True")] | length) > 0 then "auth-failed"
-          else "running"
-          end
+          else "running" end
      '
-   )"
-  case "$deprov_state" in 
+
+}
+echo "[INFO] $(now) waiting for deprovision job to complete (timeout: ${TIMEOUT_MINUTES}m)"
+POD="$(pick_deprovision_pod)"
+  echo "deprovision-pod: $POD"
+  if [[ -n "$POD" ]] ; then
+    echo "[INFO] Streaming logs from deprovision pod"
+    oc -n "$NAMESPACE" logs "$POD" -f --since="${LOG_SINCE}" 2>&1  &  
+    STREAM_PID=$!
+  else
+    echo "[INFO] no pods found"
+    STREAM_PID=$!
+fi
+
+while true; do
+#start or switch log stream if a provision pod exists
+  
+  state="$(state_from_cd)"
+  #success
+  #   cd_exists="$(get_clusterdeployement)"
+  #   deprovision_running=$(oc -n "$NAMESPACE" get pod -l hive.openshift.io/job-type=deprovision --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  # Determine deprovision state from the most recent ClusterDeprovision
+
+  case "$state" in 
     completed)
        echo 
        echo "[info] Deprovision completed."
-       break
+       [[ -n "${STREAM_PID}" ]] && kill "$STREAM_PID" 2>dev/null || true
+       exit 0
        ;;
     failed|auth-failed)
        echo
        echo "[ERROR] Deprovision failed (state=$deprov_state)."
+       [[ -n "${STREAM_PID}" ]] && kill "$STREAM_PID" 2>dev/null || true
        exit 2
        ;;
    # none|running → keep waiting  
@@ -144,14 +154,26 @@ while true; do
   if (( $(date +%s) > deadline )); then
     echo
     echo "[ERROR]Uninstall timed out after ${TIMEOUT_MINUTES} minutes."
-    echo "[HINT] Check Hive controller logs:"
-    echo " oc -n open-cluster-management-hub logs statefulset/clusterlifecycle-statefulset -c hive --tail=300 | grep -i ${CLUSTER_NAME}"
+    [[ -n "${STREAM_PID}" ]] && kill "$STREAM_PID" 2>dev/null || true
     exit 3
   fi
+  if [[  -z "${STREAM_PID:-}" ]]; then
+      POD="$(pick_deprovision_pod)"
+      echo "deprovision-pod: $POD"
+      if [[ -n "$POD" ]] ; then
+         echo "[INFO] Streaming logs from deprovision pod"
+         oc -n "$NAMESPACE" logs "$POD" -f --since="${LOG_SINCE}" 2>&1  &  
+         STREAM_PID=$!
+      else
+         echo "[INFO] no pods found"
+         STREAM_PID=$!
+      fi
+   fi
+    
 
   sleep "$POLL_SECONDS"
 done
 
-cleanup
+#cleanup
 
     
