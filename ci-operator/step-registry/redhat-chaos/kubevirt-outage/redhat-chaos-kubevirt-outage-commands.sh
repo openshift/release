@@ -1,10 +1,11 @@
 #!/bin/bash
+set -o nounset
 set -o errexit
 
 console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
 export HEALTH_CHECK_URL=https://$console_url
 oc get vmis -A
-set -o nounset
+
 set -o pipefail
 set -x
 
@@ -33,8 +34,8 @@ export NAMESPACE=$TARGET_NAMESPACE
 oc get vmis -A 
 
 export KUBE_VIRT_NAMESPACE=$TARGET_NAMESPACE
-./kubevirt-outage/prow_run.sh
-rc=$?
+./kubevirt-outage/prow_run.sh || rc=$?
+
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
