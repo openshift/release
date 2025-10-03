@@ -1,0 +1,39 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: pre-installed
+  capabilities:
+  - intranet
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: metal-redhat-gs
+    env:
+      KUBE_VIRT_FAILURES: "True"
+      TARGET_NAMESPACE: benchmark-runner
+    test:
+    - ref: redhat-chaos-kubevirt-outage
+    workflow: external-cluster
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp4.19
