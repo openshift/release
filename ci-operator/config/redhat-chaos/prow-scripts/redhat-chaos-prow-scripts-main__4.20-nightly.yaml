@@ -38,30 +38,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: cnv-aws-interop
-  cron: 0 3,15 * * *
-  steps:
-    cluster_profile: aws-chaos
-    env:
-      BASE_DOMAIN: aws.rhperfscale.org
-      COMPUTE_NODE_TYPE: c5n.metal
-      GC: "false"
-      ODF_OPERATOR_CHANNEL: stable-4.19
-      ODF_VERSION_MAJOR_MINOR: "4.19"
-    post:
-    - ref: kubevirt-gather
-    - chain: ipi-aws-post
-    pre:
-    - ref: install-operators-verify
-    - chain: ipi-aws-pre
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    - ref: interop-tests-deploy-odf
-    - ref: interop-tests-ocs-tests
-    - ref: interop-tests-cnv-tests-e2e-deploy
-    - ref: openshift-qe-virt-density
-    - ref: redhat-chaos-kubevirt-outage
-  timeout: 6h0m0s
 - always_run: false
   as: aws-virt-operator
   steps:
@@ -75,8 +51,8 @@ tests:
       SIZE_VARIANT: xlarge
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.20
+      VMS_PER_NODE: "2"
     post:
-    - ref: kubevirt-gather
     - chain: ipi-aws-post
     test:
     - ref: kubevirt-install
@@ -97,31 +73,10 @@ tests:
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.20
     post:
-    - ref: kubevirt-gather
     - chain: ipi-gcp-post
     test:
     - ref: kubevirt-install
-    - ref: openshift-qe-virt-density
-    - ref: redhat-chaos-kubevirt-outage
-    workflow: ipi-gcp
-  timeout: 6h0m0s
-- always_run: false
-  as: gcp-virt-interop
-  steps:
-    cluster_profile: gcp-chaos
-    env:
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: n2-standard-4
-      FEATURE_SET: TechPreviewNoUpgrade
-      GC: "false"
-      ODF_OPERATOR_CHANNEL: stable-4.19
-      ODF_VERSION_MAJOR_MINOR: "4.19"
-      SIZE_VARIANT: xlarge
-      SPOT_INSTANCES: "false"
-      TELEMETRY_GROUP: prow-ocp-4.20
-    test:
-    - ref: interop-tests-deploy-odf
-    - ref: interop-tests-deploy-cnv
+    - ref: clusterbot-wait
     - ref: openshift-qe-virt-density
     - ref: redhat-chaos-kubevirt-outage
     workflow: ipi-gcp
