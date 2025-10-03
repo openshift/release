@@ -11,6 +11,7 @@ set -x
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
+# shellcheck disable=SC2087
 ssh ${SSH_ARGS} root@"${bastion}" bash -s <<EOF
 ip link add name dummy0 type dummy || true
 ip link set dummy0 up
