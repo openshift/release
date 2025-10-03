@@ -283,7 +283,7 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     fi
     echo "debug...."
     #sleep 2h
-    Set -xeuo pipefail
+    set -xeuo pipefail
 fi
 # execute the cases
 function run {
