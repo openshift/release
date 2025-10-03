@@ -34,10 +34,10 @@ CONFIG = {
         'us-west-2': 25,
     },
     'aws-5-quota-slice': {
-        'us-east-1': 50,
-        'us-east-2': 35,
-        'us-west-1': 35,
-        'us-west-2': 35,
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25,
     },
     'aws-cspi-qe-quota-slice': {
         'us-east-1': 30,
