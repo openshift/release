@@ -2,6 +2,7 @@
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
 # Usage: 
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
+#   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
 
 # created with the assistance of Cursor AI
@@ -9,6 +10,10 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+
+# Endpoint for the Gangway API (https://docs.prow.k8s.io/docs/components/optional/gangway/)
+# used to interact with Prow via REST API
+GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
 
 # Function to get latest OSC catalog tag
 get_latest_osc_catalog_tag() {
@@ -259,9 +264,12 @@ show_usage() {
     echo ""
     echo "Commands:"
     echo "  create  Create prowjob configuration files"
+    echo "  run     Run prowjobs from YAML configuration"
     echo ""
     echo "Examples:"
     echo "  $0 create"
+    echo "  $0 run /path/to/job_yaml.yaml"
+    echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
     echo ""
     echo "Environment variables for 'create' command:"
     echo "  OCP_VERSION                    - OpenShift version (default: 4.19)"
@@ -298,6 +306,9 @@ main() {
     case "${COMMAND}" in
         create)
             command_create
+            ;;
+        run)
+            command_run "$@"
             ;;
         *)
             echo "ERROR: Unknown command '${COMMAND}'"
@@ -539,7 +550,19 @@ EOF
     echo "Generated file: ${OUTPUT_FILE}"
     echo "File size: ${file_size} bytes"
     echo "=========================================="
-    echo "Next Steps:"
+    echo "Next steps you have two options:"
+    echo ""
+    echo "Option A - Run jobs immediately:"
+    echo "1. Set your Prow API token:"
+    echo "   export PROW_API_TOKEN=your_token_here"
+    echo ""
+    echo "2. Run all jobs from the generated file:"
+    echo "   ./sandboxed-containers-operator-create-prowjob-commands.sh run ${OUTPUT_FILE}"
+    echo ""
+    echo "3. Or run specific jobs:"
+    echo "   ./sandboxed-containers-operator-create-prowjob-commands.sh run ${OUTPUT_FILE} azure-ipi-kata"
+    echo ""
+    echo "Option B - Submit configuration to CI:"
     echo "1. Review the created configuration file:"
     echo "   cat ${OUTPUT_FILE}"
     echo ""
@@ -556,6 +579,152 @@ EOF
     echo ""
 }
 
+# Function to run prowjobs
+command_run() {
+    echo "=========================================="
+    echo "Sandboxed Containers Operator - Run Prowjobs"
+    echo ""
+
+    # Check if job_yaml file is provided
+    if [[ $# -eq 0 ]]; then
+        echo "ERROR: No job YAML file specified"
+        echo ""
+        echo "Usage: $0 run <job_yaml_file> [job_names...]"
+        echo ""
+        echo "Examples:"
+        echo "  $0 run /path/to/job_yaml.yaml"
+        echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
+        echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata azure-ipi-peerpods"
+        echo ""
+        exit 1
+    fi
+
+    JOB_YAML_FILE="$1"
+    shift
+
+    # Check if job_yaml file exists
+    if [[ ! -f "${JOB_YAML_FILE}" ]]; then
+        echo "ERROR: Job YAML file not found: ${JOB_YAML_FILE}"
+        exit 1
+    fi
+
+    echo "Job YAML file: ${JOB_YAML_FILE}"
+
+    # Extract metadata from job_yaml
+    ORG=$(yq eval '.zz_generated_metadata.org' "${JOB_YAML_FILE}")
+    REPO=$(yq eval '.zz_generated_metadata.repo' "${JOB_YAML_FILE}")
+    BRANCH=$(yq eval '.zz_generated_metadata.branch' "${JOB_YAML_FILE}")
+    VARIANT=$(yq eval '.zz_generated_metadata.variant' "${JOB_YAML_FILE}")
+
+    if [[ -z "${ORG}" || -z "${REPO}" || -z "${BRANCH}" || -z "${VARIANT}" ]]; then
+        echo "ERROR: Missing required metadata in job YAML file"
+        echo "Required fields: org, repo, branch, variant in zz_generated_metadata section"
+        exit 1
+    fi
+
+    # Generate job name prefix
+    JOB_PREFIX="periodic-ci-${ORG}-${REPO}-${BRANCH}-${VARIANT}"
+    echo "Job name prefix: ${JOB_PREFIX}"
+
+    # Determine job names to run
+    if [[ $# -eq 0 ]]; then
+        # No specific jobs provided, extract all 'as' values from tests
+        echo "No specific jobs provided, extracting all jobs from YAML..."
+        mapfile -t JOB_NAMES < <(yq eval '.tests[].as' "${JOB_YAML_FILE}")
+    else
+        # Use provided job names
+        echo "Using provided job names: $*"
+        JOB_NAMES=("$@")
+    fi
+
+    if [[ ${#JOB_NAMES[@]} -eq 0 ]]; then
+        echo "ERROR: No jobs found to run"
+        exit 1
+    fi
+
+    echo ""
+    echo "Jobs to run:"
+    for job_suffix in "${JOB_NAMES[@]}"; do
+        full_job_name="${JOB_PREFIX}-${job_suffix}"
+        echo "  - ${full_job_name}"
+    done
+
+    echo ""
+    echo "Preparing job execution..."
+
+    # Check for PROW_API_TOKEN
+    if [[ -z "${PROW_API_TOKEN:-}" ]]; then
+        echo "ERROR: PROW_API_TOKEN environment variable is not set"
+        echo "Please set your Prow API token:"
+        echo "  export PROW_API_TOKEN=your_token_here"
+        exit 1
+    fi
+    echo "✓ PROW_API_TOKEN is set"
+
+    # Convert job YAML to JSON
+    echo "Converting job YAML to JSON..."
+    if ! yq -o=json "${JOB_YAML_FILE}" | jq -Rs . > config.json; then
+        echo "ERROR: Failed to convert YAML to JSON"
+        exit 1
+    fi
+    echo "✓ Job configuration converted to JSON"
+
+    # Trigger jobs
+    echo ""
+    echo "Triggering jobs..."
+
+    for job_suffix in "${JOB_NAMES[@]}"; do
+        full_job_name="${JOB_PREFIX}-${job_suffix}"
+        echo ""
+        echo "Triggering job: ${full_job_name}"
+
+        # Create payload
+        UNRESOLVED_SPEC=$(cat config.json)
+        payload=$(jq -n --arg job "${full_job_name}" \
+           --argjson config "${UNRESOLVED_SPEC}" \
+           '{
+               "job_name": $job,
+               "job_execution_type": "1",
+               "pod_spec_options": {
+                  "envs": {
+                     "UNRESOLVED_CONFIG": $config
+                   },
+                }
+            }')
+
+        # Make API call
+        echo "Making API call to trigger job..."
+        if curl -s -X POST -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+            -H "Content-Type: application/json" -d "${payload}" \
+            "${GANGWAY_API_ENDPOINT}" > "output_${job_suffix}.json"; then
+
+            # Extract job ID
+            job_id=$(jq -r '.id' "output_${job_suffix}.json")
+            if [[ "${job_id}" != "null" && -n "${job_id}" ]]; then
+                echo "✓ Job triggered successfully!"
+                echo "  Job ID: ${job_id}"
+                echo "  Output saved to: output_${job_suffix}.json"
+
+                # Get job status
+                echo "Fetching job status..."
+                curl -s -X GET -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+                    "${GANGWAY_API_ENDPOINT}/${job_id}" > "status_${job_suffix}.json"
+                echo "  Status saved to: status_${job_suffix}.json"
+            else
+                echo "✗ Failed to get job ID from response"
+                echo "Response content:"
+                cat "output_${job_suffix}.json"
+            fi
+        else
+            echo "✗ Failed to trigger job"
+            echo "Check output_${job_suffix}.json for details"
+        fi
+    done
+
+    echo ""
+    echo "Job triggering completed!"
+    echo "Check the output_*.json and status_*.json files for details"
+}
 
 # Call main function with all command line arguments
 main "$@"
