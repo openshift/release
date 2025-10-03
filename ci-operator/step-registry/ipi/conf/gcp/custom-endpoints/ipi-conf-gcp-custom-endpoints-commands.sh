@@ -73,6 +73,12 @@ if [[ "${ENABLE_CUSTOM_ENDPOINT_FOR_STORAGE}" == "yes" ]]; then
 EOF
 fi
 
+# The region is not set, because the private service connect endpoint is a global configuration.
+cat >> "${PATCH}" << EOF
+    endpoint:
+      - name: ${gcp_custom_endpoint}
+EOF
+
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 yq-go r "${CONFIG}" platform
 rm "${PATCH}"
