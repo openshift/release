@@ -6,11 +6,24 @@ This directory contains a robust script to generate OpenShift CI prowjob configu
 
 The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates prowjob configuration files for the sandboxed containers operator CI pipeline. It supports both Pre-GA (development) and GA (production) release types with intelligent catalog source management and comprehensive parameter validation.
 
+## Commands
+
+The script supports the following commands:
+
+- `create` - Create prowjob configuration files
+
+### Command Usage
+
+```bash
+# Show help
+./sandboxed-containers-operator-create-prowjob-commands.sh
+```
+
 ## Files
 
 - `sandboxed-containers-operator-create-prowjob-commands.sh` - Main script to generate prowjob configurations
 - The output file is created in the current directory and named `openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_VERSION}.yaml`
-  - `PROW_RUN_TYPE` is based on ``TEST_RELEASE_TYPE.  It is `candidate` for `Pre-GA` and `release` otherwise
+  - `PROW_RUN_TYPE` is based on `TEST_RELEASE_TYPE`. It is `candidate` for `Pre-GA` and `release` otherwise
 - If the output file exists, it will be moved to a `.backup` file
 
 ## Key Features
@@ -31,10 +44,10 @@ The script uses environment variables exclusively for configuration:
 
 ```bash
 # Generate configuration with defaults
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 
 # Generate configuration with custom OCP version
-OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 ### Environment Variables
@@ -75,7 +88,7 @@ OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-
 TEST_RELEASE_TYPE=Pre-GA \
 PROW_RUN_TYPE=candidate \
 OCP_VERSION=4.18 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 #### GA Production Testing
@@ -84,7 +97,7 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 TEST_RELEASE_TYPE=GA \
 PROW_RUN_TYPE=release \
 OCP_VERSION=4.19 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 #### Custom Regions and Timeouts
@@ -94,19 +107,19 @@ AWS_REGION_OVERRIDE=us-west-2 \
 CUSTOM_AZURE_REGION=westus2 \
 SLEEP_DURATION=2h \
 TEST_TIMEOUT=120 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 #### Kata RPM Testing
 ```bash
 # Test without Kata RPM installation
 INSTALL_KATA_RPM=false \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 
 # Test with specific Kata RPM version
 INSTALL_KATA_RPM=true \
 KATA_RPM_VERSION=3.18.0-3.rhaos4.20.el9 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 ## Catalog Tag Discovery
