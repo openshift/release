@@ -22,7 +22,14 @@ export E2E_EXTERNAL_DNS_DOMAIN="service.ci.hypershift.devcluster.openshift.com"
 export E2E_PULL_SECRET_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
 
 # AWS specific configuration
-TARGET_AWS_REGION="$(cat ${SHARED_DIR}/aws-region)"
+if [[ -f ${SHARED_DIR}/aws-region ]]; then
+  echo "Region override found. Using it."
+  TARGET_AWS_REGION="$(cat ${SHARED_DIR}/aws-region)"
+else
+  echo "No region override found. Using leased resource."
+  TARGET_AWS_REGION="${LEASED_RESOURCE}"
+fi
+
 export E2E_AWS_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export E2E_AWS_PRIVATE_REGION="${TARGET_AWS_REGION}"
