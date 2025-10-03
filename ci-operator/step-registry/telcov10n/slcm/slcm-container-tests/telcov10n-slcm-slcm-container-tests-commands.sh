@@ -21,8 +21,13 @@ PODMAN_AUTH_PATH="$(cat /var/run/project-02/slcm-container/PODMAN_AUTH_PATH)"
 VAULT_PASSWORD=$(cat /var/run/project-02/slcm-container/VAULT_PASSWORD)
 ECO_GOTESTS_CONTAINER="$(cat /var/run/project-02/slcm-container/ECO_GOTESTS_CONTAINER)"
 ECO_VALIDATION_CONTAINER="$(cat /var/run/project-02/slcm-container/ECO_VALIDATION_CONTAINER)"
+EDU_CLUSTER="$(cat /var/run/project-02/slcm-container/EDU_CLUSTER)"
 TB1SLCM1="$(cat /var/run/project-02/slcm-container/tb1slcm1)"
 TB2SLCM1="$(cat /var/run/project-02/slcm-container/tb2slcm1)"
+TB3SLCM3="$(cat /var/run/project-02/slcm-container/tb3slcm3)"
+TB4SLCM3="$(cat /var/run/project-02/slcm-container/tb4slcm3)"
+TB6SLCM3="$(cat /var/run/project-02/slcm-container/tb6slcm3)"
+
 SKIP_DCI="$(cat /var/run/project-02/slcm-container/SKIP_DCI)"
 STAMP="$(cat /var/run/project-02/slcm-container/STAMP)"
 LATENCY_DURATION="$(cat /var/run/project-02/slcm-container/LATENCY_DURATION)"
@@ -31,6 +36,32 @@ SITE_NAME="$(cat /var/run/project-02/slcm-container/SITE_NAME)"
 DCI_PIPELINE_FILES="$(cat /var/run/project-02/slcm-container/DCI_PIPELINE_FILES)"
 EDU_PTP="$(cat /var/run/project-02/slcm-container/EDU_PTP)"
 COPY_TO_PROW="$(cat /var/run/project-02/slcm-container/COPY_TO_PROW)"
+
+# Dynamically set TARGET_HOST based on STAMP variable
+case "${STAMP,,}" in
+    tb1slcm1)
+        TARGET_HOST="${TB1SLCM1}"
+        ;;
+    tb2slcm1)
+        TARGET_HOST="${TB2SLCM1}"
+        ;;
+    tb3slcm3)
+        TARGET_HOST="${TB3SLCM3}"
+        ;;
+    tb4slcm3)
+        TARGET_HOST="${TB4SLCM3}"
+        ;;
+    tb6slcm3)
+        TARGET_HOST="${TB6SLCM3}"
+        ;;
+    *)
+        echo "ERROR: Unknown STAMP value: ${STAMP}"
+        echo "Valid values are: tb1slcm1, tb2slcm1, tb3slcm3, tb4slcm3, tb6slcm3"
+        exit 1
+        ;;
+esac
+
+echo "Using target host: ${TARGET_HOST} (based on STAMP: ${STAMP})"
 
 SLCM_VAULT=/var/run/project-02/vault-data/vault_data
 cp $SLCM_VAULT playbooks/run_slcm_vault
@@ -82,7 +113,7 @@ copy_junit_files() {
     
     echo "Testing connectivity from jump server to target..."
     if ! ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} -o ConnectTimeout=10 ${REMOTE_USER}@${TB2SLCM1} 'echo Connection successful'"; then
+        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} -o ConnectTimeout=10 ${REMOTE_USER}@${TARGET_HOST} 'echo Connection successful'"; then
         echo "ERROR: Cannot reach target server from jump server"
         return 1
     fi
@@ -98,7 +129,7 @@ copy_junit_files() {
     # Check and list files on target server
     echo "Checking for XML files on target server..."
     target_files=$(ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TB2SLCM1} 'ls -la ${REMOTE_JUNIT_DIR}/*.xml 2>/dev/null'" || echo "")
+        "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TARGET_HOST} 'ls -la ${REMOTE_JUNIT_DIR}/*.xml 2>/dev/null'" || echo "")
     
     file_count=$(echo "$target_files" | grep -c "\.xml$" || echo "0")
     
@@ -106,7 +137,7 @@ copy_junit_files() {
         echo "Found $file_count XML files on target server:"
         echo "$target_files"
         ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-            "scp -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TB2SLCM1}:${REMOTE_JUNIT_DIR}/*.xml ${JUMP_TEMP_DIR}/"
+            "scp -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TARGET_HOST}:${REMOTE_JUNIT_DIR}/*.xml ${JUMP_TEMP_DIR}/"
         
         # Verify copy to jump server and list files
         jump_files=$(ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
@@ -143,7 +174,7 @@ copy_junit_files() {
             # Cleanup remote directory on target server after successful copy
             echo "=== Cleanup: Removing remote directory on target server ==="
             ssh -i "${SSH_KEY}" "${SSHOPTS[@]}" "${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}" \
-                "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TB2SLCM1} 'rm -rf ${REMOTE_JUNIT_DIR}'" && \
+                "ssh -i ${SSH_KEY} ${SSHOPTS[*]} ${REMOTE_USER}@${TARGET_HOST} 'rm -rf ${REMOTE_JUNIT_DIR}'" && \
                 echo "Successfully removed ${REMOTE_JUNIT_DIR} from target server" || \
                 echo "WARNING: Could not remove ${REMOTE_JUNIT_DIR} from target server"
         else
@@ -206,8 +237,8 @@ all:
           tun_name: "${IFNAME}"
     targets:
       hosts:
-        "${TB2SLCM1}":
-          ansible_host: "${TB2SLCM1}"
+        "${TARGET_HOST}":
+          ansible_host: "${TARGET_HOST}"
           ansible_ssh_common_args: >-
             -i "${SSH_KEY}" ${SSHOPTS[*]}
             -o ProxyCommand="ssh -W %h:%p ${SSHOPTS[*]} -i "${SSH_KEY}" -q ${JUMP_SERVER_USER}@${JUMP_SERVER_ADDRESS}"
@@ -242,6 +273,9 @@ PROW_JUNIT_TEMP_DIR: "/tmp/prow_pipeline_${BUILD_ID}"
 infra_hosts:
   tb1slcm1: "${TB1SLCM1}"
   tb2slcm1: "${TB2SLCM1}"
+  tb3slcm3: "${TB3SLCM3}"
+  tb4slcm3: "${TB4SLCM3}"
+  tb6slcm3: "${TB6SLCM3}"
 END_VARS
 
 ansible-galaxy collection install ansible.posix
