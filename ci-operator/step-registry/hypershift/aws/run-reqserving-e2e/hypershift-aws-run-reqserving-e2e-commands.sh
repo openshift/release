@@ -22,12 +22,13 @@ export E2E_EXTERNAL_DNS_DOMAIN="service.ci.hypershift.devcluster.openshift.com"
 export E2E_PULL_SECRET_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
 
 # AWS specific configuration
+TARGET_AWS_REGION="$(cat ${SHARED_DIR}/aws-region)"
 export E2E_AWS_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export E2E_AWS_PRIVATE_REGION="${LEASED_RESOURCE}"
+export E2E_AWS_PRIVATE_REGION="${TARGET_AWS_REGION}"
 export E2E_AWS_OIDC_S3_CREDENTIALS="/etc/hypershift-pool-aws-credentials/credentials"
 export E2E_AWS_OIDC_S3_REGION="us-east-1"
-export E2E_AWS_REGION="${LEASED_RESOURCE}"
+export E2E_AWS_REGION="${TARGET_AWS_REGION}"
 
 # Set AWS OIDC S3 bucket
 export E2E_AWS_OIDC_S3_BUCKET_NAME="${AWS_OIDC_S3_BUCKET_NAME:-hypershift-ci-oidc}"
