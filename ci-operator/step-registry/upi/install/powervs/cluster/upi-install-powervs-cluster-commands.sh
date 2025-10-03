@@ -236,6 +236,7 @@ function cleanup_prior() {
 }
 
 # creates the var file
+# Note: kdump_enable is false so that is simplifies the setup of one MCP
 function configure_terraform() {
     IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IBMCLOUD_API_KEY
@@ -316,6 +317,8 @@ ibm_cloud_cis_crn          = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
 
 dns_forwarders = "161.26.0.10; 161.26.0.11"
+
+kdump_enable = false
 EOF
 
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars "${SHARED_DIR}"/var-multi-arch-upi.tfvars
