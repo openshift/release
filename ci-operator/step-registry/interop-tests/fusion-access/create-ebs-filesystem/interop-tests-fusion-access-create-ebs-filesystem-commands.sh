@@ -18,13 +18,12 @@ for node in $WORKER_NODES; do
   oc debug node/$node -- chroot /host lsblk 2>/dev/null | grep -E "NAME|sd|nvme|xvd" | head -10 || echo "  Could not check disks"
 done
 
-# Define the EBS devices that were attached by storage-create-aws-extra-disks
-# On c5n.metal instances, EBS volumes are exposed as NVMe devices
-# The 3 attached EBS volumes (100GB each) appear as:
-# /dev/nvme2n1, /dev/nvme3n1, /dev/nvme4n1
-# (nvme0n1 is root disk, nvme1n1 is often used for other purposes)
+# Reference LocalDisk resources that were created by create-local-disks step
+# For shared storage, IBM Storage Scale requires LocalDisk resources
+# instead of direct device paths. The LocalDisk resources represent the
+# shared EBS volumes and manage multi-node access.
 echo ""
-echo "Creating Filesystem resource with explicitly defined EBS devices..."
+echo "Creating Filesystem resource referencing LocalDisk resources..."
 if oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Filesystem
@@ -37,9 +36,9 @@ spec:
     pools:
     - name: system
       disks:
-      - /dev/nvme2n1
-      - /dev/nvme3n1
-      - /dev/nvme4n1
+      - shared-ebs-disk-1
+      - shared-ebs-disk-2
+      - shared-ebs-disk-3
     replication: 1-way
     type: shared
   seLinuxOptions:
