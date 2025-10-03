@@ -14,6 +14,8 @@ PATCH="${SHARED_DIR}/custom_endpoints.yaml.patch"
 cat >> "${PATCH}" << EOF
 platform:
   gcp:
+    endpoint:
+      name: ${gcp_custom_endpoint}
     serviceEndpoints:
 EOF
 
@@ -72,12 +74,6 @@ if [[ "${ENABLE_CUSTOM_ENDPOINT_FOR_STORAGE}" == "yes" ]]; then
       url: https://storage-${gcp_custom_endpoint}.p.googleapis.com
 EOF
 fi
-
-# The region is not set, because the private service connect endpoint is a global configuration.
-cat >> "${PATCH}" << EOF
-    endpoint:
-      - name: ${gcp_custom_endpoint}
-EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 yq-go r "${CONFIG}" platform
