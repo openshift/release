@@ -258,6 +258,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 
 # check if the cluster is ready
 oc version --client
+oc mirror version --output yaml
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
@@ -281,7 +282,7 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         oc mirror version --v2 --output yaml
     fi
     echo "debug...."
-    sleep 2h
+    #sleep 2h
     Set -xeuo pipefail
 fi
 # execute the cases
