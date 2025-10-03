@@ -44,8 +44,8 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
-      GC: "false"
       COMPUTE_NODE_TYPE: c5n.metal
+      GC: "false"
       ODF_OPERATOR_CHANNEL: stable-4.19
       ODF_VERSION_MAJOR_MINOR: "4.19"
     post:
@@ -68,20 +68,20 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c5n.metal
       GC: "false"
       SIZE_VARIANT: xlarge
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.20
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: c5n.metal
-      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+    post:
+    - ref: kubevirt-gather
+    - chain: ipi-aws-post
     test:
     - ref: kubevirt-install
     - ref: openshift-qe-virt-density
     - ref: redhat-chaos-kubevirt-outage
-    post: 
-    - ref: kubevirt-gather
-    - chain: ipi-aws-post
     workflow: ipi-aws
   timeout: 6h0m0s
 - always_run: false
@@ -89,20 +89,20 @@ tests:
   steps:
     cluster_profile: gcp-chaos
     env:
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: n2-standard-4
       GC: "false"
       SIZE_VARIANT: xlarge
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.20
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: n2-standard-4
-      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+    post:
+    - ref: kubevirt-gather
+    - chain: ipi-gcp-post
     test:
     - ref: kubevirt-install
     - ref: openshift-qe-virt-density
     - ref: redhat-chaos-kubevirt-outage
-    post: 
-    - ref: kubevirt-gather
-    - chain: ipi-gcp-post
     workflow: ipi-gcp
   timeout: 6h0m0s
 - always_run: false
@@ -110,15 +110,15 @@ tests:
   steps:
     cluster_profile: gcp-chaos
     env:
-      GC: "false"
-      SIZE_VARIANT: xlarge
-      SPOT_INSTANCES: "false"
-      TELEMETRY_GROUP: prow-ocp-4.20
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: n2-standard-4
       FEATURE_SET: TechPreviewNoUpgrade
+      GC: "false"
       ODF_OPERATOR_CHANNEL: stable-4.19
       ODF_VERSION_MAJOR_MINOR: "4.19"
+      SIZE_VARIANT: xlarge
+      SPOT_INSTANCES: "false"
+      TELEMETRY_GROUP: prow-ocp-4.20
     test:
     - ref: interop-tests-deploy-odf
     - ref: interop-tests-deploy-cnv
