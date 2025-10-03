@@ -24,20 +24,24 @@ CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?pro
 CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
   ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
 
-if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
-then
-  CNV_RELEASE_CHANNEL=stable
-elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
-then
-  CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
+if [[ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]]; then
+  echo "redhat operators"
+  export CNV_RELEASE_CHANNEL=stable
+elif [[ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]] && [[ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]]; then
+  echo "elif1"
+  export CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
 else
-  if [ "${CNV_PRERELEASE_LATEST_CHANNEL}" == "true" ]; then
-    cnv_version=4.99
+  echo "else"
+  if [[ "${CNV_PRERELEASE_LATEST_CHANNEL}" == "true" ]]; then
+    echo "cnv latest true"
+    export cnv_version=4.99
   else
-    cnv_version=$(ocp_version)
+    echo "cnv latest false"
+    export cnv_version=$(ocp_version)
   fi
-  CNV_RELEASE_CHANNEL=nightly-${cnv_version}
-  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:${cnv_version}
+  export CNV_RELEASE_CHANNEL=nightly-${cnv_version}
+  export CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:${cnv_version}
+  echo "cnv pre release $CNV_PRERELEASE_CATALOG_IMAGE"
 fi
 
 # The kubevirt tests require wildcard routes to be allowed
@@ -78,6 +82,9 @@ spec:
     registryPoll:
       interval: 8h
 EOF
+
+sleep 30
+
 fi
 
 oc apply -f - <<EOF
@@ -92,6 +99,17 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: openshift-cnv-group
+  namespace: openshift-cnv
+spec:
+  targetNamespaces:
+  - openshift-cnv
+EOF
+
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: kubevirt-hyperconverged-group
   namespace: openshift-cnv
 spec:
   targetNamespaces:
@@ -119,6 +137,7 @@ sleep 30
 RETRIES=30
 CSV=
 for i in $(seq ${RETRIES}); do
+  oc get subscription -n openshift-cnv kubevirt-hyperconverged -o yaml
   if [[ -z ${CSV} ]]; then
     CSV=$(oc get subscription -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.installedCSV}')
   fi
@@ -126,14 +145,18 @@ for i in $(seq ${RETRIES}); do
     echo "Try ${i}/${RETRIES}: can't get the CSV yet. Checking again in 30 seconds"
     sleep 30
   fi
-  if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+  phase=$(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}')
+  if [[ $phase == "Succeeded" ]]; then
     echo "CNV is deployed"
     break
   else
     echo "Try ${i}/${RETRIES}: CNV is not deployed yet. Checking again in 30 seconds"
+    echo "status $phase"
     sleep 30
   fi
 done
+
+sleep 100
 
 if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
   echo "Error: Failed to deploy CNV"
@@ -170,3 +193,5 @@ spec:
 EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+
+
