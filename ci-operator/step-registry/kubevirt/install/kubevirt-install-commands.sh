@@ -78,7 +78,21 @@ spec:
     registryPoll:
       interval: 8h
 EOF
+
+RETRIES=30
+for i in $(seq ${RETRIES}); do
+  status=$(oc get catalogsource cnv-prerelease-catalog-source -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}') 
+  if [[ $status == "READY" ]]; then
+    break
+  else
+    echo "waiting for catalog source to be read, current status: $status"
+  fi
+  sleep 10
+done
+
 fi
+STARTING_CSV=$(oc get packagemanifest -n openshift-marketplace -o jsonpath="{$.items[?(@.metadata.name=='kubevirt-hyperconverged')].status.channels[?(@.name==\"${CNV_RELEASE_CHANNEL}\")].currentCSV}")
+
 
 oc apply -f - <<EOF
 apiVersion: v1
@@ -111,6 +125,7 @@ spec:
   installPlanApproval: Automatic
   name: kubevirt-hyperconverged
   source: ${CNV_SUBSCRIPTION_SOURCE}
+  startingCSV: ${STARTING_CSV}
   sourceNamespace: openshift-marketplace
 EOF
 
