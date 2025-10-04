@@ -258,12 +258,34 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 
 # check if the cluster is ready
 oc version --client
+oc mirror version --output yaml
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     oc get clusterversion version -o yaml || true
+    ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
 fi
 
+#if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
+if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
+    echo "ocpversion: ${ocpVersion}"
+    if [[ -n "${ocpVersion:-}" ]]; then
+        set +oex
+        tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
+        echo "Extracting oc-mirror from ${ocpVersion}"
+        set -x
+        oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret"
+        ls -la ./oc-mirror
+        chmod +x ./oc-mirror
+        ./oc-mirror version --output yaml
+        cp ./oc-mirror /usr/local/bin/
+        oc mirror version --v2 --output yaml
+        set +x
+    fi
+    echo "debug...."
+    #sleep 2h
+    set -xeuo pipefail
+fi
 # execute the cases
 function run {
     test_scenarios=""
