@@ -143,24 +143,6 @@ else
     KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
 fi
 
-# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
-# this triggers the mirror redirect install, creating brew & trustee catsrc,
-TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
-# Validate TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
-    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
-    exit 1
-fi
-
-# Prow Run Type depends on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    PROW_RUN_TYPE="candidate"
-else
-    PROW_RUN_TYPE="release"
-    CATALOG_SOURCE_NAME="redhat-operators"
-    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-fi
-
 # After the tests finish, wait before killing the cluster
 SLEEP_DURATION="${SLEEP_DURATION:-0h}"
 # Validate SLEEP_DURATION format (0-12 followed by 'h')
@@ -168,7 +150,6 @@ if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
     echo "ERROR: SLEEP_DURATION must be a number between 0-12 followed by 'h' (e.g., 2h, 8h), got: ${SLEEP_DURATION}"
     exit 1
 fi
-
 
 # Allow override of test scenarios
 TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
@@ -201,16 +182,22 @@ if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ON
 fi
 
 
+# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
+# this triggers the mirror redirect install, creating brew & trustee catsrc,
+TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
+# Validate TEST_RELEASE_TYPE
+if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
+    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
+    exit 1
+fi
 
-# Catalog Source Configuration
-echo "Configuring catalog sources..."
-
+# Prow Run Type depends on TEST_RELEASE_TYPE
 # Set catalog source variables based on TEST_RELEASE_TYPE
 if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+    PROW_RUN_TYPE="candidate"
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
-
     else
         echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
     fi
@@ -252,10 +239,11 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
 else # GA
+    PROW_RUN_TYPE="release" # filename suffix
     CATALOG_SOURCE_NAME="redhat-operators"
     TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-    CATALOG_SOURCE_IMAGE="none"
-    TRUSTEE_CATALOG_SOURCE_IMAGE="none"
+    CATALOG_SOURCE_IMAGE="GA"
+    TRUSTEE_CATALOG_SOURCE_IMAGE="GA"
 fi
 
 # Generate output file path
