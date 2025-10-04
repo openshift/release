@@ -1,6 +1,8 @@
 #!/bin/bash
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
-# Usage: ./sandboxed-containers-operator-create-prowjob-commands.sh
+# Usage: 
+#   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
+#   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
 
 # created with the assistance of Cursor AI
@@ -9,204 +11,106 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Function to get latest OSC catalog tag
-get_latest_osc_catalog_tag() {
-    local apiurl="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
-    local page=1
-    local max_pages=20
-    local test_pattern="^[0-9]+\.[0-9]+(\.[0-9]+)?-[0-9]+$"
-    local latest_tag=""
+# Source the lib.sh file from the same directory as this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib.sh"
 
-    while [[ ${page} -le ${max_pages} ]]; do
-        local resp
-        if ! resp=$(curl -sf "${apiurl}/tag/?limit=100&page=${page}"); then
-            break
-        fi
+# Function to validate parameters and set defaults
+validate_and_set_defaults() {
+    echo "Validating parameters and setting defaults..."
 
-        if ! jq -e '.tags | length > 0' <<< "${resp}" >/dev/null; then
-            break
-        fi
-
-        latest_tag=$(echo "${resp}" | \
-            jq -r --arg test_string "${test_pattern}" \
-            '.tags[]? | select(.name | test($test_string)) | "\(.start_ts) \(.name)"' | \
-            sort -nr | head -n1 | awk '{print $2}')
-
-        if [[ -n "${latest_tag}" ]]; then
-            break
-        fi
-
-        ((page++))
-    done
-
-    if [[ -z "${latest_tag}" ]]; then
-        echo "  ERROR: No matching OSC catalog tag found, using default fallback"
-        latest_tag="latest"
+    # OCP version to test
+    OCP_VERSION="${OCP_VERSION:-4.19}"
+    # Validate OCP version format
+    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
+        exit 1
     fi
 
-    echo "${latest_tag}"
-}
+    # AWS Region Configuration
+    AWS_REGION_OVERRIDE="${AWS_REGION_OVERRIDE:-us-east-2}"
 
-get_latest_trustee_catalog_tag() {
-    local page=1
-    local latest_tag=""
-    local test_pattern="^trustee-fbc-${OCP_VER}-on-push-.*-build-image-index$"
+    # Azure Region Configuration
+    CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
 
-    while true; do
-        local resp
+    # OSC Version Configuration
+    EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
 
-        # Query the Quay API for tags
-        if ! resp=$(curl -sf "${APIURL}/tag/?limit=100&page=${page}"); then
-            break
-        fi
+    # Kata RPM Configuration
+    INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
+    if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
+        echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
+        exit 1
+    fi
 
-        # Check if page has tags
-        if ! jq -e '.tags | length > 0' <<< "${resp}" >/dev/null; then
-            break
-        fi
-
-        # Extract the latest matching tag from this page
-        latest_tag=$(echo "${resp}" | \
-            jq -r --arg test_string "${test_pattern}" \
-            '.tags[]? | select(.name | test($test_string)) | "\(.start_ts) \(.name)"' | \
-            sort -nr | head -n1 | awk '{print $2}')
-
-        if [[ -n "${latest_tag}" ]]; then
-            break
-        fi
-
-        ((page++))
-
-
-        # Safety limit to prevent infinite loops
-        if [[ ${page} -gt 50 ]]; then
-            echo "ERROR: Reached maximum page limit (50) while searching for trustee tags"
-            exit 1
-        fi
-    done
-
-    echo "${latest_tag}"
-}
-
-
-get_expected_version() {
-    # Extract expected version from catalog tag
-    # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
-    # If input is "latest", returns "0.0.0"
-    # Otherwise returns empty string
-    local catalog_tag="$1"
-
-    if [[ "${catalog_tag}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[0-9]+$ ]]; then
-        echo "${BASH_REMATCH[1]}"
-    elif [[ "${catalog_tag}" == "latest" ]]; then
-        echo "0.0.0"
+    # Kata RPM version (includes OCP version)
+    if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
+        KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
     else
-        echo ""
+        KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
     fi
-}
 
-echo "=========================================="
-echo "Sandboxed Containers Operator - Prowjob Configuration Generator"
+    # test is Pre-GA for brew builds or GA for operators/rpms already on OCP
+    # this triggers the mirror redirect install, creating brew & trustee catsrc,
+    TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
+    # Validate TEST_RELEASE_TYPE
+    if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
+        echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
+        exit 1
+    fi
 
+    # Prow Run Type depends on TEST_RELEASE_TYPE
+    if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+        PROW_RUN_TYPE="candidate"
+    else
+        PROW_RUN_TYPE="release"
+        CATALOG_SOURCE_NAME="redhat-operators"
+        TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+    fi
 
-# Validate required parameters and set defaults
-echo "Validating parameters and setting defaults..."
+    # After the tests finish, wait before killing the cluster
+    SLEEP_DURATION="${SLEEP_DURATION:-0h}"
+    # Validate SLEEP_DURATION format (0-12 followed by 'h')
+    if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
+        echo "ERROR: SLEEP_DURATION must be a number between 0-12 followed by 'h' (e.g., 2h, 8h), got: ${SLEEP_DURATION}"
+        exit 1
+    fi
 
-# OCP version to test
-OCP_VERSION="${OCP_VERSION:-4.19}"
-# Validate OCP version format
-if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-    echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
-    exit 1
-fi
+    # Allow override of test scenarios
+    TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
 
-# AWS Region Configuration
-AWS_REGION_OVERRIDE="${AWS_REGION_OVERRIDE:-us-east-2}"
+    # Let the tests run for this many minutes before killing the cluster and interupting the test
+    TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
+    # Validate TEST_TIMEOUT is numeric
+    if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: TEST_TIMEOUT should be numeric, got: ${TEST_TIMEOUT}"
+        exit 1
+    fi
 
-# Azure Region Configuration
-CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
-
-# OSC Version Configuration
-EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
-
-# Kata RPM Configuration
-INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
-if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
-    echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
-    exit 1
-fi
-
-# Kata RPM version (includes OCP version)
-if [[ "${INSTALL_KATA_RPM}" == "true" ]]; then
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
-else
-    KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
-fi
-
-# test is Pre-GA for brew builds or GA for operators/rpms already on OCP
-# this triggers the mirror redirect install, creating brew & trustee catsrc,
-TEST_RELEASE_TYPE="${TEST_RELEASE_TYPE:-Pre-GA}"
-# Validate TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" != "Pre-GA" && "${TEST_RELEASE_TYPE}" != "GA" ]]; then
-    echo "ERROR: TEST_RELEASE_TYPE should be 'Pre-GA' or 'GA', got: ${TEST_RELEASE_TYPE}"
-    exit 1
-fi
-
-# Prow Run Type depends on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    PROW_RUN_TYPE="candidate"
-else
-    PROW_RUN_TYPE="release"
-    CATALOG_SOURCE_NAME="redhat-operators"
-    TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-fi
-
-# After the tests finish, wait before killing the cluster
-SLEEP_DURATION="${SLEEP_DURATION:-0h}"
-# Validate SLEEP_DURATION format (0-12 followed by 'h')
-if ! [[ "${SLEEP_DURATION}" =~ ^(1[0-2]|[0-9])h$ ]]; then
-    echo "ERROR: SLEEP_DURATION must be a number between 0-12 followed by 'h' (e.g., 2h, 8h), got: ${SLEEP_DURATION}"
-    exit 1
-fi
-
-
-# Allow override of test scenarios
-TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
-
-# Let the tests run for this many minutes before killing the cluster and interupting the test
-TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
-# Validate TEST_TIMEOUT is numeric
-if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: TEST_TIMEOUT should be numeric, got: ${TEST_TIMEOUT}"
-    exit 1
-fi
-
-# Must-gather Configuration
-ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
-# Validate ENABLE_MUST_GATHER
-if [[ "${ENABLE_MUST_GATHER}" != "true" && "${ENABLE_MUST_GATHER}" != "false" ]]; then
+  # Must-gather Configuration
+  ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
+  # Validate ENABLE_MUST_GATHER
+  if [[ "${ENABLE_MUST_GATHER}" != "true" && "${ENABLE_MUST_GATHER}" != "false" ]]; then
     echo "ERROR: ENABLE_MUST_GATHER should be 'true' or 'false', got: ${ENABLE_MUST_GATHER}"
     exit 1
-fi
+  fi
 
-# Must-gather image to use for collecting debug information
-MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
+  # Must-gather image to use for collecting debug information
+  MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
 
-# Only collect must-gather on test failure
-MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
-# Validate MUST_GATHER_ON_FAILURE_ONLY
-if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
+  # Only collect must-gather on test failure
+  MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
+  # Validate MUST_GATHER_ON_FAILURE_ONLY
+  if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
     echo "ERROR: MUST_GATHER_ON_FAILURE_ONLY should be 'true' or 'false', got: ${MUST_GATHER_ON_FAILURE_ONLY}"
     exit 1
-fi
-
-
+  fi
 
 # Catalog Source Configuration
 echo "Configuring catalog sources..."
 
-# Set catalog source variables based on TEST_RELEASE_TYPE
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+  # Set catalog source variables based on TEST_RELEASE_TYPE
+  if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
     # OSC Catalog Configuration - get latest or use provided
     if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
         OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
@@ -251,30 +155,99 @@ if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
 
     TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
     TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
-else # GA
+  else # GA
     CATALOG_SOURCE_NAME="redhat-operators"
     TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
     CATALOG_SOURCE_IMAGE="none"
     TRUSTEE_CATALOG_SOURCE_IMAGE="none"
-fi
+  fi
+}
 
-# Generate output file path
-OCP_PROWJOB_VERSION=$(echo "${OCP_VERSION}" | tr -d '.' )
-OUTPUT_FILE="openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_PROWJOB_VERSION}.yaml"
-echo "Generating prowjob configuration..."
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 <command>"
+    echo ""
+    echo "Commands:"
+    echo "  create  Generate prowjob configuration files"
+    echo "  run     Run prowjobs from YAML configuration"
+    echo ""
+    echo "Examples:"
+    echo "  $0 create"
+    echo "  $0 run /path/to/job_yaml.yaml"
+    echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
+    echo ""
+    echo "Environment variables for 'create' command:"
+    echo "  OCP_VERSION                    - OpenShift version (default: 4.19)"
+    echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
+    echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
+    echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
+    echo "  KATA_RPM_VERSION               - Kata RPM version (default: 3.17.0-3.rhaos4.19.el9)"
+    echo "  SLEEP_DURATION                 - Sleep duration after tests (default: 0h)"
+    echo "  TEST_SCENARIOS                 - Test scenarios filter (default: sig-kata.*Kata Author)"
+    echo "  TEST_TIMEOUT                   - Test timeout in minutes (default: 90)"
+    echo "  ENABLE_MUST_GATHER             - Enable must-gather: true or false (default: true)"
+    echo "  MUST_GATHER_IMAGE              - Must-gather image (default: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest)"
+    echo "  MUST_GATHER_ON_FAILURE_ONLY    - Must-gather on failure only: true or false (default: true)"
+    echo "  AWS_REGION_OVERRIDE            - AWS region (default: us-east-2)"
+    echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
+    echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
+    echo "  TRUSTEE_CATALOG_TAG            - Trustee catalog tag (auto-detected if not provided)"
+}
 
-# Backup existing file if it exists
-if [[ -f "${OUTPUT_FILE}" ]]; then
-    echo "Backing up existing file: ${OUTPUT_FILE}.backup"
-    cp "${OUTPUT_FILE}" "${OUTPUT_FILE}.backup"
-fi
+# Main function
+main() {
+    # Parse command line arguments
+    if [[ $# -eq 0 ]]; then
+        echo "ERROR: No command specified"
+        echo ""
+        show_usage
+        exit 1
+    fi
 
-# Generate the prowjob configuration file
+    COMMAND="$1"
+    shift
 
-cat > "${OUTPUT_FILE}" <<EOF
-documentation: |-
-  DO NOT EDIT DIRECTLY.
-  This is generated by the sandboxed-containers-operator-create-prowjob-commands.sh script.
+    # Validate command and dispatch
+    case "${COMMAND}" in
+        create)
+            command_create
+            ;;
+        run)
+            command_run "$@"
+            ;;
+        *)
+            echo "ERROR: Unknown command '${COMMAND}'"
+            echo ""
+            show_usage
+            exit 1
+            ;;
+    esac
+}
+
+# Function to generate prowjob configuration
+command_create() {
+    echo "=========================================="
+    echo "Sandboxed Containers Operator - Prowjob Configuration Generator"
+
+    # Call the validation function
+    validate_and_set_defaults
+
+    # Generate output file path
+    OCP_PROWJOB_VERSION=$(echo "${OCP_VERSION}" | tr -d '.' )
+    OUTPUT_FILE="openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_PROWJOB_VERSION}.yaml"
+    echo "Generating prowjob configuration..."
+
+    # Backup existing file if it exists
+    if [[ -f "${OUTPUT_FILE}" ]]; then
+        echo "Backing up existing file: ${OUTPUT_FILE}.backup"
+        cp "${OUTPUT_FILE}" "${OUTPUT_FILE}.backup"
+    fi
+
+    # Generate the prowjob configuration file
+
+    cat > "${OUTPUT_FILE}" <<EOF
+#  DO NOT EDIT DIRECTLY.
+#  This is generated by the sandboxed-containers-operator-create-prowjob-commands.sh script.
 base_images:
   tests-private:
     name: tests-private
@@ -428,71 +401,224 @@ zz_generated_metadata:
   variant: downstream-${PROW_RUN_TYPE}
 EOF
 
-# Validate the generated file
-echo "Validating generated configuration..."
+    # Validate the generated file
+    echo "Validating generated configuration..."
 
-if [[ ! -f "${OUTPUT_FILE}" ]]; then
-    echo "ERROR: Failed to create output file: ${OUTPUT_FILE}"
-    exit 1
-fi
-
-# Check file size
-file_size=$(wc -c < "${OUTPUT_FILE}")
-if [[ ${file_size} -lt 1000 ]]; then
-    echo "WARNING: Generated file seems too small (${file_size} bytes)"
-fi
-
-# Basic YAML syntax validation if yq is available
-if command -v yq &> /dev/null; then
-    echo "Validating YAML: yq eval '.' ${OUTPUT_FILE}"
-    if yq eval '.' "${OUTPUT_FILE}" ; then
-        echo "✓ YAML syntax is valid"
-    else
-        echo "✗ YAML syntax validation failed"
+    if [[ ! -f "${OUTPUT_FILE}" ]]; then
+        echo "ERROR: Failed to create output file: ${OUTPUT_FILE}"
         exit 1
     fi
-else
-    echo "INFO: yq not available, skipping YAML syntax validation"
-fi
 
-# Show configuration summary
-echo "=========================================="
-echo "Configuration details:"
-echo "  • OCP Version: ${OCP_VERSION}"
-echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
-echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
-echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
-echo "  • Expected Trustee Version: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
-echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
-echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
-echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
-echo "  • Sleep Duration: ${SLEEP_DURATION}"
-echo "  • Test Timeout: ${TEST_TIMEOUT}"
+    # Check file size
+    file_size=$(wc -c < "${OUTPUT_FILE}")
+    if [[ ${file_size} -lt 1000 ]]; then
+        echo "WARNING: Generated file seems too small (${file_size} bytes)"
+    fi
 
-if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-    echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
-    echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
-else
-    echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
-    echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME}"
-fi
+    # Basic YAML syntax validation if yq is available
+    if command -v yq &> /dev/null; then
+        echo "Validating YAML: yq eval '.' ${OUTPUT_FILE}"
+        if yq eval '.' "${OUTPUT_FILE}" ; then
+            echo "✓ YAML syntax is valid"
+        else
+            echo "✗ YAML syntax validation failed"
+            exit 1
+        fi
+    else
+        echo "INFO: yq not available, skipping YAML syntax validation"
+    fi
 
-echo "=========================================="
-echo "Generated file: ${OUTPUT_FILE}"
-echo "File size: ${file_size} bytes"
-echo "=========================================="
-echo "Next Steps:"
-echo "1. Review the generated configuration file:"
-echo "   cat ${OUTPUT_FILE}"
-echo ""
-echo "2. Move it to the appropriate directory:"
-echo "mv ${OUTPUT_FILE} ci-operator/config/openshift/sandboxed-containers-operator/"
-echo ""
-echo "3. Add to git:"
-echo "git add ci-operator/config/openshift/sandboxed-containers-operator/${OUTPUT_FILE}"
-echo ""
-echo "4. Generate and update CI configuration before creating PR:"
-echo "make ci-operator-config && make registry-metadata && make prow-config && make jobs && make update"
-echo ""
-echo "5. git add changes, commit and push to PR"
-echo ""
+    # Show configuration summary
+    echo "=========================================="
+    echo "Configuration details:"
+    echo "  • OCP Version: ${OCP_VERSION}"
+    echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
+    echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
+    echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
+    echo "  • Expected Trustee Version: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
+    echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
+    echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
+    echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
+    echo "  • Sleep Duration: ${SLEEP_DURATION}"
+    echo "  • Test Timeout: ${TEST_TIMEOUT}"
+
+    if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
+        echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
+        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
+    else
+        echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
+        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME}"
+    fi
+
+    echo "=========================================="
+    echo "Generated file: ${OUTPUT_FILE}"
+    echo "File size: ${file_size} bytes"
+    echo "=========================================="
+    echo "Next Steps:"
+    echo "1. Review the generated configuration file:"
+    echo "   cat ${OUTPUT_FILE}"
+    echo ""
+    echo "2. Move it to the appropriate directory:"
+    echo "mv ${OUTPUT_FILE} ci-operator/config/openshift/sandboxed-containers-operator/"
+    echo ""
+    echo "3. Add to git:"
+    echo "git add ci-operator/config/openshift/sandboxed-containers-operator/${OUTPUT_FILE}"
+    echo ""
+    echo "4. Generate and update CI configuration before creating PR:"
+    echo "make ci-operator-config && make registry-metadata && make prow-config && make jobs && make update"
+    echo ""
+    echo "5. git add changes, commit and push to PR"
+    echo ""
+}
+
+# Function to run prowjobs
+command_run() {
+    echo "=========================================="
+    echo "Sandboxed Containers Operator - Run Prowjobs"
+    echo ""
+
+    # Check if job_yaml file is provided
+    if [[ $# -eq 0 ]]; then
+        echo "ERROR: No job YAML file specified"
+        echo ""
+        echo "Usage: $0 run <job_yaml_file> [job_names...]"
+        echo ""
+        echo "Examples:"
+        echo "  $0 run /path/to/job_yaml.yaml"
+        echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
+        echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata azure-ipi-peerpods"
+        echo ""
+        exit 1
+    fi
+
+    JOB_YAML_FILE="$1"
+    shift
+
+    # Check if job_yaml file exists
+    if [[ ! -f "${JOB_YAML_FILE}" ]]; then
+        echo "ERROR: Job YAML file not found: ${JOB_YAML_FILE}"
+        exit 1
+    fi
+
+    echo "Job YAML file: ${JOB_YAML_FILE}"
+
+    # Extract metadata from job_yaml
+    ORG=$(yq eval '.zz_generated_metadata.org' "${JOB_YAML_FILE}")
+    REPO=$(yq eval '.zz_generated_metadata.repo' "${JOB_YAML_FILE}")
+    BRANCH=$(yq eval '.zz_generated_metadata.branch' "${JOB_YAML_FILE}")
+    VARIANT=$(yq eval '.zz_generated_metadata.variant' "${JOB_YAML_FILE}")
+
+    if [[ -z "${ORG}" || -z "${REPO}" || -z "${BRANCH}" || -z "${VARIANT}" ]]; then
+        echo "ERROR: Missing required metadata in job YAML file"
+        echo "Required fields: org, repo, branch, variant in zz_generated_metadata section"
+        exit 1
+    fi
+
+    # Generate job name prefix
+    JOB_PREFIX="periodic-ci-${ORG}-${REPO}-${BRANCH}-${VARIANT}"
+    echo "Job name prefix: ${JOB_PREFIX}"
+
+    # Determine job names to run
+    if [[ $# -eq 0 ]]; then
+        # No specific jobs provided, extract all 'as' values from tests
+        echo "No specific jobs provided, extracting all jobs from YAML..."
+        JOB_NAMES=($(yq eval '.tests[].as' "${JOB_YAML_FILE}"))
+    else
+        # Use provided job names
+        echo "Using provided job names: $*"
+        JOB_NAMES=("$@")
+    fi
+
+    if [[ ${#JOB_NAMES[@]} -eq 0 ]]; then
+        echo "ERROR: No jobs found to run"
+        exit 1
+    fi
+
+    echo ""
+    echo "Jobs to run:"
+    for job_suffix in "${JOB_NAMES[@]}"; do
+        full_job_name="${JOB_PREFIX}-${job_suffix}"
+        echo "  - ${full_job_name}"
+    done
+
+    echo ""
+    echo "Preparing job execution..."
+
+    # Check for PROW_API_TOKEN
+    if [[ -z "${PROW_API_TOKEN:-}" ]]; then
+        echo "ERROR: PROW_API_TOKEN environment variable is not set"
+        echo "Please set your Prow API token:"
+        echo "  export PROW_API_TOKEN=your_token_here"
+        exit 1
+    fi
+    echo "✓ PROW_API_TOKEN is set"
+
+    # Convert job YAML to JSON
+    echo "Converting job YAML to JSON..."
+    if ! yq -o=json "${JOB_YAML_FILE}" | jq -Rs . > config.json; then
+        echo "ERROR: Failed to convert YAML to JSON"
+        exit 1
+    fi
+    echo "✓ Job configuration converted to JSON"
+
+    # Trigger jobs
+    echo ""
+    echo "Triggering jobs..."
+
+    API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
+
+    for job_suffix in "${JOB_NAMES[@]}"; do
+        full_job_name="${JOB_PREFIX}-${job_suffix}"
+        echo ""
+        echo "Triggering job: ${full_job_name}"
+
+        # Create payload
+        UNRESOLVED_SPEC=$(cat config.json)
+        payload=$(jq -n --arg job "${full_job_name}" \
+           --argjson config "${UNRESOLVED_SPEC}" \
+           '{
+               "job_name": $job,
+               "job_execution_type": "1",
+               "pod_spec_options": {
+                  "envs": {
+                     "UNRESOLVED_CONFIG": $config
+                   },
+                }
+            }')
+
+        # Make API call
+        echo "Making API call to trigger job..."
+        if curl -s -X POST -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+            -H "Content-Type: application/json" -d "${payload}" \
+            "${API_ENDPOINT}" > "output_${job_suffix}.json"; then
+
+            # Extract job ID
+            job_id=$(jq -r '.id' "output_${job_suffix}.json")
+            if [[ "${job_id}" != "null" && -n "${job_id}" ]]; then
+                echo "✓ Job triggered successfully!"
+                echo "  Job ID: ${job_id}"
+                echo "  Output saved to: output_${job_suffix}.json"
+
+                # Get job status
+                echo "Fetching job status..."
+                curl -s -X GET -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+                    "${API_ENDPOINT}/${job_id}" > "status_${job_suffix}.json"
+                echo "  Status saved to: status_${job_suffix}.json"
+            else
+                echo "✗ Failed to get job ID from response"
+                echo "Response content:"
+                cat "output_${job_suffix}.json"
+            fi
+        else
+            echo "✗ Failed to trigger job"
+            echo "Check output_${job_suffix}.json for details"
+        fi
+    done
+
+    echo ""
+    echo "Job triggering completed!"
+    echo "Check the output_*.json and status_*.json files for details"
+}
+
+# Call main function with all command line arguments
+main "$@"
