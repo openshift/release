@@ -113,6 +113,39 @@ YAML
   # -----------------------------
   # Control-plane health (KAS)
   # -----------------------------
+  claim="$(oc get configs.imageregistry.operator.openshift.io/cluster -o jsonpath='{.spec.storage.pvc.claim}' 2>/dev/null || true)"
+  [[ -z "${claim}" ]] && claim="image-registry-storage"
+
+  # 2) PVC yaml + bound PV name
+  oc -n openshift-image-registry get pvc "${claim}" -o yaml \
+    > "${outdir}/pvc-${claim}.yaml" 2>/dev/null || echo "PVC ${claim} not found" > "${outdir}/pvc-${claim}.yaml"
+
+  pv="$(oc -n openshift-image-registry get pvc "${claim}" -o jsonpath='{.spec.volumeName}' 2>/dev/null || true)"
+  echo "${pv:-<unbound>}" > "${outdir}/pv-name.txt"
+
+  # 3) PV topology: accessModes / storageClass / nodeAffinity (if any)
+  if [[ -n "${pv}" ]]; then
+    oc get pv "${pv}" -o yaml > "${outdir}/pv-${pv}.yaml" 2>/dev/null || true
+    oc get pv "${pv}" -o yaml \
+      | sed -n '/accessModes:/,/^$/p; /nodeAffinity:/,/^$/p; /storageClassName:/p' \
+      > "${outdir}/pv-topology.txt" 2>/dev/null || true
+  else
+    echo "PVC not bound (no .spec.volumeName)" > "${outdir}/pv-topology.txt"
+  fi
+
+  # 4) Registry pod events (why Pending? multi-attach? node affinity?) + tolerations (unreachable eviction behavior)
+  oc -n openshift-image-registry get pods -l docker-registry=default -o name \
+    > "${outdir}/registry-pod-names.txt" 2>/dev/null || true
+  while read -r rp; do
+    [[ -z "$rp" ]] && continue
+    oc -n openshift-image-registry describe "$rp" \
+      > "${outdir}/describe-$(basename "$rp").txt" 2>/dev/null || true
+  done < "${outdir}/registry-pod-names.txt"
+
+  oc -n openshift-image-registry get pods -l docker-registry=default -o yaml \
+    | sed -n '/tolerations:/,/^[^ ]/p' \
+    > "${outdir}/registry-pod-tolerations.yaml" 2>/dev/null || true
+
   oc get co kube-apiserver -o yaml > "${outdir}/co-kas.yaml" || true
   oc -n openshift-kube-apiserver get pods -o wide > "${outdir}/kas-pods.txt" || true
   oc -n openshift-kube-apiserver get pod \
