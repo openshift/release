@@ -36,9 +36,14 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
-  (
    name=$(echo "$bmhost" | jq -r '.name')
    host=$(echo "$bmhost" | jq -r '.host')
+   if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
+     continue
+    # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+    # on a single-arch payload migrated to a multi-arch cluster)
+   fi
+  (
    transfer_protocol_type=$(echo "$bmhost" | jq -r '.transfer_protocol_type // ""')
    if [ "${transfer_protocol_type}" == "cifs" ]; then
      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
@@ -48,7 +53,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
      iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove.x86_64.iso"
    fi
    mount_virtual_media "${host}" "${iso_path}"
-
    echo "Power on #${host} (${name})..."
    if ! timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"; then
      echo "Failed to power on ${host} (${name})"
@@ -63,3 +67,8 @@ if [ -f /tmp/virtual_media_mount_failed ]; then
   echo "Failed to mount the ISO image in one or more hosts"
   exit 1
 fi
+
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    touch /var/builds/"${CLUSTER_NAME}"/preserve

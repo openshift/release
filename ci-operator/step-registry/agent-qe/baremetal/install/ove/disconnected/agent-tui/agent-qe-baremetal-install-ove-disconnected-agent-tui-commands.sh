@@ -27,6 +27,11 @@ SSH_PRIVATE_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-privatekey)
 export SSH_PRIVATE_KEY
 pids=()
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  if [[ "$(echo "$bmhost" | jq -r '.name')" == *-a-* ]] && [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
+     continue
+    # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+    # on a single-arch payload migrated to a multi-arch cluster)
+  fi
   CURRENT_RENDEZVOUS_NODE="$RENDEZVOUS_NODE"
   if [ "$CURRENT_RENDEZVOUS_NODE" = "yes" ]; then
     RENDEZVOUS_IP=$(echo "$bmhost" | jq -r '.ip')
