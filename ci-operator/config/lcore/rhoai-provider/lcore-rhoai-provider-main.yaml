@@ -1,0 +1,60 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+      RUN dnf install -y podman
+images:
+- dockerfile_path: Containerfile
+  to: lightspeed-stack
+promotion:
+  to:
+  - namespace: lcore-test
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 4Gi
+tests:
+- as: e2e-lcore-cluster-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.19"
+  cron: 10 4 * * *
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: "git clone https://github.com/lightspeed-core/lightspeed-stack.git\npwd\nexport
+        A=1\nls -A\nls lightspeed-stack\noc version\noc \noc whoami\noc help\necho
+        \"Test\"\noc get pods -A\n"
+      dependencies:
+      - env: LCORE_IMAGE
+        name: lightspeed-stack
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: lcore
+  repo: rhoai-provider
