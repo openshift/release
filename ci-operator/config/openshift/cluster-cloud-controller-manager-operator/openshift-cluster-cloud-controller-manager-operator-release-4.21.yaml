@@ -30,7 +30,8 @@ images:
   to: cluster-cloud-controller-manager-operator
 promotion:
   to:
-  - name: "4.21"
+  - disabled: true
+    name: "4.21"
     namespace: ocp
 releases:
   initial:
@@ -89,6 +90,13 @@ tests:
     cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - always_run: false
+  as: e2e-aws-ovn-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ccm-techpreview
+- always_run: false
   as: e2e-azure-manual-oidc
   optional: true
   steps:
@@ -104,7 +112,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-upgrade-azure
 - as: level0-clusterinfra-azure-ipi-proxy-tests
   optional: true
@@ -171,11 +179,6 @@ tests:
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-cloud-controller-manager-operator
-    workflow: openshift-ci-security
 - as: verify-deps
   steps:
     env:

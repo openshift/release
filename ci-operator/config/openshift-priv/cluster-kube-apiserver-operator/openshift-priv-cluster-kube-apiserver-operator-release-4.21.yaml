@@ -51,7 +51,8 @@ images:
   to: cluster-kube-apiserver-operator
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -96,7 +97,7 @@ tests:
     workflow: openshift-kubernetes-e2e-gcp-serial
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-gcp-operator
   steps:
@@ -148,7 +149,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-operator-encryption-rotation-aescbc
   optional: true
@@ -219,7 +220,7 @@ tests:
 - as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: e2e-metal-single-node-live-iso
   optional: true
@@ -229,12 +230,12 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-operator-disruptive-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -370,12 +371,12 @@ tests:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend
 - always_run: false
-  as: e2e-metal-ovn-ha-cert-rotation-suspend-360d
+  as: e2e-metal-ovn-ha-cert-rotation-suspend-1y
   optional: true
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 365d
     workflow: openshift-e2e-cert-rotation-suspend
 - always_run: false
   as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d
@@ -394,12 +395,12 @@ tests:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - always_run: false
-  as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown-1y
   optional: true
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - always_run: false
   as: e2e-metal-ovn-ha-cert-rotation-shutdown-90d
@@ -418,27 +419,40 @@ tests:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown
 - always_run: false
-  as: e2e-metal-ovn-ha-cert-rotation-shutdown-360d
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown-1y
   optional: true
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-shutdown
 - always_run: false
   as: e2e-short-cert-rotation
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-cert-rotation-short-aws
   timeout: 8h0m0s
 - always_run: false
   as: e2e-short-cert-rotation-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-cert-rotation-short-azure
   timeout: 8h0m0s
+- as: e2e-tests-extension
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary cluster-kube-apiserver-operator-tests-ext"
+        make tests-ext-build
+        echo "Running ./cluster-kube-apiserver-operator-tests-ext with sanity test"
+        ./cluster-kube-apiserver-operator-tests-ext run-test -n "[Jira:kube-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/cluster-kube-apiserver-operator/conformance/parallel]"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv

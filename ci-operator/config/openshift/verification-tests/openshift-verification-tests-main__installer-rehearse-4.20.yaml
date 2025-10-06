@@ -65,13 +65,9 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      AZURE_COMPUTE_MULTIDISK_MOUNT_PATH: /var/lib/containers
-      AZURE_COMPUTE_MULTIDISK_TYPE: user-defined
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[''AzureMultiDisk=true'', ''MultiDiskSetup=true'']'
-      FEATURE_SET: CustomNoUpgrade
-    workflow: cucushift-installer-rehearse-azure-ipi-multidisk
+      USER_PROVISIONED_DNS: "no"
+    workflow: cucushift-installer-rehearse-azure-ipi-private-customer-dns
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
@@ -88,20 +84,17 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-t07rh8b/release:latest
       FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
-- as: installer-rehearse-gcp-dedicated-dns-project
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    env:
-      BASE_DOMAIN: regional.qe.gcp.devcluster.openshift.com
-      PRIVATE_ZONE_PROJECT: openshift-qe-regional
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
@@ -118,6 +111,26 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+- as: installer-rehearse-vsphere
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      MULTI_NIC_IPI: "true"
+      SLEEP_DURATION: 24h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-provision
+- as: installer-rehearse-azurestack
+  cluster: build01
+  cron: '@yearly'
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    workflow: cucushift-installer-rehearse-azure-stack-upi
 zz_generated_metadata:
   branch: main
   org: openshift

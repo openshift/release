@@ -29,6 +29,15 @@ images:
       as:
       - $GO_BUILDER
   to: knative-eventing-appender
+- dockerfile_path: openshift/ci-operator/knative-images/auth_proxy/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
+      as:
+      - $GO_BUILDER
+  to: knative-eventing-auth-proxy
 - dockerfile_path: openshift/ci-operator/knative-images/channel_controller/Dockerfile
   inputs:
     ocp_ubi-minimal_8:
@@ -155,6 +164,15 @@ images:
       as:
       - $GO_BUILDER
   to: knative-eventing-pong
+- dockerfile_path: openshift/ci-operator/knative-images/requestreply/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.24-openshift-4.20:
+      as:
+      - $GO_BUILDER
+  to: knative-eventing-requestreply
 - dockerfile_path: openshift/ci-operator/knative-images/schema/Dockerfile
   inputs:
     ocp_ubi-minimal_8:
@@ -291,7 +309,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.19"
-  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -351,6 +369,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -379,6 +399,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK
@@ -480,6 +502,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -508,6 +532,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK
@@ -549,7 +575,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.19"
-  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -609,6 +635,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -637,6 +665,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK
@@ -738,6 +768,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -766,6 +798,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK
@@ -807,7 +841,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.19"
-  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -867,6 +901,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -895,6 +931,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK
@@ -996,6 +1034,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -1024,6 +1064,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK
@@ -1065,7 +1107,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.19"
-  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/.*|^OWNERS.*|.*\.md
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1125,6 +1167,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -1153,6 +1197,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK
@@ -1254,6 +1300,8 @@ tests:
         name: knative-eventing-apiserver-receive-adapter
       - env: KNATIVE_EVENTING_APPENDER
         name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_AUTH_PROXY
+        name: knative-eventing-auth-proxy
       - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
         name: knative-eventing-channel-controller
       - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
@@ -1282,6 +1330,8 @@ tests:
         name: knative-eventing-mtping
       - env: KNATIVE_EVENTING_PONG
         name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_REQUESTREPLY
+        name: knative-eventing-requestreply
       - env: KNATIVE_EVENTING_SCHEMA
         name: knative-eventing-schema
       - env: KNATIVE_EVENTING_WEBHOOK

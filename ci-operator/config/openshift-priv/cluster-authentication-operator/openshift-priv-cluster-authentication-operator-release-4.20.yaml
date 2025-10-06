@@ -27,8 +27,7 @@ images:
   to: cluster-authentication-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -182,38 +181,22 @@ tests:
     from: src
   optional: true
 - always_run: false
-  as: e2e-aws-external-oidc
-  optional: true
+  as: e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+  cluster: build05
   steps:
-    cluster_profile: aws-3
+    cluster_profile: equinix-ocp-metal
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: ' --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+        --cluster-stability=Disruptive '
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        reverting to IntegratedOAuth
       TEST_SUITE: openshift/auth/external-oidc
-    workflow: openshift-e2e-aws
-  timeout: 8h0m0s
-- always_run: false
-  as: e2e-azure-external-oidc
-  optional: true
-  steps:
-    cluster_profile: azure4
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
-      TEST_SUITE: openshift/auth/external-oidc
-    workflow: openshift-e2e-azure
-  timeout: 8h0m0s
-- always_run: false
-  as: e2e-gcp-external-oidc
-  optional: true
-  steps:
-    cluster_profile: gcp
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
-      TEST_SUITE: openshift/auth/external-oidc
-    workflow: openshift-e2e-gcp
-  timeout: 8h0m0s
+    workflow: baremetalds-e2e
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keel
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keel
+  namespace: keel
+  labels:
+    app: keel
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: keel
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - watch
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - watch
+      - list
+  - apiGroups:
+      - ""
+      - extensions
+      - apps
+      - batch
+    resources:
+      - pods
+      - replicasets
+      - replicationcontrollers
+      - statefulsets
+      - deployments
+      - daemonsets
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - delete
+      - watch
+      - list
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - pods/portforward
+    verbs:
+      - get
+      - create
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keel
+subjects:
+  - kind: ServiceAccount
+    name: keel
+    namespace: keel
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keel
+  namespace: keel
+  labels:
+    app: keel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keel
+  template:
+    metadata:
+      labels:
+        app: keel
+    spec:
+      serviceAccountName: keel
+      initContainers:
+      - name: restart-keel-deployments
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-yq_latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Find all deployments with keel annotations and restart them
+          DEPLOYMENTS=$(oc get deployments --all-namespaces -o yaml | /tmp/yq -r '.items[] | select(.metadata.annotations["keel.sh/policy"]) | .metadata.namespace + " " + .metadata.name')
+          echo "$DEPLOYMENTS" | while IFS=' ' read -r namespace name; do
+            if [ -n "$namespace" ] && [ -n "$name" ]; then
+              echo "Restarting deployment $namespace/$name..."
+              oc rollout restart deployment/"$name" -n "$namespace"
+            fi
+          done
+          echo "Deployment restart process completed"
+      containers:
+        - name: keel
+          image: "keelhq/keel:latest"
+          imagePullPolicy: Always
+          command: ["/bin/keel"]
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DOCKER_REGISTRY_CFG
+              valueFrom:
+                secretKeyRef:
+                  name: registry-pull-credentials
+                  key: .dockerconfigjson
+            - name: DEBUG
+              value: "true"
+          ports:
+            - containerPort: 9300
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9300
+            initialDelaySeconds: 60
+            timeoutSeconds: 10
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keel
+  namespace: keel
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: keel

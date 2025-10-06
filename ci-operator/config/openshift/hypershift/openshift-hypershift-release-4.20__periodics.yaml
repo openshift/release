@@ -76,7 +76,7 @@ tests:
       AWS_MULTI_ARCH: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aks
-  cron: 0 */2 * * *
+  cron: 0 3 * * *
   steps:
     cluster_profile: hypershift
     env:
@@ -158,6 +158,15 @@ tests:
         UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
         the local DNS endpoint \[Suite:openshift/conformance/parallel\]
     workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-external-oidc
+  minimum_interval: 8h
+  steps:
+    cluster_profile: hypershift
+    env:
+      CI_TESTS_RUN: TestExternalOIDCTechPreview
+      OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-external-oidc
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:
@@ -223,7 +232,7 @@ tests:
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       HYPERSHIFT_NODE_COUNT: "2"
-      ODF_OPERATOR_CHANNEL: stable-4.18
+      ODF_OPERATOR_CHANNEL: stable-4.19
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance

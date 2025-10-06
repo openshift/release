@@ -139,6 +139,13 @@ for (( i=0; i<${BM_COUNT}; i++ )); do
   oc patch vm "${VM_NAME}-${i}" -n ${VM_NAMESPACE} --type=merge --patch-file ${VM_NETWORK_PATCH} --kubeconfig=${VIRT_KUBECONFIG}
 done
 
+# Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
+# For now, we'll update and move on.  It should be resolved by the time the BM is ready to join.
+if [ "${CSI_MANAGEMENT_REMOVED}" == "true" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Patching clustercsidriver managementState to be Removed"
+  oc patch clustercsidriver csi.vsphere.vmware.com --type=merge --patch 'spec: {managementState: "Removed"}'
+fi
+
 # Start VM
 echo "$(date -u --rfc-3339=seconds) - Starting virtual machines"
 for (( i=0; i<${BM_COUNT}; i++ )); do

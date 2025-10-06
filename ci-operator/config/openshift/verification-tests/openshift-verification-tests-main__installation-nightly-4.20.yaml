@@ -365,8 +365,8 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
-- as: aws-ipi-user-provisioned-dns-mini-perm-arm-f7
-  cron: 39 6 2,9,16,23 * *
+- as: aws-ipi-custom-dns-mini-perm-arm-f7
+  cron: 45 19 4,11,18,25 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-qe
@@ -374,15 +374,46 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      FEATURE_GATES: '["AWSClusterHostedDNS=true"]'
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       OCP_ARCH: arm64
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-user-provisioned-dns
+    workflow: cucushift-installer-rehearse-aws-ipi-custom-dns
+- as: aws-ipi-custom-dns-priv-mini-perm-arm-f7
+  cron: 5 19 4,11,20,27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: custom-dns.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-custom-dns-private
+- as: aws-usgov-ipi-custom-dns-mini-perm-arm-f7
+  cron: 37 19 5,14,21,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-usgov-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
 - as: aws-ipi-additional-ca-always-arm-f14
   cron: 22 18 1,17 * *
   steps:
@@ -619,7 +650,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.17.2024100419
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.18.2025031114
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -634,7 +665,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_DC4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
       CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.17.2024100419
+      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.18.2025031114
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
@@ -1010,6 +1041,8 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     workflow: cucushift-installer-rehearse-gcp-cases-valid-confidential-computing
 - as: gcp-ipi-dns-peering-zone-f28
   cron: 22 9 23 * *

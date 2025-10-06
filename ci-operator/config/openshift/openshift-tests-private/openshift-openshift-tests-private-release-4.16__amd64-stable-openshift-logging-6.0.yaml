@@ -11,14 +11,14 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -58,7 +58,7 @@ resources:
       memory: 1Gi
 tests:
 - as: gcp-ipi-proxy-oidc-amd-f14-logging
-  cron: 55 5 10,26 * *
+  cron: 55 5 29 2 *
   steps:
     cluster_profile: gcp-observability
     env:
@@ -66,13 +66,11 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FILTERS_ADDITIONAL: ""
       FORCE_SUCCESS_EXIT: "true"
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log6.0
+      LOGGING_TEST_VERSION: "6.0"
       OPERATORS: |
         [
-            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-6.0", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_ADDITIONAL: ""
       TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~AZWIF&;~AZMonitor&;~Splunk&
@@ -82,7 +80,7 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
     test:
-    - ref: enable-qe-catalogsource-logging
+    - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity

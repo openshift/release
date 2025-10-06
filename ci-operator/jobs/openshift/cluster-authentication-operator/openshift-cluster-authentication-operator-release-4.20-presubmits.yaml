@@ -26,7 +26,7 @@ presubmits:
         - --target=e2e-agnostic
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -100,7 +100,7 @@ presubmits:
         - --target=e2e-agnostic-ipv6
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -172,7 +172,7 @@ presubmits:
         - --target=e2e-agnostic-upgrade
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -219,81 +219,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-agnostic-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build10
-    context: ci/prow/e2e-aws-external-oidc
-    decorate: true
-    decoration_config:
-      timeout: 8h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.20-e2e-aws-external-oidc
-    optional: true
-    rerun_command: /test e2e-aws-external-oidc
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-external-oidc
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-external-oidc,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.20$
@@ -320,7 +245,7 @@ presubmits:
         - --target=e2e-aws-single-node
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -367,81 +292,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build07
-    context: ci/prow/e2e-azure-external-oidc
-    decorate: true
-    decoration_config:
-      timeout: 8h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.20-e2e-azure-external-oidc
-    optional: true
-    rerun_command: /test e2e-azure-external-oidc
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-azure-external-oidc
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-external-oidc,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.20$
@@ -467,7 +317,7 @@ presubmits:
         - --target=e2e-console-login
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -519,81 +369,6 @@ presubmits:
     - ^release-4\.20$
     - ^release-4\.20-
     cluster: build04
-    context: ci/prow/e2e-gcp-external-oidc
-    decorate: true
-    decoration_config:
-      timeout: 8h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.20-e2e-gcp-external-oidc
-    optional: true
-    rerun_command: /test e2e-gcp-external-oidc
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gcp-external-oidc
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-external-oidc,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-perf
     decorate: true
     labels:
@@ -615,7 +390,7 @@ presubmits:
         - --target=e2e-gcp-operator-encryption-perf
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -688,7 +463,7 @@ presubmits:
         - --target=e2e-gcp-operator-encryption-rotation
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -739,6 +514,81 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
+    cluster: build05
+    context: ci/prow/e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+    decorate: true
+    decoration_config:
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.20-e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+    rerun_command: /test e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(e2e-metal-ovn-ipv4-external-oidc-configure-techpreview|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
     cluster: build04
     context: ci/prow/e2e-oidc-techpreview
     decorate: true
@@ -761,7 +611,7 @@ presubmits:
         - --target=e2e-oidc-techpreview
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -833,7 +683,7 @@ presubmits:
         - --target=e2e-operator
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -906,7 +756,7 @@ presubmits:
         - --target=e2e-operator-encryption
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -972,9 +822,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1006,6 +857,198 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build10
+    context: ci/prow/okd-scos-e2e-aws-ovn
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.20-okd-scos-e2e-aws-ovn
+    optional: true
+    rerun_command: /test okd-scos-e2e-aws-ovn
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-e2e-aws-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build07
+    context: ci/prow/okd-scos-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.20-okd-scos-images
+    rerun_command: /test okd-scos-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build07
+    context: ci/prow/periodics-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: periodics
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.20-periodics-images
+    rerun_command: /test periodics-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodics
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodics-images,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.20$
@@ -1028,7 +1071,7 @@ presubmits:
         - --target=test-operator-integration
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1081,7 +1124,7 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1134,7 +1177,7 @@ presubmits:
         - --target=verify
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1187,7 +1230,7 @@ presubmits:
         - --target=verify-bindata
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1240,7 +1283,7 @@ presubmits:
         - --target=verify-deps
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

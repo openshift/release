@@ -1,7 +1,7 @@
 presubmits:
   openshift/coredns:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
@@ -16,6 +16,7 @@ presubmits:
     name: pull-ci-openshift-coredns-release-4.21-e2e-aws-ovn
     path_alias: github.com/coredns/coredns
     rerun_command: /test e2e-aws-ovn
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -27,7 +28,7 @@ presubmits:
         - --target=e2e-aws-ovn
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -74,7 +75,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
@@ -89,6 +90,7 @@ presubmits:
     name: pull-ci-openshift-coredns-release-4.21-e2e-aws-ovn-upgrade
     path_alias: github.com/coredns/coredns
     rerun_command: /test e2e-aws-ovn-upgrade
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -100,7 +102,7 @@ presubmits:
         - --target=e2e-aws-ovn-upgrade
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -147,33 +149,37 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
     cluster: build04
-    context: ci/prow/e2e-gcp-serial
+    context: ci/prow/e2e-gcp-serial-1of2
     decorate: true
+    decoration_config:
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-coredns-release-4.21-e2e-gcp-serial
+    name: pull-ci-openshift-coredns-release-4.21-e2e-gcp-serial-1of2
     path_alias: github.com/coredns/coredns
-    rerun_command: /test e2e-gcp-serial
+    rerun_command: /test e2e-gcp-serial-1of2
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-gcp-serial
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -218,9 +224,86 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-serial-1of2,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
+    branches:
+    - ^release-4\.21$
+    - ^release-4\.21-
+    cluster: build04
+    context: ci/prow/e2e-gcp-serial-2of2
+    decorate: true
+    decoration_config:
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-coredns-release-4.21-e2e-gcp-serial-2of2
+    path_alias: github.com/coredns/coredns
+    rerun_command: /test e2e-gcp-serial-2of2
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-gcp-serial
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-serial-2of2,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
@@ -237,6 +320,7 @@ presubmits:
     optional: true
     path_alias: github.com/coredns/coredns
     rerun_command: /test e2e-metal-ipi-ovn
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -248,7 +332,7 @@ presubmits:
         - --target=e2e-metal-ipi-ovn
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -295,7 +379,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
@@ -312,6 +396,7 @@ presubmits:
     optional: true
     path_alias: github.com/coredns/coredns
     rerun_command: /test e2e-metal-ipi-ovn-dualstack
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -323,7 +408,7 @@ presubmits:
         - --target=e2e-metal-ipi-ovn-dualstack
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -390,10 +475,9 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -447,7 +531,7 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -502,7 +586,7 @@ presubmits:
         - --target=verify-deps
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

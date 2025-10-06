@@ -1,3 +1,8 @@
+base_images:
+  assisted-service-mcp:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: assisted-service-mcp
 build_root:
   image_stream_tag:
     name: release
@@ -5,7 +10,33 @@ build_root:
     tag: rhel-9-release-golang-1.21-openshift-4.17
 images:
 - dockerfile_path: Containerfile.assisted-chat
-  to: assisted-chat
+  to: rh-ecosystem-edge-assisted-chat-install
+- dockerfile_path: test/prow/Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-test
+- context_dir: inspector
+  dockerfile_path: Dockerfile
+  to: rh-ecosystem-edge-assisted-chat-inspector
+- build_args:
+  - name: AIUI_APP_GIT_SHA
+    value: $(git rev-parse HEAD)
+  - name: AIUI_APP_VERSION
+    value: latest
+  context_dir: .
+  dockerfile_path: test/prow/Dockerfile.ui
+  to: rh-ecosystem-edge-assisted-chat-ui
+- context_dir: .
+  dockerfile_path: Containerfile.assisted-chat
+  to: rh-ecosystem-edge-assisted-chat-lightspeed-stack
+- context_dir: .
+  dockerfile_path: test/prow/Dockerfile.plus-llama
+  from: rh-ecosystem-edge-assisted-chat-lightspeed-stack
+  to: rh-ecosystem-edge-assisted-chat-lightspeed-stack-plus-llama
+- dockerfile_path: test/prow/Dockerfile.local_dev
+  to: rh-ecosystem-edge-assisted-chat-local-dev-test
+promotion:
+  to:
+  - name: assisted-chat-img
+    namespace: edge-infrastructure
 releases:
   latest:
     integration:
@@ -19,6 +50,65 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: true
+  as: eval-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    dependencies:
+      ASSISTED_CHAT_IMG: rh-ecosystem-edge-assisted-chat-install
+      ASSISTED_CHAT_TEST: rh-ecosystem-edge-assisted-chat-test
+      ASSISTED_MCP_IMG: assisted-service-mcp
+    workflow: rh-ecosystem-edge-assisted-chat
+- always_run: true
+  as: local-dev-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.17"
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    dependencies:
+      ASSISTED_CHAT_IMG: rh-ecosystem-edge-assisted-chat-lightspeed-stack-plus-llama
+      ASSISTED_MCP_IMAGE: assisted-service-mcp
+      INSPECTOR_IMAGE: rh-ecosystem-edge-assisted-chat-inspector
+      UI_IMAGE: rh-ecosystem-edge-assisted-chat-ui
+    workflow: rh-ecosystem-edge-assisted-chat-local-dev
+- as: cluster-clean-up
+  cron: 0 */12 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - ref: rh-ecosystem-edge-assisted-chat-clean-up-cron
+- always_run: true
+  as: eval-test-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 2 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    dependencies:
+      ASSISTED_CHAT_IMG: rh-ecosystem-edge-assisted-chat-install
+      ASSISTED_CHAT_TEST: rh-ecosystem-edge-assisted-chat-test
+      ASSISTED_MCP_IMG: assisted-service-mcp
+    workflow: rh-ecosystem-edge-assisted-chat
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

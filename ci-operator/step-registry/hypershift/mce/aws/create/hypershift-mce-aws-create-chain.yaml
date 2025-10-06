@@ -5,8 +5,8 @@ chain:
       cli: latest
       env:
         - name: MCE_VERSION
-          default: "2.2"
-          documentation: "version of the mce.(2.2, 2.3, 2.4)"
+          default: "2.4"
+          documentation: "version of the mce.(2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
         - name: HYPERSHIFT_NODE_COUNT
           default: "3"
           documentation: "The number nodes to automatically create and join to the cluster."
@@ -59,31 +59,38 @@ chain:
           curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
           local extra_flags=""
           if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
-            extra_flags+=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+            # >= 2.7: "--render-sensitive --render", else: "--render"
+            if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+              extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+            else
+              extra_flags+="--render > /tmp/hc.yaml "
+            fi
           fi
           extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
           extra_flags+="&& oc apply -f /tmp/hc.yaml"
           echo "$extra_flags"
         }
 
-        MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
-        HYPERSHIFT_NAME=hcp
-        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-          echo "MCE version is less than 2.4, use hypershift command"
-          HYPERSHIFT_NAME=hypershift
+        HCP_CLI=""
+        echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
+        mkdir /tmp/hs-cli
+        HCP_CLI="/tmp/hs-cli/hypershift"
+        # >= 2.9
+        if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
+          oc cp -n hypershift "$(oc get pod -n hypershift -l app=operator -o jsonpath='{.items[0].metadata.name}')":/usr/bin/hypershift /tmp/hs-cli/hypershift
         else
           set +x
-          echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
           oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
           HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
-          mkdir /tmp/hs-cli
           brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
           echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
           oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
-          chmod +x /tmp/hs-cli/hypershift-no-cgo
+          HCP_CLI="/tmp/hs-cli/hypershift-no-cgo"
           set -x
         fi
+        chmod +x "$HCP_CLI"
 
+        HYPERSHIFT_NAME=hcp
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
           downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
@@ -92,7 +99,7 @@ chain:
           cd -
         fi
 
-        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 
         PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
@@ -114,20 +121,20 @@ chain:
         fi
         
         CRED_COMMAND=""
-        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
-          echo "MCE version is less than 2.6, use --aws-creds command"
-          CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
-        else
+        if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
           set +x
           export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
-          /tmp/hs-cli/hypershift-no-cgo create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
+          "${HCP_CLI}" create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
           aws sts get-session-token --output json > ${SHARED_DIR}/sts-creds.json
           ACCOUNT=$(aws sts get-caller-identity | jq -r '.Account')
           echo "arn:aws:iam::$ACCOUNT:role/$CLUSTER_NAME" > ${SHARED_DIR}/hcp-role-arn
           set -x
           CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
           sleep 60
+        else
+          echo "MCE version is less than 2.6, use --aws-creds command"
+          CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
         fi
         
         if [[ $PUBLIC_ONLY == "true" ]]; then
@@ -146,28 +153,6 @@ chain:
         --namespace local-cluster \
         --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} $(support_np_skew)"
         
-        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-          echo "MCE version is less than 2.4"
-          oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-          oc apply -f - <<EOF
-        apiVersion: cluster.open-cluster-management.io/v1
-        kind: ManagedCluster
-        metadata:
-          annotations:
-            import.open-cluster-management.io/hosting-cluster-name: local-cluster
-            import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
-            open-cluster-management/created-via: other
-          labels:
-            cloud: auto-detect
-            cluster.open-cluster-management.io/clusterset: default
-            name: ${CLUSTER_NAME}
-            vendor: OpenShift
-          name: ${CLUSTER_NAME}
-        spec:
-          hubAcceptsClient: true
-          leaseDurationSeconds: 60
-        EOF
-        fi
         
         echo "Waiting for cluster to become available"
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}

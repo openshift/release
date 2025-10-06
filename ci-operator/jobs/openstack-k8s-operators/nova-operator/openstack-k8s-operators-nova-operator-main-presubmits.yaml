@@ -1,11 +1,11 @@
 presubmits:
   openstack-k8s-operators/nova-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/functional
     decorate: true
     labels:
@@ -13,6 +13,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-nova-operator-main-functional
     rerun_command: /test functional
+    skip_if_only_changed: ^(renovate.json|.*\.md|test/kuttl/.*|OWNERS.*|LICENSE.*)$
     spec:
       containers:
       - args:
@@ -22,7 +23,7 @@ presubmits:
         - --target=functional
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -58,7 +59,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/images
     decorate: true
     labels:
@@ -76,7 +77,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -108,11 +109,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/precommit-check
     decorate: true
     labels:
@@ -120,6 +121,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-nova-operator-main-precommit-check
     rerun_command: /test precommit-check
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:
@@ -129,7 +131,7 @@ presubmits:
         - --target=precommit-check
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

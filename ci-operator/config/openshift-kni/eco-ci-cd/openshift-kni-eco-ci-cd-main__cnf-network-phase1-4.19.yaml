@@ -20,22 +20,24 @@ tests:
 - as: cnf-network-functional-tests
   capabilities:
   - intranet
-  cron: 0 23 31 2 *
+  cron: 0 14 * * 5
   restrict_network_access: false
   steps:
     env:
       CNF_TESTS_PERF_PROFILE: performance-profile-dpdk
       CNF_TESTS_SKIP: reconcile
+      DISCONNECTED: "true"
+      ENABLE_INTERNAL_REGISTRY: "true"
       FEATURES_TO_TEST: sctp|sriov|dpdk|vrf|ovs_qos|metallb|fec|multinetworkpolicy
       JOB_NAME: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-network-phase2-4.19-cnf-network-functional-tests
       JOB_TYPE: "1"
       OPERATORS: |
         [
-          {"name":"sriov-network-operator","catalog":"redhat-operators-stage","nsname":"openshift-sriov-network-operator","deploy_default_config":true, "og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
-          {"name":"ptp-operator","catalog":"redhat-operators-stage","nsname":"openshift-ptp","ns_labels":{"workload.openshift.io/allowed":"management","name":"openshift-ptp"}},
-          {"name":"kubernetes-nmstate-operator","catalog":"redhat-operators","nsname":"openshift-nmstate","deploy_default_config":true},
+          {"name":"sriov-network-operator","catalog":"redhat-operators-sriov-art","fbc_iib_repo":"ose-sriov-network-rhel9-operator","nsname":"openshift-sriov-network-operator","channel":"stable","deploy_default_config":true, "og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
+          {"name":"ptp-operator","catalog":"redhat-operators-ptp-art","fbc_iib_repo":"ose-ptp-rhel9-operator","nsname":"openshift-ptp","channel":"stable","ns_labels":{"workload.openshift.io/allowed":"management","name":"openshift-ptp"}},
+          {"name":"kubernetes-nmstate-operator","catalog":"redhat-operators-nmstate-art","fbc_iib_repo":"kubernetes-nmstate-rhel9-operator","nsname":"openshift-nmstate","channel":"stable","deploy_default_config":true},
           {"name":"sriov-fec","catalog":"certified-operators","nsname":"vran-acceleration-operators","channel":"stable"},
-          {"name":"metallb-operator","catalog":"redhat-operators-stage","nsname":"metallb-system","channel":"stable","og_spec":{},"deploy_default_config":false}
+          {"name":"metallb-operator","catalog":"redhat-operators-metallb-art","fbc_iib_repo":"metallb-rhel9-operator","nsname":"metallb-system","channel":"stable","og_spec":{},"deploy_default_config":false}
         ]
       VERSION: "4.19"
     pre:

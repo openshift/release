@@ -1,0 +1,46 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+- dockerfile_path: Dockerfile
+  from: ubi_minimal
+  to: llm-d-routing-sidecar
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: stable-2.x
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    # Set the GOFLAGS to readonly to allow the make test target to install ginkgo
+    export GOFLAGS="-mod=readonly"
+    make test
+  container:
+    from: src
+- always_run: false
+  as: pr-image-mirror
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: llm-d-routing-sidecar
+    env:
+      IMAGE_REPO: llm-d-routing-sidecar
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: stable-2.x
+  org: opendatahub-io
+  repo: llm-d-routing-sidecar

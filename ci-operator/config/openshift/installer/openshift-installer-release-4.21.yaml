@@ -87,12 +87,20 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
   splat-ci-virtctl:
     name: splat-virtctl
     namespace: ci
     tag: latest
   vsphere-ci-python:
     name: vsphere-python
+    namespace: ci
+    tag: latest
+  yamllint:
+    name: yamllint
     namespace: ci
     tag: latest
 build_root:
@@ -235,7 +243,8 @@ images:
   to: virtctl
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - src-oc
     name: "4.21"
     namespace: ocp
@@ -327,6 +336,11 @@ tests:
     clone: true
     from: golangci-lint
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: shellcheck
+  commands: IS_CONTAINER=TRUE ./hack/shellcheck.sh
+  container:
+    from: shellcheck
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
@@ -336,10 +350,15 @@ tests:
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
+- as: yaml-lint
+  commands: IS_CONTAINER=TRUE ./hack/yaml-lint.sh
+  container:
+    from: yamllint
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: e2e-aws-ovn
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       USER_TAGS: |
@@ -353,7 +372,7 @@ tests:
   as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
@@ -367,7 +386,7 @@ tests:
   as: e2e-aws-ovn-proxy
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - always_run: false
@@ -375,7 +394,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       PUBLISH: Internal
     post:
@@ -405,28 +424,35 @@ tests:
     - chain: cucushift-installer-check-cluster-health
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
+  as: e2e-aws-custom-dns-techpreview
   optional: true
+  run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-aws-custom-dns
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-vpc-custom-security-groups
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -471,7 +497,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -487,7 +513,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones
@@ -497,7 +523,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
@@ -506,7 +532,7 @@ tests:
   as: e2e-aws-ovn-edge-zones-manifest-validation
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 3h0m0s
 - as: e2e-aws-ovn-imdsv2
@@ -524,7 +550,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       ADDITIONAL_SUBNETS_COUNT: "1"
       ASSIGN_ROLES_TO_SUBNETS: "yes"
@@ -587,17 +613,19 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: gcp-custom-dns
+  as: e2e-gcp-custom-dns
   optional: true
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNSInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
-    test:
-    - chain: cucushift-installer-check-cluster-health
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
@@ -619,7 +647,7 @@ tests:
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -633,7 +661,7 @@ tests:
 - as: e2e-azure-ovn
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       USER_TAGS: |
         keyA valueA
@@ -645,7 +673,7 @@ tests:
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
@@ -659,15 +687,16 @@ tests:
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-sharednetwork
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-resourcegroup
@@ -691,13 +720,13 @@ tests:
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws-latestinstaller
   timeout: 6h0m0s
 - as: e2e-aws-ovn-upi
   run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-upi
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-upi
@@ -925,6 +954,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-externallb-ovn
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-externallb
@@ -940,7 +970,8 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-techpreview
+- always_run: false
+  as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -953,6 +984,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-static-ovn
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
@@ -960,6 +992,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn-multi-network
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -975,11 +1008,10 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
-      FEATURE_GATES: '["VSphereMultiDisk=true"]'
-      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-disk-setup
+- always_run: false
+  as: e2e-vsphere-ovn-disk-setup-techpreview
   optional: true
   run_if_changed: vsphere
   steps:
@@ -987,8 +1019,7 @@ tests:
     env:
       ADDITIONAL_DISK: "true"
       DISK_SETUP: "true"
-      FEATURE_GATES: '[VSphereMultiDisk=true,MultiDiskSetup=true]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
@@ -997,14 +1028,16 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-upi-zones
+- always_run: false
+  as: e2e-vsphere-ovn-upi-zones
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones
+- always_run: false
+  as: e2e-vsphere-ovn-zones
   optional: true
   run_if_changed: vsphere
   steps:
@@ -1039,9 +1072,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
@@ -1083,7 +1114,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -1270,7 +1301,7 @@ tests:
   optional: true
   run_if_changed: /aws/subnet.go
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
 - always_run: false
@@ -1283,7 +1314,7 @@ tests:
   as: e2e-aws-overlay-mtu-ovn-1200
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       CLUSTER_NETWORK_MTU: "1200"
     workflow: openshift-e2e-aws-network-mtu
@@ -1371,14 +1402,14 @@ tests:
   as: e2e-external-aws
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-external-aws
   timeout: 6h0m0s
 - always_run: false
   as: e2e-external-aws-ccm
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
@@ -1387,7 +1418,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
@@ -1433,7 +1464,7 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
     leases:
@@ -1445,7 +1476,7 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool-disabled
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_PUBLIC_IPV4_POOL_ID: none
     workflow: openshift-e2e-aws

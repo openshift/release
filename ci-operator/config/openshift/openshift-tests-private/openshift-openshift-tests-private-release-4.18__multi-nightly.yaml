@@ -578,7 +578,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-ipi-public-ipv4-pool-byo-subnet-amd-f28-destructive
-  cron: 3 4 24 * *
+  cron: 27 5 23 1 *
   steps:
     cluster_profile: aws
     env:
@@ -590,7 +590,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool-byo-subnet
 - as: aws-ipi-public-ipv4-pool-byo-subnet-mini-perm-arm-f14
-  cron: 31 1 12,26 * *
+  cron: 43 13 15 12 *
   steps:
     cluster_profile: aws
     env:
@@ -606,7 +606,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool-byo-subnet
 - as: aws-ipi-public-ipv4-pool-mini-perm-amd-f28-destructive
-  cron: 33 14 4 * *
+  cron: 37 5 23 9 *
   steps:
     cluster_profile: aws-3
     env:
@@ -619,7 +619,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool
 - as: aws-ipi-public-ipv4-pool-mini-perm-arm-f14
-  cron: 36 14 14,30 * *
+  cron: 54 12 13 9 *
   steps:
     cluster_profile: aws-3
     env:
@@ -742,16 +742,19 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: compliance-operator
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       FILTERS_ADDITIONAL: ""
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:5536f365df2ff3e4619532f2c6fad3ed99fe17376250d752b18ef495797feeae
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "20"
     test:
+    - ref: file-integrity-konflux-catalogsource
     - ref: ipi-install-heterogeneous
     - ref: etcd-encryption
     - ref: openshift-extended-test
@@ -766,17 +769,20 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: compliance-operator
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:5536f365df2ff3e4619532f2c6fad3ed99fe17376250d752b18ef495797feeae
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "55"
     test:
+    - ref: file-integrity-konflux-catalogsource
     - ref: ipi-install-heterogeneous
     - ref: etcd-encryption
     - ref: openshift-extended-test-disruptive
@@ -1201,13 +1207,15 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork-ovn-ipv4-subnet
-- as: azure-ipi-vnet-ovn-ipv4-subnet-arm-f14
-  cron: 33 0 2,16 * *
+- as: azure-ipi-vnet-encrypted-ovn-ipv4-subnet-arm-f14
+  cron: 26 13 14,30 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_VNET_ENABLE_ENCRYPTION: "true"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      COMPUTE_NODE_TYPE: Standard_D4ps_v6
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_E8ps_v6
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1407,89 +1415,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
-- as: baremetal-compact-agent-ipv4-static-day2-amd-mixarch-f14
-  capabilities:
-  - intranet
-  cron: 15 14 2,16 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKERS: "1"
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      DISCONNECTED: "false"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-network-static-day2
-- as: baremetal-sno-agent-ipv4-static-disc-day2-arm-mixarch-f14
-  capabilities:
-  - intranet
-  cron: 53 14 11,27 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKERS: "2"
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      DISCONNECTED: "true"
-      E2E_RUN_TAGS: '@disconnected'
-      RESERVE_BOOTSTRAP: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "1"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-network-static-disconnected-day2
-- as: baremetal-pxe-compact-agent-ipv4-static-day2-mixarch-f14
-  capabilities:
-  - intranet
-  cron: 1 16 10,26 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKERS: "2"
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-pxe-day2
-- as: baremetal-pxe-compact-agent-ipv4-static-day2-disc-mixarch-f14
-  capabilities:
-  - intranet
-  cron: 30 18 9,23 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKERS: "2"
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      E2E_RUN_TAGS: '@disc'
-      RESERVE_BOOTSTRAP: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-pxe-day2-disconnected
 - as: baremetal-ipi-ovn-ipv4-amd-f14
   capabilities:
   - intranet

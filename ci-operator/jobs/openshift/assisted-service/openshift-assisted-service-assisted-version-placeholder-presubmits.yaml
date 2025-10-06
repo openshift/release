@@ -29,7 +29,7 @@ presubmits:
         - --target=e2e-metal-assisted
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -104,7 +104,7 @@ presubmits:
         - --target=e2e-metal-assisted-ai-amd-4-19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -179,7 +179,7 @@ presubmits:
         - --target=e2e-metal-assisted-ai-nvidia-4-18
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -254,7 +254,7 @@ presubmits:
         - --target=e2e-metal-assisted-day2
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -329,7 +329,7 @@ presubmits:
         - --target=e2e-metal-assisted-external
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -404,7 +404,7 @@ presubmits:
         - --target=e2e-metal-assisted-ipv4v6
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -479,7 +479,7 @@ presubmits:
         - --target=e2e-metal-assisted-lvm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -554,7 +554,7 @@ presubmits:
         - --target=e2e-metal-assisted-none
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -629,7 +629,7 @@ presubmits:
         - --target=e2e-metal-assisted-osc
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -704,7 +704,7 @@ presubmits:
         - --target=e2e-metal-assisted-single-node
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -779,7 +779,7 @@ presubmits:
         - --target=e2e-metal-assisted-static-ip-suite
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -854,7 +854,7 @@ presubmits:
         - --target=e2e-metal-assisted-virtualization-4-18
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -905,81 +905,6 @@ presubmits:
     branches:
     - ^assisted-version-placeholder$
     - ^assisted-version-placeholder-
-    cluster: build01
-    context: ci/prow/e2e-nutanix-assisted
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: nutanix
-      ci-operator.openshift.io/cloud-cluster-profile: nutanix
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-assisted-version-placeholder-e2e-nutanix-assisted
-    rerun_command: /test e2e-nutanix-assisted
-    run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-nutanix-assisted
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-nutanix-assisted,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^assisted-version-placeholder$
-    - ^assisted-version-placeholder-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-assisted
     decorate: true
@@ -1003,7 +928,7 @@ presubmits:
         - --target=e2e-vsphere-assisted
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1072,7 +997,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1126,7 +1051,7 @@ presubmits:
         - --target=lint
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1183,7 +1108,7 @@ presubmits:
         - --target=subsystem-aws
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1251,7 +1176,7 @@ presubmits:
         - --target=unit-test
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1313,7 +1238,7 @@ presubmits:
         - --target=verify-generated-code
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

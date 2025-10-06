@@ -2,7 +2,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.63.4
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -11,14 +11,14 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
+  ocp_4.21_base-rhel9:
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
@@ -26,33 +26,33 @@ base_images:
   yamllint:
     name: rust
     namespace: cincinnati-ci-public
-    tag: boot-root-1.79.0
+    tag: boot-root-1.84.1
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-version-operator
 images:
 - dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-version-operator
 promotion:
   to:
-  - name: 4.20-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -82,7 +82,7 @@ tests:
 - as: e2e-agnostic-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -112,7 +112,7 @@ tests:
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-upgrade-azure
 - as: e2e-agnostic-ovn-upgrade-out-of-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -135,14 +135,14 @@ tests:
 - as: e2e-aws-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-agnostic-operator-techpreview
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -157,24 +157,25 @@ tests:
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-into-change-techpreview
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-out-of-change-techpreview
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
-- as: e2e-agnostic-operator-devpreview
+- always_run: false
+  as: e2e-agnostic-operator-devpreview
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       FEATURE_SET: DevPreviewNoUpgrade
     test:

@@ -370,7 +370,7 @@ tests:
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      OS_IMAGE_VERSION: 4.17.2024100419
+      OS_IMAGE_VERSION: 4.18.2025031114
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
@@ -462,42 +462,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
-- as: baremetal-compact-agent-ipv4-static-connected-f60
-  capabilities:
-  - intranet
-  cron: 30 13 7 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-static
-- as: baremetal-ha-agent-platform-none-ipv4-static-f60
-  capabilities:
-  - intranet
-  cron: 5 21 25 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      DISCONNECTED: "false"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-static
 - as: baremetalds-ipi-ovn-ipv6-fips-f999
   cluster: build05
   cron: 8 8 29 2 *
@@ -552,25 +516,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetal-sno-agent-ipv4-static-connected-fips-f60
-  capabilities:
-  - intranet
-  cron: 22 19 24 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      FIPS_ENABLED: "true"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "1"
-      workers: "0"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-upi-ovn-ipv4-f60
   capabilities:
   - intranet
@@ -760,33 +705,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-external-lb
-- as: vsphere-agent-compact-fips-f60
-  cron: 21 9 29 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-agent-vsphere-install-compact
-- as: vsphere-agent-dualstack-ha-f60
-  cron: 42 0 27 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      IP_FAMILIES: DualStack
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-agent-vsphere-dualstack-install-ha
-- as: vsphere-agent-sno-f60
-  cron: 28 5 27 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: vsphere-elastic
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-agent-vsphere-install-sno
 - as: vsphere-ipi-compact-etcd-encryption-f60
-  cron: 32 16 3 2,4,6,8,10,12 *
+  cron: 44 4 19 5 *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -795,7 +715,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
 - as: vsphere-ipi-disk-encryption-tang-fips-f60
-  cron: 55 17 8 2,4,6,8,10,12 *
+  cron: 50 10 24 1 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -804,14 +724,14 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-disk-encryption-tang
 - as: vsphere-ipi-external-lb-post-f60
-  cron: 24 22 25 2,4,6,8,10,12 *
+  cron: 52 5 26 5 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-external-lb-post
 - as: vsphere-ipi-multisubnets-elb-usermanaged-f60
-  cron: 42 4 3 1,3,5,7,9,11 *
+  cron: 42 1 15 3 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -821,14 +741,14 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
 - as: vsphere-ipi-multi-vcenter-f60
-  cron: 34 4 20 1,3,5,7,9,11 *
+  cron: 20 15 1 4 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-multi-vcenter
 - as: vsphere-ipi-ovn-dualstack-privmaryv6-f28
-  cron: 5 16 7 * *
+  cron: 25 12 17 5 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -837,21 +757,21 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-ipsec-mininal-permission-f60
-  cron: 36 20 20 2,4,6,8,10,12 *
+  cron: 32 7 7 5 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec-minimal-permission
 - as: vsphere-ipi-ovn-shared-to-local-gw-migration-f60
-  cron: 43 14 26 1,3,5,7,9,11 *
+  cron: 9 10 5 6 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
 - as: vsphere-ipi-proxy-fips-f60
-  cron: 41 21 7 1,3,5,7,9,11 *
+  cron: 13 11 10 5 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -863,7 +783,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-tp-f60
-  cron: 23 23 10 2,4,6,8,10,12 *
+  cron: 10 5 28 11 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -875,7 +795,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-remote-worker-f60
-  cron: 54 19 29 2,4,6,8,10,12 *
+  cron: 34 22 21 9 *
   steps:
     cluster_profile: vsphere-connected-2
     leases:
@@ -885,14 +805,14 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-remote-worker
 - as: vsphere-ipi-static-ip-f60
-  cron: 12 16 8 1,3,5,7,9,11 *
+  cron: 16 12 5 3 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
 - as: vsphere-ipi-vsphere7-f60
-  cron: 2 19 11 2,4,6,8,10,12 *
+  cron: 8 10 2 6 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -903,14 +823,14 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-nested
 - as: vsphere-ipi-zones-template-f60
-  cron: 1 20 19 2,4,6,8,10,12 *
+  cron: 0 19 11 6 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-template
 - as: vsphere-ipi-zones-multisubnets-external-lb-f60
-  cron: 6 17 19 1,3,5,7,9,11 *
+  cron: 50 22 10 12 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -919,7 +839,7 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb
 - as: vsphere-upi-disc-secureboot-fips-f60
-  cron: 3 3 20 1,3,5,7,9,11 *
+  cron: 51 13 3 7 *
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -931,21 +851,21 @@ tests:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
 - as: vsphere-upi-encrypt-f60
-  cron: 24 17 1 2,4,6,8,10,12 *
+  cron: 52 11 23 10 *
   steps:
     cluster_profile: vsphere-connected-2
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-upi-encrypt
 - as: vsphere-upi-multi-vcenter-f60
-  cron: 5 0 14 1,3,5,7,9,11 *
+  cron: 34 0 11 2 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-upi-multi-vcenter
 - as: vsphere-upi-platform-external-f60
-  cron: 25 18 29 2,4,6,8,10,12 *
+  cron: 6 20 1 9 *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -954,14 +874,14 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
 - as: vsphere-upi-platform-none-f60
-  cron: 31 13 29 1,3,5,7,9,11 *
+  cron: 13 20 15 12 *
   steps:
     cluster_profile: vsphere-elastic
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-upi-platform-external
 - as: vsphere-upi-zones-f60
-  cron: 33 15 12 2,4,6,8,10,12 *
+  cron: 28 7 20 2 *
   steps:
     cluster_profile: vsphere-elastic
     test:

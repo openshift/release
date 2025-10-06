@@ -48,6 +48,7 @@ tests:
       ES_METADATA_INDEX: perf_scale_ci*
       ES_TYPE: qe
       EXTRA_FLAGS: --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
+      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
       INSTALLATION_SOURCE: Source
       KAFKA_CONSUMER_REPLICAS: "6"
       LOKISTACK_SIZE: 1x.small
@@ -55,7 +56,7 @@ tests:
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
       ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-node-density-heavy.yaml
-      ORION_ENVS: PLATFORM=AWS,WORKERS=25,version=4
+      ORION_ENVS: PLATFORM=AWS,WORKERS=25
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       PODS_PER_NODE: "200"
@@ -66,8 +67,7 @@ tests:
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
     post:
-    - ref: netobserv-perf-test-cleanup
-    - chain: ipi-aws-post
+    - chain: netobserv-perf-test-post
     test:
     - ref: netobserv-perf-test-deploy
     - ref: openshift-qe-kube-burner-ingress-perf
@@ -93,6 +93,7 @@ tests:
       ES_TYPE: qe
       EXTRA_FLAGS: --churn=true --churn-delay=60s --churn-duration=10m --churn-percent=10
         --timeout=5h --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
+      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
       INSTALLATION_SOURCE: Source
       ITERATION_MULTIPLIER_ENV: "4"
       KAFKA_CONSUMER_REPLICAS: "18"
@@ -101,7 +102,7 @@ tests:
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
       ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-cluster-density-v2.yaml
-      ORION_ENVS: PLATFORM=AWS,WORKERS=250,version=4
+      ORION_ENVS: PLATFORM=AWS,WORKERS=250
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       RUN_ORION: "true"
@@ -111,8 +112,7 @@ tests:
       WORKLOAD: cluster-density-v2
       ZONES_COUNT: "3"
     post:
-    - ref: netobserv-perf-test-cleanup
-    - chain: ipi-aws-post
+    - chain: netobserv-perf-test-post
     test:
     - ref: netobserv-perf-test-deploy
     - ref: openshift-qe-kube-burner-ingress-perf

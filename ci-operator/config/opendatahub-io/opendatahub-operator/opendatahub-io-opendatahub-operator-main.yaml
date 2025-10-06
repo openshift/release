@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.23
+    tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
 - context_dir: .
   dockerfile_path: Dockerfiles/Dockerfile
@@ -29,7 +29,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.17"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -52,7 +52,17 @@ tests:
       IMAGE_REPO: opendatahub-operator
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
+- as: opendatahub-operator-image-mirror-latest
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+      IMAGE_TAG: latest
+    workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-e2e
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$
   steps:
     cluster_profile: gcp-opendatahub
     dependencies:

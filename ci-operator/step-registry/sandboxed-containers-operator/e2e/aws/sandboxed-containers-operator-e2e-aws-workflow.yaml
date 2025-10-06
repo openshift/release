@@ -6,10 +6,19 @@ workflow:
       COMPUTE_NODE_REPLICAS: 2
       CONTROL_PLANE_REPLICAS: 3
       SPOT_INSTANCES: "false"
+      FORCE_SUCCESS_EXIT: "no"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      ENABLE_MUST_GATHER: "true"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
     pre:
-    - chain: ipi-aws-pre
+    - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: sandboxed-containers-operator-aws-region-override
+    - chain: ipi-install
     - chain: sandboxed-containers-operator-pre
     post:
+    - ref: sandboxed-containers-operator-gather-must-gather
     - ref: cucushift-installer-wait
     - chain: ipi-aws-post
     test:
@@ -17,3 +26,5 @@ workflow:
   documentation: |-
     This workflow run openshift-extented-test on an AWS cluster with
     the sandboxed containers deployed.
+    AWS_REGION_OVERRIDE from sandboxed-containers-operator-aws-region-override
+    defines the region to create the cluster in.

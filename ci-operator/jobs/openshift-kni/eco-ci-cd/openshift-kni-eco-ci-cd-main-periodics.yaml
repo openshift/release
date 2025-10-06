@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 0 1 * * *
   decorate: true
   decoration_config:
@@ -41,7 +41,7 @@ periodics:
       - --variant=ci-4.20
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -87,8 +87,72 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 15 * * 5
+  cluster: build06
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: cnf-network-4.14
+    ci.openshift.io/generator: prowgen
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-network-4.14-cnf-network-functional-tests
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=cnf-network-functional-tests
+      - --variant=cnf-network-4.14
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 0 0 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -114,7 +178,7 @@ periodics:
       - --variant=cnf-network-4.15
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -151,8 +215,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 15 * * 5
+  cluster: build06
+  cron: 0 16 * * 5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -178,7 +242,7 @@ periodics:
       - --variant=cnf-network-4.16
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -215,8 +279,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 13 * * 5
+  cluster: build06
+  cron: 0 14 * * 5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -242,7 +306,7 @@ periodics:
       - --variant=cnf-network-4.17
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -279,8 +343,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 23 31 2 *
+  cluster: build06
+  cron: 0 14 * * 5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -306,7 +370,7 @@ periodics:
       - --variant=cnf-network-phase1-4.18
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -343,8 +407,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 23 31 2 *
+  cluster: build06
+  cron: 0 14 * * 5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -370,7 +434,7 @@ periodics:
       - --variant=cnf-network-phase1-4.19
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -407,7 +471,71 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
+  cron: 0 14 * * 5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: cnf-network-phase1-4.20
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-network-phase1-4.20-cnf-network-functional-tests
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=cnf-network-functional-tests
+      - --variant=cnf-network-phase1-4.20
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -434,7 +562,7 @@ periodics:
       - --variant=cnf-network-phase2-4.18
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -471,7 +599,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -498,7 +626,7 @@ periodics:
       - --variant=cnf-network-phase2-4.19
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -535,8 +663,72 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 22 31 2 5
+  cluster: build06
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: cnf-network-phase2-4.20
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-network-phase2-4.20-cnf-network-functional-tests
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=cnf-network-functional-tests
+      - --variant=cnf-network-phase2-4.20
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 0 8 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -549,18 +741,18 @@ periodics:
     ci-operator.openshift.io/variant: compute-nto
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-functional-tests-4-18
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-e2e-telcov10n-nto-tests-cgroups-v1-tier-0-vm-4-18
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --target=functional-tests-4-18
+      - --target=e2e-telcov10n-nto-tests-cgroups-v1-tier-0-vm-4-18
       - --variant=compute-nto
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -591,8 +783,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 22 31 2 5
+  cluster: build06
+  cron: 0 8 * * 1,3,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -605,18 +797,18 @@ periodics:
     ci-operator.openshift.io/variant: compute-nto
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-functional-tests-4-19
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-e2e-telcov10n-nto-tests-cgroups-v1-vm-4-14
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --target=functional-tests-4-19
+      - --target=e2e-telcov10n-nto-tests-cgroups-v1-vm-4-14
       - --variant=compute-nto
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -647,8 +839,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 0 22 31 2 5
+  cluster: build06
+  cron: 0 8 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -661,18 +853,18 @@ periodics:
     ci-operator.openshift.io/variant: compute-nto
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-functional-tests-4-20
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-e2e-telcov10n-nto-tests-cgroups-v1-vm-4-16
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --target=functional-tests-4-20
+      - --target=e2e-telcov10n-nto-tests-cgroups-v1-vm-4-16
       - --variant=compute-nto
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -703,8 +895,176 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: 00 08 29 02 *
+  cluster: build06
+  cron: 0 8 * * 2,4
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: compute-nto
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-e2e-telcov10n-nto-tests-cgroups-v1-vm-4-17
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=e2e-telcov10n-nto-tests-cgroups-v1-vm-4-17
+      - --variant=compute-nto
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 0 8 * * 6
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: compute-nto
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-e2e-telcov10n-nto-tests-cgroups-v2-tier-0-vm-4-18
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=e2e-telcov10n-nto-tests-cgroups-v2-tier-0-vm-4-18
+      - --variant=compute-nto
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 0 8 * * 5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: compute-nto
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-compute-nto-e2e-telcov10n-nto-tests-cgroups-v2-tier-0-vm-4-19
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=e2e-telcov10n-nto-tests-cgroups-v2-tier-0-vm-4-19
+      - --variant=compute-nto
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 00 16 1-7,15-21 * 4
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -716,7 +1076,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: hcp-cnf-4.18
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-hcp-cnf-4.18-e2e-telcov10n-functional-hcp-cnf-stable
   reporter_config:
@@ -742,7 +1101,7 @@ periodics:
       - --variant=hcp-cnf-4.18
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -779,7 +1138,232 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
+  cron: 00 16 * * 5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: hcp-cnf-4.19
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-hcp-cnf-4.19-e2e-telcov10n-functional-hcp-cnf-stable
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telcov10n-functional-hcp-cnf-stable
+      - --variant=hcp-cnf-4.19
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 00 16 * * 4
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: hcp-cnf-nrop-4.19
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-hcp-cnf-nrop-4.19-e2e-telcov10n-functional-hcp-cnf-nrop-stable-prod
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telcov10n-functional-hcp-cnf-nrop-stable-prod
+      - --variant=hcp-cnf-nrop-4.19
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 00 16 * * 5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: hcp-cnf-nrop-4.19
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-hcp-cnf-nrop-4.19-e2e-telcov10n-functional-hcp-cnf-nrop-stable-stage
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telcov10n-functional-hcp-cnf-nrop-stable-stage
+      - --variant=hcp-cnf-nrop-4.19
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
   cron: 00 13 * * 0
   decorate: true
   decoration_config:
@@ -794,6 +1378,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-llc-cnf-4.19-e2e-telcov10n-functional-llc-cnf-stable
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -805,7 +1401,7 @@ periodics:
       - --variant=llc-cnf-4.19
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -842,7 +1438,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 00 08 * * 6
   decorate: true
   decoration_config:
@@ -858,6 +1454,18 @@ periodics:
     job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-llc-cnf-4.20-e2e-telcov10n-functional-llc-cnf-nightly
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -869,7 +1477,7 @@ periodics:
       - --variant=llc-cnf-4.20
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -906,7 +1514,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 0 22 31 2 5
   decorate: true
   decoration_config:
@@ -948,7 +1556,7 @@ periodics:
       - --variant=nightly-4.18
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -994,7 +1602,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 0 22 31 2 5
   decorate: true
   decoration_config:
@@ -1036,7 +1644,7 @@ periodics:
       - --variant=nightly-4.19
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1082,7 +1690,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 0 22 31 2 5
   decorate: true
   decoration_config:
@@ -1124,7 +1732,7 @@ periodics:
       - --variant=nightly-4.20
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1170,7 +1778,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 0 22 31 2 5
   decorate: true
   decoration_config:
@@ -1212,7 +1820,7 @@ periodics:
       - --variant=nightly-4.20
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1258,7 +1866,247 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
+  cron: 0 22 31 2 5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/variant: nightly-4.21
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-nightly-4.21-telcov10n-metal-single-node-spoke
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=telcov10n-metal-single-node-spoke
+      - --variant=nightly-4.21
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 0 22 31 2 5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/variant: nightly-4.21
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-nightly-4.21-telcov10n-metal-single-node-spoke-kpis
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      - aborted
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=telcov10n-metal-single-node-spoke-kpis
+      - --variant=nightly-4.21
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
+  cron: 0 16 * * 1,3,5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: nightly-compute-nto
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-nightly-compute-nto-e2e-telcov10n-nto-tests-cgroups-v2-tier-0-vm-4-20
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telcov10n-nto-tests-cgroups-v2-tier-0-vm-4-20
+      - --variant=nightly-compute-nto
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build06
   cron: 0 7 * * *
   decorate: true
   decoration_config:
@@ -1270,10 +2118,10 @@ periodics:
     repo: eco-ci-cd
   labels:
     capability/intranet: intranet
-    ci-operator.openshift.io/variant: orion-4.19
+    ci-operator.openshift.io/variant: orion-nightly
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-orion-4.19-e2e-telcov10n-orion
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-orion-nightly-e2e-telcov10n-orion
   reporter_config:
     slack:
       channel: '#eco-ci-cd-notifications'
@@ -1293,10 +2141,10 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --target=e2e-telcov10n-orion
-      - --variant=orion-4.19
+      - --variant=orion-nightly
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1327,7 +2175,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 00 13 * * 1
   decorate: true
   decoration_config:
@@ -1369,7 +2217,7 @@ periodics:
       - --variant=telco-operators-dast-4.16
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1415,7 +2263,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build06
   cron: 00 13 * * 1
   decorate: true
   decoration_config:
@@ -1457,7 +2305,7 @@ periodics:
       - --variant=telco-operators-dast-4.17
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:

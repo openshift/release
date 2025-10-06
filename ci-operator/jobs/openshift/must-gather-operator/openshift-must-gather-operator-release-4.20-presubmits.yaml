@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build02
     context: ci/prow/ci-bundle-must-gather-operator-bundle
     decorate: true
     labels:
@@ -22,7 +22,7 @@ presubmits:
         - --target=must-gather-operator-bundle
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -54,11 +54,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ci-bundle-must-gather-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build02
     context: ci/prow/coverage
     decorate: true
     labels:
@@ -66,6 +66,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-must-gather-operator-release-4.20-coverage
     rerun_command: /test coverage
+    skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -76,7 +77,7 @@ presubmits:
         - --target=coverage
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -118,7 +119,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
@@ -133,9 +134,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -167,11 +169,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     labels:
@@ -179,6 +181,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-must-gather-operator-release-4.20-lint
     rerun_command: /test lint
+    skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -188,7 +191,7 @@ presubmits:
         - --target=lint
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -220,11 +223,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build02
     context: ci/prow/test
     decorate: true
     labels:
@@ -232,6 +235,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-must-gather-operator-release-4.20-test
     rerun_command: /test test
+    skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -241,7 +245,7 @@ presubmits:
         - --target=test
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -273,28 +277,30 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )test,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
-    context: ci/prow/validate
+    cluster: build02
+    context: ci/prow/validate-boilerplate
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-must-gather-operator-release-4.20-validate
-    rerun_command: /test validate
+    name: pull-ci-openshift-must-gather-operator-release-4.20-validate-boilerplate
+    optional: true
+    rerun_command: /test validate-boilerplate
+    skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=validate
+        - --target=validate-boilerplate
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -324,13 +330,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )validate,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate-boilerplate,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build02
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -348,7 +354,7 @@ presubmits:
         - --target=verify-deps
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

@@ -12,7 +12,7 @@ base_images:
     namespace: ci
     tag: latest
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
@@ -39,17 +39,17 @@ images:
   to: machine-api-operator
 promotion:
   to:
-  - name: 4.20-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -80,7 +80,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-azure-ovn
   optional: true
@@ -105,7 +105,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -120,7 +120,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-azure-operator
   optional: true
@@ -243,8 +243,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
-        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-multi-vcenter
   optional: true
@@ -283,11 +281,13 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn
+- as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-openstack
   optional: true
@@ -299,7 +299,7 @@ tests:
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
@@ -308,11 +308,6 @@ tests:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 7h0m0s
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: machine-api-operator
-    workflow: openshift-ci-security
 - as: verify-deps
   steps:
     env:

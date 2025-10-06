@@ -54,6 +54,11 @@ objects:
     labels:
       app: prow
       component: gangway
+    annotations:
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
   spec:
     replicas: 1
     selector:
@@ -132,6 +137,7 @@ objects:
           imagePullPolicy: Always
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_tp-envoyproxy_latest
         - name: nginx-rate-limit
+          imagePullPolicy: Always
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_nging-rate-limit_latest
           volumeMounts:
           - mountPath: /var/cache/nginx
@@ -139,7 +145,7 @@ objects:
           - mountPath: /tmp
             name: nginx-tmp
         - name: gangway
-          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20250709-d01b8af18
+          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20250927-87810a762
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -286,4 +292,10 @@ objects:
     name: periodic-job-bot
   - kind: ServiceAccount
     namespace: telcov10n-ci
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: oadp-dev
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: aro-hcp-prow-ci
     name: periodic-job-bot

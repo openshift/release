@@ -407,6 +407,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v5
       ENABLE_CONFIDENTIAL_COMPUTE: "true"
       ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
+      ENABLE_ENCRYPTIONATHOST_CONTROL_PLANE: "false"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
@@ -441,7 +442,7 @@ tests:
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      OS_IMAGE_VERSION: 4.17.2024100419
+      OS_IMAGE_VERSION: 4.18.2025031114
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
@@ -545,42 +546,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
-- as: baremetal-compact-agent-ipv4-static-connected-f60
-  capabilities:
-  - intranet
-  cron: 28 18 30 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-static
-- as: baremetal-ha-agent-platform-none-ipv4-static-f60
-  capabilities:
-  - intranet
-  cron: 11 17 8 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      DISCONNECTED: "false"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-static
 - as: baremetalds-ipi-ovn-ipv6-fips-f999
   cluster: build05
   cron: 8 8 29 2 *
@@ -623,25 +588,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetal-sno-agent-ipv4-static-connected-fips-f60
-  capabilities:
-  - intranet
-  cron: 0 18 4 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      FIPS_ENABLED: "true"
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "1"
-      workers: "0"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-upi-ovn-ipv4-f60
   capabilities:
   - intranet
@@ -868,31 +814,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-external-lb
-- as: vsphere-agent-compact-fips-f60
-  cron: 25 1 10 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-agent-vsphere-install-compact
-- as: vsphere-agent-dualstack-ha-f60
-  cron: 26 10 12 2,4,6,8,10,12 *
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      IP_FAMILIES: DualStack
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-agent-vsphere-dualstack-install-ha
-- as: vsphere-agent-sno-f60
-  cron: 35 20 24 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: vsphere-elastic
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-agent-vsphere-install-sno
 - as: vsphere-ipi-compact-etcd-encryption-f60
   cron: 16 20 26 1,3,5,7,9,11 *
   steps:

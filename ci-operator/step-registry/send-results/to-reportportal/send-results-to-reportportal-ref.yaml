@@ -1,0 +1,38 @@
+ref:
+  as: send-results-to-reportportal
+  from_image:
+    namespace: ci
+    name: datarouter2reportportal
+    tag: latest
+  grace_period: 1m
+  timeout: 30m
+  commands: send-results-to-reportportal-commands.sh
+  resources:
+    limits:
+      cpu: "4"
+      memory: 4Gi
+    requests:
+      cpu: 400m
+      memory: 1Gi
+  env:
+  - name: NO_REPORTPORTAL
+    default: "false"
+    documentation: "Whether to send test results to ReportPortal"
+  - name: REPORTPORTAL_HOSTNAME
+    default: "reportportal-openshift.apps.dno.ocp-hub.prod.psi.redhat.com"
+    documentation: "The hostname name for ReportPortal"
+  - name: REPORTPORTAL_PROJECT
+    default: "prow"
+    documentation: "The project name in ReportPortal"
+  - name: APPLY_TFA
+    default: "true"
+    documentation: "Whether to apply TFA ( Test Failure Anylisis )"
+  - name: DISABLE_TESTITEM_UPDATER
+    default: "true"
+    documentation: "Whether to disable test item updater"
+  credentials:
+  - namespace: test-credentials
+    name: datarouter
+    mount_path: /var/run/datarouter
+  documentation: |-
+    The step analysis the tests and send the results to ReportPortal

@@ -1,37 +1,48 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  base-rhel9:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  golang-builder:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
-  ubi_minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "9"
 binary_build_commands: make go-build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/must-gather-operator
 images:
-- dockerfile_path: build/Dockerfile
-  from: ubi_minimal
+- dockerfile_path: Dockerfile.openshift
+  from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    golang-builder:
       as:
-      - quay.io/redhat-services-prod/openshift/boilerplate:image-v7.4.0
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: must-gather-operator
+operator:
+  bundles:
+  - as: must-gather-operator-bundle
+    context_dir: bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-support-log-gather-operator:latest
+    with: pipeline:must-gather-operator
+  - pullspec: quay.io/openshift/origin-must-gather:latest
+    with: stable:must-gather
 promotion:
   to:
-  - name: 4.20-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -57,18 +68,23 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: must-gather-operator-codecov-token
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: lint
   commands: make lint
   container:
     from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: test
   commands: make test
   container:
     from: src
-- as: validate
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: validate-boilerplate
   commands: make validate
   container:
     from: src
+  optional: true
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 zz_generated_metadata:
   branch: master
   org: openshift-priv

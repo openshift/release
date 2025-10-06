@@ -28,6 +28,7 @@ promotion:
   to:
   - additional_images:
       cluster-control-plane-machine-set-tests: src
+    disabled: true
     name: 4.21-priv
     namespace: ocp-private
 releases:
@@ -81,23 +82,23 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-serial
   shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     test:
     - as: test
       commands: |
@@ -112,7 +113,7 @@ tests:
 - as: e2e-aws-operator-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -130,7 +131,7 @@ tests:
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       commands: |
@@ -146,7 +147,7 @@ tests:
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -419,7 +420,7 @@ tests:
 - as: e2e-aws-ovn-etcd-scaling
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
   optional: true
@@ -460,7 +461,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
       TEST_SCENARIOS: Cluster_Infrastructure
@@ -469,12 +470,6 @@ tests:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 7h30m0s
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-control-plane-machineset-operator
-    workflow: openshift-ci-security
-  timeout: 7h45m0s
 - as: verify-deps
   steps:
     env:

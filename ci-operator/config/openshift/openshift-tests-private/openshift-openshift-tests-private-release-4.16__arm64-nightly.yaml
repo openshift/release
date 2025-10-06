@@ -419,141 +419,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-equinix
-- as: baremetal-compact-agent-ipv4-dynamic-connected-f14
-  capabilities:
-  - intranet
-  cron: 21 21 8,24 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-network-dynamic
-- as: baremetal-compact-agent-ipv4-static-connected-f14
-  capabilities:
-  - intranet
-  cron: 41 14 13,27 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-network-static
-- as: baremetal-compact-agent-ipv4-static-disc-proxy-f14
-  capabilities:
-  - intranet
-  cron: 1 14 7,23 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-network-static-disconnected-proxy
-- as: baremetal-pxe-compact-agent-ipv4-static-connected-f28
-  capabilities:
-  - intranet
-  cron: 27 21 20 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-pxe
-- as: baremetal-pxe-ha-agent-ipv4-static-connected-f28
-  capabilities:
-  - intranet
-  cron: 10 18 14 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-pxe
-- as: baremetal-pxe-sno-agent-ipv4-static-connected-f28
-  capabilities:
-  - intranet
-  cron: 33 15 23 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "1"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-pxe
-- as: baremetal-sno-agent-ipv4-static-connected-f14
-  capabilities:
-  - intranet
-  cron: 51 17 7,23 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: arm64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "1"
-      workers: "0"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-upi-ovn-ipv4-f28
   capabilities:
   - intranet
@@ -643,14 +508,17 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      CATALOG_SOURCE_NAME: compliance-operator
       COMPUTE_NODE_TYPE: t2a-standard-4
       FILTERS_ADDITIONAL: ""
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-16@sha256:358f5bca2ade0f18ce0e21c697aacdf1c61b211b19f7c1bd12739bee1904e323
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "30"
     test:
+    - ref: file-integrity-konflux-catalogsource
     - ref: etcd-encryption
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
@@ -662,15 +530,18 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      CATALOG_SOURCE_NAME: compliance-operator
       COMPUTE_NODE_TYPE: t2a-standard-4
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-16@sha256:358f5bca2ade0f18ce0e21c697aacdf1c61b211b19f7c1bd12739bee1904e323
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "55"
     test:
+    - ref: file-integrity-konflux-catalogsource
     - ref: etcd-encryption
     - ref: openshift-extended-test-disruptive
     - ref: openshift-extended-web-tests
@@ -708,6 +579,25 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-sno-ipv4-disk-etcd-encryption-f60
+  capabilities:
+  - intranet
+  cron: 56 14 4 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      ENABLE_ETCD_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

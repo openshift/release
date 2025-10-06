@@ -237,10 +237,13 @@ CONFIG = {
         'eastus': 6,
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 120,
+        'default': 140,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
+    },
+    'aws-sandboxed-containers-operator-quota-slice': {
+        'us-east-2': 10,
     },
     'oex-aws-qe-quota-slice': {
         'default': 40,
@@ -295,7 +298,6 @@ CONFIG = {
     'libvirt-s390x-vpn-quota-slice': {
         'libvirt-s390x-0-1': 1
     },
-    'libvirt-ppc64le-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -390,6 +392,7 @@ CONFIG = {
     'powervs-5-quota-slice': {},
     'powervs-6-quota-slice': {},
     'powervs-7-quota-slice': {},
+    'powervs-8-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -569,16 +572,23 @@ CONFIG = {
         'us-east-1': 15,
         'us-east-2': 15,
     },
+    'azure-oadp-qe-quota-slice': {
+        'centralus': 10,
+        'eastus': 10,
+        'eastus2': 10,
+    },
+    'aws-lp-chaos-quota-slice': {
+        'us-west-2': 10,
+    },
+    'metal-redhat-gs-quota-slice': {
+        'default': 1,
+    },
 }
 
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-# Excluding Mihawk0 from lease pool due to S2S migration
-for i in range(1, 3):
-    for j in range(4):
-        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
-for i in range(0, 2):
+for i in range(0, 3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
@@ -634,6 +644,9 @@ for i in range(4):
 
 for i in range(4):
     CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
+
+for i in range(2):
+    CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
 
 config = {

@@ -15,40 +15,40 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: "4.20"
+  ocp_4.20_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-network-operator
 promotion:
   to:
-  - name: "4.20"
+  - name: "4.21"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -104,12 +104,12 @@ tests:
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-ovn-ipsec-step-registry
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-aws-ovn-serial
-  optional: true
+  shard_count: 2
   steps:
     cluster_profile: aws
     env:
@@ -118,6 +118,7 @@ tests:
 - always_run: true
   as: e2e-aws-ovn-serial-ipsec
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: aws-2
     env:
@@ -147,7 +148,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -172,7 +173,8 @@ tests:
         Services Secondary IP Family \[LinuxOnly\] should function for service endpoints
         using hostNetwork\| should have ipv4 and ipv6 internal node ip
     workflow: openshift-e2e-vsphere-ovn-dualstack
-- as: e2e-vsphere-ovn-dualstack-primaryv6
+- always_run: false
+  as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -183,7 +185,7 @@ tests:
 - as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
@@ -205,7 +207,7 @@ tests:
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       FAIL_ON_CORE_DUMP: "true"
@@ -232,8 +234,9 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-techpreview-serial
   optional: true
+  shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -262,7 +265,7 @@ tests:
 - as: e2e-aws-ovn-clusternetwork-cidr-expansion
   cron: 0 3 * * 0,2,4,6
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
@@ -276,7 +279,7 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-single-node
@@ -325,7 +328,7 @@ tests:
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -441,8 +444,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: eastus2
-      TECH_PREVIEW_NO_UPGRADE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:

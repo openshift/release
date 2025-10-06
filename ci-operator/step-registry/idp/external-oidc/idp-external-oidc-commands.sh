@@ -116,9 +116,19 @@ function configure_external_oidc () {
     fi
     echo "KAS completed rollout"
 
+    IS_GOOD_STATUS="yes"
     # Below cluster operators should be in good status
     if oc get co kube-apiserver authentication console --no-headers --kubeconfig "$CLUSTER_IN_TEST" | grep -v "True  *False  *False"; then
         echo '"oc get co kube-apiserver authentication console" shows some cluster operator not in good status!'
+        IS_GOOD_STATUS="no"
+    fi
+    # Below covers regression bugs like OCPBUGS-60219 in case the clusterversion is not in good status
+    if oc get clusterversion version --kubeconfig "$CLUSTER_IN_TEST" | grep -iE "(err|warn|fail|bad|not available)"; then
+        echo '"oc get clusterversion version" shows not good status! The ".status.conditions" shows:'
+        oc get clusterversion version -o jsonpath='{.status.conditions}' --kubeconfig "$CLUSTER_IN_TEST"
+        IS_GOOD_STATUS="no"
+    fi
+    if [ "$IS_GOOD_STATUS" != "yes" ]; then
         exit 1
     fi
 }

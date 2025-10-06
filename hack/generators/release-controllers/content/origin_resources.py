@@ -127,7 +127,10 @@ def _add_origin_resources(gendoc):
             "kind": "Deployment",
             "metadata": {
                 "annotations": {
-                    "image.openshift.io/triggers": "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"release-controller:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image\"}]",
+                    'keel.sh/policy': 'force',
+                    'keel.sh/matchTag': 'true',
+                    'keel.sh/trigger': 'poll',
+                    'keel.sh/pollSchedule': '@every 5m'
                 },
                 "name": "release-controller",
                 "namespace": "ci",
@@ -217,7 +220,8 @@ def _add_origin_resources(gendoc):
                                     "-v=4",
                                     "--manifest-list-mode"
                                 ],
-                                "image": "release-controller:latest",
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
+                                'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rc_volume_mounts(),
                                 'livenessProbe': {
@@ -249,7 +253,10 @@ def _add_origin_resources(gendoc):
             "kind": "Deployment",
             "metadata": {
                 "annotations": {
-                    "image.openshift.io/triggers": "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"release-controller-api:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image\"}]",
+                    'keel.sh/policy': 'force',
+                    'keel.sh/matchTag': 'true',
+                    'keel.sh/trigger': 'poll',
+                    'keel.sh/pollSchedule': '@every 5m'
                 },
                 "name": "release-controller-api",
                 "namespace": "ci",
@@ -282,7 +289,8 @@ def _add_origin_resources(gendoc):
                                     "--jira-bearer-token-file=/etc/jira/api",
                                     "-v=4"
                                 ],
-                                "image": "release-controller-api:latest",
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
+                                'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rcapi_volume_mounts(),
                                 'livenessProbe': {

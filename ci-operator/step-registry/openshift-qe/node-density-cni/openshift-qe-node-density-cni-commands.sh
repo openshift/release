@@ -54,14 +54,7 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-cni
-
-# A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=2m" ./run.sh
-
-# The measurable run
-export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
-
-
+export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 rm -f ${SHARED_DIR}/index.json
@@ -69,3 +62,6 @@ rm -f ${SHARED_DIR}/index.json
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
+fi
