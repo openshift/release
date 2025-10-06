@@ -58,11 +58,34 @@ then
   exit 0
 fi
 
+oc apply -f - <<EOF
+---
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: a-gp3-csi
+parameters:
+  encrypted: "true"
+  type: gp3
+provisioner: ebs.csi.aws.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: snapshot.storage.k8s.io/v1
+deletionPolicy: Delete
+driver: ebs.csi.aws.com
+kind: VolumeSnapshotClass
+metadata:
+  name: a-csi-aws-vsc
+EOF
 
-if [ -n "${KUBEVIRT_CSI_INFRA}" ]
-then
-  EXTRA_ARGS="${EXTRA_ARGS} --infra-storage-class-mapping=${KUBEVIRT_CSI_INFRA}/${KUBEVIRT_CSI_INFRA}"
-fi
+
+EXTRA_ARGS="${EXTRA_ARGS} --infra-storage-class-mapping=gp3-csi/gp3-csi \
+--infra-storage-class-mapping=a-gp3-csi/a-gp3-csi \
+--infra-volumesnapshot-class-mapping=csi-aws-vsc/csi-aws-vsc \
+--infra-volumesnapshot-class-mapping=a-csi-aws-vsc/a-csi-aws-vsc"
+
 
 if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "AWS" ]; then
   if [ -z "$ETCD_STORAGE_CLASS" ]; then
