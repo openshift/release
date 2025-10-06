@@ -1,0 +1,54 @@
+ref:
+  as: servicemesh-data-router-send
+  from: src
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  timeout: 1h0m0s
+  commands: servicemesh-data-router-send-commands.sh
+  env:
+  - name: TESTRUN_NAME
+    default: "Istio integration test"
+    documentation: |-
+      Name of the test run
+  - name: TESTRUN_DESCRIPTION
+    default: "Istio integration test run for Istio midstream repository"
+    documentation: |-
+      Description of the test run
+  - name: ARTIFACT_DIR
+    default: "/tmp/artifacts"
+    documentation: |-
+      Directory containing test artifacts
+  - name: TEST_FILE_PATH
+    default: ""
+    documentation: |-
+      Path to JUnit XML test results file (defaults to ${ARTIFACT_DIR}/junit.xml if not specified)
+  - name: ISTIO_VERSION
+    default: "master"
+    documentation: |-
+      Version of Istio being tested
+  - name: TEST_SUITE
+    default: "sail-e2e-ocp"
+    documentation: |-
+      Name of the test suite being executed
+  - name: TEST_REPO
+    default: "n/a"
+    documentation: |-
+      Repository being tested
+  - name: INSTALLATION_METHOD
+    default: "n/a"
+    documentation: |-
+      Method used for Istio installation
+  - name: EXTRA_ATTRIBUTES
+    default: ""
+    documentation: |-
+      JSON array of additional key/value pairs for metadata, e.g. '[{"key": "k1", "value": "v1"}, {"key": "k2", "value": "v2"}]'
+  documentation: |-
+    Sends test results from OpenShift Service Mesh (OSSM) test suites to the OSSM Report Portal instance using the Data Router service. 
+    This step requires test results in JUnit XML format and valid Data Router credentials. 
+    The step creates metadata with test run information and attributes, then sends both the metadata and test results to the Report Portal for analysis and reporting.
+    Note: To be able to work this script need to have mount the oidc service account name and token at /creds-data-router, the config should be set timeout:
+    secrets:
+    - mount_path: /creds-data-router
+      name: ossm-oidc-sa
