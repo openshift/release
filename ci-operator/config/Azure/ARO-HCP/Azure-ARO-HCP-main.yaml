@@ -21,9 +21,11 @@ images:
   to: src-plus-az
 - dockerfile_literal: |
     FROM nested-podman
-    COPY /src /opt/app-root/src
-    WORKDIR /opt/app-root/src/ARO-HCP
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
     USER root
+    # allow anyone to create content in GOPATH so we can go install stuff
+    RUN chmod 777 /opt/app-root
     RUN dnf install -y git go make
     RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
     RUN dnf install -y pass || true
@@ -52,10 +54,8 @@ tests:
   capabilities:
   - nested-podman
   nested_podman: true
-  optional: true
+  run_if_changed: ^(frontend)|^(internal)
   steps:
-    pre:
-    - ref: aro-hcp-frontend-start-cosmos-emulator
     test:
     - ref: aro-hcp-frontend-run-simulation-tests
 - always_run: false
