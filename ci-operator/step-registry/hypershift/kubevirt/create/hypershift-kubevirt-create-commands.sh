@@ -235,6 +235,7 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
+    --control-plane-operator-image quay.io/mgencur/cpo:OCPBUGS-61245 \
     --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
 fi
 
