@@ -301,11 +301,12 @@ done
 
 HUB_COMPUTE_RIPS=()
 # Fetching the number of compute nodes in the hub cluster
-HUB_COMPUTE_COUNT=($(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' | wc -l
-))
+HUB_COMPUTE_COUNT=$(oc get nodes -l node-role.kubernetes.io/worker= \
+  -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' | wc -l)
+
 
 # Fetching the Reserved IPs of the hub cluster compute nodes
-for i in $(seq 1 $HUB_COMPUTE_COUNT); do
+for i in $(seq 1 "$HUB_COMPUTE_COUNT"); do
     HUB_COMPUTE_RIPS+=("$(ibmcloud is instance hcp-s390x-mgmt-ci-$job_id-compute-$i --output JSON | jq -r '.network_interfaces[0].primary_ip.address')")
 done
 
@@ -359,7 +360,7 @@ backend hub-api-server
 HAPROXY_CFG
 
 # Append backend servers
-for i in $(seq 1 ${HUB_COMPUTE_COUNT}); do
+for i in $(seq 1 "$HUB_COMPUTE_COUNT"); do
   index=$((i - 1))
   echo "   server ${MGMT_CLUSTER_NAME}-compute-${i} ${HUB_COMPUTE_RIPS[$index]}" >> haproxy.cfg
 done
