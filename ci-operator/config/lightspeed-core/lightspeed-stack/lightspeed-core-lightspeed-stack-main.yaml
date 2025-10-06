@@ -1,0 +1,83 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+      RUN dnf install -y podman
+images:
+- dockerfile_path: Containerfile
+  to: lightspeed-stack
+promotion:
+  to:
+  - namespace: lcore-test
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 4Gi
+tests:
+- as: e2e-lcore-cluster-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.19"
+  cron: 10 4 * * *
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: "export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/token)\nexport
+        VLLM_API_KEY=$(cat /var/run/vllm/key)\nls -A\noc version\noc whoami\noc help\necho
+        \"Test\"\noc get pods -A\n\necho \"===== DEPLOY vLLM ======\"\n\ngit clone
+        https://github.com/are-ces/lightspeed-stack.git\ngit checkout e2e-rhoai\ncd
+        lightspeed-stack/tests/e2e-prow/rhoai\n\noc create namespace e2e-rhoai-dsc\n\necho
+        \"ECHO VLLM KEY\"\necho $VLLM_API_KEY\ncat /var/run/vllm/key\necho \"ECHO
+        END\"\n\noc create secret generic hf-token-secret \\\n    --from-literal=token=\"$HUGGING_FACE_HUB_TOKEN\"
+        \\\n    -n e2e-rhoai-dsc || echo \"Secret exists\"\n\noc create secret generic
+        vllm-api-key-secret \\\n    --from-literal=key=\"$VLLM_API_KEY\" \\\n    -n
+        e2e-rhoai-dsc || echo \"Secret exists\"\n\ncurl -L -o tool_chat_template_llama3.2_json.jinja
+        \\\n  https://raw.githubusercontent.com/vllm-project/vllm/main/examples/tool_chat_template_llama3.2_json.jinja\n
+        \ \noc create configmap vllm-chat-template -n e2e-rhoai-dsc \\\n  --from-file=tool_chat_template_llama3.2_json.jinja\n\npwd\n\n./pipeline.sh\n\noc
+        get pods\n\necho \"===== LCS POD =====\"\n\nls\n\nsource pod.env\n\necho $KSVC_URL\n\ncurl
+        -k -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer
+        $VLLM_API_KEY\" \\\n  -d '{\n      \"model\": \"meta-llama/Llama-3.2-1B-Instruct\",\n
+        \     \"prompt\": \"You are a helpful assistant. Who won the world series
+        in 2020?\",\n      \"max_new_tokens\": 100\n  }' \\\n  \"$KSVC_URL/v1/completions\"\n"
+      credentials:
+      - collection: ""
+        mount_path: /var/run/huggingface
+        name: hf-token-ces-lcore-test
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/vllm
+        name: vllm-api-key-lcore-test
+        namespace: test-credentials
+      dependencies:
+      - env: LCORE_IMAGE
+        name: lightspeed-stack
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: lightspeed-core
+  repo: lightspeed-stack
