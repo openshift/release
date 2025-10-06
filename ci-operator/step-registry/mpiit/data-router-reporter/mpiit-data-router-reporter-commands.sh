@@ -12,12 +12,8 @@ function reportToDataRouter() {
 
 export DATAROUTER_RESULTS="${SHARED_DIR}/*.xml"
 export OCP_VERSION
-
 export REPORTPORTAL_APPLY_TFA="${APPLY_TFA}"
-
-# Component (Layered Product) mention for metadata attributes
 export REPORTPORTAL_CMP
-
 export REPORTPORTAL_HOSTNAME
 export REPORTPORTAL_PROJECT="lp-interop-dr_personal"
 export REPORTPORTAL_LAUNCH_NAME="lp-interop-${OCP_VERSION}"
