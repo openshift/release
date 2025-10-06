@@ -84,8 +84,8 @@ EOF
 EXTRA_ARGS="${EXTRA_ARGS} --infra-storage-class-mapping=gp3-csi/gp3-csi \
 --infra-storage-class-mapping=a-gp3-csi/a-gp3-csi \
 --infra-volumesnapshot-class-mapping=csi-aws-vsc/csi-aws-vsc \
---infra-volumesnapshot-class-mapping=a-csi-aws-vsc/a-csi-aws-vsc"
-
+--infra-volumesnapshot-class-mapping=a-csi-aws-vsc/a-csi-aws-vsc \
+--annotations=hypershift.openshift.io/control-plane-operator-image=quay.io/mgencur/cpo:OCPBUGS-61245"
 
 if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "AWS" ]; then
   if [ -z "$ETCD_STORAGE_CLASS" ]; then
@@ -235,7 +235,6 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --control-plane-operator-image quay.io/mgencur/cpo:OCPBUGS-61245 \
     --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
 fi
 
