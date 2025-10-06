@@ -27,26 +27,26 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-etcd-operator
 promotion:
   to:
@@ -86,7 +86,7 @@ tests:
     from: test-bin
 - as: e2e-agnostic-ovn
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-agnostic-ovn-upgrade
   steps:
@@ -100,7 +100,7 @@ tests:
 - as: e2e-aws-disruptive-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-disruption-ovn
 - as: e2e-gcp-disruptive
   optional: true
@@ -114,7 +114,7 @@ tests:
     workflow: openshift-e2e-gcp-disruption-ovn
 - as: e2e-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -147,7 +147,7 @@ tests:
 - as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-azure
   optional: true
@@ -170,12 +170,13 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-assisted
   cluster: build05
+  optional: true
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-baremetal
 - as: e2e-aws-ovn-single-node
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-single-node-live-iso
   optional: true
@@ -193,12 +194,14 @@ tests:
     cluster_profile: aws
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-serial
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-serial
-- as: e2e-aws-ovn-etcd-scaling
+  shard_count: 2
   steps:
     cluster_profile: aws-3
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
   optional: true
@@ -208,7 +211,7 @@ tests:
 - as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-azure-etcd-scaling
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
@@ -218,12 +221,12 @@ tests:
 - as: e2e-aws-etcd-recovery
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-etcd-recovery
 - as: e2e-aws-etcd-certrotation
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-etcd-certrotation
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown
   optional: true
@@ -242,8 +245,9 @@ tests:
       CLUSTER_AGE_STEP: "365"
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-aws-cpms
+  optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     test:
     - as: test
       commands: make e2e-periodic

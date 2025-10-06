@@ -7,10 +7,18 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
+  ocp_4.21_base-rhel9:
+    name: "4.22"
+    namespace: ocp
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 images:
@@ -19,18 +27,30 @@ images:
     ocp_4.20_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: olm-catalogd
 - dockerfile_path: openshift/operator-controller.Dockerfile
   inputs:
     ocp_4.20_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: olm-operator-controller
 - dockerfile_path: openshift/registry.Dockerfile
   inputs:
@@ -103,7 +123,7 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: aws-3
     test:
     - as: upstream-e2e
       cli: latest
@@ -182,7 +202,7 @@ tests:
           cpu: 100m
 - as: e2e-aws-techpreview-olmv1-ext
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --monitor=watch-namespaces
