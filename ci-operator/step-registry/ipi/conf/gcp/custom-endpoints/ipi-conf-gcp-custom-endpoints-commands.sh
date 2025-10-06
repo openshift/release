@@ -14,6 +14,8 @@ PATCH="${SHARED_DIR}/custom_endpoints.yaml.patch"
 cat >> "${PATCH}" << EOF
 platform:
   gcp:
+    endpoint:
+      name: ${gcp_custom_endpoint}
     serviceEndpoints:
 EOF
 

@@ -57,7 +57,9 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
 echo "Run compute-nto eco-gotests via ssh tunnel"
-timeout -s 9 5h ssh \
+# Temporarily disable set -e to capture SSH exit code
+set +e
+timeout -s 9 "${ECO_GOTESTS_SSH_TIMEOUT}" ssh \
   -o ServerAliveInterval=60 \
   -o ServerAliveCountMax=3 \
   -o StrictHostKeyChecking=no \
@@ -75,7 +77,20 @@ echo "--------------------------------------------------"
 echo
 cd /tmp/gotest && ./run_gotests.sh || true
 EOF
+ssh_ret=$?
+# Re-enable set -e for the rest of the script
+set -e
 set +x
+if [[ $ssh_ret -ne 0 ]]; then
+    echo
+    echo "-------------------------------------------------------------"
+    echo "[WARNING] The test script exited with $ssh_ret from ssh!!!!"
+    echo "-------------------------------------------------------------"
+    echo "The step will continue to run but the test results"
+    echo "might not be available or might be incomplete."
+    echo "-------------------------------------------------------------"
+    echo
+fi
 
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${PROJECT_DIR}/temp_ssh_key \
   "${BASTION_USER}@${BASTION_IP}":"${REPORT_DIR}/*.xml" "${ARTIFACT_DIR}/junit_eco_gotests/"

@@ -11,19 +11,7 @@ cat /etc/os-release
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if [ ${BAREMETAL} == "true" ]; then
-  SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-  bastion="$(cat /bm/address)"
-  # Copy over the kubeconfig
-  ssh ${SSH_ARGS} root@$bastion "cat ${KUBECONFIG_PATH}" > /tmp/kubeconfig
-  # Setup socks proxy
-  ssh ${SSH_ARGS} root@$bastion -fNT -D 12345
-  export KUBECONFIG=/tmp/kubeconfig
-  export https_proxy=socks5://localhost:12345
-  export http_proxy=socks5://localhost:12345
-  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
-  cd /tmp
-elif test -f "${SHARED_DIR}/proxy-conf.sh"; then
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -43,6 +31,7 @@ LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmark
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 
 if [ ${BAREMETAL} == "true" ]; then
+  bastion="$(cat /bm/address)"
   ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
   ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cd /tmp;git clone $REPO_URL $TAG_OPTION --depth 1"
   ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/mno/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"

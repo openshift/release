@@ -244,7 +244,14 @@ EOF
   set -x
   oc -n openshift-marketplace delete catsrc ${CATALOGSOURCE_NAME} --ignore-not-found
   sed -i "s/name: .*/name: ${CATALOGSOURCE_NAME}/" ${prega_info_dir}/catalogSource.yaml
-  sed -i "s/displayName: .*/displayName: ${CATALOGSOURCE_DISPLAY_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  # Add or update displayName field in catalogSource.yaml under spec section
+  if grep -q "displayName:" ${prega_info_dir}/catalogSource.yaml; then
+    # Update existing displayName
+    sed -i "s/displayName: .*/displayName: ${CATALOGSOURCE_DISPLAY_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  else
+    # Add displayName field after image field in spec section
+    sed -i "/^  image: /a\  displayName: ${CATALOGSOURCE_DISPLAY_NAME}" ${prega_info_dir}/catalogSource.yaml
+  fi
   set +x
   echo "--------------------- ${ARTIFACT_DIR}/pre-ga-info/catalogSource.yaml -------------------------"
   cat ${prega_info_dir}/catalogSource.yaml

@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-for mabc_path in clusters/build-clusters/common_except_app.ci/supplemental-ci-images/*; do
+for mabc_path in clusters/build-clusters/multiarch_builds/supplemental-ci-images/*; do
 	mabc_name=$(basename $mabc_path | sed -s 's,_mabc.yaml,,')
 
 	multiarch_build="$(oc -n ci get "mabc/$mabc_name" -o json)"
