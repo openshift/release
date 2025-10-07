@@ -98,22 +98,22 @@ if [ -n "${REBASE_TO}" ]; then
 
   cd /go/src/github.com/openshift/microshift/
   DEST_DIR="${HOME}"/.local/bin ./scripts/fetch_tools.sh yq
-  # Extract the ARM release image from the last_rebase.sh file (third parameter)
-  ARM_RELEASE_IMAGE=$(grep -o 'registry\.ci\.openshift\.org/ocp-arm64/release-arm64:[^[:space:]"]*' ./scripts/auto-rebase/last_rebase.sh | head -1)
+  # Extract the ARM image from the nightly release
+  ARM_RELEASE_IMAGE="${OPENSHIFT_RELEASE_IMAGE_ARM}"
   if [[ -z "${ARM_RELEASE_IMAGE}" ]]; then
-    echo "Failed to extract ARM release image from last_rebase.sh"
+    echo "Failed to extract ARM release image from nightly release image"
     trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
     exit 1
   fi
   # Bail out without error if the rebase fails. Next steps should be skipped if this happens.
   PULLSPEC_RELEASE_AMD64="${REBASE_TO}" \
-    PULLSPEC_RELEASE_ARM64="${ARM_RELEASE_IMAGE}" \
-    DRY_RUN=y \
-    ./scripts/auto-rebase/rebase_job_entrypoint.sh || {
-      echo "Rebase failed"
-      trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
-      exit 1
-    }
+  PULLSPEC_RELEASE_ARM64="${ARM_RELEASE_IMAGE}" \
+  DRY_RUN=y \
+  ./scripts/auto-rebase/rebase_job_entrypoint.sh || {
+    echo "Rebase failed"
+    trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
+    exit 1
+  }
 else
   echo "REBASE_TO is not set, skipping rebase"
 fi
