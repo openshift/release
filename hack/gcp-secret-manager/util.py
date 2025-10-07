@@ -66,7 +66,7 @@ def validate_secret_name(_ctx, _param, value):
     if not re.fullmatch("[A-Za-z0-9-]+", value):
         raise click.BadParameter("May only contain letters, numbers or dashes.")
     if len(value) > SECRET_NAME_MAX_LENGTH:
-        raise click.BadParameter(f"Secret name must be max {SECRET_NAME_MAX_LENGTH} characters.")
+        raise click.BadParameter(f"Secret name must be less than {SECRET_NAME_MAX_LENGTH} characters.")
     return value
 
 
