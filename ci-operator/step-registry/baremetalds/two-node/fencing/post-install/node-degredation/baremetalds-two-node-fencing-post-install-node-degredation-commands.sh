@@ -296,7 +296,7 @@ snapshot_cluster "before-degradation"
 # Start capture BEFORE fencing
 CAP_DIR="$(start_capture_window "during-fence")"
 
-# Reaper to kill watchers after the window (no trap needed)
+# Reaper to kill watchers after the window
 (
   sleep "${CAPTURE_SECS}"
   for pf in "${CAP_DIR}"/.pid-*; do
