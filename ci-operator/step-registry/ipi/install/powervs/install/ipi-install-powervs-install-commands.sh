@@ -51,7 +51,6 @@ function prepare_next_steps() {
   #Save exit code for must-gather to generate junit
   echo "$?" > "${SHARED_DIR}/install-status.txt"
   echo "Setup phase finished, prepare env for next steps"
-  sleep 2h
   populate_artifact_dir
   echo "Copying required artifacts to shared dir"
   #Copy the auth artifacts to shared dir for the next steps
