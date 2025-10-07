@@ -22,7 +22,7 @@
 # - TESTRUN_NAME: Name of the test run (default: "Istio integration test")
 # - TESTRUN_DESCRIPTION: Description of the test run
 # - ARTIFACT_DIR: Directory containing test artifacts (default: "/tmp/artifacts")
-# - TEST_FILE_PATH: Path to JUnit XML test results (default: "${ARTIFACT_DIR}/junit.xml")
+# - TEST_FILE_NAME: Name of the JUnit XML test result file (default: "${ARTIFACT_DIR}/junit.xml")
 # - ISTIO_VERSION: Version of Istio being tested (default: "master")
 # - TEST_SUITE: Name of the test suite (default: "sail-e2e-ocp")
 # - TEST_REPO: Repository being tested (default: "n/a")
@@ -43,8 +43,9 @@ readonly TESTRUN_NAME=${TESTRUN_NAME:-"Istio integration test"}
 readonly TESTRUN_DESCRIPTION=${TESTRUN_DESCRIPTION:-"Istio integration test run for Istio midstream repository"}
 readonly STARTTIME=$(date +%s)000
 readonly ARTIFACT_DIR=${ARTIFACT_DIR:-"/tmp/artifacts"}
-readonly TEST_FILE_PATH=${TEST_FILE_PATH:-"${ARTIFACT_DIR}/junit.xml"}
+readonly TEST_FILE_NAME=${TEST_FILE_NAME:-"junit.xml"}
 readonly ISTIO_VERSION=${ISTIO_VERSION:-"master"}
+readonly OSSM_VERSION=${OSSM_VERSION:-"n/a"}
 readonly TEST_SUITE=${TEST_SUITE:-"sail-e2e-ocp"}
 readonly TEST_REPO=${TEST_REPO:-"n/a"}
 readonly INSTALLATION_METHOD=${INSTALLATION_METHOD:-"n/a"}
@@ -78,6 +79,10 @@ create_metadata_file() {
                         {
                             "key": "istio_version",
                             "value": "${ISTIO_VERSION}"
+                        },
+                        {
+                            "key": "ossm_version",
+                            "value": "${OSSM_VERSION}"
                         },
                         {
                             "key": "stage",
@@ -126,21 +131,21 @@ EOF
 send_results() {
     local metadata_file="metadata.json"
 
-    echo "Preparing to send test results from '${TEST_FILE_PATH}'..."
+    echo "Preparing to send test results from '${TEST_FILE_NAME}'..."
 
     # Verify test results file exists and is readable
-    if [[ ! -f "${TEST_FILE_PATH}" ]]; then
-        echo "ERROR: Test results file '${TEST_FILE_PATH}' not found." >&2
+    if [[ ! -f "${ARTIFACT_DIR}/${TEST_FILE_NAME}" ]]; then
+        echo "ERROR: Test results file '${ARTIFACT_DIR}/${TEST_FILE_NAME}' not found." >&2
         exit 1
     fi
 
-    if [[ ! -r "${TEST_FILE_PATH}" ]]; then
-        echo "ERROR: Test results file '${TEST_FILE_PATH}' is not readable." >&2
+    if [[ ! -r "${ARTIFACT_DIR}/${TEST_FILE_NAME}" ]]; then
+        echo "ERROR: Test results file '${ARTIFACT_DIR}/${TEST_FILE_NAME}' is not readable." >&2
         exit 1
     fi
 
     echo "Test results file information:"
-    ls -lh "${TEST_FILE_PATH}"
+    ls -lh "${ARTIFACT_DIR}/${TEST_FILE_NAME}"
 
     echo "Creating metadata file..."
     create_metadata_file
@@ -169,7 +174,7 @@ send_results() {
     
     echo "Sending test results to Report Portal via Data Router..."
     if ! droute send --metadata "${metadata_file}" \
-        --results "${TEST_FILE_PATH}" \
+        --results "${ARTIFACT_DIR}/${TEST_FILE_NAME}" \
         --username "${DATA_ROUTER_USERNAME}" \
         --password "${DATA_ROUTER_PASSWORD}" \
         --url "${DATA_ROUTER_URL}" \

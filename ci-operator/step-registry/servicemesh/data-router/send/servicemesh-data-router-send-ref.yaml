@@ -1,12 +1,19 @@
 ref:
   as: servicemesh-data-router-send
-  from: src
+  from_image:
+    namespace: dno
+    name: droute
+    tag: latest
   resources:
     requests:
-      cpu: '1'
-      memory: 500Mi
-  timeout: 1h0m0s
+      cpu: 100m
+      memory: 200Mi
+  timeout: 0h30m0s
   commands: servicemesh-data-router-send-commands.sh
+  credentials:
+    - namespace: ci
+      name: ossm-oidc-sa
+      mount_path: /creds-data-router
   env:
   - name: TESTRUN_NAME
     default: "Istio integration test"
@@ -17,17 +24,21 @@ ref:
     documentation: |-
       Description of the test run
   - name: ARTIFACT_DIR
-    default: "/tmp/artifacts"
+    default: "/logs/artifacts"
     documentation: |-
       Directory containing test artifacts
-  - name: TEST_FILE_PATH
+  - name: TEST_FILE_NAME
     default: ""
     documentation: |-
-      Path to JUnit XML test results file (defaults to ${ARTIFACT_DIR}/junit.xml if not specified)
+      Name of the JUnit XML test result file; the path will be $ARTIFACT_DIR/$TEST_FILE_NAME
   - name: ISTIO_VERSION
     default: "master"
     documentation: |-
       Version of Istio being tested
+  - name: OSSM_VERSION
+    default: "n/a"
+    documentation: |-
+      Version of OpenShift Service Mesh being tested
   - name: TEST_SUITE
     default: "sail-e2e-ocp"
     documentation: |-
@@ -48,7 +59,3 @@ ref:
     Sends test results from OpenShift Service Mesh (OSSM) test suites to the OSSM Report Portal instance using the Data Router service. 
     This step requires test results in JUnit XML format and valid Data Router credentials. 
     The step creates metadata with test run information and attributes, then sends both the metadata and test results to the Report Portal for analysis and reporting.
-    Note: To be able to work this script need to have mount the oidc service account name and token at /creds-data-router, the config should be set timeout:
-    secrets:
-    - mount_path: /creds-data-router
-      name: ossm-oidc-sa
