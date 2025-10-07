@@ -96,46 +96,18 @@ EOF
 
 export ARTIFACT_DIR_JSON="${ARTIFACT_DIR}/json"
 mkdir -p "$ARTIFACT_DIR_JSON"
+mkdir -p "${ARTIFACT_DIR}/nodes"
+
+# for each resource we gather both JSON-formatted output and standard table
+# output
+
+# servers
 
 openstack server list --name "${CLUSTER_NAME}" -f json > "${ARTIFACT_DIR_JSON}/openstack_server_list.json"
 
 for server in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_server_list.json"); do
 	openstack server show "$server" -f json
 done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_server_show.json"
-
-openstack volume list -f json \
-	| jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
-	> "${ARTIFACT_DIR_JSON}/openstack_volume_list.json"
-
-for volume in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_volume_list.json"); do
-	openstack volume show "$volume" -f json
-done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_volume_show.json"
-
-openstack port list -f json \
-    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
-    > "${ARTIFACT_DIR_JSON}/openstack_port_list.json"
-
-for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_port_list.json"); do
-	openstack port show "$port" -f json
-done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_port_show.json"
-
-openstack subnet list -f json \
-    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
-    > "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"
-
-for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"); do
-	openstack subnet show "$port" -f json
-done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_subnet_show.json"
-
-openstack floating ip list --long -f json \
-    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Description | test($CLUSTER_NAME)))' \
-    > "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"
-
-for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
-	openstack floating ip show "$fip" -f json
-done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_fip_show.json"
-
-mkdir -p "${ARTIFACT_DIR}/nodes"
 
 openstack server list --name "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_nodes.log"
 for server in $(openstack server list --name "$CLUSTER_NAME" -c Name -f value | sort); do
@@ -145,11 +117,31 @@ for server in $(openstack server list --name "$CLUSTER_NAME" -c Name -f value | 
 	openstack console log show "$server"          &> "${ARTIFACT_DIR}/nodes/console_${server}.log"
 done
 
+# volumes
+
+openstack volume list -f json \
+	| jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
+	> "${ARTIFACT_DIR_JSON}/openstack_volume_list.json"
+
+for volume in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_volume_list.json"); do
+	openstack volume show "$volume" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_volume_show.json"
+
 openstack volume list | grep "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_volumes.log" || true
 for volume in $(openstack volume list -c Name -f value | { grep "$CLUSTER_NAME" || true; } | sort); do
 	echo -e "\n$ openstack volume show $volume" >> "${ARTIFACT_DIR}/openstack_volumes.log"
 	openstack volume show "$volume"             >> "${ARTIFACT_DIR}/openstack_volumes.log"
 done
+
+# ports
+
+openstack port list -f json \
+    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
+    > "${ARTIFACT_DIR_JSON}/openstack_port_list.json"
+
+for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_port_list.json"); do
+	openstack port show "$port" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_port_show.json"
 
 openstack port list | grep "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_ports.log" || true
 for port in $(openstack port list -c Name -f value | { grep "$CLUSTER_NAME" || true; } | sort); do
@@ -157,10 +149,30 @@ for port in $(openstack port list -c Name -f value | { grep "$CLUSTER_NAME" || t
 	openstack port show "$port"             >> "${ARTIFACT_DIR}/openstack_ports.log"
 done
 
+# subnets
+
+openstack subnet list -f json \
+    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
+    > "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"
+
+for subnet in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"); do
+	openstack subnet show "$subnet" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_subnet_show.json"
+
 openstack subnet list | grep "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_subnets.log" || true
 for subnet in $(openstack subnet list -c Name -f value | { grep "$CLUSTER_NAME" || true; } | sort); do
 	echo -e "\n$ openstack subnet show $subnet" >> "${ARTIFACT_DIR}/openstack_subnets.log"
 	openstack subnet show "$subnet"             >> "${ARTIFACT_DIR}/openstack_subnets.log"
 done
+
+# floating IPs
+
+openstack floating ip list --long -f json \
+    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Description | test($CLUSTER_NAME)))' \
+    > "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"
+
+for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
+	openstack floating ip show "$fip" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_fip_show.json"
 
 collect_bootstrap_logs
