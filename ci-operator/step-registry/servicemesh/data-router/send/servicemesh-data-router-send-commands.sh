@@ -41,7 +41,6 @@ readonly REPORT_PORTAL_PROJECT="osssm_general"
 readonly DATA_ROUTER_URL="https://datarouter.ccitredhat.com"
 readonly TESTRUN_NAME=${TESTRUN_NAME:-"Istio integration test"}
 readonly TESTRUN_DESCRIPTION=${TESTRUN_DESCRIPTION:-"Istio integration test run for Istio midstream repository"}
-readonly STARTTIME=$(date +%s)000
 readonly ARTIFACT_DIR=${ARTIFACT_DIR:-"/tmp/artifacts"}
 readonly TEST_FILE_NAME=${TEST_FILE_NAME:-"junit.xml"}
 readonly ISTIO_VERSION=${ISTIO_VERSION:-"master"}
@@ -56,6 +55,7 @@ readonly EXTRA_ATTRIBUTES=${EXTRA_ATTRIBUTES:-""} # JSON array of key/value pair
 
 create_metadata_file() {
     local metadata_file="metadata.json"
+    STARTTIME=$(date +%s)000
 
     cat << EOF > "${metadata_file}"
 {
