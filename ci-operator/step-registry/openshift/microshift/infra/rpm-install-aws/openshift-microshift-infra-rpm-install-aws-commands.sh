@@ -87,6 +87,8 @@ if [[ -n "${PROWJOB_ID}" && "${PROWJOB_ID}" =~ .*nightly.* ]]; then
   REBASE_TO="${RELEASE_IMAGE_LATEST}"
 fi
 
+REBASE_TO="registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-02-002727"
+
 if [ -n "${REBASE_TO}" ]; then
   # Under this condition we need to force traps at the last moment to not override the one above.
   echo "REBASE_TO is set to ${REBASE_TO}"
@@ -99,12 +101,14 @@ if [ -n "${REBASE_TO}" ]; then
   cd /go/src/github.com/openshift/microshift/
   DEST_DIR="${HOME}"/.local/bin ./scripts/fetch_tools.sh yq
   # Extract the ARM image from the nightly release
-  ARM_RELEASE_IMAGE="${OPENSHIFT_RELEASE_IMAGE_ARM}"
-  if [[ -z "${ARM_RELEASE_IMAGE}" ]]; then
+  oc registry login --to=/tmp/registry.json
+  release_arm64="$(oc image info --registry-config=/tmp/registry.json ${OPENSHIFT_RELEASE_IMAGE_ARM} -o json | jq -r '.config.config.Labels."io.openshift.release"')"
+  if [[ -z "${release_arm64}" ]]; then
     echo "Failed to extract ARM release image from nightly release image"
     trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
     exit 1
   fi
+  ARM_RELEASE_IMAGE="registry.ci.openshift.org/ocp-arm64/release-arm64:${release_arm64}"
   # Bail out without error if the rebase fails. Next steps should be skipped if this happens.
   PULLSPEC_RELEASE_AMD64="${REBASE_TO}" \
   PULLSPEC_RELEASE_ARM64="${ARM_RELEASE_IMAGE}" \
