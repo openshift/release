@@ -180,4 +180,21 @@ for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
 	openstack floating ip show "$fip"             >> "${ARTIFACT_DIR}/openstack_fips.log"
 done
 
+# load balancers
+
+openstack loadbalancer list -f json \
+    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.name | test($CLUSTER_NAME)))' \
+    > "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_list.json"
+
+for lb in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_list.json"); do
+	openstack loadbalancer show "$lb" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_show.json"
+
+touch "${ARTIFACT_DIR}/openstack_loadbalancers.log"
+for lb in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_list.json"); do
+	echo -e "\n$ openstack loadbalancer show $lb" >> "${ARTIFACT_DIR}/openstack_loadbalancers.log"
+	openstack loadbalancer show "$lb"             >> "${ARTIFACT_DIR}/openstack_loadbalancers.log"
+done
+
+
 collect_bootstrap_logs
